@@ -1,0 +1,32 @@
+# Secrets — never commit. Written before anything else exists.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Customer data
+backend/data/
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Local tooling
+.local/
+.DS_Store
+*.swp
+*.swo
+*~
+*.tar.gz
+
+# Logs
+*.log
+npm-debug.log*

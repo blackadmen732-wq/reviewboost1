@@ -1,0 +1,23 @@
+#!/bin/sh
+# Blocks committing live secrets. Installed via: git config core.hooksPath .githooks
+# Bypass with --no-verify only when you are certain.
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+fail=0
+
+echo "$staged" | grep -qE '(^|/)\.env$' && {
+  echo "BLOCKED: .env must never be committed."; fail=1; }
+
+for file in $staged; do
+  [ -f "$file" ] || continue
+  if git show ":$file" 2>/dev/null | grep -qE \
+    '^(JWT_SECRET|PII_ENCRYPTION_KEY|TWILIO_AUTH_TOKEN|TWILIO_API_KEY_SECRET|RESEND_API_KEY|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET)=.+'; then
+    echo "BLOCKED: $file contains a populated secret assignment."; fail=1
+  fi
+  if git show ":$file" 2>/dev/null | grep -qE '(re_[A-Za-z0-9_]{20,}|sk_live_[A-Za-z0-9]{20,}|SK[0-9a-f]{32}|AC[0-9a-f]{32})'; then
+    echo "BLOCKED: $file looks like it contains a live API key."; fail=1
+  fi
+done
+
+[ "$fail" = "1" ] && { echo "Commit aborted. Secrets belong in .env (gitignored)."; exit 1; }
+exit 0
