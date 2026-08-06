@@ -8,6 +8,10 @@ if (
 }
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
+  experimental: {
+    useTypeScriptCli: false,
+  },
   poweredByHeader: false,
   reactStrictMode: true,
 };

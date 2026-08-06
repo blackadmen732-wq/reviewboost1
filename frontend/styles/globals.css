@@ -27,6 +27,7 @@
   --rb-brand-hover: #125548;
   --rb-brand-soft: #ddefe9;
   --rb-star: #d89a2b;
+  --rb-star-label: #9a6417;
   --rb-warning: #9a6417;
   --rb-danger: #b24747;
   --rb-info: #356d8c;
@@ -46,6 +47,7 @@
     --rb-brand-hover: #82d5bc;
     --rb-brand-soft: #193a31;
     --rb-star: #f0b84a;
+    --rb-star-label: #f0b84a;
     --rb-danger: #f08a8a;
     --rb-info: #7eb2ce;
     --rb-focus: #82d5bc;
@@ -258,7 +260,7 @@ select {
 }
 
 .inline-notice__body {
-  color: var(--rb-muted);
+  color: var(--rb-ink);
   font-size: 0.9375rem;
   line-height: 1.45;
 }
@@ -296,4 +298,3 @@ select {
     transform: none;
   }
 }
-

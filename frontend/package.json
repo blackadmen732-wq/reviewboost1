@@ -5,9 +5,13 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "overrides": {
+    "js-yaml": "4.3.1"
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
+    "build:turbopack": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
@@ -45,7 +49,6 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
-    "agent-browser": "^0.33.2",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.0.0",
     "jsdom": "^26.0.0",

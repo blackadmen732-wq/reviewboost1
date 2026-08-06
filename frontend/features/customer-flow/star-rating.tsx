@@ -23,7 +23,7 @@ export function StarRating({ value, onChange, messages, disabled = false }: Star
           return (
             <span className="star-option" key={rating}>
               <input
-                className="star-option__input sr-only"
+                className="star-option__input"
                 id={`rating-${rating}`}
                 name="rating"
                 type="radio"
@@ -49,4 +49,3 @@ export function StarRating({ value, onChange, messages, disabled = false }: Star
     </fieldset>
   );
 }
-

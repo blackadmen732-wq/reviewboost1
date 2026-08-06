@@ -7,6 +7,7 @@ export default defineConfig([
   ...nextTypeScript,
   globalIgnores([
     ".next/**",
+    ".playwright-browsers/**",
     "coverage/**",
     "lib/api/generated/**",
     "node_modules/**",
@@ -14,4 +15,3 @@ export default defineConfig([
     "test-results/**",
   ]),
 ]);
-

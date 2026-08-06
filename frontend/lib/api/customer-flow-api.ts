@@ -46,13 +46,12 @@ export interface CustomerFlowApi {
 let developmentApiPromise: Promise<CustomerFlowApi> | undefined;
 
 export async function getCustomerFlowApi(): Promise<CustomerFlowApi> {
-  if (!shouldUseCustomerFixtures()) {
-    return productionCustomerFlowApi;
+  if (process.env.NODE_ENV !== "production" && shouldUseCustomerFixtures()) {
+    developmentApiPromise ??= import("@/lib/api/dev/development-customer-flow-api").then(
+      ({ developmentCustomerFlowApi }) => developmentCustomerFlowApi,
+    );
+    return developmentApiPromise;
   }
 
-  developmentApiPromise ??= import("@/lib/api/dev/development-customer-flow-api").then(
-    ({ developmentCustomerFlowApi }) => developmentCustomerFlowApi,
-  );
-  return developmentApiPromise;
+  return productionCustomerFlowApi;
 }
-

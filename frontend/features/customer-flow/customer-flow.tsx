@@ -313,7 +313,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
 
   const motionProps = useMemo(
     () => ({
-      initial: { opacity: 0, y: prefersReducedMotion ? 0 : 6 },
+      initial: { opacity: 0.96, y: prefersReducedMotion ? 0 : 6 },
       animate: { opacity: 1, y: 0 },
       transition: { duration: prefersReducedMotion ? 0.1 : 0.22, ease: "easeOut" as const },
     }),

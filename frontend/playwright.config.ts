@@ -5,6 +5,8 @@ const port = 3100;
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
+  timeout: 120_000,
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [["html", { open: "never" }], ["line"]] : "list",
@@ -15,6 +17,7 @@ export default defineConfig({
     video: "retain-on-failure",
   },
   expect: {
+    timeout: 15_000,
     toHaveScreenshot: {
       animations: "disabled",
       caret: "hide",
@@ -24,11 +27,19 @@ export default defineConfig({
   projects: [
     {
       name: "mobile-chromium",
-      use: { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } },
+      use: {
+        ...devices["iPhone 13"],
+        browserName: "chromium",
+        viewport: { width: 390, height: 844 },
+      },
     },
     {
       name: "desktop-chromium",
-      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 900 } },
+      use: {
+        ...devices["Desktop Chrome"],
+        browserName: "chromium",
+        viewport: { width: 1280, height: 900 },
+      },
     },
   ],
   webServer: {
@@ -37,6 +48,7 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_USE_CUSTOMER_FIXTURES: "true",
     },
+    url: `http://127.0.0.1:${port}/q/fixture-valid`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

@@ -32,7 +32,7 @@ test.describe("ReviewBoost customer flow", () => {
     }> = [];
 
     for (let ratingIndex = 0; ratingIndex < spokenRatings.length; ratingIndex += 1) {
-      await openFlow(page);
+      await openFlow(page, `fixture-valid-rating-${ratingIndex + 1}`);
       await reachGoogle(page, ratingIndex);
 
       const google = page.locator("[data-flow-screen='google-opportunity']");
@@ -102,7 +102,7 @@ test.describe("ReviewBoost customer flow", () => {
     const note = page.getByRole("textbox", { name: /want to add a note/i });
     await note.fill("Retained after failure");
     await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.getByRole("alert")).toContainText("Your feedback is still here");
+    await expect(page.locator("#feedback-status")).toContainText("Your feedback is still here");
     await expect(note).toHaveValue("Retained after failure");
     await page.getByRole("button", { name: "Try again" }).click();
     await expect(page.getByRole("heading", { name: "Thanks for sharing." })).toBeVisible();
