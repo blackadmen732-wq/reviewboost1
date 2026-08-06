@@ -1,0 +1,315 @@
+openapi: 3.1.0
+info:
+  title: ReviewBoost customer flow — required frontend contract
+  version: 0.1.0
+  description: >-
+    Frontend-required Phase 1 contract. The current backend does not implement
+    these operations. Backend review and an authoritative generated API document
+    are required before production release.
+servers:
+  - url: /
+paths:
+  /api/v1/public/q/{token}:
+    get:
+      operationId: getCustomerReviewContext
+      summary: Resolve one active public review link without exposing tenant data
+      parameters:
+        - $ref: "#/components/parameters/ReviewToken"
+      responses:
+        "200":
+          description: Active review context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerReviewContext"
+        "404":
+          $ref: "#/components/responses/InactiveReviewLink"
+        default:
+          $ref: "#/components/responses/ApiError"
+  /api/v1/public/q/{token}/sessions:
+    post:
+      operationId: createCustomerReviewSession
+      summary: Start an anonymous customer session
+      parameters:
+        - $ref: "#/components/parameters/ReviewToken"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "200":
+          description: Existing idempotent session result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionResponse"
+        "201":
+          description: Session persisted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionResponse"
+        "404":
+          $ref: "#/components/responses/InactiveReviewLink"
+        default:
+          $ref: "#/components/responses/ApiError"
+  /api/v1/public/q/{token}/responses:
+    post:
+      operationId: submitCustomerResponse
+      summary: Persist an honest rating and optional private note
+      parameters:
+        - $ref: "#/components/parameters/ReviewToken"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitResponseRequest"
+      responses:
+        "200":
+          description: Existing idempotent response result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitResponseResponse"
+        "201":
+          description: Response persisted; this is terminal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitResponseResponse"
+        "404":
+          $ref: "#/components/responses/InactiveReviewLink"
+        default:
+          $ref: "#/components/responses/ApiError"
+  /api/v1/public/q/{token}/google-click:
+    post:
+      operationId: recordGoogleReviewClick
+      summary: Record that the public Google action was selected, not that a review was posted
+      parameters:
+        - $ref: "#/components/parameters/ReviewToken"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleClickRequest"
+      responses:
+        "204":
+          description: Click recorded
+        "404":
+          $ref: "#/components/responses/InactiveReviewLink"
+        default:
+          $ref: "#/components/responses/ApiError"
+  /api/v1/public/q/{token}/team-praise:
+    post:
+      operationId: submitTeamPraise
+      summary: Persist private praise without rating data or automatic staff matching
+      parameters:
+        - $ref: "#/components/parameters/ReviewToken"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamPraiseRequest"
+      responses:
+        "200":
+          description: Existing idempotent Team Praise result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamPraiseResponse"
+        "201":
+          description: Team Praise persisted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamPraiseResponse"
+        "404":
+          $ref: "#/components/responses/InactiveReviewLink"
+        default:
+          $ref: "#/components/responses/ApiError"
+components:
+  parameters:
+    ReviewToken:
+      name: token
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+        pattern: "^[A-Za-z0-9_-]+$"
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+  responses:
+    InactiveReviewLink:
+      description: Unknown and inactive tokens deliberately share this response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ApiError:
+      description: Recoverable or blocking API error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    Locale:
+      type: string
+      enum: [en, es, ht]
+    CustomerReviewContext:
+      type: object
+      additionalProperties: false
+      required: [business, location, googleReviewUrl, supportedLocales, defaultLocale]
+      properties:
+        business:
+          type: object
+          additionalProperties: false
+          required: [name, logoUrl]
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 160
+            logoUrl:
+              type: [string, "null"]
+              format: uri
+        location:
+          type: object
+          additionalProperties: false
+          required: [name]
+          properties:
+            name:
+              type: [string, "null"]
+              maxLength: 160
+        googleReviewUrl:
+          type: string
+          format: uri
+          description: Backend-validated HTTPS Google review destination
+        supportedLocales:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Locale"
+        defaultLocale:
+          $ref: "#/components/schemas/Locale"
+    CreateSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [locale]
+      properties:
+        locale:
+          $ref: "#/components/schemas/Locale"
+    CreateSessionResponse:
+      type: object
+      additionalProperties: false
+      required: [sessionId]
+      properties:
+        sessionId:
+          type: string
+          minLength: 1
+          maxLength: 160
+    SubmitResponseRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId, rating]
+      properties:
+        sessionId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        note:
+          type: string
+          maxLength: 2000
+    SubmitResponseResponse:
+      type: object
+      additionalProperties: false
+      required: [responseId]
+      properties:
+        responseId:
+          type: string
+          minLength: 1
+          maxLength: 160
+    GoogleClickRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId, responseId]
+      properties:
+        sessionId:
+          type: string
+        responseId:
+          type: string
+    TeamPraiseRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId, responseId, firstName]
+      properties:
+        sessionId:
+          type: string
+        responseId:
+          type: string
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 80
+        note:
+          type: string
+          maxLength: 2000
+    TeamPraiseResponse:
+      type: object
+      additionalProperties: false
+      required: [teamPraiseId]
+      properties:
+        teamPraiseId:
+          type: string
+          minLength: 1
+          maxLength: 160
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error, requestId]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                $ref: "#/components/schemas/FieldError"
+        requestId:
+          type: string

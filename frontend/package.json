@@ -1,0 +1,62 @@
+{
+  "name": "reviewboost-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "api:generate": "openapi-typescript contracts/customer-flow.openapi.yaml -o lib/api/generated/customer-flow.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:a11y": "vitest run tests/accessibility",
+    "test:e2e": "playwright test",
+    "test:visual": "playwright test --grep @visual",
+    "test:visual:update": "playwright test --grep @visual --update-snapshots",
+    "test:production-fixtures": "node tests/scripts/assert-no-production-fixtures.mjs",
+    "verify": "npm run api:generate && npm run typecheck && npm run lint && npm run test && npm run build && npm run test:production-fixtures"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.0.0",
+    "@tanstack/react-query": "^5.0.0",
+    "geist": "^1.7.0",
+    "lucide-react": "^0.500.0",
+    "motion": "^12.0.0",
+    "next": "^16.0.0",
+    "openapi-fetch": "^0.15.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-hook-form": "^7.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@playwright/test": "^1.50.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/user-event": "^14.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "agent-browser": "^0.33.2",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^16.0.0",
+    "jsdom": "^26.0.0",
+    "msw": "^2.0.0",
+    "node": "^22.0.0",
+    "openapi-typescript": "^7.0.0",
+    "prettier": "^3.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.8.0",
+    "vite-tsconfig-paths": "^5.0.0",
+    "vitest": "^3.0.0",
+    "vitest-axe": "^0.1.0"
+  }
+}
