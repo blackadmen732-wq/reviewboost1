@@ -1,13 +1,13 @@
-import { query, withTenant } from '../db/pool.js';
+import { withTenant } from '../db/pool.js';
 
 /**
- * QR / NFC stands, scans, and intercepted feedback.
+ * QR / NFC stand management, scan analytics, and stored customer feedback.
  *
- * The public scan and feedback paths are uncredentialed, so they go through
- * SECURITY DEFINER functions that derive `account_id` from the stand itself.
- * The tenant is never taken from client input — accepting an account id from an
- * anonymous caller would let anyone who scanned a code write unlimited fake
- * feedback into that business.
+ * Every function here is tenant-scoped through `withTenant`, because every
+ * caller is an authenticated owner. The anonymous customer path lives in
+ * customerFlowRepository.js, which derives the tenant from the stand token
+ * instead — it never accepts an account id, because a caller who could name a
+ * tenant could write unlimited fabricated feedback into it.
  */
 
 // ------------------------------------------------- management (authed) -----
@@ -16,9 +16,8 @@ export async function createStand(accountId, stand) {
   return withTenant(accountId, async (client) => {
     const { rows } = await client.query(
       `INSERT INTO qr_stands
-         (account_id, public_id, label, destination_url,
-          primary_color, background_color, review_threshold)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (account_id, public_id, label, destination_url, primary_color, background_color)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
       [
         accountId,
@@ -27,7 +26,6 @@ export async function createStand(accountId, stand) {
         stand.destinationUrl ?? null,
         stand.primaryColor ?? '#111827',
         stand.backgroundColor ?? '#FFFFFF',
-        stand.reviewThreshold ?? 4,
       ],
     );
     return rows[0];
@@ -67,8 +65,7 @@ export async function updateStand(accountId, standId, patch) {
               destination_url  = COALESCE($4, destination_url),
               primary_color    = COALESCE($5, primary_color),
               background_color = COALESCE($6, background_color),
-              review_threshold = COALESCE($7, review_threshold),
-              is_active        = COALESCE($8, is_active)
+              is_active        = COALESCE($7, is_active)
         WHERE account_id = $1 AND id = $2
         RETURNING *`,
       [
@@ -78,7 +75,6 @@ export async function updateStand(accountId, standId, patch) {
         patch.destinationUrl ?? null,
         patch.primaryColor ?? null,
         patch.backgroundColor ?? null,
-        patch.reviewThreshold ?? null,
         patch.isActive ?? null,
       ],
     );
@@ -94,61 +90,6 @@ export async function deleteStand(accountId, standId) {
     );
     return rowCount > 0;
   });
-}
-
-// -------------------------------------------------------- public path ------
-
-/**
- * Resolve a stand for `/q/:publicId`.
- *
- * Runs outside tenant context by necessity — the scanner has no session. Only
- * the fields the gate page needs are selected, and `account_id` is deliberately
- * not among them so it cannot leak to an anonymous client.
- */
-export async function resolveStandByPublicId(publicId) {
-  const { rows } = await query(
-    `SELECT s.id AS stand_id,
-            s.label,
-            s.review_threshold,
-            s.is_active,
-            s.destination_url,
-            a.business_name,
-            a.google_review_url,
-            b.status AS subscription_status,
-            b.trial_ends_at
-       FROM qr_stands s
-       JOIN accounts a ON a.id = s.account_id
-       LEFT JOIN billing_subscriptions b ON b.account_id = s.account_id
-      WHERE s.public_id = $1`,
-    [publicId],
-  );
-  return rows[0] ?? null;
-}
-
-/** Append a scan, deduplicated by hashed address inside a short window. */
-export async function registerScan({ standId, ipHash, userAgent, deviceType }) {
-  const { rows } = await query('SELECT register_scan($1, $2, $3, $4) AS recorded', [
-    standId,
-    ipHash,
-    userAgent?.slice(0, 400) ?? null,
-    deviceType ?? null,
-  ]);
-  return rows[0]?.recorded === true;
-}
-
-/** Store intercepted feedback. The tenant is derived from the stand. */
-export async function submitPrivateFeedback({
-  standId,
-  rating,
-  feedbackEncrypted,
-  phoneEncrypted = null,
-  emailEncrypted = null,
-}) {
-  const { rows } = await query(
-    'SELECT submit_private_feedback($1, $2::smallint, $3, $4, $5) AS feedback_id',
-    [standId, rating, feedbackEncrypted, phoneEncrypted, emailEncrypted],
-  );
-  return rows[0]?.feedback_id ?? null;
 }
 
 // --------------------------------------------------------- analytics -------

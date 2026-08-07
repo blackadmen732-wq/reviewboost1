@@ -375,7 +375,7 @@ export async function accountDashboard(accountId) {
          (SELECT COUNT(*)::int FROM contacts WHERE account_id = $1)                          AS contacts_total,
          (SELECT COUNT(*)::int FROM suppressions WHERE account_id = $1)                      AS suppressed_total,
          (SELECT COUNT(*)::int FROM qr_scans WHERE account_id = $1)                          AS scans_total,
-         (SELECT COUNT(*)::int FROM private_feedback WHERE account_id = $1)                  AS feedback_intercepted,
+         (SELECT COUNT(*)::int FROM private_feedback WHERE account_id = $1)                  AS private_feedback_total,
          (SELECT COALESCE(AVG(rating), 0)::numeric(3,2) FROM private_feedback WHERE account_id = $1)
                                                                                              AS average_private_rating`,
       [accountId],

@@ -2,6 +2,7 @@ import { closePool } from './db/pool.js';
 import { logger } from './logger.js';
 import { closeQueues } from './queue/index.js';
 import { expireLapsedTrials } from './repositories/billingRepository.js';
+import { purgeCustomerFlowEphemera } from './repositories/customerFlowRepository.js';
 import { purgeOldAttempts } from './repositories/securityRepository.js';
 import { purgeExpiredTokens } from './repositories/sessionRepository.js';
 import { purgeExpiredUserTokens } from './repositories/tokenRepository.js';
@@ -38,6 +39,13 @@ const TASKS = [
   {
     name: 'purge_auth_attempts',
     run: () => purgeOldAttempts(),
+  },
+  {
+    name: 'purge_customer_flow_ephemera',
+    // Expires idempotency records and scrubs the short-lived client hash from
+    // old sessions. Deliberately does not delete sessions or responses: those
+    // are business history.
+    run: () => purgeCustomerFlowEphemera(),
   },
 ];
 

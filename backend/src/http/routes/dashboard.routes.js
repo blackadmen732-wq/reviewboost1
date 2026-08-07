@@ -64,12 +64,11 @@ dashboardRoutes.get(
         contacts: stats.contacts_total,
         suppressed: stats.suppressed_total,
         scans: stats.scans_total,
-        feedbackIntercepted: stats.feedback_intercepted,
+        // Recovery, not prevention. ReviewBoost does not stop reviews, and no
+        // metric here may suggest it does — the count is private feedback the
+        // business can act on, and the average is the rating those carried.
+        privateFeedbackReceived: stats.private_feedback_total,
         averagePrivateRating: Number(stats.average_private_rating ?? 0),
-        interceptRatePercent:
-          stats.scans_total > 0
-            ? Math.round((stats.feedback_intercepted / stats.scans_total) * 100)
-            : 0,
         spendInCents: stats.spend_in_cents,
         spendFormatted: formatCents(stats.spend_in_cents),
       },

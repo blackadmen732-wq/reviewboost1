@@ -113,6 +113,40 @@ function origins(name, value, isProduction) {
   return [...new Set(isProduction ? list : [...devDefaults, ...list])];
 }
 
+/**
+ * The public origin customer review links are built against.
+ *
+ * `PUBLIC_FRONTEND_URL` if set, otherwise `PUBLIC_APP_URL` — the frontend is
+ * where /q/:token is served, and the two are the same host in every deployment
+ * so far. Production must have one of them: falling back to a localhost default
+ * would print QR codes that resolve to nothing on a customer's phone, and would
+ * do it silently.
+ */
+function frontendOrigin(env, isProduction) {
+  const explicit = url('PUBLIC_FRONTEND_URL', env.PUBLIC_FRONTEND_URL, {
+    requireHttps: isProduction,
+    allowEmpty: true,
+  });
+  if (explicit) return explicit;
+
+  const app = url('PUBLIC_APP_URL', env.PUBLIC_APP_URL, {
+    requireHttps: isProduction,
+    allowEmpty: true,
+  });
+  if (app) return app;
+
+  if (isProduction) {
+    throw new ConfigError(
+      'PUBLIC_FRONTEND_URL (or PUBLIC_APP_URL) is required in production. It is the origin ' +
+        'printed into every QR code, and a stand printed against the wrong origin cannot be ' +
+        'recalled.',
+    );
+  }
+
+  // Development only, and stated rather than assumed.
+  return 'http://localhost:3000';
+}
+
 /** Credentials that only make sense as a complete set. */
 function credentialGroup(name, values) {
   const provided = values.filter((value) => optional(value) !== null);
@@ -252,6 +286,11 @@ export function loadConfig(env = process.env) {
       requireHttps: isProduction,
       allowEmpty: !isProduction,
     }),
+    // The origin printed into every QR code and written to every NFC tag.
+    // Required in production and validated at boot, because a stand is a
+    // physical object: a code printed against the wrong origin cannot be
+    // recalled from the tables it is already sitting on.
+    publicFrontendUrl: frontendOrigin(env, isProduction),
     corsOrigins: origins('CORS_ORIGINS', env.CORS_ORIGINS, isProduction),
 
     // ---- Data stores -------------------------------------------------------
