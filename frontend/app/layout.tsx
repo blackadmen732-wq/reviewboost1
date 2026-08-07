@@ -16,12 +16,14 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   colorScheme: "light dark",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F7F5EF" },
-    { media: "(prefers-color-scheme: dark)", color: "#101512" },
+    { media: "(prefers-color-scheme: light)", color: "#F8F5F0" },
+    { media: "(prefers-color-scheme: dark)", color: "#0F1110" },
   ],
 };
 
-export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
       <body className={GeistSans.className}>
@@ -30,4 +32,3 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     </html>
   );
 }
-

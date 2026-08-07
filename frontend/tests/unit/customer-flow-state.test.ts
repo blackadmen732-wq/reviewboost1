@@ -19,7 +19,10 @@ describe("customer flow state", () => {
         type: "select-rating",
         rating,
       });
-      state = customerFlowReducer(state, { type: "change-note", note: "Private note" });
+      state = customerFlowReducer(state, {
+        type: "change-note",
+        note: "Private note",
+      });
       state = customerFlowReducer(state, {
         type: "feedback-started",
         sessionKey: "session-key-123456",
@@ -58,6 +61,49 @@ describe("customer flow state", () => {
     expect(retried.responseKey).toBe("response-key-123456");
   });
 
+  it("creates a fresh response attempt after the rating or note changes", () => {
+    const started = customerFlowReducer(
+      { ...initialCustomerFlowState, rating: 4, note: "Good service" },
+      {
+        type: "feedback-started",
+        sessionKey: "session-key-123456",
+        responseKey: "response-key-123456",
+      },
+    );
+
+    const ratingChanged = customerFlowReducer(started, {
+      type: "select-rating",
+      rating: 3,
+    });
+    expect(ratingChanged.responseKey).toBeNull();
+    expect(ratingChanged.sessionKey).toBe("session-key-123456");
+
+    const noteChanged = customerFlowReducer(started, {
+      type: "change-note",
+      note: "The service was good, but slow.",
+    });
+    expect(noteChanged.responseKey).toBeNull();
+    expect(noteChanged.sessionKey).toBe("session-key-123456");
+  });
+
+  it("creates a fresh Team Praise attempt after its draft changes", () => {
+    const started = customerFlowReducer(
+      {
+        ...initialCustomerFlowState,
+        praiseFirstName: "Sarah",
+        praiseNote: "Very kind",
+      },
+      { type: "praise-started", idempotencyKey: "praise-key-123456" },
+    );
+    const edited = customerFlowReducer(started, {
+      type: "change-praise",
+      firstName: "Sarah",
+      note: "Very kind and helpful",
+    });
+
+    expect(edited.praiseKey).toBeNull();
+  });
+
   it("clears all private drafts on finish", () => {
     const completed = customerFlowReducer(
       {
@@ -82,4 +128,3 @@ describe("customer flow state", () => {
     });
   });
 });
-

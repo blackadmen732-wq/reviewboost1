@@ -40,13 +40,19 @@ export function CustomerBlockingState({
         </div>
         <div className="screen-heading-group">
           <h1 className="customer-question" data-screen-heading tabIndex={-1}>
-            {unavailable ? messages.unavailableHeading : messages.loadErrorHeading}
+            {unavailable
+              ? messages.unavailableHeading
+              : messages.loadErrorHeading}
           </h1>
           <p className="customer-support">
             {unavailable ? messages.unavailableBody : messages.loadErrorBody}
           </p>
         </div>
-        {!unavailable && onRetry ? <Button onClick={onRetry}>{messages.tryAgain}</Button> : null}
+        {!unavailable && onRetry ? (
+          <Button size="lg" onClick={onRetry}>
+            {messages.tryAgain}
+          </Button>
+        ) : null}
       </section>
     </CustomerFrame>
   );

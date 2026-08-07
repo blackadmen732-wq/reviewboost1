@@ -32,7 +32,7 @@ export function CustomerLoading({ messages }: { messages: CustomerMessages }) {
         <div className="loading-stars" aria-hidden="true">
           {[1, 2, 3, 4, 5].map((star) => (
             <span key={star}>
-              <Star size={34} strokeWidth={1.7} />
+              <Star size={40} strokeWidth={1.7} />
             </span>
           ))}
         </div>
@@ -43,4 +43,3 @@ export function CustomerLoading({ messages }: { messages: CustomerMessages }) {
     </CustomerFrame>
   );
 }
-

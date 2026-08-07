@@ -2,7 +2,14 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { LazyMotion, domAnimation, m, useReducedMotion } from "motion/react";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 
 import { CustomerBlockingState } from "@/features/customer-flow/customer-blocking-state";
 import { CustomerFrame } from "@/features/customer-flow/customer-frame";
@@ -26,13 +33,19 @@ import {
   getCustomerFlowApi,
   type CustomerFlowApi,
 } from "@/lib/api/customer-flow-api";
-import { CustomerApiError, isUnavailableReviewLink } from "@/lib/api/customer-api-error";
+import {
+  CustomerApiError,
+  isUnavailableReviewLink,
+} from "@/lib/api/customer-api-error";
 import type {
   SubmitResponseRequest,
   TeamPraiseRequest,
 } from "@/lib/api/customer-flow-types";
 import { createIdempotencyKey } from "@/lib/api/idempotency";
-import { customerMessages, type RatingValue } from "@/lib/i18n/customer-messages";
+import {
+  customerMessages,
+  type RatingValue,
+} from "@/lib/i18n/customer-messages";
 import { type Locale } from "@/lib/i18n/config";
 import { requireValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
 
@@ -66,13 +79,18 @@ function isOfflineError(error: unknown): boolean {
 
 function normalizedContextLocales(locales: readonly string[]): Locale[] {
   const supported = locales.filter(
-    (locale): locale is Locale => locale === "en" || locale === "es" || locale === "ht",
+    (locale): locale is Locale =>
+      locale === "en" || locale === "es" || locale === "ht",
   );
   return supported.length ? supported : ["en"];
 }
 
 export function CustomerFlow({ token }: CustomerFlowProps) {
-  const [state, dispatch] = useReducer(customerFlowReducer, undefined, safeInitialCustomerState);
+  const [state, dispatch] = useReducer(
+    customerFlowReducer,
+    undefined,
+    safeInitialCustomerState,
+  );
   const [recoveryReady, setRecoveryReady] = useState(false);
   const hadRecoveredDraft = useRef(false);
   const localeChosen = useRef(false);
@@ -85,16 +103,20 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
 
   const contextQuery = useQuery({
     queryKey: ["public-review-context", token],
+    networkMode: "always",
     queryFn: async ({ signal }) => {
       const api = await getCustomerFlowApi();
       const context = await api.getContext(token, { signal });
       return {
         ...context,
-        googleReviewUrl: requireValidatedGoogleReviewUrl(context.googleReviewUrl),
+        googleReviewUrl: requireValidatedGoogleReviewUrl(
+          context.googleReviewUrl,
+        ),
         supportedLocales: normalizedContextLocales(context.supportedLocales),
       };
     },
-    retry: (failureCount, error) => !isUnavailableReviewLink(error) && failureCount < 1,
+    retry: (failureCount, error) =>
+      !isUnavailableReviewLink(error) && failureCount < 1,
   });
 
   useEffect(() => {
@@ -110,10 +132,17 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   }, [token]);
 
   useEffect(() => {
-    if (!contextQuery.data || !recoveryReady || hadRecoveredDraft.current || localeChosen.current) {
+    if (
+      !contextQuery.data ||
+      !recoveryReady ||
+      hadRecoveredDraft.current ||
+      localeChosen.current
+    ) {
       return;
     }
-    const defaultLocale = contextQuery.data.supportedLocales.includes(contextQuery.data.defaultLocale)
+    const defaultLocale = contextQuery.data.supportedLocales.includes(
+      contextQuery.data.defaultLocale,
+    )
       ? contextQuery.data.defaultLocale
       : contextQuery.data.supportedLocales[0];
     if (defaultLocale && defaultLocale !== state.locale) {
@@ -133,14 +162,17 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   useEffect(() => {
     if (contextQuery.isPending) return;
     const animationFrame = window.requestAnimationFrame(() => {
-      const heading = contentRef.current?.querySelector<HTMLElement>("[data-screen-heading]") ??
-        document.querySelector<HTMLElement>("[data-screen-heading]");
+      const heading =
+        contentRef.current?.querySelector<HTMLElement>(
+          "[data-screen-heading]",
+        ) ?? document.querySelector<HTMLElement>("[data-screen-heading]");
       heading?.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(animationFrame);
   }, [contextQuery.isPending, contextQuery.status, state.screen]);
 
   const feedbackMutation = useMutation({
+    networkMode: "always",
     mutationFn: async (attempt: FeedbackAttempt) => {
       const api = await getCustomerFlowApi();
       let sessionId = attempt.sessionId;
@@ -196,13 +228,24 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
         responseId: result.responseId,
       });
     } catch (error) {
-      dispatch({ type: isOfflineError(error) ? "feedback-offline" : "feedback-failed" });
+      dispatch({
+        type: isOfflineError(error) ? "feedback-offline" : "feedback-failed",
+      });
     } finally {
       feedbackInFlight.current = false;
     }
-  }, [feedbackMutation, state.locale, state.note, state.rating, state.responseKey, state.sessionId, state.sessionKey]);
+  }, [
+    feedbackMutation,
+    state.locale,
+    state.note,
+    state.rating,
+    state.responseKey,
+    state.sessionId,
+    state.sessionKey,
+  ]);
 
   const praiseMutation = useMutation({
+    networkMode: "always",
     mutationFn: async (attempt: PraiseAttempt) => {
       const api = await getCustomerFlowApi();
       const trimmedNote = attempt.note.trim();
@@ -212,15 +255,19 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
         firstName: attempt.firstName.trim(),
         ...(trimmedNote ? { note: trimmedNote } : {}),
       };
-      return api.submitTeamPraise(token, body, { idempotencyKey: attempt.idempotencyKey });
+      return api.submitTeamPraise(token, body, {
+        idempotencyKey: attempt.idempotencyKey,
+      });
     },
   });
 
   const submitPraise = useCallback(
     async (firstName = state.praiseFirstName, note = state.praiseNote) => {
-      if (!state.sessionId || !state.responseId || praiseInFlight.current) return;
+      if (!state.sessionId || !state.responseId || praiseInFlight.current)
+        return;
 
-      const idempotencyKey = state.praiseKey ?? createIdempotencyKey("team-praise");
+      const idempotencyKey =
+        state.praiseKey ?? createIdempotencyKey("team-praise");
       dispatch({ type: "change-praise", firstName, note });
       dispatch({ type: "praise-started", idempotencyKey });
 
@@ -241,17 +288,36 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
         dispatch({ type: "finish" });
         clearCustomerDraft(token);
       } catch (error) {
-        dispatch({ type: isOfflineError(error) ? "praise-offline" : "praise-failed" });
+        dispatch({
+          type: isOfflineError(error) ? "praise-offline" : "praise-failed",
+        });
       } finally {
         praiseInFlight.current = false;
       }
     },
-    [praiseMutation, state.praiseFirstName, state.praiseKey, state.praiseNote, state.responseId, state.sessionId, token],
+    [
+      praiseMutation,
+      state.praiseFirstName,
+      state.praiseKey,
+      state.praiseNote,
+      state.responseId,
+      state.sessionId,
+      token,
+    ],
   );
 
   const recordGoogleClick = useCallback(
-    async (api: CustomerFlowApi, idempotencyKey: string, snapshot: CustomerFlowState) => {
-      if (!snapshot.sessionId || !snapshot.responseId || googleClickInFlight.current) return;
+    async (
+      api: CustomerFlowApi,
+      idempotencyKey: string,
+      snapshot: CustomerFlowState,
+    ) => {
+      if (
+        !snapshot.sessionId ||
+        !snapshot.responseId ||
+        googleClickInFlight.current
+      )
+        return;
       googleClickInFlight.current = true;
       try {
         await api.recordGoogleClick(
@@ -272,9 +338,12 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
 
   const handleGoogleAction = useCallback(() => {
     if (!state.sessionId || !state.responseId) return;
-    const idempotencyKey = state.googleClickKey ?? createIdempotencyKey("google-click");
+    const idempotencyKey =
+      state.googleClickKey ?? createIdempotencyKey("google-click");
     dispatch({ type: "google-click-started", idempotencyKey });
-    void getCustomerFlowApi().then((api) => recordGoogleClick(api, idempotencyKey, state));
+    void getCustomerFlowApi().then((api) =>
+      recordGoogleClick(api, idempotencyKey, state),
+    );
   }, [recordGoogleClick, state]);
 
   useEffect(() => {
@@ -315,7 +384,10 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     () => ({
       initial: { opacity: 0.96, y: prefersReducedMotion ? 0 : 6 },
       animate: { opacity: 1, y: 0 },
-      transition: { duration: prefersReducedMotion ? 0.1 : 0.22, ease: "easeOut" as const },
+      transition: {
+        duration: prefersReducedMotion ? 0.1 : 0.22,
+        ease: "easeOut" as const,
+      },
     }),
     [prefersReducedMotion],
   );
@@ -328,7 +400,11 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     return (
       <div ref={contentRef}>
         <CustomerBlockingState
-          kind={isUnavailableReviewLink(contextQuery.error) ? "unavailable" : "error"}
+          kind={
+            isUnavailableReviewLink(contextQuery.error)
+              ? "unavailable"
+              : "error"
+          }
           locale={state.locale}
           messages={messages}
           onLocaleChange={changeLocale}
@@ -358,7 +434,9 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
                 rating={state.rating}
                 note={state.note}
                 status={state.feedbackStatus}
-                onRatingChange={(rating) => dispatch({ type: "select-rating", rating })}
+                onRatingChange={(rating) =>
+                  dispatch({ type: "select-rating", rating })
+                }
                 onNoteChange={(note) => dispatch({ type: "change-note", note })}
                 onSubmit={() => void submitFeedback()}
               />
@@ -382,14 +460,18 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
                 onDraftChange={(firstName, note) =>
                   dispatch({ type: "change-praise", firstName, note })
                 }
-                onSubmit={(firstName, note) => void submitPraise(firstName, note)}
+                onSubmit={(firstName, note) =>
+                  void submitPraise(firstName, note)
+                }
                 onSkip={() => {
                   dispatch({ type: "finish" });
                   clearCustomerDraft(token);
                 }}
               />
             ) : null}
-            {state.screen === "finished" ? <FinishedScreen messages={messages} /> : null}
+            {state.screen === "finished" ? (
+              <FinishedScreen messages={messages} />
+            ) : null}
           </m.div>
         </LazyMotion>
       </div>

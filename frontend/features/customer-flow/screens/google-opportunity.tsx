@@ -1,8 +1,10 @@
 "use client";
 
-import { ExternalLink, LockKeyhole } from "lucide-react";
+import { CircleCheck, ExternalLink, LockKeyhole } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { CustomerActionBar } from "@/features/customer-flow/customer-action-bar";
+import { cn } from "@/lib/utils/cn";
 import type { CustomerMessages } from "@/lib/i18n/customer-messages";
 
 interface GoogleOpportunityProps {
@@ -22,30 +24,40 @@ export function GoogleOpportunity({
 }: GoogleOpportunityProps) {
   return (
     <section className="flow-screen" data-flow-screen="google-opportunity">
+      <div className="success-mark" aria-hidden="true">
+        <CircleCheck size={28} strokeWidth={2.1} />
+      </div>
       <div className="screen-heading-group">
         <h1 className="customer-question" data-screen-heading tabIndex={-1}>
           {messages.thanksHeading}
         </h1>
-        <p className="customer-support">{messages.feedbackSent(businessName)}</p>
+        <p className="customer-support">
+          {messages.feedbackSent(businessName)}
+        </p>
       </div>
 
       <div className="google-opportunity">
         <p className="google-prompt">{messages.googlePrompt}</p>
-        <div className="action-stack">
-          <a
-            className="button button--primary google-review-link"
-            href={googleReviewUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={onGoogleAction}
-          >
-            <span>{messages.googleAction}</span>
-            <ExternalLink aria-hidden="true" size={18} strokeWidth={2} />
-          </a>
-          <Button variant="secondary" onClick={onContinue}>
-            {messages.googleContinue}
-          </Button>
-        </div>
+        <CustomerActionBar>
+          <div className="action-stack">
+            <a
+              className={cn(
+                buttonVariants({ variant: "primary", size: "lg" }),
+                "google-review-link",
+              )}
+              href={googleReviewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={onGoogleAction}
+            >
+              <span>{messages.googleAction}</span>
+              <ExternalLink aria-hidden="true" size={18} strokeWidth={2} />
+            </a>
+            <Button variant="ghost" onClick={onContinue}>
+              {messages.googleContinue}
+            </Button>
+          </div>
+        </CustomerActionBar>
         <p className="trust-line google-trust">
           <LockKeyhole aria-hidden="true" size={17} strokeWidth={2} />
           <span>{messages.googleTrust(businessName)}</span>
@@ -54,4 +66,3 @@ export function GoogleOpportunity({
     </section>
   );
 }
-

@@ -20,7 +20,10 @@ export interface IdempotentRequestOptions extends RequestOptions {
 }
 
 export interface CustomerFlowApi {
-  getContext(token: string, options?: RequestOptions): Promise<CustomerReviewContext>;
+  getContext(
+    token: string,
+    options?: RequestOptions,
+  ): Promise<CustomerReviewContext>;
   createSession(
     token: string,
     body: CreateSessionRequest,

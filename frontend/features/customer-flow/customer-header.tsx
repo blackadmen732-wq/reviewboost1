@@ -22,7 +22,10 @@ export function CustomerHeader({
 }: CustomerHeaderProps) {
   const [logoFailed, setLogoFailed] = useState(false);
   const logoUrl = logoFailed ? null : context.business.logoUrl;
-  const initial = context.business.name.trim().slice(0, 1).toLocaleUpperCase(locale);
+  const initial = context.business.name
+    .trim()
+    .slice(0, 1)
+    .toLocaleUpperCase(locale);
 
   return (
     <header className="customer-header">
@@ -35,8 +38,8 @@ export function CustomerHeader({
             <img
               src={logoUrl}
               alt={messages.businessLogoAlt(context.business.name)}
-              width={48}
-              height={48}
+              width={56}
+              height={56}
               onError={() => setLogoFailed(true)}
             />
           ) : (
@@ -45,7 +48,9 @@ export function CustomerHeader({
         </div>
         <div className="business-identity__copy">
           <p className="business-name">{context.business.name}</p>
-          {context.location.name ? <p className="location-name">{context.location.name}</p> : null}
+          {context.location.name ? (
+            <p className="location-name">{context.location.name}</p>
+          ) : null}
         </div>
       </div>
       <LanguageSelector

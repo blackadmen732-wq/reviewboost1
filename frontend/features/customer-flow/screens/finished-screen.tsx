@@ -4,7 +4,10 @@ import type { CustomerMessages } from "@/lib/i18n/customer-messages";
 
 export function FinishedScreen({ messages }: { messages: CustomerMessages }) {
   return (
-    <section className="flow-screen finished-screen" data-flow-screen="finished">
+    <section
+      className="flow-screen finished-screen"
+      data-flow-screen="finished"
+    >
       <div className="finished-mark" aria-hidden="true">
         <Check size={28} strokeWidth={2.2} />
       </div>
@@ -18,4 +21,3 @@ export function FinishedScreen({ messages }: { messages: CustomerMessages }) {
     </section>
   );
 }
-

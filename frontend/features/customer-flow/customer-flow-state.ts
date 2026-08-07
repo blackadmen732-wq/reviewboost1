@@ -70,10 +70,16 @@ export function customerFlowReducer(
       return {
         ...state,
         rating: action.rating,
+        responseKey: null,
         feedbackStatus: "idle",
       };
     case "change-note":
-      return { ...state, note: action.note, feedbackStatus: "idle" };
+      return {
+        ...state,
+        note: action.note,
+        responseKey: null,
+        feedbackStatus: "idle",
+      };
     case "change-locale":
       return { ...state, locale: action.locale };
     case "feedback-started":
@@ -115,6 +121,7 @@ export function customerFlowReducer(
         ...state,
         praiseFirstName: action.firstName,
         praiseNote: action.note,
+        praiseKey: null,
         praiseStatus: "idle",
       };
     case "praise-started":
@@ -135,4 +142,3 @@ export function customerFlowReducer(
       };
   }
 }
-

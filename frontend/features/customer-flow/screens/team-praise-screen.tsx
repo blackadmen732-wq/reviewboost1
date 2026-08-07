@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { CustomerActionBar } from "@/features/customer-flow/customer-action-bar";
 import type { SubmissionStatus } from "@/features/customer-flow/customer-flow-state";
 import type { CustomerMessages } from "@/lib/i18n/customer-messages";
 
@@ -74,7 +75,9 @@ export function TeamPraiseScreen({
         <h1 className="customer-question" data-screen-heading tabIndex={-1}>
           {messages.praiseHeading}
         </h1>
-        <p className="customer-support">{messages.praiseSupport(businessName)}</p>
+        <p className="customer-support">
+          {messages.praiseSupport(businessName)}
+        </p>
       </div>
 
       <form
@@ -82,9 +85,9 @@ export function TeamPraiseScreen({
         onSubmit={(event) => {
           preventNativeSubmit(event);
           if (!isSubmitting && !isOffline) {
-            void handleSubmit((values) => onSubmit(values.firstName.trim(), values.note.trim()))(
-              event,
-            );
+            void handleSubmit((values) =>
+              onSubmit(values.firstName.trim(), values.note.trim()),
+            )(event);
           }
         }}
       >
@@ -114,7 +117,8 @@ export function TeamPraiseScreen({
 
         <div className="field-group">
           <label className="field-label" htmlFor="praise-note">
-            {messages.praiseNoteLabel} <span className="field-optional">({messages.optional})</span>
+            {messages.praiseNoteLabel}{" "}
+            <span className="field-optional">({messages.optional})</span>
           </label>
           <Textarea
             {...noteField}
@@ -130,7 +134,11 @@ export function TeamPraiseScreen({
         </div>
 
         {hasError ? (
-          <InlineNotice kind="error" title={messages.praiseErrorHeading} blocking>
+          <InlineNotice
+            kind="error"
+            title={messages.praiseErrorHeading}
+            blocking
+          >
             <p>{messages.praiseErrorBody}</p>
           </InlineNotice>
         ) : null}
@@ -140,21 +148,23 @@ export function TeamPraiseScreen({
           </InlineNotice>
         ) : null}
 
-        <div className="action-stack">
-          <Button
-            type="submit"
-            loading={isSubmitting}
-            loadingLabel={messages.sending}
-            disabled={isOffline}
-          >
-            {hasError ? messages.tryAgain : messages.sendThanks}
-          </Button>
-          <Button variant="secondary" onClick={onSkip} disabled={isSubmitting}>
-            {messages.skip}
-          </Button>
-        </div>
+        <CustomerActionBar>
+          <div className="action-stack">
+            <Button
+              type="submit"
+              size="lg"
+              loading={isSubmitting}
+              loadingLabel={messages.sending}
+              disabled={isOffline}
+            >
+              {hasError ? messages.tryAgain : messages.sendThanks}
+            </Button>
+            <Button variant="ghost" onClick={onSkip} disabled={isSubmitting}>
+              {messages.skip}
+            </Button>
+          </div>
+        </CustomerActionBar>
       </form>
     </section>
   );
 }
-

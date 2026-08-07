@@ -2,7 +2,10 @@
 
 import { Star } from "lucide-react";
 
-import type { CustomerMessages, RatingValue } from "@/lib/i18n/customer-messages";
+import type {
+  CustomerMessages,
+  RatingValue,
+} from "@/lib/i18n/customer-messages";
 
 const ratings: RatingValue[] = [1, 2, 3, 4, 5];
 
@@ -13,7 +16,17 @@ interface StarRatingProps {
   disabled?: boolean;
 }
 
-export function StarRating({ value, onChange, messages, disabled = false }: StarRatingProps) {
+export function StarRating({
+  value,
+  onChange,
+  messages,
+  disabled = false,
+}: StarRatingProps) {
+  function selectRating(rating: RatingValue) {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator)
+      navigator.vibrate(10);
+    onChange(rating);
+  }
   return (
     <fieldset className="star-rating" disabled={disabled}>
       <legend className="sr-only">{messages.ratingGroup}</legend>
@@ -29,7 +42,7 @@ export function StarRating({ value, onChange, messages, disabled = false }: Star
                 type="radio"
                 value={rating}
                 checked={value === rating}
-                onChange={() => onChange(rating)}
+                onChange={() => selectRating(rating)}
                 aria-label={messages.ratingSpoken[rating]}
               />
               <label
@@ -37,7 +50,7 @@ export function StarRating({ value, onChange, messages, disabled = false }: Star
                 htmlFor={`rating-${rating}`}
                 data-filled={selected || undefined}
               >
-                <Star aria-hidden="true" size={34} strokeWidth={1.8} />
+                <Star aria-hidden="true" size={40} strokeWidth={1.7} />
               </label>
             </span>
           );
