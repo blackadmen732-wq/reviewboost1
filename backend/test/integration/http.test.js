@@ -192,8 +192,9 @@ describe('input validation', () => {
 
   it('rejects an out-of-range rating', async () => {
     const response = await request(app)
-      .post('/q/abcdefgh1234/rating')
-      .send({ rating: 9 })
+      .post('/api/v1/public/q/abcdefgh1234/responses')
+      .set('Idempotency-Key', 'rb_response_0123456789abcdef')
+      .send({ sessionId: 'a'.repeat(43), rating: 9 })
       .expect(400);
 
     assert.equal(response.body.error.code, 'validation_failed');
@@ -201,8 +202,9 @@ describe('input validation', () => {
 
   it('names the offending field, so a client can point at it', async () => {
     const response = await request(app)
-      .post('/q/abcdefgh1234/rating')
-      .send({ rating: 'five' })
+      .post('/api/v1/public/q/abcdefgh1234/responses')
+      .set('Idempotency-Key', 'rb_response_0123456789abcdef')
+      .send({ sessionId: 'a'.repeat(43), rating: 'five' })
       .expect(400);
 
     assert.ok(Array.isArray(response.body.error.details));

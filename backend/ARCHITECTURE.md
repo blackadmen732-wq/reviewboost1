@@ -1,6 +1,7 @@
 # ReviewBoost Backend
 
-Multi-tenant SaaS backend for SMS review campaigns and QR/NFC review gating.
+Multi-tenant SaaS backend for the QR/NFC customer review flow and SMS review
+campaigns.
 
 ---
 
@@ -39,7 +40,7 @@ src/
 │   └── deviceFingerprint.js   Coarse device recognition
 ├── db/{pool,migrate}.js
 ├── repositories/            All SQL (7 files)
-├── services/                Auth, MFA, billing, campaign, QR, SMS, email (10 files)
+├── services/                Auth, MFA, billing, campaign, QR, customer flow, SMS, email
 ├── queue/                   BullMQ + 2 workers
 ├── http/                    app, errors, schemas, 5 middleware, 7 route files
 ├── server.js                API entrypoint
@@ -185,21 +186,44 @@ The scan limiter is keyed **per stand**, not per IP — every customer in a
 restaurant shares one NAT address, and an IP-keyed limit would block real
 customers at exactly the busiest moment.
 
-### QR / NFC gate
+### The customer flow
 
-`GET /q/:publicId` → record scan → rating gate → high ratings redirect to
-Google, low ratings captured privately.
+Five anonymous endpoints under `/api/v1/public/q/:token` — context, session,
+response, Google-click, Team Praise. See
+[`docs/backend/CUSTOMER_FLOW.md`](../docs/backend/CUSTOMER_FLOW.md).
 
-The tenant is **always derived server-side from the stand**. The public
-endpoints never accept an account id and never return one — otherwise anyone
-could scan a code, harvest the account id, and write unlimited fabricated
-feedback into that tenant. A test asserts the id never appears in the response.
+**Every rating from 1 to 5 takes the identical path.** The Google opportunity is
+a property of the business and is returned by the *context* endpoint, before any
+rating exists — which is the structural reason it cannot vary by rating. The
+private note and Team Praise are additive steps, never a substitute for the
+public review.
+
+There is no `review_threshold`, no rating-dependent branch, and no redirect from
+the API. The gate that used to live at `POST /q/:publicId/rating` returns 410;
+`GET /q/:publicId` forwards codes printed against the old origin to the frontend
+flow.
+
+**Tenant derivation without a tenant context.** The customer has no session, so
+RLS cannot be satisfied by the caller — and `SECURITY DEFINER` does not help,
+because every tenant table is `FORCE ROW LEVEL SECURITY` and the definer would
+be the table owner, subject to the very policy it is trying to satisfy. Instead
+one transaction binds two settings in order: `app.public_stand_token`, which a
+narrow SELECT policy uses to expose exactly the one stand whose token the caller
+already holds, and then `app.current_account_id` read out of that row. Every
+statement after that runs under ordinary tenant RLS. An `account_id` in the
+request body is ignored, because the token is the only tenant input.
 
 `public_id` is 16 bytes of entropy, separate from the primary key, so internal
-ids are never exposed and stands cannot be enumerated.
+ids are never exposed and stands cannot be enumerated. `sessionId` and
+`responseId` are 32 bytes, stored only as keyed HMACs.
 
-Scan dedupe is a single `INSERT ... WHERE NOT EXISTS` inside a `SECURITY
-DEFINER` function — a read-then-write check would let concurrent scans both pass.
+**Idempotency is durable.** The claim, the domain write, and the stored result
+commit in one transaction, so a network timeout either replays a stored result
+or performs the operation for the first time — never both. Concurrent duplicates
+serialise on the unique key rather than racing.
+
+A scan is recorded when a session is created, not on the GET, so a link preview
+or a crawler cannot inflate a business's numbers.
 
 ---
 
