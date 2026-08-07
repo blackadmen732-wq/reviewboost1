@@ -2,6 +2,7 @@ import rateLimit from 'express-rate-limit';
 
 import { logger } from '../../logger.js';
 import { rateLimitCommand, rateLimitRedisReady } from '../../queue/index.js';
+import { publicClientFingerprint } from '../../services/encryption.js';
 import { ResilientRateLimitStore } from './resilientStore.js';
 
 /**
@@ -145,29 +146,50 @@ export const billingLimiter = build({
 });
 
 /**
- * Public QR scan.
+ * The anonymous customer flow.
  *
- * Keyed per *stand*, not per IP: every customer in a restaurant shares one NAT
- * address, so an IP-keyed limit would block real customers at exactly the
- * busiest moment.
+ * Layered deliberately, because neither layer alone works:
+ *
+ *   Per stand — a whole restaurant shares one NAT address, so an address-keyed
+ *   limit would block real customers at exactly the busiest moment. This is the
+ *   layer that bounds abuse of one printed code.
+ *
+ *   Per client fingerprint — a rotating keyed hash of address and user agent,
+ *   never the raw address. This is the layer that stops one device from filling
+ *   a business's feedback with fabricated submissions while every other
+ *   customer at that stand carries on unaffected.
+ *
+ * Reads get a generous budget; writes get a tight one.
  */
-export const scanLimiter = build({
-  prefix: 'scan',
+const byStand = (req) => `stand:${req.params?.token ?? ipKey(req.ip)}`;
+
+export const publicContextLimiter = build({
+  prefix: 'public-context',
   windowMs: 60 * 1000,
   max: 240,
-  code: 'scan_rate_limited',
-  message: 'This QR code is receiving too many requests. Try again shortly.',
-  keyGenerator: (req) => `stand:${req.params?.publicId ?? ipKey(req.ip)}`,
+  code: 'rate_limited',
+  message: 'This review link is receiving too many requests. Try again shortly.',
+  keyGenerator: byStand,
 });
 
-/** Public feedback submission — per IP, because it writes. */
-export const feedbackLimiter = build({
-  prefix: 'feedback',
-  windowMs: 60 * 60 * 1000,
-  max: 20,
-  code: 'feedback_rate_limited',
-  message: 'Too many submissions from this device.',
-  keyGenerator: (req) => ipKey(req.ip),
+export const publicStandWriteLimiter = build({
+  prefix: 'public-write-stand',
+  windowMs: 60 * 1000,
+  max: 60,
+  code: 'rate_limited',
+  message: 'This review link is receiving too many submissions. Try again shortly.',
+  keyGenerator: byStand,
+});
+
+export const publicClientWriteLimiter = build({
+  prefix: 'public-write-client',
+  windowMs: 5 * 60 * 1000,
+  max: 30,
+  code: 'rate_limited',
+  message: 'Too many submissions from this device. Try again shortly.',
+  // Hashed, so no raw address is stored even in the limiter's own state.
+  keyGenerator: (req) =>
+    publicClientFingerprint({ ip: ipKey(req.ip), userAgent: req.get('user-agent') }),
 });
 
 /** Generous, because Stripe and Twilio legitimately burst — but not unbounded. */

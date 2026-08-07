@@ -24,6 +24,26 @@ export const CSRF_HEADER = 'x-csrf-token';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+/**
+ * Paths that carry no ambient authority and must never be CSRF-checked.
+ *
+ * The customer flow is anonymous: authorisation comes entirely from the stand
+ * token in the URL, and the browser has no cookie that grants anything on it.
+ * There is therefore nothing for an attacker to ride on — the worst a forged
+ * cross-origin request achieves is what any visitor could do by scanning the
+ * printed code themselves.
+ *
+ * Exempting it is not a convenience. Without this, an owner who scans their own
+ * QR code while signed in to the dashboard sends their session cookies with the
+ * request, falls into the check below, and is rejected 403 — the public flow
+ * breaking for exactly the person most likely to test it.
+ */
+const ANONYMOUS_PATH_PREFIXES = ['/api/v1/public/'];
+
+function isAnonymousPath(path) {
+  return ANONYMOUS_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
 export function csrfCookieOptions() {
   return {
     // Deliberately readable by JavaScript: the client has to echo it back.
@@ -48,6 +68,10 @@ export function csrfTokenRoute(_req, res) {
 
 export function requireCsrfToken(req, _res, next) {
   if (SAFE_METHODS.has(req.method)) return next();
+
+  // Checked before the cookie test below, because the owner's dashboard
+  // cookies *are* present when they scan their own code.
+  if (isAnonymousPath(req.path)) return next();
 
   // Not a browser, so not forgeable.
   if (String(req.get('authorization') ?? '').startsWith('Bearer ')) return next();

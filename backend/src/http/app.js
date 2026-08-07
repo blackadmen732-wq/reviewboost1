@@ -19,6 +19,7 @@ import { csrfTokenRoute, requireCsrfToken } from './middleware/csrf.js';
 import { apiLimiter, webhookLimiter } from './middleware/rateLimit.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { campaignRoutes } from './routes/campaigns.routes.js';
+import { customerFlowRoutes } from './routes/customerFlow.routes.js';
 import { dashboardRoutes } from './routes/dashboard.routes.js';
 import { mfaRoutes } from './routes/mfa.routes.js';
 import { publicRoutes } from './routes/public.routes.js';
@@ -73,10 +74,20 @@ export function createApp() {
         if (!origin || config.corsOrigins.includes(origin)) return callback(null, true);
         return callback(null, false);
       },
-      // Required for the httpOnly session cookies to cross origins.
+      // Required for the httpOnly session cookies to cross origins on the
+      // dashboard. The customer flow sends no credentials and does not rely on
+      // this — see routes/customerFlow.routes.js.
       credentials: true,
       methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'X-CSRF-Token'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Request-Id',
+        'X-CSRF-Token',
+        // Without this every public mutation fails at preflight, and the
+        // customer flow cannot make a single request.
+        'Idempotency-Key',
+      ],
       exposedHeaders: ['X-Request-Id'],
       maxAge: 600,
     }),
@@ -136,7 +147,11 @@ export function createApp() {
   // Browsers fetch a token here before their first mutating request.
   app.get('/api/csrf-token', csrfTokenRoute);
 
-  // ---- public QR gate (no auth) ------------------------------------------
+  // ---- anonymous customer flow (no auth, no CSRF) ------------------------
+  app.use('/api/v1/public', customerFlowRoutes);
+
+  // Compatibility only: forwards codes printed against the old origin to the
+  // current flow. The rating gate that used to live here is gone.
   app.use('/', publicRoutes);
 
   // ---- API ---------------------------------------------------------------

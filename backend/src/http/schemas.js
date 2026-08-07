@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+import {
+  MAX_FIRST_NAME_BYTES,
+  MAX_FIRST_NAME_LENGTH,
+  MAX_NOTE_BYTES,
+  MAX_NOTE_LENGTH,
+  SUPPORTED_LOCALES,
+  byteLength,
+} from '../domain/customerFlow.js';
+
 /**
  * Request schemas.
  *
@@ -113,23 +122,74 @@ export const createStandSchema = z.object({
   destinationUrl: httpUrl.optional(),
   primaryColor: hexColor.optional(),
   backgroundColor: hexColor.optional(),
-  reviewThreshold: z.number().int().min(1).max(5).optional(),
 });
 
 export const updateStandSchema = createStandSchema.extend({
   isActive: z.boolean().optional(),
 });
 
-export const submitRatingSchema = z.object({
-  rating: z.number().int().min(1).max(5),
-  feedbackText: z.string().trim().max(2000).optional(),
-  contactPhone: z.string().trim().max(32).optional(),
-  contactEmail: email.optional(),
-});
-
 export const publicIdSchema = z.object({
   publicId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/, 'Invalid QR code.'),
 });
+
+// ------------------------------------------------------- customer flow -----
+//
+// The anonymous flow at /api/v1/public/q/:token. Every schema below is
+// `.strict()`, which is the published contract's `additionalProperties: false`
+// enforced server-side: an unrecognised field is rejected rather than ignored.
+// That is what makes "the public endpoints do not accept a phone number, an
+// email address, a marketing consent flag, or a tenant id" a property the code
+// has rather than a promise the documentation makes.
+
+const customerNote = z
+  .string()
+  .max(MAX_NOTE_LENGTH)
+  // Character limits count UTF-16 code units, so 2,000 characters of emoji is
+  // several times 2,000 bytes. The storage layer cares about bytes.
+  .refine((value) => byteLength(value) <= MAX_NOTE_BYTES, 'Note is too large.');
+
+const opaqueToken = z.string().regex(/^[A-Za-z0-9_-]{16,160}$/, 'Invalid token.');
+
+export const publicTokenSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{8,128}$/, 'Invalid review link.'),
+});
+
+/** Contract: `Idempotency-Key`, 16 to 128 characters, required on every mutation. */
+export const idempotencyKeySchema = z
+  .string()
+  .regex(/^[A-Za-z0-9_.:-]{16,128}$/, 'Idempotency-Key must be 16-128 URL-safe characters.');
+
+export const createSessionSchema = z
+  .object({ locale: z.enum(SUPPORTED_LOCALES) })
+  .strict();
+
+export const submitResponseSchema = z
+  .object({
+    sessionId: opaqueToken,
+    // Every rating is accepted and stored. Nothing downstream branches on it.
+    rating: z.number().int().min(1).max(5),
+    // Optional for every rating, including 4 and 5.
+    note: customerNote.optional(),
+  })
+  .strict();
+
+export const googleClickSchema = z
+  .object({ sessionId: opaqueToken, responseId: opaqueToken })
+  .strict();
+
+export const teamPraiseSchema = z
+  .object({
+    sessionId: opaqueToken,
+    responseId: opaqueToken,
+    // Unicode is accepted as written. Names are not transliterated.
+    firstName: z
+      .string()
+      .min(1)
+      .max(MAX_FIRST_NAME_LENGTH)
+      .refine((value) => byteLength(value) <= MAX_FIRST_NAME_BYTES, 'Name is too large.'),
+    note: customerNote.optional(),
+  })
+  .strict();
 
 // --------------------------------------------------------------- account --
 
