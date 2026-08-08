@@ -425,6 +425,10 @@ create or replace function app.public_submit_team_praise(
     p_request_hash            text,
     p_session_token_hash      text,
     p_response_token_hash     text,
+    -- Supplied by the caller rather than defaulted here, so the application
+    -- knows the id before the call and can encrypt the replay body with it.
+    -- Without that, a retry would have no stored result to return.
+    p_praise_id               uuid,
     p_first_name_encrypted    text,
     p_note_encrypted          text,
     p_key_version             smallint,
@@ -481,10 +485,10 @@ begin
     -- Stored unmatched. Matching is a human decision made later, with the
     -- rating deliberately out of view.
     insert into public.team_praise_records
-        (org_id, location_id, response_id, first_name_encrypted,
+        (id, org_id, location_id, response_id, first_name_encrypted,
          praise_note_encrypted, encryption_key_version, status)
     values
-        (resp.org_id, resp.location_id, resp.id, p_first_name_encrypted,
+        (p_praise_id, resp.org_id, resp.location_id, resp.id, p_first_name_encrypted,
          p_note_encrypted, p_key_version, 'unmatched');
 
     perform app.complete_idempotency(operation, scope_key, p_idempotency_key,
@@ -536,12 +540,12 @@ revoke all on function app.resolve_public_stand(text) from public, anon, authent
 revoke all on function app.public_create_session(text, text, text, text, text, text, integer, integer, boolean, text) from public, anon, authenticated;
 revoke all on function app.public_submit_response(text, text, text, text, text, smallint, text, smallint, integer, text) from public, anon, authenticated;
 revoke all on function app.public_record_google_click(text, text, text, text, text, integer) from public, anon, authenticated;
-revoke all on function app.public_submit_team_praise(text, text, text, text, text, text, text, smallint, integer, text) from public, anon, authenticated;
+revoke all on function app.public_submit_team_praise(text, text, text, text, text, uuid, text, text, smallint, integer, text) from public, anon, authenticated;
 revoke all on function app.purge_public_flow_ephemera(integer) from public, anon, authenticated;
 
 grant execute on function app.resolve_public_stand(text) to service_role;
 grant execute on function app.public_create_session(text, text, text, text, text, text, integer, integer, boolean, text) to service_role;
 grant execute on function app.public_submit_response(text, text, text, text, text, smallint, text, smallint, integer, text) to service_role;
 grant execute on function app.public_record_google_click(text, text, text, text, text, integer) to service_role;
-grant execute on function app.public_submit_team_praise(text, text, text, text, text, text, text, smallint, integer, text) to service_role;
+grant execute on function app.public_submit_team_praise(text, text, text, text, text, uuid, text, text, smallint, integer, text) to service_role;
 grant execute on function app.purge_public_flow_ephemera(integer) to service_role;
