@@ -1,33 +1,34 @@
 # Frontend handoff
 
-Changes the backend needs in frontend-owned or shared files. **The backend agent
-has made none of these** — they are requests, not edits.
+Changes the backend needs in frontend-owned or shared files.
+
+Item 1 was completed by the backend after the user explicitly lifted the lock on
+`frontend/package.json`. Everything else below is a **request, not an edit** —
+no component, page, layout, style, form, reducer, or copy string has been
+touched.
 
 Requested by: backend, on `backend/customer-flow-foundation`
 Against: `codex/frontend-premium-redesign` @ `f64b519`
 
 ---
 
-## 1. Install the Supabase client — BLOCKING
+## 1. Supabase client — DONE, no action needed
 
-**This blocks all five Route Handlers.** Nothing server-side can talk to the
-database until it lands.
+Unblocked and completed by the backend after the lock on
+`frontend/package.json` was lifted explicitly.
 
 | | |
 |---|---|
-| File | `frontend/package.json` (locked shared file) |
-| Change | Add `"@supabase/supabase-js": "^2.58.0"` to `dependencies` |
-| Then | `npm install` in `frontend/`, commit the lockfile |
+| File | `frontend/package.json` |
+| Added | `"@supabase/supabase-js": "2.112.2"`, `"server-only": "0.0.1"` — both pinned |
+| Status | Installed, lockfile committed, `npm audit` reports 0 vulnerabilities |
 
-**Why:** the Route Handlers under `frontend/app/api/v1/public/**` are the only
-thing that will talk to Supabase. There is no alternative that avoids the
-dependency — hand-rolling PostgREST calls with `fetch` would mean reimplementing
-auth header handling and error mapping, which is more code and more risk for no
-benefit.
+Nothing else in that file changed. If you have local changes to
+`package.json` or the lockfile, expect a conflict on merge and take both
+dependency additions.
 
-**Security impact:** the package itself is the standard first-party client and
-adds no browser exposure by itself. The exposure to watch is the *key*, not the
-package:
+**Security impact:** the package adds no browser exposure by itself. The
+exposure to watch is the *key*, not the package:
 
 - The **service-role key** must be read only inside `frontend/lib/server/**` and
   Route Handlers. It must never be named `NEXT_PUBLIC_*`, never imported into a
