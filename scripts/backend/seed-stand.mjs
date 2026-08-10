@@ -18,25 +18,32 @@ import { createHmac, randomBytes } from "node:crypto";
 import { argv, env, exit } from "node:process";
 
 const DEFAULT_LOCATION = "aaaa1111-1111-1111-1111-111111111111";
-const DEFAULT_DB = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+// Inside the container the database is on its own loopback, not the host port
+// Supabase publishes. Passing the host URL here fails with "connection
+// refused" in a way that looks like the database is down when it is not.
+const CONTAINER = "supabase_db_reviewboost";
 
 function argument(name, fallback) {
   const index = argv.indexOf(`--${name}`);
   return index >= 0 && argv[index + 1] ? argv[index + 1] : fallback;
 }
 
-const encryptionKey = env.CUSTOMER_NOTE_ENCRYPTION_KEY;
+// Must match lib/server/crypto.ts: TOKEN_DIGEST_KEY, falling back to the
+// content key. Digesting with the wrong one produces a stand that exists in the
+// database and can never be resolved — which looks like a broken QR code rather
+// than a configuration mistake.
+const encryptionKey = env.TOKEN_DIGEST_KEY || env.CUSTOMER_NOTE_ENCRYPTION_KEY;
 if (!encryptionKey) {
   console.error(
-    "CUSTOMER_NOTE_ENCRYPTION_KEY is required, and must match the one the app uses.\n" +
-      "Generate one with:  openssl rand -base64 32",
+    "TOKEN_DIGEST_KEY (or CUSTOMER_NOTE_ENCRYPTION_KEY) is required, and must match\n" +
+      "the one the app uses. Generate one with:  openssl rand -base64 32",
   );
   exit(1);
 }
 
 const key = Buffer.from(encryptionKey, "base64");
 if (key.length !== 32) {
-  console.error("CUSTOMER_NOTE_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
+  console.error("The token digest key must be a base64-encoded 32-byte key.");
   exit(1);
 }
 
@@ -68,9 +75,12 @@ try {
   const { stdout } = await run("docker", [
     "exec",
     "-i",
-    "supabase_db_reviewboost",
+    env.SUPABASE_DB_CONTAINER ?? CONTAINER,
     "psql",
-    env.DATABASE_URL ?? DEFAULT_DB,
+    "-U",
+    "postgres",
+    "-d",
+    "postgres",
     "-t",
     "-A",
     "-c",
