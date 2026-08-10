@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeft, Mail } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ArrowLeft, Check, Mail } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Wordmark } from "@/components/brand/wordmark";
 import { Button } from "@/components/ui/button";
 import { CodeInput } from "@/components/ui/code-input";
 import { InlineNotice } from "@/components/ui/inline-notice";
@@ -29,7 +29,6 @@ type Step = "email" | "code";
 const RESEND_SECONDS = 30;
 
 export function SignInFlow({ next }: { next: string }) {
-  const router = useRouter();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -152,7 +151,7 @@ export function SignInFlow({ next }: { next: string }) {
 
         {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
 
-        <div className="text-center">
+        <div className="flex flex-col items-center gap-3">
           {secondsLeft > 0 ? (
             <p className="text-sm text-muted" aria-live="polite">
               Send again in {secondsLeft}s
@@ -168,6 +167,14 @@ export function SignInFlow({ next }: { next: string }) {
               Send it again
             </Button>
           )}
+
+          {/* The single most common reason someone gets stuck here, said before
+              they conclude it is broken and close the tab. A first message from
+              a new sender lands in spam often enough that not mentioning it
+              costs real signups. */}
+          <p className="max-w-[30ch] text-center text-sm leading-relaxed text-muted">
+            Not there? Check your spam folder.
+          </p>
         </div>
       </div>
     );
@@ -175,11 +182,19 @@ export function SignInFlow({ next }: { next: string }) {
 
   return (
     <form onSubmit={handleEmailSubmit} className="flex flex-col gap-8" noValidate>
-      <div className="flex flex-col gap-2">
+      {/* The brand comes first, because someone landing here cold — or an owner
+          handed a phone mid-demo — needs to know what this is before they type
+          anything into it. */}
+      <div className="flex flex-col gap-3">
+        <Wordmark size="lg" />
         <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
-          Get started
+          More Google reviews, without the work
         </h1>
-        <p className="text-base text-muted">Enter your email. No password needed.</p>
+        {/* One sentence, concrete, no adjectives. A busy owner reads exactly
+            this much before deciding whether to continue. */}
+        <p className="text-base leading-relaxed text-muted">
+          Customers scan a code on your counter. You get more reviews.
+        </p>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -212,13 +227,28 @@ export function SignInFlow({ next }: { next: string }) {
         Continue
       </Button>
 
+      {/* Three facts that answer what a skeptical owner is actually thinking:
+          is this a commitment, do I have to learn something, and is it going to
+          cost me. Stated flatly — no ticks, no badges, no "trusted by 10,000
+          businesses" nobody believes. */}
+      <ul className="flex flex-col gap-2.5">
+        {[
+          "No password to remember",
+          "Set up in about two minutes",
+          "Nothing to install for your customers",
+        ].map((fact) => (
+          <li key={fact} className="flex items-center gap-2.5 text-sm text-muted">
+            <Check className="size-4 shrink-0 text-brand-text" aria-hidden="true" />
+            {fact}
+          </li>
+        ))}
+      </ul>
+
       {/* Below the button, small, and not a checkbox. Nobody is blocked by it,
           and pretending a tick box means informed consent helps no one. */}
       <p className="text-center text-sm leading-relaxed text-muted">
         By continuing you agree to our terms and privacy policy.
       </p>
-
-      <button type="button" hidden onClick={() => router.refresh()} aria-hidden="true" />
     </form>
   );
 }

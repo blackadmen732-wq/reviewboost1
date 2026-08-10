@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { BottomNav } from "@/features/dashboard/bottom-nav";
 import { DesktopSidebar } from "@/features/dashboard/desktop-sidebar";
+import { PageTransition } from "@/features/dashboard/page-transition";
 
 /**
  * The frame every owner screen sits in.
@@ -44,7 +45,7 @@ export function AppShell({
             "px-5 pb-28 pt-8 lg:px-8 lg:pb-16 lg:pt-10",
           ].join(" ")}
         >
-          {children}
+          <PageTransition>{children}</PageTransition>
         </main>
       </div>
 
