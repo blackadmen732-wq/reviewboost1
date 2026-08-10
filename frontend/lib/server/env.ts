@@ -121,6 +121,69 @@ export function encryptionKey(): Buffer {
 }
 
 /**
+ * The key that produces stand, session, and response token digests.
+ *
+ * Deliberately separate from `CUSTOMER_NOTE_ENCRYPTION_KEY`, because the two
+ * rotate on completely different terms. Encrypted content can be re-encrypted;
+ * a digest cannot be recomputed without the original token, and we do not keep
+ * those. Sharing one key would mean rotating it after a note-key exposure
+ * invalidated every printed QR code in the field.
+ *
+ * Falls back to the encryption key so existing deployments keep working, and
+ * so a fresh install needs one fewer secret. Set it explicitly before printing
+ * stands for a paying customer.
+ */
+export function tokenDigestKey(): Buffer {
+  const raw = process.env.TOKEN_DIGEST_KEY?.trim();
+  if (!raw) return encryptionKey();
+
+  const key = Buffer.from(raw, "base64");
+  if (key.length !== 32) {
+    throw new ConfigError(
+      "TOKEN_DIGEST_KEY must be a base64-encoded 32-byte key. " +
+        "Generate one with: openssl rand -base64 32",
+    );
+  }
+  return key;
+}
+
+/**
+ * The key being rotated away from, during a rotation only.
+ *
+ * While set, a stand whose digest was produced by it still resolves, and is
+ * rewritten under the current key the first time it is scanned. Unset it once
+ * `public_token_key_version` shows no stands left on the old version.
+ */
+export function previousTokenDigestKey(): Buffer | null {
+  const raw = process.env.TOKEN_DIGEST_KEY_PREVIOUS?.trim();
+  if (!raw) return null;
+
+  const key = Buffer.from(raw, "base64");
+  if (key.length !== 32) {
+    throw new ConfigError("TOKEN_DIGEST_KEY_PREVIOUS must be a base64-encoded 32-byte key.");
+  }
+  return key;
+}
+
+/**
+ * Which key version new and upgraded digests are written under.
+ *
+ * Increment alongside TOKEN_DIGEST_KEY so the lazy upgrade knows a stand is
+ * behind. Leaving it unchanged during a rotation would make every stand look
+ * current and the migration would never happen.
+ */
+export function tokenDigestKeyVersion(): number {
+  const raw = process.env.TOKEN_DIGEST_KEY_VERSION?.trim();
+  if (!raw) return 1;
+
+  const version = Number(raw);
+  if (!Number.isInteger(version) || version < 1 || version > 32767) {
+    throw new ConfigError("TOKEN_DIGEST_KEY_VERSION must be an integer between 1 and 32767.");
+  }
+  return version;
+}
+
+/**
  * Startup validation.
  *
  * Call from a health check or a deploy gate to surface a misconfiguration

@@ -8,7 +8,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 
-import { encryptionKey } from "@/lib/server/env";
+import { encryptionKey, previousTokenDigestKey, tokenDigestKey } from "@/lib/server/env";
 
 /**
  * Encryption and token primitives for the public customer flow.
@@ -59,13 +59,36 @@ export function tokenPrefix(token: string): string {
  * from producing the same stored digest, which would let one be presented where
  * the other is expected.
  */
-export function keyedDigest(value: string, domain: string): string {
-  return createHmac("sha256", encryptionKey()).update(`${domain}:${value}`).digest("hex");
+export function keyedDigest(value: string, domain: string, key: Buffer = encryptionKey()): string {
+  return createHmac("sha256", key).update(`${domain}:${value}`).digest("hex");
 }
 
-export const digestStandToken = (token: string) => keyedDigest(token, "stand_token");
-export const digestSessionToken = (token: string) => keyedDigest(token, "session_token");
-export const digestResponseToken = (token: string) => keyedDigest(token, "response_token");
+/**
+ * Token digests use the token key, not the content key.
+ *
+ * A digest cannot be recomputed without the original token, so this key's
+ * rotation story is entirely different from the encryption key's — see
+ * `env.ts`. Keeping them separate is what makes rotating either one survivable.
+ */
+export const digestStandToken = (token: string) =>
+  keyedDigest(token, "stand_token", tokenDigestKey());
+
+/**
+ * The same digest under the key being rotated away from, or null when no
+ * rotation is in progress.
+ */
+export function digestStandTokenWithPreviousKey(token: string): string | null {
+  const previous = previousTokenDigestKey();
+  return previous === null ? null : keyedDigest(token, "stand_token", previous);
+}
+
+// Sessions and responses expire within 24 hours, so a rotation drains them on
+// its own and they need no fallback path.
+export const digestSessionToken = (token: string) =>
+  keyedDigest(token, "session_token", tokenDigestKey());
+export const digestResponseToken = (token: string) =>
+  keyedDigest(token, "response_token", tokenDigestKey());
+
 export const digestIdempotencyKey = (key: string) => keyedDigest(key, "idempotency_key");
 export const digestRequestBody = (canonical: string) => keyedDigest(canonical, "idempotency_request");
 

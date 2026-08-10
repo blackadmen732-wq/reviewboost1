@@ -30,27 +30,66 @@ CUSTOMER_NOTE_ENCRYPTION_KEY=
 PUBLIC_FRONTEND_URL=http://localhost:3000
 ```
 
-### `CUSTOMER_NOTE_ENCRYPTION_KEY` — read this before rotating
+### Optional but recommended
 
-It does two jobs, and only one of them is reversible.
+```bash
+# Produces the stand, session, and response token digests. Separate from the
+# encryption key on purpose — see below. Falls back to
+# CUSTOMER_NOTE_ENCRYPTION_KEY if unset.
+TOKEN_DIGEST_KEY=
 
-- **Encryption.** Notes and praise are AES-256-GCM. Re-encrypting old rows under
-  a new key is possible: the ciphertext carries a key version, so old and new can
-  coexist during a migration.
-- **Lookup digests.** Stand, session, and response tokens are stored only as
-  keyed HMACs of this key. These are **not** recoverable. Rotating the key
-  invalidates every existing digest, which means **every printed QR code and
-  every NFC tag stops resolving** — the stands would have to be reissued and
-  physically replaced.
+# Set only during a rotation. See "Rotating the token digest key".
+TOKEN_DIGEST_KEY_PREVIOUS=
+TOKEN_DIGEST_KEY_VERSION=1
+```
 
-Treat it as permanent. Store it in a managed secret store, include it in the
-backup procedure, and never rotate it casually. Losing it makes every encrypted
-column unreadable *and* every stand unresolvable.
+### Why the two keys are separate
 
-The right long-term fix is to derive token digests from a separate, rotatable
-key with its own version column, so token rotation and content rotation are
-independent. That is not built. It should be, before the first stand is printed
-for a paying customer.
+They have completely different rotation properties, and conflating them makes
+one of them effectively un-rotatable.
+
+- **`CUSTOMER_NOTE_ENCRYPTION_KEY`** protects content that must be readable
+  again. Re-encrypting is possible: the ciphertext carries a key version, so old
+  and new coexist during a migration.
+- **`TOKEN_DIGEST_KEY`** produces one-way digests. A digest cannot be recomputed
+  without the original token, and the whole point is that we never keep one.
+
+When these were the same key, rotating it — the ordinary response to a suspected
+exposure — would have invalidated every `public_token_hash` at once. **Every
+printed QR code and NFC tag in the field would have stopped resolving.** Those
+are physical objects on customers' tables; they cannot be recalled. The rotation
+would have cost the customer money and downtime, which means in practice it
+would never have been done, and a leaked key would have stayed live.
+
+### Rotating the token digest key
+
+Survivable, because the raw token *does* exist for one instant: when a customer
+scans the code. Resolution accepts the old digest as a fallback and rewrites the
+row under the new key on the way past.
+
+```bash
+# 1. Keep the current key as the fallback, install a new one, bump the version.
+TOKEN_DIGEST_KEY=<new key>
+TOKEN_DIGEST_KEY_PREVIOUS=<the key you are retiring>
+TOKEN_DIGEST_KEY_VERSION=2
+
+# 2. Deploy. Stands migrate themselves as they are scanned. Nothing is
+#    reprinted, nothing goes down, and customers notice nothing.
+
+# 3. Watch the migration drain:
+select public_token_key_version, count(*)
+  from public.review_stands group by 1;
+
+# 4. When nothing is left on the old version, remove TOKEN_DIGEST_KEY_PREVIOUS.
+```
+
+A stand nobody scans stays on the old key until someone does. That is correct:
+an unscanned stand is not a live exposure, and it migrates the moment it becomes
+one. If a stand must be retired sooner, rotate *its token* — which does mean
+reprinting that one stand.
+
+`CUSTOMER_NOTE_ENCRYPTION_KEY` still belongs in a managed secret store and in
+the backup procedure. Losing it makes every encrypted note unreadable.
 
 ---
 

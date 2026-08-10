@@ -17,9 +17,11 @@ import {
   digestResponseToken,
   digestSessionToken,
   digestStandToken,
+  digestStandTokenWithPreviousKey,
   encrypt,
   generateToken,
 } from "@/lib/server/crypto";
+import { tokenDigestKeyVersion } from "@/lib/server/env";
 import { ApiError, ERROR_CODE, rateLimited, reviewLinkInactive } from "@/lib/server/errors";
 import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
 import { logger } from "@/lib/server/logger";
@@ -223,6 +225,73 @@ async function guardWrite(tokenHash: string, meta: RequestMeta): Promise<void> {
   await consume(CLIENT_WRITE_BUDGET, clientFingerprint(meta.address, meta.userAgent), meta.requestId);
 }
 
+interface ResolvedStand {
+  business_name: string;
+  location_name: string | null;
+  google_review_url: string | null;
+  default_locale: string | null;
+  matched_key_version: number;
+}
+
+/**
+ * Resolve a stand, migrating its token digest if a key rotation is in progress.
+ *
+ * The raw token exists in exactly one place — this request. That makes a scan
+ * the only opportunity to re-digest a stand under a new key, which is what lets
+ * a rotation happen without reprinting a single QR code. A stand nobody scans
+ * stays on the old key until someone does, and an unscanned stand is not a live
+ * exposure.
+ *
+ * The upgrade is deliberately fire-and-forget: a customer standing at a counter
+ * must not wait on, or be failed by, a housekeeping write.
+ */
+async function resolveStand(
+  token: string,
+  tokenHash: string,
+  meta: RequestMeta,
+): Promise<ResolvedStand | null> {
+  const previousHash = digestStandTokenWithPreviousKey(token);
+
+  const { data, error } = await serviceRoleClient().rpc("rpc_public_resolve_stand", {
+    p_token_hash: tokenHash,
+    p_previous_token_hash: previousHash,
+  });
+
+  if (error) fail("resolve_stand", error, meta.requestId);
+
+  const stand = Array.isArray(data) ? (data[0] as ResolvedStand | undefined) : undefined;
+  if (!stand) return null;
+
+  const currentVersion = tokenDigestKeyVersion();
+  if (previousHash !== null && stand.matched_key_version < currentVersion) {
+    void upgradeStandDigest(previousHash, tokenHash, currentVersion, meta);
+  }
+
+  return stand;
+}
+
+async function upgradeStandDigest(
+  oldHash: string,
+  newHash: string,
+  version: number,
+  meta: RequestMeta,
+): Promise<void> {
+  const { error } = await serviceRoleClient().rpc("rpc_upgrade_stand_token_digest", {
+    p_old_token_hash: oldHash,
+    p_new_token_hash: newHash,
+    p_new_version: version,
+  });
+
+  if (error) {
+    // Logged, never surfaced. The stand still resolves under the old key, so a
+    // failed upgrade costs nothing but a retry on the next scan.
+    logger.warn("public.token_digest_upgrade_failed", { requestId: meta.requestId, error });
+    return;
+  }
+
+  logger.info("public.token_digest_upgraded", { requestId: meta.requestId, version });
+}
+
 // --------------------------------------------------------------- context --
 
 /**
@@ -240,16 +309,7 @@ export async function getContext(token: string, meta: RequestMeta): Promise<Cust
   const tokenHash = digestStandToken(token);
   await guardRead(tokenHash, meta);
 
-  const { data, error } = await serviceRoleClient().rpc("rpc_public_resolve_stand", {
-    p_token_hash: tokenHash,
-  });
-
-  if (error) fail("resolve_stand", error, meta.requestId);
-
-  const stand = Array.isArray(data) ? (data[0] as
-    | { business_name: string; location_name: string | null; google_review_url: string | null; default_locale: string | null }
-    | undefined) : undefined;
-
+  const stand = await resolveStand(token, tokenHash, meta);
   if (!stand) throw reviewLinkInactive();
 
   // The contract makes googleReviewUrl required and non-nullable, and the

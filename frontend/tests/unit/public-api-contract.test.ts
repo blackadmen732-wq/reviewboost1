@@ -46,6 +46,7 @@ const ACTIVE_STAND = {
   location_name: "High Street",
   google_review_url: "https://g.page/r/CdSAMPLE/review",
   default_locale: "en",
+  matched_key_version: 1,
 };
 
 function allowed() {
@@ -656,5 +657,114 @@ describe("CORS", () => {
     );
 
     expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
+});
+
+describe("token digest key rotation", () => {
+  // The scenario this exists for: a key is exposed and has to be rotated, and
+  // there are printed QR codes on customers' tables that cannot be recalled.
+  // If rotation invalidated them, the rotation would simply never be done.
+  const OLD_KEY = Buffer.alloc(32, 1).toString("base64");
+  const NEW_KEY = Buffer.alloc(32, 2).toString("base64");
+
+  async function withRotation<T>(run: () => Promise<T>): Promise<T> {
+    vi.resetModules();
+    vi.stubEnv("TOKEN_DIGEST_KEY", NEW_KEY);
+    vi.stubEnv("TOKEN_DIGEST_KEY_PREVIOUS", OLD_KEY);
+    vi.stubEnv("TOKEN_DIGEST_KEY_VERSION", "2");
+    try {
+      return await run();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
+  }
+
+  it("sends both digests during a rotation, so an old stand still resolves", async () => {
+    await withRotation(async () => {
+      calls.length = 0;
+      const { GET } = await import("@/app/api/v1/public/q/[token]/route");
+      await GET(request("GET", `/api/v1/public/q/${TOKEN}`), params(TOKEN));
+
+      const resolve = calls.find((call) => call.fn === "rpc_public_resolve_stand");
+      expect(resolve?.args["p_token_hash"]).toBeTruthy();
+      expect(resolve?.args["p_previous_token_hash"]).toBeTruthy();
+      // Two different keys must produce two different digests, or the fallback
+      // is doing nothing.
+      expect(resolve?.args["p_previous_token_hash"]).not.toBe(resolve?.args["p_token_hash"]);
+    });
+  });
+
+  it("re-digests a stand that matched the old key, without reprinting it", async () => {
+    await withRotation(async () => {
+      calls.length = 0;
+      rpcHandler = (fn) => {
+        if (fn === "rpc_consume_rate_limit") return allowed();
+        if (fn === "rpc_public_resolve_stand") {
+          // Matched under the key being retired.
+          return { data: [{ ...ACTIVE_STAND, matched_key_version: 1 }], error: null };
+        }
+        return { data: true, error: null };
+      };
+
+      const { GET } = await import("@/app/api/v1/public/q/[token]/route");
+      const response = await GET(request("GET", `/api/v1/public/q/${TOKEN}`), params(TOKEN));
+
+      // The customer is served normally; the migration is invisible to them.
+      expect(response.status).toBe(200);
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const upgrade = calls.find((call) => call.fn === "rpc_upgrade_stand_token_digest");
+      expect(upgrade).toBeDefined();
+      expect(upgrade?.args["p_new_version"]).toBe(2);
+      expect(upgrade?.args["p_old_token_hash"]).not.toBe(upgrade?.args["p_new_token_hash"]);
+    });
+  });
+
+  it("does not re-digest a stand already on the current key", async () => {
+    await withRotation(async () => {
+      calls.length = 0;
+      rpcHandler = (fn) => {
+        if (fn === "rpc_consume_rate_limit") return allowed();
+        if (fn === "rpc_public_resolve_stand") {
+          return { data: [{ ...ACTIVE_STAND, matched_key_version: 2 }], error: null };
+        }
+        return { data: true, error: null };
+      };
+
+      const { GET } = await import("@/app/api/v1/public/q/[token]/route");
+      await GET(request("GET", `/api/v1/public/q/${TOKEN}`), params(TOKEN));
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(calls.map((call) => call.fn)).not.toContain("rpc_upgrade_stand_token_digest");
+    });
+  });
+
+  it("still serves the customer when the upgrade write fails", async () => {
+    await withRotation(async () => {
+      rpcHandler = (fn) => {
+        if (fn === "rpc_consume_rate_limit") return allowed();
+        if (fn === "rpc_public_resolve_stand") {
+          return { data: [{ ...ACTIVE_STAND, matched_key_version: 1 }], error: null };
+        }
+        // Housekeeping failing must never cost a customer their review.
+        return { data: null, error: { message: "write failed" } };
+      };
+
+      const { GET } = await import("@/app/api/v1/public/q/[token]/route");
+      const response = await GET(request("GET", `/api/v1/public/q/${TOKEN}`), params(TOKEN));
+
+      expect(response.status).toBe(200);
+    });
+  });
+
+  it("sends no fallback digest when no rotation is in progress", async () => {
+    calls.length = 0;
+    const { GET } = await import("@/app/api/v1/public/q/[token]/route");
+    await GET(request("GET", `/api/v1/public/q/${TOKEN}`), params(TOKEN));
+
+    const resolve = calls.find((call) => call.fn === "rpc_public_resolve_stand");
+    expect(resolve?.args["p_previous_token_hash"]).toBeNull();
   });
 });
