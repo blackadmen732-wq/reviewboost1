@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/features/dashboard/app-shell";
 import { InstallPrompt } from "@/features/dashboard/install-prompt";
+import { StatusBanner } from "@/features/dashboard/status-banner";
 import { StatTile } from "@/features/dashboard/stat-tile";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -60,7 +61,7 @@ export default async function HomePage() {
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  const [today, unread, praise, stands, recent] = await Promise.all([
+  const [today, unread, praise, stands, locations, recent] = await Promise.all([
     supabase
       .from("customer_responses")
       .select("rating", { count: "exact" })
@@ -75,6 +76,7 @@ export default async function HomePage() {
       .eq("status", "unmatched")
       .gte("created_at", monthStart.toISOString()),
     supabase.from("review_stands").select("id", { count: "exact", head: true }).eq("status", "active"),
+    supabase.from("locations").select("google_review_url").limit(1),
     supabase
       .from("customer_responses")
       .select("rating")
@@ -104,6 +106,20 @@ export default async function HomePage() {
   );
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
+  const googleUrl = (locations.data ?? [])[0]?.google_review_url as string | null | undefined;
+  const unreadCount = unread.count ?? 0;
+
+  // One status, most urgent first. A code that cannot serve customers beats
+  // unread messages, which beat silence. Showing two problems at once turns
+  // the screen into a list, and a list is homework.
+  const status = !googleUrl || !hasStand
+    ? ({ kind: "setup", href: "/onboarding" } as const)
+    : unreadCount > 0
+      ? ({ kind: "unread", count: unreadCount, href: "/feedback" } as const)
+      : todayCount === 0 && ratings.length === 0
+        ? ({ kind: "quiet", href: "/stands" } as const)
+        : ({ kind: "ok" } as const);
+
   return (
     <AppShell unreadCount={unread.count ?? 0} businessName={businessName}>
         <InstallPrompt />
@@ -126,7 +142,11 @@ export default async function HomePage() {
           </Link>
         </header>
 
-        {/* The headline number. One glance, from across a counter. */}
+        <StatusBanner status={status} />
+
+        {/* The rating is context, not the headline. It sits below the answer to
+            "is anything wrong", because that is the question people open this
+            screen to ask. */}
         <div className="mb-8 grid gap-4 lg:grid-cols-[1fr_1fr] lg:items-stretch">
         <section className="rounded-[var(--radius-card)] border border-border bg-surface p-6 text-center shadow-[var(--shadow-card)] lg:flex lg:flex-col lg:justify-center lg:p-10">
           {average === null ? (

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Globe, Mail, MapPin, Store } from "lucide-react";
+import { Eye, Globe, LifeBuoy, Mail, MapPin, Shield, Store } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/features/dashboard/app-shell";
@@ -76,11 +77,56 @@ export default async function SettingsPage() {
           <Row icon={Mail} label="Signed in as" value={user.email ?? "—"} />
         </div>
 
-        <SignOutButton />
+        {/* A real person to contact, and a plain answer about customer data.
+            A barber deciding whether to put our code on their counter wants to
+            know who is behind it — a faceless product is one they will not
+            recommend to the shop next door. */}
+        <section className="mb-6 flex flex-col gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Help</h2>
 
-        <p className="mt-8 text-center text-sm text-muted">
-          To change these, message support. Editing is coming.
-        </p>
+          <a
+            href="mailto:help@reviewboost.app"
+            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft">
+              <LifeBuoy className="size-5 text-brand-text" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-medium text-ink">Ask us anything</p>
+              <p className="text-sm text-muted">We answer every message.</p>
+            </div>
+          </a>
+
+          {/* Seeing exactly what a customer sees is the single thing that makes
+              an owner comfortable putting this on their counter. */}
+          <Link
+            href="/stands"
+            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+              <Eye className="size-5 text-muted" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-medium text-ink">See what customers see</p>
+              <p className="text-sm text-muted">Scan your own code to try it.</p>
+            </div>
+          </Link>
+
+          <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+              <Shield className="size-5 text-muted" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-medium text-ink">Your customers stay private</p>
+              <p className="text-sm leading-relaxed text-muted">
+                We never ask them for a name, phone number, or email. Private
+                notes are locked so only you can read them.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <SignOutButton />
       </AppShell>
   );
 }
