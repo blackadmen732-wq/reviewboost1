@@ -28,6 +28,14 @@ export function SignOutButton() {
       onClick={async () => {
         setBusy(true);
         await supabaseBrowser().auth.signOut();
+
+        // A full document navigation, deliberately, not router.push(). Signing
+        // out has to destroy every trace of the previous session, and the
+        // client-side Router Cache holds rendered Server Component payloads
+        // containing that owner's feedback and business name. A soft navigation
+        // can serve those from memory to whoever signs in next on the same
+        // phone — which, on a shared device behind a counter, is a real leak.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- see above
         window.location.assign("/login");
       }}
     >

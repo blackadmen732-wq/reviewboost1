@@ -1,31 +1,27 @@
 "use client";
 
-import { Home, MessageSquare, QrCode, Settings, Sparkles } from "lucide-react";
+import { Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Wordmark } from "@/components/brand/wordmark";
+import { DESKTOP_NAV, isActive } from "@/features/dashboard/nav-items";
 import { cn } from "@/lib/utils/cn";
 
 /**
  * Desktop navigation.
  *
  * Hidden below `lg`, where the bottom bar takes over. Both are always rendered
- * and CSS decides — no viewport detection in JavaScript, so there is no flash
- * of the wrong navigation on first paint.
+ * and CSS decides — no viewport detection in JavaScript, so there is no flash of
+ * the wrong navigation on first paint.
  *
- * Settings lives here as a sixth item but is deliberately *not* in the mobile
- * bar, which stays at four. On a phone, a fifth item shrinks every target and
- * settings is not something anyone opens mid-shift; it is reachable from the
- * account row at the bottom instead.
+ * Carries every screen, unlike the phone bar. A sidebar has vertical room, and
+ * scanning a list of six at rest costs nothing; four is a constraint of the
+ * thumb, not of comprehension.
+ *
+ * Settings is not in the list. It lives in the account row at the bottom, where
+ * every desktop product has trained people to look for it.
  */
-
-const ITEMS = [
-  { href: "/home", label: "Home", icon: Home },
-  { href: "/feedback", label: "Feedback", icon: MessageSquare },
-  { href: "/praise", label: "Praise", icon: Sparkles },
-  { href: "/stands", label: "Codes", icon: QrCode },
-] as const;
 
 export function DesktopSidebar({
   unreadCount = 0,
@@ -58,10 +54,10 @@ export function DesktopSidebar({
 
       <nav className="flex-1 px-3 py-2">
         <ul className="flex flex-col gap-1">
-          {ITEMS.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          {DESKTOP_NAV.map((item) => {
+            const active = isActive(pathname, item.href);
             const Icon = item.icon;
-            const badge = item.href === "/feedback" ? unreadCount : 0;
+            const badge = item.badge === "unread" ? unreadCount : 0;
 
             return (
               <li key={item.href}>

@@ -43,15 +43,26 @@ export function CodeInput({
   const [digits, setDigits] = useState<string[]>(() => Array.from({ length }, () => ""));
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
 
-  useEffect(() => {
-    if (resetToken === 0) return;
+  /**
+   * Clearing on reset happens during render, not in an effect.
+   *
+   * React's documented way to adjust state when a prop changes: compare against
+   * the previous value and set during rendering. The effect version renders the
+   * stale code once, then re-renders empty — which after a wrong code shows the
+   * rejected digits for a frame before they vanish.
+   */
+  const [seenReset, setSeenReset] = useState(resetToken);
+  if (resetToken !== seenReset) {
+    setSeenReset(resetToken);
     setDigits(Array.from({ length }, () => ""));
-    inputs.current[0]?.focus();
-  }, [resetToken, length]);
+  }
 
+  // Focus is a DOM side effect, so it does belong in an effect. Runs on mount
+  // and again whenever a reset lands, putting the caret where the next digit
+  // goes without the person having to tap.
   useEffect(() => {
     inputs.current[0]?.focus();
-  }, []);
+  }, [seenReset]);
 
   function commit(next: string[]) {
     setDigits(next);
@@ -124,7 +135,6 @@ export function CodeInput({
     >
       {digits.map((digit, index) => (
         <input
-          // eslint-disable-next-line react/no-array-index-key
           key={index}
           ref={(element) => {
             inputs.current[index] = element;

@@ -279,6 +279,10 @@ export function OnboardingFlow() {
         <div className="w-full rounded-[var(--radius-card)] border border-border bg-surface p-6 shadow-[var(--shadow-card)]">
           {/* The QR is the reward. It is the first tangible thing they have
               made, and it is on screen before any dashboard. */}
+          {/* A server-rendered SVG from our own route, not a raster asset:
+              next/image cannot optimise it and would only add a proxy hop in
+              front of the one image that must appear instantly. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/api/v1/review-stands/${created.standId}/qr`}
             alt="Your QR code"

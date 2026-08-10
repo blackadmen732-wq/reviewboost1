@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import { Eye, Globe, LifeBuoy, Mail, MapPin, Shield, Store } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { AppShell } from "@/features/dashboard/app-shell";
 import { SignOutButton } from "@/features/dashboard/sign-out-button";
-import { supabaseServer } from "@/lib/supabase/server";
+import { getPrimaryLocation, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
   title: "Settings — ReviewBoost",
@@ -26,53 +25,23 @@ export const dynamic = "force-dynamic";
  * in the app at all.
  */
 export default async function SettingsPage() {
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/settings");
-
-  const { data: memberships } = await supabase
-    .from("organization_members")
-    .select("org_id, role, organizations(name, slug, timezone)")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .limit(1);
-
-  const membership = memberships?.[0] as
-    | {
-        org_id: string;
-        role: string;
-        organizations: { name: string; slug: string; timezone: string } | null;
-      }
-    | undefined;
-
-  const { data: locations } = membership
-    ? await supabase
-        .from("locations")
-        .select("name, google_review_url")
-        .eq("org_id", membership.org_id)
-        .limit(1)
-    : { data: null };
-
-  const location = locations?.[0] as
-    | { name: string; google_review_url: string | null }
-    | undefined;
+  const { user, organization } = await requireOwner("/settings");
+  const location = await getPrimaryLocation();
 
   return (
-    <AppShell businessName={membership?.organizations?.name}>
+    <AppShell businessName={organization.name}>
         <h1 className="mb-6 text-2xl font-semibold tracking-[-0.02em] text-ink">Settings</h1>
 
         <div className="mb-6 flex flex-col gap-3">
-          <Row icon={Store} label="Business" value={membership?.organizations?.name ?? "—"} />
+          <Row icon={Store} label="Business" value={organization.name} />
           <Row icon={MapPin} label="Location" value={location?.name ?? "—"} />
           <Row
             icon={Globe}
             label="Google link"
-            value={location?.google_review_url ?? "Not set yet"}
+            value={location?.googleReviewUrl ?? "Not set yet"}
             // The one field where absence is a problem worth flagging: without
             // it a stand cannot serve customers at all.
-            warn={!location?.google_review_url}
+            warn={!location?.googleReviewUrl}
           />
           <Row icon={Mail} label="Signed in as" value={user.email ?? "—"} />
         </div>

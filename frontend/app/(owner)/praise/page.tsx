@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Sparkles } from "lucide-react";
-import { redirect } from "next/navigation";
+import { Sparkles, Trophy } from "lucide-react";
 
+import { EmptyState } from "@/components/ui/empty-state";
 import { AppShell } from "@/features/dashboard/app-shell";
-import { tryDecrypt } from "@/lib/server/crypto";
-import { supabaseServer } from "@/lib/supabase/server";
+import { getPraiseLeaderboard, listPraise, requireOwner } from "@/lib/server/owner-data";
+import { relativeDay } from "@/lib/utils/relative-day";
 
 export const metadata: Metadata = {
   title: "Praise — ReviewBoost",
@@ -16,73 +16,82 @@ export const dynamic = "force-dynamic";
 /**
  * Staff a customer named, deliberately without the rating.
  *
- * The select list below is the privacy barrier, and it is not a convention that
- * can be forgotten: `team_praise_records` has no rating column and there is no
- * join to `customer_responses`, so the star rating is not available to leak.
+ * That absence is the whole point of the feature, and it is enforced in the
+ * schema rather than by convention: `team_praise_records` has no rating column
+ * and the data layer performs no join to `customer_responses`, so the star is
+ * not available to leak even by accident.
  *
- * That is the point of the whole feature. An owner deciding whether to
- * recognise someone should be reacting to what a customer wrote about them, not
- * to a number that may have been about the wait or the parking.
+ * An owner deciding whether to recognise someone should be reacting to what a
+ * customer wrote about them — not to a number that may have been about the wait,
+ * the parking, or the weather.
  */
 export default async function PraisePage() {
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/praise");
+  await requireOwner("/praise");
 
-  const { data } = await supabase
-    .from("team_praise_records")
-    .select("id, first_name_encrypted, praise_note_encrypted, status, created_at")
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  const items = (data ?? []).map((row) => ({
-    id: row.id as string,
-    firstName: tryDecrypt(row.first_name_encrypted as string) ?? "Someone",
-    note: tryDecrypt(row.praise_note_encrypted as string | null),
-    createdAt: row.created_at as string,
-  }));
+  const [{ items }, leaderboard] = await Promise.all([
+    listPraise({ limit: 50 }),
+    getPraiseLeaderboard(),
+  ]);
 
   return (
     <AppShell>
-        <h1 className="mb-2 text-2xl font-semibold tracking-[-0.02em] text-ink">Praise</h1>
-        <p className="mb-6 text-base text-muted">Staff your customers named.</p>
+      <h1 className="mb-2 text-2xl font-semibold tracking-[-0.02em] text-ink">Praise</h1>
+      <p className="mb-6 text-base text-muted">Staff your customers named.</p>
 
-        {items.length === 0 ? (
-          <div className="flex flex-col items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface px-6 py-16 text-center">
-            <div className="grid size-16 place-items-center rounded-full bg-quiet">
-              <Sparkles className="size-8 text-muted" aria-hidden="true" />
-            </div>
-            <p className="text-lg font-semibold text-ink">Nothing yet</p>
-            <p className="max-w-[30ch] text-base text-muted">
-              When a customer names one of your team, they show up here.
-            </p>
-          </div>
-        ) : (
+      {items.length === 0 ? (
+        <EmptyState
+          icon={Sparkles}
+          title="Nothing yet"
+          description="When a customer names one of your team, they show up here."
+        />
+      ) : (
+        <>
+          {/* Shown only once there is enough to rank. Two names and a trophy
+              looks like a toy; it needs to be earned before it means anything. */}
+          {leaderboard.length >= 2 && (leaderboard[0]?.count ?? 0) > 1 ? (
+            <section className="mb-6 rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-control)]">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted">
+                <Trophy className="size-4 text-[color:var(--rb-star)]" aria-hidden="true" />
+                Named most often
+              </h2>
+
+              <ol className="flex flex-col gap-3">
+                {leaderboard.map((entry, index) => (
+                  <li key={entry.firstName} className="flex items-center gap-3">
+                    <span className="w-5 shrink-0 text-sm font-semibold tabular-nums text-muted">
+                      {index + 1}
+                    </span>
+                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-semibold text-brand-text">
+                      {entry.firstName.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-base font-medium text-ink">
+                      {entry.firstName}
+                    </span>
+                    <span className="shrink-0 text-base font-semibold tabular-nums text-ink">
+                      {entry.count}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ) : null}
+
           <ul className="flex flex-col gap-3">
             {items.map((item) => (
               <li
-                key={item.id}
+                key={item.praiseId}
                 className="rounded-[var(--radius-card)] border border-border bg-surface p-4 shadow-[var(--shadow-control)]"
               >
                 <div className="flex items-center gap-3">
                   {/* The name is the headline. It is the thing the owner is
-                      looking for and the only thing they need to act. */}
+                      looking for and the only thing they need in order to act. */}
                   <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-soft text-lg font-semibold text-brand-text">
                     {item.firstName.slice(0, 1).toUpperCase()}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-lg font-semibold text-ink">{item.firstName}</p>
-                    <time
-                      dateTime={item.createdAt}
-                      className="text-sm text-muted"
-                      suppressHydrationWarning
-                    >
-                      {new Date(item.createdAt).toLocaleDateString(undefined, {
-                        day: "numeric",
-                        month: "short",
-                      })}
+                    <time dateTime={item.createdAt} className="text-sm text-muted">
+                      {relativeDay(item.createdAt)}
                     </time>
                   </div>
                 </div>
@@ -95,13 +104,8 @@ export default async function PraisePage() {
               </li>
             ))}
           </ul>
-        )}
-
-        {items.length > 0 ? (
-          <p className="mt-6 text-center text-sm leading-relaxed text-muted">
-            Matching praise to staff and recording a thank-you is coming next.
-          </p>
-        ) : null}
-      </AppShell>
+        </>
+      )}
+    </AppShell>
   );
 }

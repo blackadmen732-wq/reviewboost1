@@ -1,7 +1,7 @@
 "use client";
 
 import { Share, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -17,8 +17,22 @@ import { Button } from "@/components/ui/button";
  * show the three taps — which is why the iOS branch describes the Share menu
  * rather than pretending a button exists.
  *
- * Dismissal is remembered. Nagging someone who already said no on every visit
- * is how a helpful prompt becomes the reason they stop opening the app.
+ * Dismissal is remembered. Nagging someone who already said no on every visit is
+ * how a helpful prompt becomes the reason they stop opening the app.
+ *
+ * WHY useSyncExternalStore RATHER THAN AN EFFECT
+ * ----------------------------------------------
+ * Everything this component needs — display mode, user agent, localStorage —
+ * lives outside React and cannot be read while rendering on the server. Reading
+ * it in an effect and calling setState works, but costs a second render pass on
+ * every dashboard load and is exactly the cascading-render pattern React now
+ * flags.
+ *
+ * `useSyncExternalStore` is the supported way to read a browser fact:
+ * `getServerSnapshot` returns "not eligible", so the server and the first client
+ * render agree and hydration is clean, and the real value arrives without a
+ * setState in an effect body. The subscribe function is a no-op because none of
+ * these facts change while the page is open.
  */
 
 interface InstallEvent extends Event {
@@ -28,56 +42,75 @@ interface InstallEvent extends Event {
 
 const DISMISSED_KEY = "reviewboost:install-dismissed";
 
+type Eligibility = "no" | "ios" | "android";
+
+function subscribeToNothing(): () => void {
+  return () => {};
+}
+
+function readEligibility(): Eligibility {
+  // Already installed. `standalone` is the non-standard iOS flag; the media
+  // query covers everyone else.
+  const installed =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as { standalone?: boolean }).standalone === true;
+
+  if (installed) return "no";
+
+  try {
+    if (window.localStorage.getItem(DISMISSED_KEY)) return "no";
+  } catch {
+    // Private browsing can throw on localStorage. Showing the prompt is the safe
+    // failure here.
+  }
+
+  return /iphone|ipad|ipod/i.test(window.navigator.userAgent) ? "ios" : "android";
+}
+
 export function InstallPrompt() {
+  const eligibility = useSyncExternalStore(
+    subscribeToNothing,
+    readEligibility,
+    // Server and first client render agree on "nothing to show", so there is no
+    // hydration mismatch and no flash of a card that then disappears.
+    () => "no" as const,
+  );
+
   const [deferred, setDeferred] = useState<InstallEvent | null>(null);
-  const [isIos, setIsIos] = useState(false);
-  const [visible, setVisible] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    // Already installed. `standalone` is the non-standard iOS flag; the media
-    // query covers everyone else.
-    const installed =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as { standalone?: boolean }).standalone === true;
-
-    if (installed) return;
-
-    try {
-      if (window.localStorage.getItem(DISMISSED_KEY)) return;
-    } catch {
-      // Private browsing can throw on localStorage. Showing the prompt is the
-      // safe failure here.
-    }
-
-    const ios = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
-    setIsIos(ios);
-    if (ios) {
-      setVisible(true);
-      return;
-    }
+    if (eligibility !== "android") return;
 
     function capture(event: Event) {
-      // Preventing the default is what lets us show it at a sensible moment
+      // Preventing the default is what lets us show this at a sensible moment
       // instead of Chrome's own banner appearing over the dashboard.
       event.preventDefault();
       setDeferred(event as InstallEvent);
-      setVisible(true);
     }
 
     window.addEventListener("beforeinstallprompt", capture);
     return () => window.removeEventListener("beforeinstallprompt", capture);
-  }, []);
+  }, [eligibility]);
 
-  function dismiss() {
-    setVisible(false);
+  const dismiss = useCallback(() => {
+    setDismissed(true);
     try {
       window.localStorage.setItem(DISMISSED_KEY, "1");
     } catch {
       // Not remembering is a minor annoyance, not a failure worth handling.
     }
-  }
+  }, []);
+
+  // Android only earns the card once the browser has told us an install is
+  // actually possible; showing a button that cannot install is worse than
+  // showing nothing.
+  const visible =
+    !dismissed && (eligibility === "ios" || (eligibility === "android" && deferred !== null));
 
   if (!visible) return null;
+
+  const isIos = eligibility === "ios";
 
   return (
     <div className="mb-6 rounded-[var(--radius-card)] border border-border bg-surface p-4 shadow-[var(--shadow-control)] lg:hidden">
@@ -89,7 +122,9 @@ export function InstallPrompt() {
         <div className="min-w-0 flex-1">
           <p className="text-base font-semibold text-ink">Put this on your home screen</p>
           <p className="mt-0.5 text-sm text-muted">
-            {isIos ? "Open your phone's share menu, then Add to Home Screen." : "One tap. Opens like a normal app."}
+            {isIos
+              ? "Open your phone's share menu, then Add to Home Screen."
+              : "One tap. Opens like a normal app."}
           </p>
         </div>
 

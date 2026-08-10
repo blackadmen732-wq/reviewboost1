@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { MessageSquare } from "lucide-react";
-import { redirect } from "next/navigation";
 
 import { AppShell } from "@/features/dashboard/app-shell";
+import { EmptyState } from "@/components/ui/empty-state";
 import { FeedbackList } from "@/features/dashboard/feedback-list";
-import { supabaseServer } from "@/lib/supabase/server";
+import { getOwnerCounts, listReviews, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
   title: "Feedback — ReviewBoost",
@@ -14,62 +14,53 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * What customers said, newest first.
+ * The private messages customers left, newest first.
  *
- * Notes are decrypted on the server and never logged. The rating is shown here
- * because this is the private feedback workspace — the one place an owner is
- * meant to see it. Team Praise deliberately does not.
+ * FEEDBACK VS REVIEWS
+ * -------------------
+ * These are two screens on purpose. Feedback is the *inbox* — things that may
+ * need a reply, with unread state and an action attached. Reviews is the
+ * *record* — every rating, browsable and filterable, with nothing to do.
+ *
+ * Collapsing them would mean either burying complaints in a list of 5s, or
+ * pretending a silent 5 is an unread task. An owner between customers needs the
+ * first list short and true.
+ *
+ * Notes are decrypted on the server and never logged. The rating appears here
+ * because this is the private workspace — the one place an owner is meant to see
+ * it. Team Praise deliberately does not.
  */
 export default async function FeedbackPage() {
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/feedback");
+  await requireOwner("/feedback");
 
-  const { data } = await supabase
-    .from("customer_responses")
-    .select("id, rating, note_encrypted, submitted_at, read_at")
-    .order("submitted_at", { ascending: false })
-    .limit(50);
-
-  const { count } = await supabase
-    .from("customer_responses")
-    .select("id", { count: "exact", head: true })
-    .is("read_at", null);
+  const [{ items }, counts] = await Promise.all([
+    listReviews({ withNotesOnly: true, limit: 50 }),
+    getOwnerCounts(),
+  ]);
 
   return (
-    <AppShell unreadCount={count ?? 0}>
-        <h1 className="mb-6 text-2xl font-semibold tracking-[-0.02em] text-ink">Feedback</h1>
+    <AppShell unreadCount={counts.unread}>
+      <h1 className="mb-2 text-2xl font-semibold tracking-[-0.02em] text-ink">Feedback</h1>
+      <p className="mb-6 text-base text-muted">Messages customers wrote for you.</p>
 
-        {(data ?? []).length === 0 ? (
-          <EmptyFeedback />
-        ) : (
-          <FeedbackList
-            items={(data ?? []).map((row) => ({
-              id: row.id as string,
-              rating: row.rating as number,
-              noteEncrypted: (row.note_encrypted as string | null) ?? null,
-              submittedAt: row.submitted_at as string,
-              isRead: row.read_at !== null,
-            }))}
-          />
-        )}
-      </AppShell>
-  );
-}
-
-function EmptyFeedback() {
-  return (
-    <div className="flex flex-col items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface px-6 py-16 text-center">
-      <div className="grid size-16 place-items-center rounded-full bg-quiet">
-        <MessageSquare className="size-8 text-muted" aria-hidden="true" />
-      </div>
-      <p className="text-lg font-semibold text-ink">Nothing yet</p>
-      {/* An empty state that explains the cause, not just the absence. */}
-      <p className="max-w-[28ch] text-base text-muted">
-        When a customer scans your code, what they say shows up here.
-      </p>
-    </div>
+      {items.length === 0 ? (
+        <EmptyState
+          icon={MessageSquare}
+          title="Nothing yet"
+          // Explains the cause, not just the absence.
+          description="When a customer scans your code and writes something, it shows up here."
+        />
+      ) : (
+        <FeedbackList
+          items={items.map((item) => ({
+            id: item.responseId,
+            rating: item.rating,
+            note: item.note,
+            submittedAt: item.submittedAt,
+            isRead: item.isRead,
+          }))}
+        />
+      )}
+    </AppShell>
   );
 }

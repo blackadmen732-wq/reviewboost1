@@ -1,16 +1,16 @@
 "use client";
 
-import { Home, MessageSquare, QrCode, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { MOBILE_NAV, isActive } from "@/features/dashboard/nav-items";
 import { cn } from "@/lib/utils/cn";
 
 /**
  * Bottom navigation.
  *
- * Four items, never five. Past four, people stop reading the bar and start
- * hunting, and a hunting user is a user who thinks the app is complicated.
+ * Four items, never five — see `nav-items.ts` for why, and for where the screens
+ * that do not fit are reachable instead.
  *
  * At the bottom rather than the top because this is used one-handed, standing
  * up, often while doing something else. The bottom third of a phone is the only
@@ -21,14 +21,6 @@ import { cn } from "@/lib/utils/cn";
  * often than designers assume, and this audience will not tap something to find
  * out what it does.
  */
-
-const ITEMS = [
-  { href: "/home", label: "Home", icon: Home },
-  { href: "/feedback", label: "Feedback", icon: MessageSquare },
-  { href: "/praise", label: "Praise", icon: Sparkles },
-  { href: "/stands", label: "Codes", icon: QrCode },
-] as const;
-
 export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
   const pathname = usePathname();
 
@@ -41,16 +33,16 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
         // decides, so there is no flash of the wrong navigation on first paint.
         "lg:hidden",
         "shadow-[var(--shadow-float)]",
-        // Clears the iOS home indicator. Without this the last row of taps
-        // lands on the system gesture area and appears to do nothing.
+        // Clears the iOS home indicator. Without this the last row of taps lands
+        // on the system gesture area and appears to do nothing.
         "pb-[env(safe-area-inset-bottom)]",
       )}
     >
       <ul className="mx-auto flex max-w-lg items-stretch">
-        {ITEMS.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        {MOBILE_NAV.map((item) => {
+          const active = isActive(pathname, item.href);
           const Icon = item.icon;
-          const badge = item.href === "/feedback" ? unreadCount : 0;
+          const badge = item.badge === "unread" ? unreadCount : 0;
 
           return (
             <li key={item.href} className="flex-1">
