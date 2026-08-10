@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { MessageSquare } from "lucide-react";
 import { redirect } from "next/navigation";
 
-import { BottomNav } from "@/features/dashboard/bottom-nav";
+import { AppShell } from "@/features/dashboard/app-shell";
 import { FeedbackList } from "@/features/dashboard/feedback-list";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -39,8 +39,7 @@ export default async function FeedbackPage() {
     .is("read_at", null);
 
   return (
-    <>
-      <main className="mx-auto w-full max-w-lg px-5 pb-28 pt-8">
+    <AppShell unreadCount={count ?? 0}>
         <h1 className="mb-6 text-2xl font-semibold tracking-[-0.02em] text-ink">Feedback</h1>
 
         {(data ?? []).length === 0 ? (
@@ -56,9 +55,7 @@ export default async function FeedbackPage() {
             }))}
           />
         )}
-      </main>
-      <BottomNav unreadCount={count ?? 0} />
-    </>
+      </AppShell>
   );
 }
 

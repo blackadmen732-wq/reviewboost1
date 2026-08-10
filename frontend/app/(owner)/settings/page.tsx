@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Globe, Mail, MapPin, Store } from "lucide-react";
 import { redirect } from "next/navigation";
 
-import { BottomNav } from "@/features/dashboard/bottom-nav";
+import { AppShell } from "@/features/dashboard/app-shell";
 import { SignOutButton } from "@/features/dashboard/sign-out-button";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -59,8 +59,7 @@ export default async function SettingsPage() {
     | undefined;
 
   return (
-    <>
-      <main className="mx-auto w-full max-w-lg px-5 pb-28 pt-8">
+    <AppShell businessName={membership?.organizations?.name}>
         <h1 className="mb-6 text-2xl font-semibold tracking-[-0.02em] text-ink">Settings</h1>
 
         <div className="mb-6 flex flex-col gap-3">
@@ -82,9 +81,7 @@ export default async function SettingsPage() {
         <p className="mt-8 text-center text-sm text-muted">
           To change these, message support. Editing is coming.
         </p>
-      </main>
-      <BottomNav />
-    </>
+      </AppShell>
   );
 }
 

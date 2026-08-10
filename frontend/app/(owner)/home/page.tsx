@@ -4,7 +4,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { BottomNav } from "@/features/dashboard/bottom-nav";
+import { AppShell } from "@/features/dashboard/app-shell";
+import { InstallPrompt } from "@/features/dashboard/install-prompt";
 import { StatTile } from "@/features/dashboard/stat-tile";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -39,13 +40,13 @@ export default async function HomePage() {
   // rows, and a missing clause returns fewer, never somebody else's.
   const { data: memberships } = await supabase
     .from("organization_members")
-    .select("org_id, organizations(name)")
+    .select("org_id, organizations(name, timezone)")
     .eq("user_id", user.id)
     .eq("status", "active")
     .limit(1);
 
   const membership = memberships?.[0] as
-    | { org_id: string; organizations: { name: string } | null }
+    | { org_id: string; organizations: { name: string; timezone: string } | null }
     | undefined;
 
   // No organization yet means they have never finished setting up. Send them
@@ -91,30 +92,43 @@ export default async function HomePage() {
   const businessName = membership.organizations?.name ?? "Your business";
   const hasStand = (stands.count ?? 0) > 0;
 
+  // Server-rendered from the organization's own hour, not the viewer's clock,
+  // so an owner checking from a different timezone still gets their own
+  // morning rather than the server's.
+  const hour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "numeric",
+      hour12: false,
+      timeZone: membership.organizations?.timezone ?? "UTC",
+    }).format(new Date()),
+  );
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
   return (
-    <>
-      {/* pb-28 clears the fixed bottom bar. Content hidden behind navigation is
-          the most common mobile layout bug and the hardest for a user to
-          describe when they report it. */}
-      <main className="mx-auto w-full max-w-lg px-5 pb-28 pt-8">
+    <AppShell unreadCount={unread.count ?? 0} businessName={businessName}>
+        <InstallPrompt />
+
         <header className="mb-8 flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-muted">Today</p>
-            <h1 className="truncate text-2xl font-semibold tracking-[-0.02em] text-ink">
+            <p className="text-sm font-medium text-muted">{greeting}</p>
+            <h1 className="truncate text-2xl font-semibold tracking-[-0.02em] text-ink lg:text-3xl">
               {businessName}
             </h1>
           </div>
           <Link
             href="/settings"
             aria-label="Settings"
-            className="grid size-11 shrink-0 place-items-center rounded-full border border-border bg-surface text-base font-semibold text-ink transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+            // Hidden on desktop: the sidebar already carries the account row,
+            // and two ways to reach the same place is two things to scan past.
+            className="grid size-11 shrink-0 place-items-center rounded-full border border-border bg-surface text-base font-semibold text-ink transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] lg:hidden"
           >
             {businessName.slice(0, 1).toUpperCase()}
           </Link>
         </header>
 
         {/* The headline number. One glance, from across a counter. */}
-        <section className="mb-6 rounded-[var(--radius-card)] border border-border bg-surface p-6 text-center shadow-[var(--shadow-card)]">
+        <div className="mb-8 grid gap-4 lg:grid-cols-[1fr_1fr] lg:items-stretch">
+        <section className="rounded-[var(--radius-card)] border border-border bg-surface p-6 text-center shadow-[var(--shadow-card)] lg:flex lg:flex-col lg:justify-center lg:p-10">
           {average === null ? (
             <>
               <Star className="mx-auto mb-3 size-10 text-[color:var(--rb-border-strong)]" aria-hidden="true" />
@@ -143,7 +157,7 @@ export default async function HomePage() {
           )}
         </section>
 
-        <section className="mb-8 grid grid-cols-2 gap-3">
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-1 lg:gap-4">
           <StatTile
             value={unread.count ?? 0}
             label="To read"
@@ -159,18 +173,16 @@ export default async function HomePage() {
             needsAttention={(praise.count ?? 0) > 0}
           />
         </section>
+      </div>
 
         {/* Exactly one primary action, and it changes with what they still need
             to do. Two primary buttons is the same as none. */}
-        <Button asChild size="lg">
+        <Button asChild size="lg" className="lg:w-auto lg:min-w-[280px]">
           <Link href={hasStand ? "/stands" : "/onboarding"}>
             <QrCode className="size-5" aria-hidden="true" />
             {hasStand ? "Print your code" : "Finish setting up"}
           </Link>
         </Button>
-      </main>
-
-      <BottomNav unreadCount={unread.count ?? 0} />
-    </>
+      </AppShell>
   );
 }

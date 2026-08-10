@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ReviewBoost wordmark.
+
+  NOTE ON FONTS: this uses live text with a Geist-first fallback stack, which
+  keeps the file editable and tiny. It renders correctly anywhere Geist is
+  available (including inside this app). For print, a third party, or anywhere
+  the font cannot be guaranteed, convert the text to outlines first — otherwise
+  it silently falls back to the system sans and stops being the logo.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 72" width="420" height="72" role="img" aria-labelledby="rb-title">
+  <title id="rb-title">ReviewBoost</title>
+  <text x="0" y="52"
+        font-family="Geist, 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="52" letter-spacing="-1.8">
+    <tspan font-weight="400" fill="#1A1712">Review</tspan><tspan font-weight="700" fill="#007A4D">Boost</tspan>
+  </text>
+</svg>

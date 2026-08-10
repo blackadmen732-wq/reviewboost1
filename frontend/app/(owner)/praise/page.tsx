@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Sparkles } from "lucide-react";
 import { redirect } from "next/navigation";
 
-import { BottomNav } from "@/features/dashboard/bottom-nav";
+import { AppShell } from "@/features/dashboard/app-shell";
 import { tryDecrypt } from "@/lib/server/crypto";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -45,8 +45,7 @@ export default async function PraisePage() {
   }));
 
   return (
-    <>
-      <main className="mx-auto w-full max-w-lg px-5 pb-28 pt-8">
+    <AppShell>
         <h1 className="mb-2 text-2xl font-semibold tracking-[-0.02em] text-ink">Praise</h1>
         <p className="mb-6 text-base text-muted">Staff your customers named.</p>
 
@@ -103,8 +102,6 @@ export default async function PraisePage() {
             Matching praise to staff and recording a thank-you is coming next.
           </p>
         ) : null}
-      </main>
-      <BottomNav />
-    </>
+      </AppShell>
   );
 }

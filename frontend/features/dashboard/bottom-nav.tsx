@@ -37,6 +37,9 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
       aria-label="Main"
       className={cn(
         "fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur",
+        // The desktop sidebar takes over here. Both render always and CSS
+        // decides, so there is no flash of the wrong navigation on first paint.
+        "lg:hidden",
         "shadow-[var(--shadow-float)]",
         // Clears the iOS home indicator. Without this the last row of taps
         // lands on the system gesture area and appears to do nothing.

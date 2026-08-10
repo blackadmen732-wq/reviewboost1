@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { QrCode } from "lucide-react";
 import { redirect } from "next/navigation";
 
-import { BottomNav } from "@/features/dashboard/bottom-nav";
+import { AppShell } from "@/features/dashboard/app-shell";
 import { StandCard } from "@/features/dashboard/stand-card";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -34,8 +34,7 @@ export default async function StandsPage() {
   const stands = data ?? [];
 
   return (
-    <>
-      <main className="mx-auto w-full max-w-lg px-5 pb-28 pt-8">
+    <AppShell>
         <h1 className="mb-2 text-2xl font-semibold tracking-[-0.02em] text-ink">Your codes</h1>
         <p className="mb-6 text-base text-muted">Put these where customers pay.</p>
 
@@ -62,8 +61,6 @@ export default async function StandsPage() {
             ))}
           </div>
         )}
-      </main>
-      <BottomNav />
-    </>
+      </AppShell>
   );
 }
