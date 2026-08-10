@@ -1,5 +1,7 @@
 import { Star } from "lucide-react";
 
+import { MarkReadButton } from "@/features/dashboard/mark-read-button";
+
 import { tryDecrypt } from "@/lib/server/crypto";
 import { cn } from "@/lib/utils/cn";
 
@@ -66,6 +68,12 @@ export function FeedbackList({ items }: { items: FeedbackItem[] }) {
               // Most customers rate and leave. Saying so is kinder than an
               // empty space that looks like something failed to load.
               <p className="text-base italic text-muted">Rating only, no message</p>
+            )}
+
+            {item.isRead ? null : (
+              <div className="mt-3 flex justify-end">
+                <MarkReadButton responseId={item.id} />
+              </div>
             )}
           </li>
         );

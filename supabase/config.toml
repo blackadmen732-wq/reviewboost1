@@ -248,6 +248,13 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# The sign-in email. Supabase's default sends only a magic link, but the login
+# screen asks for a six-digit code — so the default made signing in impossible.
+# This template leads with {{ .Token }} and keeps the link as a fallback.
+[auth.email.template.magic_link]
+subject = "Your ReviewBoost sign-in code"
+content_path = "./supabase/templates/magic-link.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
