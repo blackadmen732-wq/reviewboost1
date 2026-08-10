@@ -7,25 +7,25 @@ Ordered by what would hurt most if it stayed missing.
 
 ---
 
-## 1. There is no owner. Anywhere.
+## 1. The owner API exists; the owner *interface* does not
 
-**This is the biggest hole and it is easy to miss**, because the customer flow
-works end to end and feels like progress.
+**Backend: done.** `POST /api/v1/onboarding` creates the organization, owner
+membership, first location, and first stand in one transaction.
+`GET /api/v1/customer-responses` and `GET /api/v1/team-praise` read them back,
+cursor-paginated. `GET /api/v1/review-stands/{id}/qr` renders a printable code.
 
-A customer can scan, rate, leave a note, and praise a colleague. **No human
-being can read any of it.** There is no sign-up, no login, no dashboard, no way
-to create an organization, no way to create a location, and no way to make a
-stand. Every row the customer flow writes goes into a database nobody can open
-except through Studio.
+Owner routes run under the **caller's own** Supabase client, so RLS enforces
+isolation on every statement rather than each handler remembering a `where
+org_id`. The service role stays confined to the anonymous customer flow, where
+there is no user for RLS to key on.
 
-The migrations define `organizations`, `organization_members`, and `locations`
-with correct policies, and no code path creates a row in any of them. The seed
-script exists precisely because there is no other way to get a stand.
+**Frontend: missing, and it is Codex's to build.** There is still no sign-up
+screen, no onboarding wizard, and no dashboard. A business owner cannot yet do
+any of the above without an HTTP client.
 
-**What to build:** Supabase Auth sign-up, an onboarding route that creates the
-organization, owner membership, first location, and first stand in one
-transaction, and a dashboard that lists responses and praise. Until that exists,
-ReviewBoost has no users — only customers of users who do not exist yet.
+Also missing on the backend side: member invitations, role changes, location
+editing, marking feedback read or resolved, and stand pause/retire. The schema
+and policies support all of it; the routes are not written.
 
 ---
 
@@ -41,18 +41,19 @@ separated by all of that.
 
 ---
 
-## 3. Stands cannot be created, printed, or rotated
+## 3. Stand lifecycle is half-built
 
-The `review_stands` table is correct. Nothing writes to it except a development
-script.
+**Done:** the first stand is created during onboarding, listed, token-rotated,
+and rendered as printable SVG at high error correction.
 
-Missing: stand creation, activation, pause, retire, token rotation, QR image
-rendering (SVG and PNG), and a printable PDF. The legacy backend had QR
-rendering; that code did not carry over and needs re-deriving on this stack.
+**Missing:** creating *additional* stands, pause and retire, PNG, and a
+print-ready PDF with the business name and instructions. Physical NFC encoding
+and a hardware catalogue do not exist at all.
 
-A stand also has no lifecycle safeguard: **rotating a token invalidates a
-physical object already sitting on a customer's table.** There is no reprint
-workflow and no warning that rotation means replacement.
+Token rotation is deliberately destructive — it invalidates a code already on a
+table — and is therefore a separate explicit action, not a side effect of
+editing a stand. The route says so. **The UI that calls it must say so too**, or
+an owner will click it to "refresh" a stand and silently kill their signage.
 
 ---
 
@@ -72,18 +73,18 @@ data nobody can act on.
 
 ---
 
-## 5. Key rotation would brick every printed stand
+## 5. Key rotation — fixed
 
-`CUSTOMER_NOTE_ENCRYPTION_KEY` does two jobs. Encryption is reversible: the key
-version travels with the ciphertext, so old and new can coexist.
+Token digests now use `TOKEN_DIGEST_KEY`, separate from the content encryption
+key. During a rotation, resolution accepts the previous key and rewrites the row
+under the new one the first time the stand is scanned — so stands migrate
+themselves with nothing reprinted. Runbook in `ENVIRONMENT.md`.
 
-The lookup digests are not. Stand, session, and response tokens are stored only
-as keyed HMACs of that key, so rotating it **invalidates every QR code and NFC
-tag in the field**. They would have to be reprinted and physically replaced.
-
-**Fix before the first paying customer prints anything:** derive token digests
-from a separate, rotatable key with its own version column, so content rotation
-and token rotation are independent. This is cheap now and expensive later.
+Stands are also reprintable now: the token is stored encrypted alongside its
+digest, so an owner who loses the printout gets a new copy instead of having to
+rotate and replace a code already on a table. The trade is stated in migration
+`20260810000200` — a database disclosure alone still yields nothing, because the
+key is not in the database.
 
 ---
 
@@ -142,16 +143,15 @@ capture, suppression, quiet hours, outbox and inbox designs, reconciliation.
 
 - **No `OPTIONS`-only CORS test against a real browser.** Same-origin means no
   preflight today, which also means the CORS path is untested in practice.
-- **No pagination anywhere.** The dashboard does not exist yet, but
-  `customer_responses` grows without bound and the first listing endpoint must
-  be cursor-paginated from day one, not retrofitted.
+- **Pagination is cursor-based and bounded** on both listing endpoints, capped
+  at 100 rows. Done, not a gap — noted so nobody re-adds an offset.
 - **`idempotency_records` and `rate_limit_buckets` grow forever** unless the
   purge functions are scheduled. They exist; nothing calls them. Supabase Cron
   is the intended home and is not configured.
 - **No `robots.txt` or `noindex` on `/q/*`.** Review pages should not be
   indexed; a crawler in the index is also a crawler generating scans.
-- **The `location.name` and `business.logoUrl` fields are permanently null**
-  until the dashboard can set them, and the contract says they are populated.
+- **`business.logoUrl` is permanently null** — there is no logo column and no
+  upload path. `location.name` is now populated from the real location record.
 - **No accessibility or localisation review of the Haitian Creole strings.** The
   locale is offered by the API; nobody has confirmed the translations are real.
 

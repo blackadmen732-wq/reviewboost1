@@ -99,6 +99,22 @@ export function supabaseServiceRoleKey(): string {
 }
 
 /**
+ * The publishable (anon) key.
+ *
+ * Safe in a browser by design — it grants nothing on its own, because every
+ * table denies `anon` and RLS decides what an authenticated session may see.
+ * The owner API uses it to build a client carrying the caller's own token, so
+ * their queries run under RLS rather than under the service role.
+ */
+export function supabaseAnonKey(): string {
+  return (
+    process.env.SUPABASE_ANON_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+    read("SUPABASE_ANON_KEY")
+  );
+}
+
+/**
  * Base64-encoded 32 bytes. Encrypts customer notes and praise, and keys the
  * lookup digests for stand, session, and response tokens.
  *

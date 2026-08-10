@@ -30,3 +30,6 @@ coverage/
 # Logs
 *.log
 npm-debug.log*
+
+# Next.js build output, if a build is ever run from the repo root by mistake.
+.next/
