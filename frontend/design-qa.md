@@ -2,8 +2,8 @@
 
 ## Approved palette
 
-- Primary `#06C167`
-- Hover `#059A52`
+- Primary `#00A86B`
+- Hover `#009A61`
 - Background `#F8F5F0`
 - Surface `#FFFFFF`
 - Text `#111111`

@@ -129,7 +129,7 @@ export function SignInFlow({ next }: { next: string }) {
 
         <div className="flex flex-col gap-3 text-center">
           <div className="mx-auto grid size-16 place-items-center rounded-full bg-brand-soft">
-            <Mail className="size-8 text-brand" aria-hidden="true" />
+            <Mail className="size-8 text-brand-text" aria-hidden="true" />
           </div>
           <h1 className="text-[1.75rem] font-semibold tracking-[-0.02em] text-ink">
             Check your email

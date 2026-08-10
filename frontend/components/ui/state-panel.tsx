@@ -25,7 +25,7 @@ function StatePanel({
     >
       <span
         className={cn(
-          "grid size-14 place-items-center rounded-2xl bg-brand-soft text-brand",
+          "grid size-14 place-items-center rounded-2xl bg-brand-soft text-brand-text",
           tone === "danger" && "bg-[color:var(--rb-danger-soft)] text-danger",
         )}
       >

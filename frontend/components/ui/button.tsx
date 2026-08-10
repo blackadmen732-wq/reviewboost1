@@ -17,7 +17,10 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "border-brand bg-brand text-[#071B10] shadow-[var(--shadow-button)] hover:border-brand-hover hover:bg-brand-hover hover:shadow-[var(--shadow-button-hover)]",
+          // Dark ink on brand green, never white. White on #00A86B is 3.08:1 —
+          // large-text only — so a white label on a normal-size button fails
+          // AA. The token flips with the theme; the hardcoded value did not.
+          "border-brand bg-brand text-on-brand shadow-[var(--shadow-button)] hover:border-brand-hover hover:bg-brand-hover hover:shadow-[var(--shadow-button-hover)] active:bg-brand-active",
         secondary:
           "border-border bg-surface text-ink shadow-[var(--shadow-control)] hover:border-[color:var(--rb-border-strong)] hover:bg-quiet",
         outline:

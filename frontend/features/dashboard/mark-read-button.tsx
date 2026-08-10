@@ -64,7 +64,7 @@ export function MarkReadButton({ responseId }: { responseId: string }) {
       onClick={() => void markRead()}
       className={cn(
         "inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold",
-        "text-brand transition-colors hover:bg-brand-soft",
+        "text-brand-text transition-colors hover:bg-brand-soft",
         "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
       )}
     >

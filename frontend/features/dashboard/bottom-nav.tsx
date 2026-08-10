@@ -60,7 +60,7 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
                   "relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2",
                   "text-xs font-medium transition-colors duration-150",
                   "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
-                  active ? "text-brand" : "text-muted hover:text-ink",
+                  active ? "text-brand-text" : "text-muted hover:text-ink",
                 )}
               >
                 <span className="relative">

@@ -116,7 +116,7 @@ export function OnboardingFlow() {
 
         <div className="flex flex-col gap-2">
           <div className="mb-2 grid size-14 place-items-center rounded-full bg-brand-soft">
-            <Store className="size-7 text-brand" aria-hidden="true" />
+            <Store className="size-7 text-brand-text" aria-hidden="true" />
           </div>
           <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
             What is your business called?
@@ -221,7 +221,7 @@ export function OnboardingFlow() {
           {/* Confirmation the instant it is right, so nobody submits and waits
               to find out. A green tick here removes real anxiety. */}
           {urlLooksRight ? (
-            <p className="flex items-center gap-2 text-sm font-medium text-brand">
+            <p className="flex items-center gap-2 text-sm font-medium text-brand-text">
               <Check className="size-4" aria-hidden="true" />
               That is the right link
             </p>
@@ -263,7 +263,7 @@ export function OnboardingFlow() {
   return (
     <div className="flex flex-col items-center gap-8 text-center">
       <div className="grid size-20 place-items-center rounded-full bg-brand-soft">
-        <Check className="size-10 text-brand" strokeWidth={3} aria-hidden="true" />
+        <Check className="size-10 text-brand-text" strokeWidth={3} aria-hidden="true" />
       </div>
 
       <div className="flex flex-col gap-2">

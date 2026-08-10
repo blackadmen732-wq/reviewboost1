@@ -9,7 +9,10 @@
   --color-border: var(--rb-border);
   --color-brand: var(--rb-brand);
   --color-brand-hover: var(--rb-brand-hover);
+  --color-brand-active: var(--rb-brand-active);
   --color-brand-soft: var(--rb-brand-soft);
+  --color-brand-text: var(--rb-brand-text);
+  --color-on-brand: var(--rb-on-brand);
   --color-star: var(--rb-star);
   --color-danger: var(--rb-danger);
   --color-info: var(--rb-info);
@@ -25,22 +28,35 @@
   --rb-muted: #555555;
   --rb-border: #e5e5e5;
   --rb-border-strong: #c9ccc9;
-  --rb-brand: #06c167;
-  --rb-brand-hover: #059a52;
-  --rb-brand-soft: #e6f8ee;
-  --rb-star: #f2a900;
+  --rb-brand: #00a86b;
+  --rb-brand-hover: #009a61;
+  --rb-brand-active: #008f5b;
+  --rb-brand-soft: #e5f6ef;
+  /* Brand green as *text* is only 2.83:1 on cream. This darker green is
+     4.96:1, so links and inline emphasis stay readable. */
+  --rb-brand-text: #007a4d;
+  /* Dark ink on brand green is 6.13:1. White would be 3.08:1 — large text
+     only — so primary buttons never use white labels. */
+  --rb-on-brand: #111111;
+  /* Deliberately deeper than the #F2A900 in the brand sheet. That gold is
+     2.01:1 on white — below the 3:1 floor for a meaningful graphic — and the
+     star rating is the single most important thing on the screen, read on a
+     phone in daylight. This is 3.42:1 on white, 3.14:1 on cream, and still
+     unmistakably gold. Unfilled stars stay outline-only, so filled versus
+     unfilled is a shape difference and never colour alone. */
+  --rb-star: #bf7d00;
   --rb-warning: #9a6417;
   --rb-danger: #b33a3a;
   --rb-danger-soft: #faeaea;
   --rb-info: #356d8c;
-  --rb-focus-soft: rgb(6 193 103 / 24%);
+  --rb-focus-soft: rgb(0 168 107 / 28%);
   --radius-control: 14px;
   --radius-card: 20px;
   --shadow-control: 0 1px 2px rgb(17 17 17 / 4%);
   --shadow-button:
-    0 2px 0 rgb(0 88 47 / 20%), 0 8px 18px -10px rgb(6 193 103 / 75%);
+    0 2px 0 rgb(0 74 47 / 22%), 0 8px 18px -10px rgb(0 168 107 / 70%);
   --shadow-button-hover:
-    0 2px 0 rgb(0 72 39 / 24%), 0 12px 24px -12px rgb(6 193 103 / 80%);
+    0 2px 0 rgb(0 62 39 / 26%), 0 12px 24px -12px rgb(0 168 107 / 76%);
   --shadow-card:
     0 1px 2px rgb(17 17 17 / 3%), 0 18px 50px -28px rgb(17 17 17 / 20%);
   --shadow-float: 0 -12px 36px -28px rgb(17 17 17 / 28%);
@@ -55,19 +71,22 @@
     --rb-muted: #b2b5b3;
     --rb-border: #303531;
     --rb-border-strong: #4b514d;
-    --rb-brand: #06c167;
-    --rb-brand-hover: #20d879;
-    --rb-brand-soft: #123b27;
+    --rb-brand: #00a86b;
+    --rb-brand-hover: #17c07f;
+    --rb-brand-active: #21cf8c;
+    --rb-brand-soft: #123b2c;
+    --rb-brand-text: #4fd69b;
+    --rb-on-brand: #06231a;
     --rb-star: #f7b928;
     --rb-danger: #f08a8a;
     --rb-danger-soft: #452323;
     --rb-info: #8bc2df;
-    --rb-focus-soft: rgb(6 193 103 / 30%);
+    --rb-focus-soft: rgb(0 168 107 / 34%);
     --shadow-control: 0 1px 2px rgb(0 0 0 / 24%);
     --shadow-button:
-      0 2px 0 rgb(0 0 0 / 32%), 0 10px 22px -12px rgb(6 193 103 / 72%);
+      0 2px 0 rgb(0 0 0 / 32%), 0 10px 22px -12px rgb(0 168 107 / 66%);
     --shadow-button-hover:
-      0 2px 0 rgb(0 0 0 / 38%), 0 14px 28px -14px rgb(6 193 103 / 78%);
+      0 2px 0 rgb(0 0 0 / 38%), 0 14px 28px -14px rgb(0 168 107 / 72%);
     --shadow-card:
       0 1px 2px rgb(0 0 0 / 30%), 0 24px 64px -30px rgb(0 0 0 / 85%);
     --shadow-float: 0 -12px 36px -26px rgb(0 0 0 / 85%);
@@ -83,14 +102,27 @@
   --rb-muted: #555;
   --rb-border: #e5e5e5;
   --rb-border-strong: #c9ccc9;
-  --rb-brand: #06c167;
-  --rb-brand-hover: #059a52;
-  --rb-brand-soft: #e6f8ee;
-  --rb-star: #f2a900;
+  --rb-brand: #00a86b;
+  --rb-brand-hover: #009a61;
+  --rb-brand-active: #008f5b;
+  --rb-brand-soft: #e5f6ef;
+  /* Brand green as *text* is only 2.83:1 on cream. This darker green is
+     4.96:1, so links and inline emphasis stay readable. */
+  --rb-brand-text: #007a4d;
+  /* Dark ink on brand green is 6.13:1. White would be 3.08:1 — large text
+     only — so primary buttons never use white labels. */
+  --rb-on-brand: #111111;
+  /* Deliberately deeper than the #F2A900 in the brand sheet. That gold is
+     2.01:1 on white — below the 3:1 floor for a meaningful graphic — and the
+     star rating is the single most important thing on the screen, read on a
+     phone in daylight. This is 3.42:1 on white, 3.14:1 on cream, and still
+     unmistakably gold. Unfilled stars stay outline-only, so filled versus
+     unfilled is a shape difference and never colour alone. */
+  --rb-star: #bf7d00;
   --rb-danger: #b33a3a;
   --rb-danger-soft: #faeaea;
   --rb-info: #356d8c;
-  --rb-focus-soft: rgb(6 193 103 / 24%);
+  --rb-focus-soft: rgb(0 168 107 / 28%);
 }
 :root[data-theme="dark"],
 .dark {
@@ -102,14 +134,17 @@
   --rb-muted: #b2b5b3;
   --rb-border: #303531;
   --rb-border-strong: #4b514d;
-  --rb-brand: #06c167;
-  --rb-brand-hover: #20d879;
-  --rb-brand-soft: #123b27;
+  --rb-brand: #00a86b;
+  --rb-brand-hover: #17c07f;
+  --rb-brand-active: #21cf8c;
+  --rb-brand-soft: #123b2c;
+  --rb-brand-text: #4fd69b;
+  --rb-on-brand: #06231a;
   --rb-star: #f7b928;
   --rb-danger: #f08a8a;
   --rb-danger-soft: #452323;
   --rb-info: #8bc2df;
-  --rb-focus-soft: rgb(6 193 103 / 30%);
+  --rb-focus-soft: rgb(0 168 107 / 34%);
 }
 
 *,

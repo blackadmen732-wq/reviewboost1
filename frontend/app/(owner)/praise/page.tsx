@@ -70,7 +70,7 @@ export default async function PraisePage() {
                 <div className="flex items-center gap-3">
                   {/* The name is the headline. It is the thing the owner is
                       looking for and the only thing they need to act. */}
-                  <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-soft text-lg font-semibold text-brand">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-soft text-lg font-semibold text-brand-text">
                     {item.firstName.slice(0, 1).toUpperCase()}
                   </span>
                   <div className="min-w-0 flex-1">
