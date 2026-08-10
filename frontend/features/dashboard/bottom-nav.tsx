@@ -1,0 +1,91 @@
+"use client";
+
+import { Home, MessageSquare, QrCode, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+import { cn } from "@/lib/utils/cn";
+
+/**
+ * Bottom navigation.
+ *
+ * Four items, never five. Past four, people stop reading the bar and start
+ * hunting, and a hunting user is a user who thinks the app is complicated.
+ *
+ * At the bottom rather than the top because this is used one-handed, standing
+ * up, often while doing something else. The bottom third of a phone is the only
+ * part a thumb reaches comfortably; a top nav bar on a large phone is a
+ * two-handed control.
+ *
+ * Every item is an icon **and** a word. Icons alone are guessed wrong far more
+ * often than designers assume, and this audience will not tap something to find
+ * out what it does.
+ */
+
+const ITEMS = [
+  { href: "/home", label: "Home", icon: Home },
+  { href: "/feedback", label: "Feedback", icon: MessageSquare },
+  { href: "/praise", label: "Praise", icon: Sparkles },
+  { href: "/stands", label: "Codes", icon: QrCode },
+] as const;
+
+export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
+  const pathname = usePathname();
+
+  return (
+    <nav
+      aria-label="Main"
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur",
+        "shadow-[var(--shadow-float)]",
+        // Clears the iOS home indicator. Without this the last row of taps
+        // lands on the system gesture area and appears to do nothing.
+        "pb-[env(safe-area-inset-bottom)]",
+      )}
+    >
+      <ul className="mx-auto flex max-w-lg items-stretch">
+        {ITEMS.map((item) => {
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const Icon = item.icon;
+          const badge = item.href === "/feedback" ? unreadCount : 0;
+
+          return (
+            <li key={item.href} className="flex-1">
+              <Link
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  // 64px tall: comfortably above the 44px minimum, because the
+                  // people using this are often moving.
+                  "relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2",
+                  "text-xs font-medium transition-colors duration-150",
+                  "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
+                  active ? "text-brand" : "text-muted hover:text-ink",
+                )}
+              >
+                <span className="relative">
+                  <Icon
+                    className="size-6"
+                    // Weight change as well as colour, so the active item is
+                    // distinguishable without relying on colour alone.
+                    strokeWidth={active ? 2.5 : 2}
+                    aria-hidden="true"
+                  />
+                  {badge > 0 ? (
+                    <span
+                      className="absolute -right-2 -top-1 grid min-w-5 place-items-center rounded-full bg-[color:var(--rb-star)] px-1 text-[0.6875rem] font-bold text-[#3d2a00]"
+                      aria-label={`${badge} unread`}
+                    >
+                      {badge > 9 ? "9+" : badge}
+                    </span>
+                  ) : null}
+                </span>
+                {item.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
