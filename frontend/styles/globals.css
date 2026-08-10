@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Supplies the data-[state] enter/exit utilities Radix drives. Without it the
+   dialog and sheet classes are inert and panels pop instead of moving. */
+@import "tw-animate-css";
 
 @theme inline {
   --color-canvas: var(--rb-canvas);

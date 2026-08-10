@@ -1,10 +1,11 @@
 "use client";
 
-import { Download, Printer, RefreshCw, TriangleAlert } from "lucide-react";
+import { Download, Printer, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { InlineNotice } from "@/components/ui/inline-notice";
+import { AlertDialog } from "@/components/ui/dialog";
+import { notify } from "@/components/ui/toast";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -35,14 +36,12 @@ interface StandCardProps {
 export function StandCard({ standId, label, status, tokenPrefix }: StandCardProps) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [rotatedAt, setRotatedAt] = useState<number>(0);
 
   const qrSrc = `/api/v1/review-stands/${standId}/qr${rotatedAt ? `?v=${rotatedAt}` : ""}`;
 
   async function rotate() {
     setBusy(true);
-    setError(null);
 
     const {
       data: { session },
@@ -50,7 +49,7 @@ export function StandCard({ standId, label, status, tokenPrefix }: StandCardProp
 
     if (!session) {
       setBusy(false);
-      setError("Your session expired. Please sign in again.");
+      notify.error("Please sign in again", "Your session expired.");
       return;
     }
 
@@ -63,13 +62,14 @@ export function StandCard({ standId, label, status, tokenPrefix }: StandCardProp
     setConfirming(false);
 
     if (!response.ok) {
-      setError("Could not make a new code. Please try again.");
+      notify.error("Could not make a new code", "Please try again.");
       return;
     }
 
     // Cache-busts the image so the new code appears immediately. Showing the
     // old one after rotating would be actively dangerous — it is now dead.
     setRotatedAt(Date.now());
+    notify.success("New code ready", "Print it and replace the old one.");
   }
 
   return (
@@ -108,53 +108,29 @@ export function StandCard({ standId, label, status, tokenPrefix }: StandCardProp
         </Button>
       </div>
 
-      {error ? (
-        <div className="mt-4">
-          <InlineNotice kind="error">{error}</InlineNotice>
-        </div>
-      ) : null}
-
       {/* Separated by a rule and pushed to the bottom. Nothing dangerous should
           sit next to something you tap every day. */}
       <div className="mt-6 border-t border-border pt-5">
-        {confirming ? (
-          <div className="flex flex-col gap-4 rounded-[var(--radius-control)] bg-[color:var(--rb-danger-soft)] p-4">
-            <div className="flex gap-3">
-              <TriangleAlert
-                className="size-5 shrink-0 text-danger"
-                aria-hidden="true"
-              />
-              <div>
-                <p className="font-semibold text-ink">Your printed code will stop working</p>
-                <p className="mt-1 text-sm leading-relaxed text-ink">
-                  Anyone who scans the old one will see nothing. You will have to
-                  print the new code and replace it on every table.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              {/* Says what it does. "OK" or "Confirm" gets tapped without
-                  reading; a sentence does not. */}
-              <Button variant="destructive" loading={busy} onClick={() => void rotate()}>
-                Yes, make a new code
-              </Button>
-              <Button variant="ghost" onClick={() => setConfirming(false)}>
-                Keep my code
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setConfirming(true)}
-            className="inline-flex items-center gap-2 rounded-[var(--radius-control)] px-2 py-2 text-sm font-medium text-muted transition-colors hover:text-danger focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-          >
-            <RefreshCw className="size-4" aria-hidden="true" />
-            Make a new code
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-2 text-sm font-medium text-muted transition-colors hover:text-danger focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
+          <RefreshCw className="size-4" aria-hidden="true" />
+          Make a new code
+        </button>
       </div>
+
+      <AlertDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="Your printed code will stop working"
+        description="Anyone who scans the old one will see nothing. You will have to print the new code and replace it on every table."
+        confirmLabel="Yes, make a new code"
+        cancelLabel="Keep my code"
+        loading={busy}
+        onConfirm={() => void rotate()}
+      />
     </div>
   );
 }

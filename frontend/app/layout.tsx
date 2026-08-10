@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { Providers } from "@/components/providers";
 import { PwaRegister } from "@/components/pwa-register";
+import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
@@ -54,8 +55,19 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
+      <head>
+        {/*
+          iOS shows a white launch screen for a home-screen PWA unless a
+          startup image matches the device exactly, and that list goes stale
+          with every new iPhone. Painting the canvas colour on the document
+          means the first frame is already cream — no device-specific assets to
+          maintain, and no white flash in a demo.
+        */}
+        <style>{`html{background-color:#F8F5F0}@media (prefers-color-scheme:dark){html{background-color:#14120F}}`}</style>
+      </head>
       <body className={GeistSans.className}>
         <Providers>{children}</Providers>
+        <Toaster />
         <PwaRegister />
       </body>
     </html>
