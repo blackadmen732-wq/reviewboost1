@@ -350,12 +350,10 @@ select results_eq(
     $$ values (0) $$,
     'tenant A cannot update tenant B''s locations');
 
-select results_eq(
-    $$ with attempt as (
-         delete from public.locations
-          where org_id = 'b0000000-0000-0000-0000-00000000000b' returning 1)
-       select count(*)::int from attempt $$,
-    $$ values (0) $$,
+select throws_ok(
+    $$ delete from public.locations
+       where org_id = 'b0000000-0000-0000-0000-00000000000b' $$,
+    '42501', null,
     'tenant A cannot delete tenant B''s locations');
 
 select results_eq(

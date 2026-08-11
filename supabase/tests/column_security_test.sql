@@ -68,6 +68,9 @@ values ('e0000000-0000-0000-0000-00000000000a', 'a0000000-c015-e570-0000-0000000
 insert into public.customer_responses (id, org_id, location_id, stand_id, session_id, response_token_hash, rating, submitted_at)
 values ('f0000000-0000-0000-0000-00000000000a', 'a0000000-c015-e570-0000-00000000000a', 'c0000000-0000-0000-0000-00000000000a', 'd0000000-0000-0000-0000-00000000000a', 'e0000000-0000-0000-0000-00000000000a', 'col-test-response-hash', 4, now());
 
+insert into public.staff_members (id, org_id, name_encrypted, status)
+values ('f2000000-0000-0000-0000-00000000000a', 'a0000000-c015-e570-0000-00000000000a', 'v1:enc-staff', 'active');
+
 insert into public.team_praise_records (id, org_id, location_id, response_id, first_name_encrypted, praise_note_encrypted)
 values ('f1000000-0000-0000-0000-00000000000a', 'a0000000-c015-e570-0000-00000000000a', 'c0000000-0000-0000-0000-00000000000a', 'f0000000-0000-0000-0000-00000000000a', 'v1:enc-name', 'v1:enc-note');
 
@@ -124,6 +127,7 @@ select throws_ok(
 select lives_ok(
     $$ update public.team_praise_records
        set status = 'matched',
+           matched_staff_id = 'f2000000-0000-0000-0000-00000000000a',
            matched_by_user_id = 'aa000000-0000-0000-0000-000000000001',
            matched_at = now()
        where id = 'f1000000-0000-0000-0000-00000000000a' $$,
