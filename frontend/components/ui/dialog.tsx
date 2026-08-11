@@ -104,6 +104,86 @@ export function DialogContent({
 }
 
 /**
+ * A sheet for choosing from a list.
+ *
+ * Different from `DialogContent` in the one way that matters on a phone: the
+ * body scrolls inside a bounded panel instead of growing until the buttons are
+ * under the fold. A roster of twenty people in a fixed dialog pushes "Add
+ * someone new" off the bottom of the screen, and nobody scrolls a modal they did
+ * not expect to be scrollable.
+ *
+ * It also carries a grab handle. Purely an affordance — the sheet is not
+ * draggable — but it is the shape people have learned means "this came up from
+ * the bottom and can go back down", and it makes the panel read as native rather
+ * than as a web modal that happened to slide.
+ *
+ * Capped at 85vh so the page behind stays visible. A sheet that fills the screen
+ * is a new page, and should have been one.
+ */
+export function SheetContent({
+  title,
+  description,
+  children,
+  footer,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  return (
+    <DialogPrimitive.Portal>
+      <Overlay />
+      <DialogPrimitive.Content
+        className={cn(
+          PANEL,
+          "max-h-[85dvh] gap-4 sm:max-h-[80dvh]",
+          // The panel is the scroll container's parent, not the scroller
+          // itself — the heading and footer stay put while the list moves.
+          "overflow-hidden",
+        )}
+      >
+        {/* Phone only: the sheet is a centred card on desktop, where a grab
+            handle would be meaningless. */}
+        <div
+          aria-hidden="true"
+          className="mx-auto -mt-2 h-1 w-10 shrink-0 rounded-full bg-[color:var(--rb-border-strong)] sm:hidden"
+        />
+
+        <div className="flex shrink-0 items-start justify-between gap-4">
+          <div className="flex flex-col gap-1.5">
+            <DialogPrimitive.Title className="text-xl font-semibold tracking-[-0.02em] text-ink">
+              {title}
+            </DialogPrimitive.Title>
+            {description ? (
+              <DialogPrimitive.Description className="text-base leading-relaxed text-muted">
+                {description}
+              </DialogPrimitive.Description>
+            ) : (
+              <DialogPrimitive.Description className="sr-only">{title}</DialogPrimitive.Description>
+            )}
+          </div>
+
+          <DialogPrimitive.Close
+            aria-label="Close"
+            className="-mr-2 -mt-1 grid size-11 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-quiet hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+          >
+            <X className="size-5" aria-hidden="true" />
+          </DialogPrimitive.Close>
+        </div>
+
+        {/* `overscroll-contain` stops a flick at the end of the list from
+            scrolling the page underneath, which is the single thing that most
+            gives away a web sheet on iOS. */}
+        <div className="-mx-1 flex-1 overflow-y-auto overscroll-contain px-1">{children}</div>
+
+        {footer ? <div className="shrink-0">{footer}</div> : null}
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
+  );
+}
+
+/**
  * A destructive confirmation.
  *
  * `confirmLabel` must describe the outcome — "Yes, make a new code", not "OK".

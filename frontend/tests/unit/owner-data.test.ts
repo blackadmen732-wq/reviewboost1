@@ -177,18 +177,40 @@ describe("review integrity in the owner interface", () => {
   it("never joins praise to a rating", () => {
     const layer = code("lib/server/owner-data.ts");
 
-    // `team_praise_records` has no rating column, and listPraise must not reach
-    // `customer_responses` to find one. The whole point of the feature is that
-    // an owner reacts to what was written, not to a number that may have been
-    // about the parking.
-    const listPraise = layer.slice(
-      layer.indexOf("export async function listPraise"),
-      layer.indexOf("export async function getPraiseLeaderboard"),
-    );
+    // `team_praise_records` has no rating column, and nothing on the praise path
+    // may reach `customer_responses` to find one. The whole point of the feature
+    // is that an owner reacts to what a customer wrote about a person, not to a
+    // number that may have been about the parking.
+    //
+    // Bounded by "the next export" rather than by a named neighbour: pinning it
+    // to a specific following function means a rename silently turns this into
+    // an assertion about an empty string, and the rule stops being enforced at
+    // the exact moment somebody is restructuring the file.
+    const body = (name: string) => {
+      const start = layer.indexOf(`export async function ${name}`);
+      expect(start, `${name} should exist`).toBeGreaterThan(-1);
+      const rest = layer.slice(start + 10);
+      const end = rest.indexOf("\nexport ");
+      return end === -1 ? rest : rest.slice(0, end);
+    };
 
-    expect(listPraise.length).toBeGreaterThan(0);
-    expect(listPraise).not.toMatch(/rating/i);
-    expect(listPraise).not.toMatch(/customer_responses/);
+    for (const name of ["listPraise", "getStaffPraiseTally"]) {
+      const source = body(name);
+      expect(source.length, name).toBeGreaterThan(50);
+      expect(source, name).not.toMatch(/rating/i);
+      expect(source, name).not.toMatch(/customer_responses/);
+    }
+  });
+
+  it("keeps the roster and the matching endpoint clear of ratings", () => {
+    // The staff roster must never become a place where a person's average shows
+    // up next to their name. That is a performance-review tool, and it is not
+    // what a customer typing a first name after a meal consented to.
+    expect(code("app/api/v1/staff/route.ts")).not.toMatch(/rating/i);
+    expect(code("app/api/v1/staff/[staffId]/route.ts")).not.toMatch(/rating/i);
+    expect(code("app/api/v1/team-praise/[praiseId]/route.ts")).not.toMatch(/rating/i);
+    expect(code("features/dashboard/praise-matcher.tsx")).not.toMatch(/rating/i);
+    expect(code("features/dashboard/praise-shared-button.tsx")).not.toMatch(/rating/i);
   });
 
   it("renders every star value through one component with no branch on value", () => {

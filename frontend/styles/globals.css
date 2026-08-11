@@ -303,6 +303,11 @@ html {
      every carefully-sized heading in landscape. */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+
+  /* Reserves the scrollbar's width on desktop whether or not it is showing, so
+     navigating from a short screen to a long one does not shift the whole
+     layout sideways by 15px. Ignored on phones, where scrollbars are overlays. */
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -322,6 +327,33 @@ a,
 nav,
 label {
   -webkit-touch-callout: none;
+  user-select: none;
+}
+
+/* Mobile browsers wait ~300ms after a tap to see whether a second one is
+   coming, so it can be a double-tap zoom. On every control in this product that
+   wait is pure latency: the whole interface is already sized for a thumb and
+   nothing here benefits from zooming.
+
+   Removing it is the difference between a button that responds and one that
+   feels a beat behind — the most common reason a well-built web app still reads
+   as "not quite an app". Applied to controls only, so pinch-zoom on content
+   stays available to anyone who needs it. */
+button,
+[role="button"],
+a,
+label,
+summary,
+input[type="checkbox"],
+input[type="radio"] {
+  touch-action: manipulation;
+}
+
+/* Dragging a QR code out of the page as a ghost image is a desktop-browser
+   behaviour that looks like a glitch on a screen someone is holding up to a
+   customer. */
+img {
+  -webkit-user-drag: none;
   user-select: none;
 }
 

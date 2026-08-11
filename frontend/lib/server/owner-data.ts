@@ -374,7 +374,48 @@ export interface Praise {
   note: string | null;
   status: string;
   createdAt: string;
+  matchedStaffId: string | null;
+  matchedStaffName: string | null;
+  isShared: boolean;
 }
+
+export interface StaffMember {
+  staffId: string;
+  name: string;
+  roleLabel: string | null;
+  isActive: boolean;
+}
+
+/**
+ * The people who work here.
+ *
+ * Names are encrypted with a random IV, so the database cannot sort them and
+ * ordering happens here after decryption. For a roster of a few dozen that is
+ * free; a chain with thousands is the point at which this decision needs
+ * revisiting.
+ */
+export const listStaff = cache(async (): Promise<StaffMember[]> => {
+  const supabase = await supabaseServer();
+
+  const { data } = await supabase
+    .from("staff_members")
+    .select("id, name_encrypted, role_label, is_active")
+    .order("created_at", { ascending: true });
+
+  return (data ?? [])
+    .map((row) => ({
+      staffId: row.id as string,
+      name: tryDecrypt(row.name_encrypted as string) ?? "Unknown",
+      roleLabel: (row.role_label as string | null) ?? null,
+      isActive: row.is_active as boolean,
+    }))
+    .sort((a, b) => {
+      // Active first, then alphabetical. Someone who has left keeps their
+      // history but should not sit at the top of a picker.
+      if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+});
 
 /**
  * Staff a customer named — deliberately without the rating.
@@ -386,54 +427,99 @@ export interface Praise {
  * been about the wait or the parking.
  */
 export async function listPraise(
-  options: { cursor?: string | undefined; limit?: number | undefined } = {},
+  options: {
+    cursor?: string | undefined;
+    limit?: number | undefined;
+    unmatchedOnly?: boolean | undefined;
+  } = {},
 ): Promise<Page<Praise>> {
   const supabase = await supabaseServer();
   const limit = clampLimit(options.limit);
 
   let query = supabase
     .from("team_praise_records")
-    .select("id, first_name_encrypted, praise_note_encrypted, status, created_at")
+    .select(
+      "id, first_name_encrypted, praise_note_encrypted, status, created_at, matched_staff_id, shared_at",
+    )
     .order("created_at", { ascending: false })
     .limit(limit + 1);
 
   if (options.cursor) query = query.lt("created_at", options.cursor);
+  if (options.unmatchedOnly) query = query.eq("status", "unmatched");
 
-  const { data } = await query;
+  const [{ data }, staff] = await Promise.all([query, listStaff()]);
+  const staffNames = new Map(staff.map((member) => [member.staffId, member.name]));
 
   return paginate(
     data ?? [],
     limit,
-    (row) => ({
-      praiseId: row.id as string,
-      firstName: tryDecrypt(row.first_name_encrypted as string) ?? "Someone",
-      note: tryDecrypt(row.praise_note_encrypted as string | null),
-      status: row.status as string,
-      createdAt: row.created_at as string,
-    }),
+    (row) => {
+      const matchedStaffId = (row.matched_staff_id as string | null) ?? null;
+
+      return {
+        praiseId: row.id as string,
+        firstName: tryDecrypt(row.first_name_encrypted as string) ?? "Someone",
+        note: tryDecrypt(row.praise_note_encrypted as string | null),
+        status: row.status as string,
+        createdAt: row.created_at as string,
+        matchedStaffId,
+        matchedStaffName: matchedStaffId ? (staffNames.get(matchedStaffId) ?? null) : null,
+        isShared: row.shared_at !== null,
+      };
+    },
     "created_at",
   );
 }
 
-/** Who gets named most often — the leaderboard behind the Praise page. */
-export async function getPraiseLeaderboard(
-  limit = 5,
-): Promise<Array<{ firstName: string; count: number }>> {
-  // Names are encrypted with a random IV, so identical names produce different
-  // ciphertext and the database cannot group them. Counting therefore has to
-  // happen after decryption, here. Bounded to a recent window so this stays a
-  // fixed cost rather than growing with the table forever.
-  const { items } = await listPraise({ limit: MAX_PAGE });
+export interface StaffPraiseTally {
+  staffId: string;
+  name: string;
+  roleLabel: string | null;
+  count: number;
+  unshared: number;
+}
 
-  const tally = new Map<string, { firstName: string; count: number }>();
-  for (const item of items) {
-    const key = item.firstName.toLocaleLowerCase();
-    const existing = tally.get(key);
-    if (existing) existing.count += 1;
-    else tally.set(key, { firstName: item.firstName, count: 1 });
+/**
+ * How much praise each person on the team has earned.
+ *
+ * Counted per matched staff member, not per typed name. Counting raw names would
+ * split "Amara" and "amara" into two people and merge two different Sams into
+ * one — which is exactly the guesswork the matching step exists to avoid.
+ *
+ * Only matched praise appears. Something nobody has put a name to is not an
+ * achievement yet, it is a decision waiting to be made, and it belongs in the
+ * needs-you list rather than silently inflating somebody's total.
+ */
+export async function getStaffPraiseTally(): Promise<StaffPraiseTally[]> {
+  const supabase = await supabaseServer();
+
+  const [{ data }, staff] = await Promise.all([
+    supabase
+      .from("team_praise_records")
+      .select("matched_staff_id, shared_at")
+      .not("matched_staff_id", "is", null),
+    listStaff(),
+  ]);
+
+  const counts = new Map<string, { count: number; unshared: number }>();
+  for (const row of data ?? []) {
+    const key = row.matched_staff_id as string;
+    const entry = counts.get(key) ?? { count: 0, unshared: 0 };
+    entry.count += 1;
+    if (row.shared_at === null) entry.unshared += 1;
+    counts.set(key, entry);
   }
 
-  return [...tally.values()].sort((a, b) => b.count - a.count).slice(0, limit);
+  return staff
+    .map((member) => ({
+      staffId: member.staffId,
+      name: member.name,
+      roleLabel: member.roleLabel,
+      count: counts.get(member.staffId)?.count ?? 0,
+      unshared: counts.get(member.staffId)?.unshared ?? 0,
+    }))
+    .filter((member) => member.count > 0)
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
 // --------------------------------------------------------------- stands ----

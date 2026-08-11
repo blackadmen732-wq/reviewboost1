@@ -22,7 +22,7 @@ create extension if not exists pgtap with schema extensions;
 -- below have somewhere to live.
 create schema if not exists tests;
 
-select plan(70);
+select plan(87);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -596,7 +596,152 @@ select is_empty(
     $$ select 1 from public.profiles where id = 'bbbbbbbb-0000-0000-0000-000000000001' $$,
     'a user cannot see somebody from another business');
 
+-- ============================================== team roster & matching =====
+--
+-- staff_members and the praise matching it makes possible. Every isolation
+-- claim performs the attack.
+
+select tests.set_service();
+
+insert into public.staff_members (id, org_id, name_encrypted, role_label)
+values
+    ('a6000000-0000-0000-0000-00000000000a', 'a0000000-0000-0000-0000-00000000000a',
+     'ciphertext-amara', 'Front of house'),
+    ('b6000000-0000-0000-0000-00000000000b', 'b0000000-0000-0000-0000-00000000000b',
+     'ciphertext-rival-staff', 'Bar');
+
+insert into public.team_praise_records
+    (id, org_id, location_id, response_id, first_name_encrypted)
+values ('a7000000-0000-0000-0000-00000000000a',
+        'a0000000-0000-0000-0000-00000000000a',
+        'a1000000-0000-0000-0000-00000000000a',
+        'a5000000-0000-0000-0000-00000000000a',
+        'ciphertext-typed-amara');
+
+select tests.set_actor('aaaaaaaa-0000-0000-0000-000000000001');
+
+select isnt_empty(
+    $$ select 1 from public.staff_members
+        where org_id = 'a0000000-0000-0000-0000-00000000000a' $$,
+    'a member can see their own team');
+
+select is_empty(
+    $$ select 1 from public.staff_members
+        where org_id = 'b0000000-0000-0000-0000-00000000000b' $$,
+    'a member never sees another business team');
+
+select lives_ok(
+    $$ insert into public.staff_members (org_id, name_encrypted)
+       values ('a0000000-0000-0000-0000-00000000000a', 'ciphertext-new-starter') $$,
+    'a member can add somebody to their own team');
+
+select throws_ok(
+    $$ insert into public.staff_members (org_id, name_encrypted)
+       values ('b0000000-0000-0000-0000-00000000000b', 'ciphertext-planted') $$,
+    '42501', null,
+    'a member cannot plant somebody on another business team');
+
+-- Somebody who leaves is deactivated, never removed, so the praise they earned
+-- keeps pointing at a real name. There is no delete policy and no delete grant.
+select throws_ok(
+    $$ delete from public.staff_members
+        where org_id = 'a0000000-0000-0000-0000-00000000000a' $$,
+    '42501', null,
+    'staff are deactivated, never deleted');
+
+select throws_ok(
+    $$ truncate public.staff_members $$,
+    '42501', null,
+    'the roster cannot be truncated away');
+
+select lives_ok(
+    $$ update public.staff_members set is_active = false
+        where id = 'a6000000-0000-0000-0000-00000000000a' $$,
+    'a member can mark somebody as having left');
+
+-- ---- matching ----
+
+select lives_ok(
+    $$ update public.team_praise_records
+          set matched_staff_id = 'a6000000-0000-0000-0000-00000000000a',
+              matched_at = now(),
+              matched_by_user_id = 'aaaaaaaa-0000-0000-0000-000000000001',
+              status = 'matched'
+        where id = 'a7000000-0000-0000-0000-00000000000a' $$,
+    'praise can be matched to somebody on the team');
+
+-- The composite foreign key carries org_id, so praise cannot be matched to
+-- somebody at a different business even with a valid-looking uuid.
+select throws_ok(
+    $$ update public.team_praise_records
+          set matched_staff_id = 'b6000000-0000-0000-0000-00000000000b',
+              matched_at = now(),
+              status = 'matched'
+        where id = 'a7000000-0000-0000-0000-00000000000a' $$,
+    '23503', null,
+    'praise cannot be matched to another business staff');
+
+-- Matched implies a matcher and a moment. Half-written state is how "who
+-- decided this?" becomes unanswerable later.
+select throws_ok(
+    $$ update public.team_praise_records
+          set matched_staff_id = 'a6000000-0000-0000-0000-00000000000a', matched_at = null
+        where id = 'a7000000-0000-0000-0000-00000000000a' $$,
+    '23514', null,
+    'a match cannot exist without a moment');
+
+select throws_ok(
+    $$ update public.team_praise_records set shared_at = now(), shared_by = null
+        where id = 'a7000000-0000-0000-0000-00000000000a' $$,
+    '23514', null,
+    'praise cannot be passed on by nobody');
+
+select lives_ok(
+    $$ update public.team_praise_records
+          set shared_at = now(), shared_by = 'aaaaaaaa-0000-0000-0000-000000000001'
+        where id = 'a7000000-0000-0000-0000-00000000000a' $$,
+    'praise can be recorded as passed on');
+
+-- Unmatching must be possible: an owner who picked the wrong Sam cannot be
+-- stuck with it.
+select lives_ok(
+    $$ update public.team_praise_records
+          set matched_staff_id = null, matched_at = null,
+              matched_by_user_id = null, status = 'unmatched'
+        where id = 'a7000000-0000-0000-0000-00000000000a' $$,
+    'a wrong match can be undone');
+
+-- ---- the rating is not reachable from praise ----
+--
+-- The whole point of the feature. team_praise_records has no rating column, so
+-- there is nothing for a query here to read even by accident.
+select is_empty(
+    $$ select 1 from information_schema.columns
+        where table_name = 'team_praise_records' and column_name = 'rating' $$,
+    'praise records carry no rating column');
+
+select is_empty(
+    $$ select 1 from information_schema.columns
+        where table_name = 'staff_members' and column_name like '%rating%' $$,
+    'the roster carries no rating column');
+
+-- ---- anonymous ----
+
+select tests.set_anonymous();
+
+select throws_ok(
+    $$ select 1 from public.staff_members $$,
+    '42501', null,
+    'the anonymous customer role cannot read the roster');
+
+select throws_ok(
+    $$ insert into public.staff_members (org_id, name_encrypted)
+       values ('a0000000-0000-0000-0000-00000000000a', 'x') $$,
+    '42501', null,
+    'the anonymous customer role cannot write to the roster');
+
 select * from finish();
+
 
 
 rollback;
