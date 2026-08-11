@@ -71,6 +71,7 @@ export const getCurrentOrganization = cache(async (): Promise<CurrentOrganizatio
     .select("org_id, role, organizations(name, timezone)")
     .eq("user_id", user.id)
     .eq("status", "active")
+    .order("created_at", { ascending: true })
     .limit(1);
 
   const row = data?.[0] as

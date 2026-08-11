@@ -153,7 +153,8 @@ export async function getOnboardingState(context: AuthenticatedContext, requestI
     .from("organization_members")
     .select("org_id, role, organizations(id, name, slug)")
     .eq("user_id", context.userId)
-    .eq("status", "active");
+    .eq("status", "active")
+    .order("created_at", { ascending: true });
 
   if (membershipError) databaseFailure("onboarding_memberships", membershipError, requestId);
 
