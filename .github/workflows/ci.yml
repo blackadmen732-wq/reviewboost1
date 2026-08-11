@@ -28,7 +28,7 @@ jobs:
         working-directory: frontend
 
       - name: Lint
-        run: npx next lint .
+        run: npx eslint .
         working-directory: frontend
 
   test:

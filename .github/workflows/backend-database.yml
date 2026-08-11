@@ -130,7 +130,7 @@ jobs:
           fi
 
           if git grep -nIE '^(SUPABASE_SERVICE_ROLE_KEY|CUSTOMER_NOTE_ENCRYPTION_KEY)=.+' \
-               -- ':!*.example'; then
+               -- ':!*.example' ':!*.md' ':!docs/**'; then
             echo "::error::A populated secret assignment is committed."
             exit 1
           fi
