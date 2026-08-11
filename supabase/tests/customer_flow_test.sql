@@ -356,12 +356,10 @@ select throws_ok(
     '42501', null,
     'tenant A cannot delete tenant B''s locations');
 
-select results_eq(
-    $$ with attempt as (
-         update public.customer_responses set rating = 1
-          where org_id = 'b0000000-0000-0000-0000-00000000000b' returning 1)
-       select count(*)::int from attempt $$,
-    $$ values (0) $$,
+select throws_ok(
+    $$ update public.customer_responses set rating = 1
+       where org_id = 'b0000000-0000-0000-0000-00000000000b' $$,
+    '42501', null,
     'tenant A cannot rewrite tenant B''s ratings');
 
 -- A member may not fabricate a customer response even in their own tenant.
