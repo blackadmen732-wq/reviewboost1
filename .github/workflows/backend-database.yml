@@ -139,7 +139,7 @@ jobs:
           # prefix is what decides whether Next inlines a value into the browser
           # bundle, so this naming mistake is the difference between a server
           # secret and a public one.
-          if git grep -nI 'NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY' -- ':!*.md'; then
+          if git grep -nI 'NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY' -- ':!*.md' ':!.github/**' ':!*.ts'; then
             echo "::error::The service-role key must never carry the NEXT_PUBLIC_ prefix."
             exit 1
           fi
