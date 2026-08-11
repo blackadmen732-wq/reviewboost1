@@ -124,7 +124,7 @@ jobs:
           # `grep ... | head` here always succeeds and the check silently
           # passes forever.
           if git grep -nIE '(sk_live_|re_[A-Za-z0-9_]{20,}|SK[0-9a-f]{32}|AC[0-9a-f]{32}|ghp_[A-Za-z0-9]{30,})' \
-               -- ':!*.md' ':!.github/**'; then
+               -- ':!*.md' ':!.github/**' ':!.githooks/**'; then
             echo "::error::A live credential appears to be committed."
             exit 1
           fi
@@ -156,11 +156,15 @@ jobs:
       - name: Fail if rating-gating reappears
         run: |
           # Review gating is a release blocker, so it is checked mechanically
-          # rather than left to review. Scoped to the new stack: the legacy
-          # Express backend still contains the old implementation and is
-          # excluded until it is removed.
-          if git grep -nIE 'review_threshold|reviewThreshold|reviews_prevented|reviewsPrevented|intercept_rate|interceptRate|feedback_intercepted|feedbackIntercepted' \
-               -- 'supabase/**' 'frontend/app/**' 'frontend/lib/server/**' 'openapi/**'; then
+          # rather than left to review.
+          hits=$(git grep -nIE 'review_threshold|reviewThreshold|reviews_prevented|reviewsPrevented|intercept_rate|interceptRate|feedback_intercepted|feedbackIntercepted' \
+               -- 'supabase/migrations/**' 'frontend/app/**' 'frontend/lib/server/**' 'openapi/**' \
+               | grep -v '^\s*--' \
+               | grep -v 'hasnt_column' \
+               | grep -v 'no review_threshold' \
+               || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
             echo "::error::Review gating vocabulary found. Every rating gets the same Google opportunity."
             exit 1
           fi

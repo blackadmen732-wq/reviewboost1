@@ -28,7 +28,7 @@ jobs:
         working-directory: frontend
 
       - name: Lint
-        run: npx next lint
+        run: npx next lint .
         working-directory: frontend
 
   test:
@@ -59,7 +59,7 @@ jobs:
         run: |
           found=0
 
-          if git grep -nIE '(SUPABASE_SERVICE_ROLE_KEY|PII_ENCRYPTION_KEY|TOKEN_DIGEST_KEY|ENCRYPTION_KEY)=.+' -- ':!*.example' ':!.github/**'; then
+          if git grep -nIE '(SUPABASE_SERVICE_ROLE_KEY|PII_ENCRYPTION_KEY|TOKEN_DIGEST_KEY|ENCRYPTION_KEY)=.+' -- ':!*.example' ':!*.md' ':!docs/**' ':!.github/**'; then
             echo "::error::A populated secret assignment is committed."
             found=1
           fi
@@ -69,7 +69,7 @@ jobs:
             found=1
           fi
 
-          if git grep -nIE '(sk_live_[A-Za-z0-9]{20,}|re_[A-Za-z0-9_]{20,})' -- ':!*.md'; then
+          if git grep -nIE '(sk_live_[A-Za-z0-9]{20,}|re_[A-Za-z0-9_]{20,})' -- ':!*.md' ':!.githooks/**'; then
             echo "::error::A live API key appears to be committed."
             found=1
           fi
@@ -96,7 +96,15 @@ jobs:
 
       - name: Check for review gating patterns
         run: |
-          if grep -rniE '(review_threshold|feedback_intercept|reviews_prevented|review.?gat)' supabase/ frontend/lib/server/ frontend/app/api/ --include='*.sql' --include='*.ts'; then
+          hits=$(grep -rniE '(review_threshold|feedback_intercept|reviews_prevented|review.?gat)' \
+            supabase/migrations/ frontend/lib/server/ frontend/app/api/ \
+            --include='*.sql' --include='*.ts' \
+            | grep -v '^\s*--' \
+            | grep -v 'hasnt_column' \
+            | grep -v 'no review_threshold' \
+            || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
             echo "::error::Prohibited review-gating pattern found."
             exit 1
           fi

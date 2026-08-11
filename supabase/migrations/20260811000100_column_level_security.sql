@@ -287,7 +287,8 @@ revoke all on function public.rpc_unmark_praise_shared(uuid) from public, anon;
 -- authenticated members cannot correlate praise with ratings
 -- through the Data API.
 
-create or replace view public.praise_safe_view as
+create or replace view public.praise_safe_view
+with (security_invoker = true) as
 select
     tpr.id,
     tpr.org_id,
@@ -305,8 +306,8 @@ select
     tpr.updated_at
 from public.team_praise_records tpr;
 
--- The view inherits the base table's RLS when accessed through the
--- data API because it runs as the invoker.
+-- security_invoker = true ensures the view runs as the querying user,
+-- so the base table's RLS policies apply to every access.
 grant select on public.praise_safe_view to authenticated;
 revoke all on public.praise_safe_view from anon;
 
@@ -383,12 +384,18 @@ begin
 
     -- Last-owner protection: if demoting an owner, ensure at least one remains
     if v_target_current_role = 'owner' and p_new_role <> 'owner' then
-        select count(*) into v_owner_count
+        perform 1
         from public.organization_members
         where org_id = v_target_org_id
           and role = 'owner'
           and status = 'active'
-        for update;  -- Lock to prevent concurrent demotion
+        for update;
+
+        select count(*) into v_owner_count
+        from public.organization_members
+        where org_id = v_target_org_id
+          and role = 'owner'
+          and status = 'active';
 
         if v_owner_count <= 1 then
             raise exception 'cannot_remove_last_owner'
@@ -455,12 +462,18 @@ begin
 
     -- Last-owner protection
     if v_target_role = 'owner' then
-        select count(*) into v_owner_count
+        perform 1
         from public.organization_members
         where org_id = v_target_org_id
           and role = 'owner'
           and status = 'active'
         for update;
+
+        select count(*) into v_owner_count
+        from public.organization_members
+        where org_id = v_target_org_id
+          and role = 'owner'
+          and status = 'active';
 
         if v_owner_count <= 1 then
             raise exception 'cannot_remove_last_owner'
@@ -516,12 +529,18 @@ begin
 
     -- Last-owner protection
     if v_target_role = 'owner' then
-        select count(*) into v_owner_count
+        perform 1
         from public.organization_members
         where org_id = v_target_org_id
           and role = 'owner'
           and status = 'active'
         for update;
+
+        select count(*) into v_owner_count
+        from public.organization_members
+        where org_id = v_target_org_id
+          and role = 'owner'
+          and status = 'active';
 
         if v_owner_count <= 1 then
             raise exception 'cannot_remove_last_owner'

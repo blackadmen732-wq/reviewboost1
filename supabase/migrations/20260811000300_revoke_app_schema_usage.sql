@@ -14,7 +14,15 @@
 -- A. Redefine public wrappers as SECURITY DEFINER
 -- ============================================================
 
-create or replace function public.rpc_record_audit_event(
+-- DROP first: PostgreSQL's CREATE OR REPLACE cannot remove parameter
+-- defaults from an existing function, so a plain replace would fail
+-- with SQLSTATE 42P13 if the prior definition carried defaults.
+
+drop function if exists public.rpc_record_audit_event(uuid, text, text, text, text, jsonb);
+
+drop function if exists public.rpc_record_audit_event(uuid, text, text, text, text, jsonb);
+
+create function public.rpc_record_audit_event(
     p_org_id      uuid,
     p_action      text,
     p_target_type text,
@@ -31,7 +39,9 @@ as $$
                                   p_request_id, p_metadata);
 $$;
 
-create or replace function public.rpc_create_organization(
+drop function if exists public.rpc_create_organization(text, text, text, text, text, text, text, text, text, smallint, text);
+
+create function public.rpc_create_organization(
     p_name             text,
     p_slug             text,
     p_timezone         text,
@@ -55,7 +65,9 @@ as $$
         p_stand_label, p_token_key_version, p_request_id);
 $$;
 
-create or replace function public.rpc_set_stand_token_ciphertext(
+drop function if exists public.rpc_set_stand_token_ciphertext(uuid, text, smallint);
+
+create function public.rpc_set_stand_token_ciphertext(
     p_stand_id   uuid,
     p_ciphertext text,
     p_key_version smallint

@@ -47,26 +47,29 @@ values
     ('aa000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'outsider@test.com', '', now(), now());
 
 insert into public.organizations (id, name, slug)
-values ('a0000000-col-test-0000-00000000000a', 'Column Security Test Org', 'col-sec-test');
+values ('a0000000-c015-e570-0000-00000000000a', 'Column Security Test Org', 'col-sec-test');
 
 insert into public.organization_members (id, org_id, user_id, role, status)
 values
-    ('m0000000-0000-0000-0000-000000000001', 'a0000000-col-test-0000-00000000000a', 'aa000000-0000-0000-0000-000000000001', 'owner', 'active'),
-    ('m0000000-0000-0000-0000-000000000002', 'a0000000-col-test-0000-00000000000a', 'aa000000-0000-0000-0000-000000000002', 'admin', 'active'),
-    ('m0000000-0000-0000-0000-000000000003', 'a0000000-col-test-0000-00000000000a', 'aa000000-0000-0000-0000-000000000003', 'member', 'active'),
-    ('m0000000-0000-0000-0000-000000000004', 'a0000000-col-test-0000-00000000000a', 'aa000000-0000-0000-0000-000000000004', 'viewer', 'active');
+    ('b0000000-0000-0000-0000-000000000001', 'a0000000-c015-e570-0000-00000000000a', 'aa000000-0000-0000-0000-000000000001', 'owner', 'active'),
+    ('b0000000-0000-0000-0000-000000000002', 'a0000000-c015-e570-0000-00000000000a', 'aa000000-0000-0000-0000-000000000002', 'admin', 'active'),
+    ('b0000000-0000-0000-0000-000000000003', 'a0000000-c015-e570-0000-00000000000a', 'aa000000-0000-0000-0000-000000000003', 'member', 'active'),
+    ('b0000000-0000-0000-0000-000000000004', 'a0000000-c015-e570-0000-00000000000a', 'aa000000-0000-0000-0000-000000000004', 'viewer', 'active');
 
 insert into public.locations (id, org_id, name, google_review_url)
-values ('l0000000-col-test-0000-00000000000a', 'a0000000-col-test-0000-00000000000a', 'Test Location', 'https://g.page/r/test/review');
+values ('c0000000-0000-0000-0000-00000000000a', 'a0000000-c015-e570-0000-00000000000a', 'Test Location', 'https://g.page/r/test/review');
 
 insert into public.review_stands (id, org_id, location_id, public_token_hash, public_token_prefix)
-values ('s0000000-col-test-0000-00000000000a', 'a0000000-col-test-0000-00000000000a', 'l0000000-col-test-0000-00000000000a', 'hash-test', 'testpfx1');
+values ('d0000000-0000-0000-0000-00000000000a', 'a0000000-c015-e570-0000-00000000000a', 'c0000000-0000-0000-0000-00000000000a', 'hash-col-test', 'testpfx1');
 
-insert into public.customer_responses (id, org_id, location_id, stand_id, rating, submitted_at)
-values ('r0000000-col-test-0000-00000000000a', 'a0000000-col-test-0000-00000000000a', 'l0000000-col-test-0000-00000000000a', 's0000000-col-test-0000-00000000000a', 4, now());
+insert into public.public_review_sessions (id, org_id, location_id, stand_id, session_token_hash, locale, expires_at)
+values ('e0000000-0000-0000-0000-00000000000a', 'a0000000-c015-e570-0000-00000000000a', 'c0000000-0000-0000-0000-00000000000a', 'd0000000-0000-0000-0000-00000000000a', 'col-test-session-hash', 'en', now() + interval '1 hour');
+
+insert into public.customer_responses (id, org_id, location_id, stand_id, session_id, response_token_hash, rating, submitted_at)
+values ('f0000000-0000-0000-0000-00000000000a', 'a0000000-c015-e570-0000-00000000000a', 'c0000000-0000-0000-0000-00000000000a', 'd0000000-0000-0000-0000-00000000000a', 'e0000000-0000-0000-0000-00000000000a', 'col-test-response-hash', 4, now());
 
 insert into public.team_praise_records (id, org_id, location_id, response_id, first_name_encrypted, praise_note_encrypted)
-values ('p0000000-col-test-0000-00000000000a', 'a0000000-col-test-0000-00000000000a', 'l0000000-col-test-0000-00000000000a', 'r0000000-col-test-0000-00000000000a', 'v1:enc-name', 'v1:enc-note');
+values ('f1000000-0000-0000-0000-00000000000a', 'a0000000-c015-e570-0000-00000000000a', 'c0000000-0000-0000-0000-00000000000a', 'f0000000-0000-0000-0000-00000000000a', 'v1:enc-name', 'v1:enc-note');
 
 -- ============================================================
 -- 1. CUSTOMER RESPONSES — column restriction
@@ -78,14 +81,14 @@ select tests.set_actor('aa000000-0000-0000-0000-000000000001');
 select lives_ok(
     $$ update public.customer_responses
        set read_at = now()
-       where id = 'r0000000-col-test-0000-00000000000a' $$,
+       where id = 'f0000000-0000-0000-0000-00000000000a' $$,
     'owner can mark response as read');
 
 -- Blocked: rating column
 select throws_ok(
     $$ update public.customer_responses
        set rating = 5
-       where id = 'r0000000-col-test-0000-00000000000a' $$,
+       where id = 'f0000000-0000-0000-0000-00000000000a' $$,
     '42501', null,
     'owner cannot modify rating through Data API');
 
@@ -93,7 +96,7 @@ select throws_ok(
 select throws_ok(
     $$ update public.customer_responses
        set note_encrypted = 'tampered'
-       where id = 'r0000000-col-test-0000-00000000000a' $$,
+       where id = 'f0000000-0000-0000-0000-00000000000a' $$,
     '42501', null,
     'owner cannot modify encrypted note through Data API');
 
@@ -101,7 +104,7 @@ select throws_ok(
 select throws_ok(
     $$ update public.customer_responses
        set org_id = 'b0000000-0000-0000-0000-00000000000b'
-       where id = 'r0000000-col-test-0000-00000000000a' $$,
+       where id = 'f0000000-0000-0000-0000-00000000000a' $$,
     '42501', null,
     'owner cannot reassign response to another org');
 
@@ -109,7 +112,7 @@ select throws_ok(
 select throws_ok(
     $$ update public.customer_responses
        set submitted_at = '2020-01-01T00:00:00Z'
-       where id = 'r0000000-col-test-0000-00000000000a' $$,
+       where id = 'f0000000-0000-0000-0000-00000000000a' $$,
     '42501', null,
     'owner cannot backdate submission timestamp');
 
@@ -123,21 +126,21 @@ select lives_ok(
        set status = 'matched',
            matched_by_user_id = 'aa000000-0000-0000-0000-000000000001',
            matched_at = now()
-       where id = 'p0000000-col-test-0000-00000000000a' $$,
+       where id = 'f1000000-0000-0000-0000-00000000000a' $$,
     'owner can match praise');
 
 -- Blocked: encrypted fields
 select throws_ok(
     $$ update public.team_praise_records
        set first_name_encrypted = 'tampered'
-       where id = 'p0000000-col-test-0000-00000000000a' $$,
+       where id = 'f1000000-0000-0000-0000-00000000000a' $$,
     '42501', null,
     'owner cannot modify encrypted praise name');
 
 select throws_ok(
     $$ update public.team_praise_records
        set praise_note_encrypted = 'tampered'
-       where id = 'p0000000-col-test-0000-00000000000a' $$,
+       where id = 'f1000000-0000-0000-0000-00000000000a' $$,
     '42501', null,
     'owner cannot modify encrypted praise note');
 
@@ -145,7 +148,7 @@ select throws_ok(
 select throws_ok(
     $$ update public.team_praise_records
        set response_id = null
-       where id = 'p0000000-col-test-0000-00000000000a' $$,
+       where id = 'f1000000-0000-0000-0000-00000000000a' $$,
     '42501', null,
     'owner cannot modify response_id on praise');
 
@@ -153,7 +156,7 @@ select throws_ok(
 select throws_ok(
     $$ update public.team_praise_records
        set org_id = 'b0000000-0000-0000-0000-00000000000b'
-       where id = 'p0000000-col-test-0000-00000000000a' $$,
+       where id = 'f1000000-0000-0000-0000-00000000000a' $$,
     '42501', null,
     'owner cannot reassign praise to another org');
 
@@ -164,21 +167,21 @@ select throws_ok(
 -- Blocked: DELETE on locations
 select throws_ok(
     $$ delete from public.locations
-       where id = 'l0000000-col-test-0000-00000000000a' $$,
+       where id = 'c0000000-0000-0000-0000-00000000000a' $$,
     '42501', null,
     'admin cannot delete locations');
 
 -- Blocked: DELETE on review_stands
 select throws_ok(
     $$ delete from public.review_stands
-       where id = 's0000000-col-test-0000-00000000000a' $$,
+       where id = 'd0000000-0000-0000-0000-00000000000a' $$,
     '42501', null,
     'admin cannot delete review stands');
 
 -- Blocked: DELETE on organization_members
 select throws_ok(
     $$ delete from public.organization_members
-       where id = 'm0000000-0000-0000-0000-000000000003' $$,
+       where id = 'b0000000-0000-0000-0000-000000000003' $$,
     '42501', null,
     'admin cannot hard-delete members');
 
@@ -190,7 +193,7 @@ select throws_ok(
 select throws_ok(
     $$ update public.organization_members
        set org_id = 'b0000000-0000-0000-0000-00000000000b'
-       where id = 'm0000000-0000-0000-0000-000000000003' $$,
+       where id = 'b0000000-0000-0000-0000-000000000003' $$,
     '42501', null,
     'admin cannot reassign membership to another org');
 
@@ -198,7 +201,7 @@ select throws_ok(
 select throws_ok(
     $$ update public.organization_members
        set user_id = 'aa000000-0000-0000-0000-000000000005'
-       where id = 'm0000000-0000-0000-0000-000000000003' $$,
+       where id = 'b0000000-0000-0000-0000-000000000003' $$,
     '42501', null,
     'admin cannot swap user_id on membership row');
 
@@ -209,20 +212,20 @@ select throws_ok(
 -- Blocked: demoting the only owner
 select throws_ok(
     $$ select public.rpc_change_member_role(
-        'm0000000-0000-0000-0000-000000000001',
+        'b0000000-0000-0000-0000-000000000001',
         'admin'::public.member_role) $$,
     'P0001', null,
     'cannot demote the last owner');
 
 -- Blocked: suspending the only owner
 select throws_ok(
-    $$ select public.rpc_suspend_member('m0000000-0000-0000-0000-000000000001') $$,
+    $$ select public.rpc_suspend_member('b0000000-0000-0000-0000-000000000001') $$,
     'P0001', null,
     'cannot suspend the last owner');
 
 -- Blocked: removing the only owner
 select throws_ok(
-    $$ select public.rpc_remove_member('m0000000-0000-0000-0000-000000000001') $$,
+    $$ select public.rpc_remove_member('b0000000-0000-0000-0000-000000000001') $$,
     'P0001', null,
     'cannot remove the last owner');
 
@@ -235,7 +238,7 @@ select tests.set_actor('aa000000-0000-0000-0000-000000000003');
 
 select throws_ok(
     $$ select public.rpc_change_member_role(
-        'm0000000-0000-0000-0000-000000000003',
+        'b0000000-0000-0000-0000-000000000003',
         'owner'::public.member_role) $$,
     'P0001', null,
     'member cannot self-promote to owner');
@@ -243,7 +246,7 @@ select throws_ok(
 -- Member tries to self-promote to admin
 select throws_ok(
     $$ select public.rpc_change_member_role(
-        'm0000000-0000-0000-0000-000000000003',
+        'b0000000-0000-0000-0000-000000000003',
         'admin'::public.member_role) $$,
     'P0001', null,
     'member cannot self-promote to admin');
@@ -258,7 +261,7 @@ select tests.set_actor('aa000000-0000-0000-0000-000000000004');
 select tests.set_service();
 update public.customer_responses
 set read_at = null
-where id = 'r0000000-col-test-0000-00000000000a';
+where id = 'f0000000-0000-0000-0000-00000000000a';
 
 select tests.set_actor('aa000000-0000-0000-0000-000000000004');
 
@@ -266,7 +269,7 @@ select tests.set_actor('aa000000-0000-0000-0000-000000000004');
 select is_empty(
     $$ update public.customer_responses
        set read_at = now()
-       where id = 'r0000000-col-test-0000-00000000000a'
+       where id = 'f0000000-0000-0000-0000-00000000000a'
        returning id $$,
     'viewer cannot triage customer responses');
 
@@ -306,10 +309,10 @@ select tests.set_actor('aa000000-0000-0000-0000-000000000001');
 -- Allowed action
 select lives_ok(
     $$ select public.rpc_record_audit_event(
-        'a0000000-col-test-0000-00000000000a',
+        'a0000000-c015-e570-0000-00000000000a',
         'stand.token_rotated',
         'review_stand',
-        's0000000-col-test-0000-00000000000a',
+        'd0000000-0000-0000-0000-00000000000a',
         'test-req-id',
         '{}'::jsonb) $$,
     'allowed audit action succeeds');
@@ -317,10 +320,10 @@ select lives_ok(
 -- Blocked: arbitrary action
 select throws_ok(
     $$ select public.rpc_record_audit_event(
-        'a0000000-col-test-0000-00000000000a',
+        'a0000000-c015-e570-0000-00000000000a',
         'attack.inject_fake_event',
         'review_stand',
-        's0000000-col-test-0000-00000000000a',
+        'd0000000-0000-0000-0000-00000000000a',
         'test-req-id',
         '{}'::jsonb) $$,
     '42501', null,
@@ -329,10 +332,10 @@ select throws_ok(
 -- Blocked: null action
 select throws_ok(
     $$ select public.rpc_record_audit_event(
-        'a0000000-col-test-0000-00000000000a',
+        'a0000000-c015-e570-0000-00000000000a',
         null,
         'review_stand',
-        's0000000-col-test-0000-00000000000a',
+        'd0000000-0000-0000-0000-00000000000a',
         'test-req-id',
         '{}'::jsonb) $$,
     '42501', null,
@@ -341,7 +344,7 @@ select throws_ok(
 -- Blocked: direct INSERT into audit_events
 select throws_ok(
     $$ insert into public.audit_events (org_id, actor_user_id, actor_type, action, target_type, target_id)
-       values ('a0000000-col-test-0000-00000000000a', 'aa000000-0000-0000-0000-000000000001', 'user', 'fake', 'test', 'test') $$,
+       values ('a0000000-c015-e570-0000-00000000000a', 'aa000000-0000-0000-0000-000000000001', 'user', 'fake', 'test', 'test') $$,
     '42501', null,
     'direct INSERT into audit_events is blocked');
 
