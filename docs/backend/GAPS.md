@@ -125,17 +125,11 @@ per-instance memory.
 
 ---
 
-## 9. The legacy backend still serves review gating
+## 9. ~~The legacy backend still serves review gating~~ (RESOLVED)
 
-`backend/` contains a live Express app whose `POST /q/:publicId/rating` routes
-4–5★ to Google and diverts everything below a threshold into a private form that
-demands an explanation and offers to collect a phone number and email address.
-
-It is not deployed anywhere, so it harms nobody today. It should be removed once
-the Supabase flow is live — after pushing, because the only executed
-implementation of these endpoints lives on an unpushed branch, and after
-harvesting requirements: SMS segment counting, integer-cent money, consent
-capture, suppression, quiet hours, outbox and inbox designs, reconciliation.
+The legacy `backend/` directory containing the Express app with review gating
+has been removed. Requirements were harvested to `docs/backend/LEGACY_REQUIREMENTS.md`
+before deletion. The legacy code is preserved on branch `archive/legacy-express-backend`.
 
 ---
 
