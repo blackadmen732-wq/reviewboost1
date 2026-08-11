@@ -160,6 +160,9 @@ export interface Review {
   note: string | null;
   submittedAt: string;
   isRead: boolean;
+  isResolved: boolean;
+  resolvedAt: string | null;
+  noteCount: number;
 }
 
 /**
@@ -181,6 +184,7 @@ export async function listReviews(
     rating?: number | undefined;
     unreadOnly?: boolean | undefined;
     withNotesOnly?: boolean | undefined;
+    openOnly?: boolean | undefined;
   } = {},
 ): Promise<Page<Review>> {
   const supabase = await supabaseServer();
@@ -188,7 +192,7 @@ export async function listReviews(
 
   let query = supabase
     .from("customer_responses")
-    .select("id, rating, note_encrypted, submitted_at, read_at")
+    .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
     .order("submitted_at", { ascending: false })
     .limit(limit + 1);
 
@@ -196,11 +200,29 @@ export async function listReviews(
   if (options.rating !== undefined) query = query.eq("rating", options.rating);
   if (options.unreadOnly) query = query.is("read_at", null);
   if (options.withNotesOnly) query = query.not("note_encrypted", "is", null);
+  if (options.openOnly) query = query.is("resolved_at", null);
 
   const { data } = await query;
+  const rows = data ?? [];
+
+  // How many times the business has acted on each item. Fetched as ids and
+  // counted here rather than as a PostgREST aggregate, because the relationship
+  // is a composite key and inference over those is the thing that works in
+  // development and errors in production.
+  const ids = rows.map((row) => row.id as string);
+  const { data: noteRows } =
+    ids.length > 0
+      ? await supabase.from("response_notes").select("response_id").in("response_id", ids)
+      : { data: [] as Array<{ response_id: string }> };
+
+  const noteCounts = new Map<string, number>();
+  for (const row of noteRows ?? []) {
+    const key = row.response_id as string;
+    noteCounts.set(key, (noteCounts.get(key) ?? 0) + 1);
+  }
 
   return paginate(
-    data ?? [],
+    rows,
     limit,
     (row) => ({
       responseId: row.id as string,
@@ -210,9 +232,107 @@ export async function listReviews(
       note: tryDecrypt(row.note_encrypted as string | null),
       submittedAt: row.submitted_at as string,
       isRead: row.read_at !== null,
+      isResolved: row.resolved_at !== null,
+      resolvedAt: (row.resolved_at as string | null) ?? null,
+      noteCount: noteCounts.get(row.id as string) ?? 0,
     }),
     "submitted_at",
   );
+}
+
+// ------------------------------------------------------ action notes ----
+
+export interface ActionNote {
+  noteId: string;
+  body: string;
+  authorName: string;
+  authorId: string;
+  createdAt: string;
+}
+
+/**
+ * What the business did about a piece of feedback.
+ *
+ * Not a reply to the customer — there is nobody to reply to. The public flow
+ * collects no email, phone or name, so no row in this schema can be turned into
+ * a delivery address. That anonymity is why people write "waited 25 minutes and
+ * the order was wrong" instead of writing nothing.
+ *
+ * What this thread is instead is the record of what happened next, which is the
+ * part that changes the business. Appended to, never edited: something that can
+ * be quietly rewritten afterwards is not a record.
+ */
+export async function listActionNotes(responseId: string): Promise<ActionNote[]> {
+  const supabase = await supabaseServer();
+
+  const { data } = await supabase
+    .from("response_notes")
+    .select("id, body_encrypted, author_id, created_at")
+    .eq("response_id", responseId)
+    .order("created_at", { ascending: true });
+
+  const rows = data ?? [];
+  const authorIds = [...new Set(rows.map((row) => row.author_id as string))];
+
+  // A separate lookup rather than an embed: `author_id` references auth.users,
+  // which PostgREST cannot traverse to public.profiles, so there is no
+  // relationship to infer.
+  const { data: profiles } =
+    authorIds.length > 0
+      ? await supabase.from("profiles").select("id, display_name").in("id", authorIds)
+      : { data: [] as Array<{ id: string; display_name: string | null }> };
+
+  const names = new Map(
+    (profiles ?? []).map((profile) => [
+      profile.id as string,
+      (profile.display_name as string | null)?.trim() || "",
+    ]),
+  );
+
+  return rows.map((row) => ({
+    noteId: row.id as string,
+    body: tryDecrypt(row.body_encrypted as string) ?? "",
+    // "Someone on your team" rather than a blank byline. A profile can be
+    // missing a display name, and an empty name next to an action reads as a
+    // rendering bug rather than as missing data.
+    authorName: names.get(row.author_id as string) || "Someone on your team",
+    authorId: row.author_id as string,
+    createdAt: row.created_at as string,
+  }));
+}
+
+/** One piece of feedback with its full history, for the detail screen. */
+export async function getReview(
+  responseId: string,
+): Promise<{ review: Review; actions: ActionNote[] } | null> {
+  const supabase = await supabaseServer();
+
+  const { data } = await supabase
+    .from("customer_responses")
+    .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .eq("id", responseId)
+    .maybeSingle();
+
+  // Null covers "does not exist" and "belongs to another tenant" alike. RLS
+  // makes them indistinguishable, which is the correct behaviour: telling them
+  // apart would confirm that somebody else's feedback exists.
+  if (!data) return null;
+
+  const actions = await listActionNotes(responseId);
+
+  return {
+    review: {
+      responseId: data.id as string,
+      rating: data.rating as number,
+      note: tryDecrypt(data.note_encrypted as string | null),
+      submittedAt: data.submitted_at as string,
+      isRead: data.read_at !== null,
+      isResolved: data.resolved_at !== null,
+      resolvedAt: (data.resolved_at as string | null) ?? null,
+      noteCount: actions.length,
+    },
+    actions,
+  };
 }
 
 /** How many responses sit at each star value — the Reviews page breakdown. */

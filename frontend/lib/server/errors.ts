@@ -24,6 +24,15 @@ export const ERROR_CODE = {
   idempotencyConflict: "idempotency_conflict",
   idempotencyInProgress: "idempotency_in_progress",
   rateLimited: "rate_limited",
+  // Owner-side only. Covers "does not exist" and "belongs to another business"
+  // with one indistinguishable answer, because RLS returns no row for either and
+  // telling them apart would confirm that another tenant's record exists.
+  notFound: "not_found",
+  // The caller is legitimately signed in and in the right business, but lacks
+  // the role. Distinct from notFound on purpose: hiding a real permission
+  // boundary behind "missing" leaves someone retrying a thing that will never
+  // work.
+  forbidden: "forbidden",
   requestTimeout: "request_timeout",
   internalError: "internal_error",
   serviceUnavailable: "service_unavailable",

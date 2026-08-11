@@ -41,7 +41,7 @@ export const MAX_FIRST_NAME_LENGTH = 80;
 export const MAX_NOTE_BYTES = MAX_NOTE_LENGTH * 3;
 export const MAX_FIRST_NAME_BYTES = MAX_FIRST_NAME_LENGTH * 3;
 
-const byteLength = (value: string) => Buffer.byteLength(value, "utf8");
+export const byteLength = (value: string) => Buffer.byteLength(value, "utf8");
 
 /** Stand token from the URL. Matches the contract's pattern exactly. */
 export const tokenSchema = z

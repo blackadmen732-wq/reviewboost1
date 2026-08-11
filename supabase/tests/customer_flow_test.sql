@@ -22,7 +22,7 @@ create extension if not exists pgtap with schema extensions;
 -- below have somewhere to live.
 create schema if not exists tests;
 
-select plan(54);
+select plan(70);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -428,6 +428,175 @@ select throws_ok(
     '42501', null,
     'a normal user cannot erase audit history');
 
+-- ================================================ feedback workflow ========
+--
+-- The action-note thread and the resolved state. Every isolation claim below
+-- performs the attack rather than asserting a policy exists.
+
+select tests.set_service();
+
+-- One known response to hang the thread from.
+insert into public.public_review_sessions
+    (id, org_id, location_id, stand_id, session_token_hash, locale, expires_at)
+values ('a4000000-0000-0000-0000-00000000000a',
+        'a0000000-0000-0000-0000-00000000000a',
+        'a1000000-0000-0000-0000-00000000000a',
+        'a2000000-0000-0000-0000-00000000000a',
+        'hash-session-workflow', 'en', now() + interval '1 day');
+
+insert into public.customer_responses
+    (id, org_id, location_id, stand_id, session_id, response_token_hash, rating)
+values ('a5000000-0000-0000-0000-00000000000a',
+        'a0000000-0000-0000-0000-00000000000a',
+        'a1000000-0000-0000-0000-00000000000a',
+        'a2000000-0000-0000-0000-00000000000a',
+        'a4000000-0000-0000-0000-00000000000a',
+        'hash-response-workflow', 3);
+
+-- Tenant B gets one too, so cross-tenant reads have something to fail to find.
+insert into public.public_review_sessions
+    (id, org_id, location_id, stand_id, session_token_hash, locale, expires_at)
+values ('b4000000-0000-0000-0000-00000000000b',
+        'b0000000-0000-0000-0000-00000000000b',
+        'b1000000-0000-0000-0000-00000000000b',
+        'b2000000-0000-0000-0000-00000000000b',
+        'hash-session-workflow-b', 'en', now() + interval '1 day');
+
+insert into public.customer_responses
+    (id, org_id, location_id, stand_id, session_id, response_token_hash, rating)
+values ('b5000000-0000-0000-0000-00000000000b',
+        'b0000000-0000-0000-0000-00000000000b',
+        'b1000000-0000-0000-0000-00000000000b',
+        'b2000000-0000-0000-0000-00000000000b',
+        'b4000000-0000-0000-0000-00000000000b',
+        'hash-response-workflow-b', 2);
+
+insert into public.response_notes (org_id, response_id, author_id, body_encrypted)
+values ('b0000000-0000-0000-0000-00000000000b',
+        'b5000000-0000-0000-0000-00000000000b',
+        'bbbbbbbb-0000-0000-0000-000000000001',
+        'ciphertext-tenant-b');
+
+-- ---- as tenant A's owner ----
+
+select tests.set_actor('aaaaaaaa-0000-0000-0000-000000000001');
+
+select lives_ok(
+    $$ insert into public.response_notes (org_id, response_id, author_id, body_encrypted)
+       values ('a0000000-0000-0000-0000-00000000000a',
+               'a5000000-0000-0000-0000-00000000000a',
+               'aaaaaaaa-0000-0000-0000-000000000001',
+               'ciphertext-called-them-back') $$,
+    'an owner can record what they did about their own feedback');
+
+select isnt_empty(
+    $$ select 1 from public.response_notes
+        where response_id = 'a5000000-0000-0000-0000-00000000000a' $$,
+    'an owner can read their own action notes');
+
+-- Attribution cannot be forged: the insert policy requires author_id to be the
+-- caller, so a note cannot be filed under a colleague's name.
+select throws_ok(
+    $$ insert into public.response_notes (org_id, response_id, author_id, body_encrypted)
+       values ('a0000000-0000-0000-0000-00000000000a',
+               'a5000000-0000-0000-0000-00000000000a',
+               'bbbbbbbb-0000-0000-0000-000000000001',
+               'forged-attribution') $$,
+    '42501', null,
+    'a note cannot be attributed to somebody else');
+
+-- Cross-tenant write, refused by the policy.
+select throws_ok(
+    $$ insert into public.response_notes (org_id, response_id, author_id, body_encrypted)
+       values ('b0000000-0000-0000-0000-00000000000b',
+               'b5000000-0000-0000-0000-00000000000b',
+               'aaaaaaaa-0000-0000-0000-000000000001',
+               'note-on-a-rivals-feedback') $$,
+    '42501', null,
+    'an owner cannot annotate another business feedback');
+
+-- Cross-tenant read returns nothing rather than erroring, which is what RLS
+-- does and what keeps existence itself private.
+select is_empty(
+    $$ select 1 from public.response_notes
+        where org_id = 'b0000000-0000-0000-0000-00000000000b' $$,
+    'an owner never sees another business action notes');
+
+-- Append-only, enforced by the absence of a grant rather than by convention.
+select throws_ok(
+    $$ update public.response_notes set body_encrypted = 'rewritten' $$,
+    '42501', null,
+    'an action note cannot be rewritten');
+
+select throws_ok(
+    $$ delete from public.response_notes $$,
+    '42501', null,
+    'an action note cannot be deleted');
+
+select throws_ok(
+    $$ truncate public.response_notes $$,
+    '42501', null,
+    'action notes cannot be truncated away');
+
+-- ---- resolution ----
+
+select lives_ok(
+    $$ update public.customer_responses
+          set resolved_at = now(), resolved_by = 'aaaaaaaa-0000-0000-0000-000000000001'
+        where id = 'a5000000-0000-0000-0000-00000000000a' $$,
+    'an owner can mark their own feedback sorted');
+
+-- resolved_at and resolved_by travel together or not at all, so "sorted" always
+-- has a name against it.
+select throws_ok(
+    $$ update public.customer_responses set resolved_at = now(), resolved_by = null
+        where id = 'a5000000-0000-0000-0000-00000000000a' $$,
+    '23514', null,
+    'feedback cannot be sorted by nobody');
+
+select lives_ok(
+    $$ update public.customer_responses set resolved_at = null, resolved_by = null
+        where id = 'a5000000-0000-0000-0000-00000000000a' $$,
+    'an owner can reopen their own feedback');
+
+-- The customer's own words stay immutable. Nothing in this workflow may edit
+-- what was actually said.
+select is(
+    (select rating from public.customer_responses
+      where id = 'a5000000-0000-0000-0000-00000000000a'),
+    3::smallint,
+    'the rating is untouched by the workflow');
+
+-- ---- anonymous ----
+
+select tests.set_anonymous();
+
+select throws_ok(
+    $$ select 1 from public.response_notes $$,
+    '42501', null,
+    'the anonymous customer role cannot read internal notes');
+
+select throws_ok(
+    $$ insert into public.response_notes (org_id, response_id, author_id, body_encrypted)
+       values ('a0000000-0000-0000-0000-00000000000a',
+               'a5000000-0000-0000-0000-00000000000a',
+               'aaaaaaaa-0000-0000-0000-000000000001', 'x') $$,
+    '42501', null,
+    'the anonymous customer role cannot write internal notes');
+
+-- ---- seeing your own team ----
+
+select tests.set_actor('aaaaaaaa-0000-0000-0000-000000000001');
+
+select isnt_empty(
+    $$ select 1 from public.profiles where id = 'aaaaaaaa-0000-0000-0000-000000000001' $$,
+    'a user can still see their own profile');
+
+select is_empty(
+    $$ select 1 from public.profiles where id = 'bbbbbbbb-0000-0000-0000-000000000001' $$,
+    'a user cannot see somebody from another business');
+
 select * from finish();
+
 
 rollback;
