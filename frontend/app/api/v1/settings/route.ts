@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/server/auth";
+import { requireOrganizationContext } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
@@ -69,29 +69,10 @@ const updateSchema = z
 
 export async function PATCH(request: NextRequest): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    const context = await requireUser(request);
+    const context = await requireOrganizationContext(request);
     const body = parseOrThrow(updateSchema, await readJsonBody(request));
 
-    const { data: membership, error: membershipError } = await context.db
-      .from("organization_members")
-      .select("org_id, role")
-      .eq("user_id", context.userId)
-      .eq("status", "active")
-      .limit(1)
-      .maybeSingle();
-
-    if (membershipError) {
-      throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
-    }
-
-    if (!membership) {
-      throw new ApiError(404, ERROR_CODE.notFound, "You do not have a business set up yet.");
-    }
-
-    // Checked here so a member gets a clear refusal rather than a silent no-op:
-    // the RLS policy restricts these tables to owners and admins, and an update
-    // that matches no row otherwise looks exactly like success.
-    if (membership.role !== "owner" && membership.role !== "admin") {
+    if (context.role !== "owner" && context.role !== "admin") {
       throw new ApiError(
         403,
         ERROR_CODE.forbidden,
@@ -107,7 +88,7 @@ export async function PATCH(request: NextRequest): Promise<Response> {
       const { error } = await context.db
         .from("organizations")
         .update(organizationChanges)
-        .eq("id", membership.org_id);
+        .eq("id", context.orgId);
 
       if (error) {
         throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
@@ -127,7 +108,7 @@ export async function PATCH(request: NextRequest): Promise<Response> {
       const { data: location, error: locationLookupError } = await context.db
         .from("locations")
         .select("id")
-        .eq("org_id", membership.org_id)
+        .eq("org_id", context.orgId)
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();

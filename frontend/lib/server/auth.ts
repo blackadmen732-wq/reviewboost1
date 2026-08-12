@@ -100,3 +100,61 @@ export function requireRole(role: string, allowed: readonly string[]): void {
     throw new ApiError(403, ERROR_CODE.validationFailed, "You do not have permission to do that.");
   }
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface OrganizationContext extends AuthenticatedContext {
+  orgId: string;
+  role: string;
+}
+
+/**
+ * Resolve the caller and their active organization.
+ *
+ * The organization is identified by a query parameter or header, validated
+ * against the user's actual memberships. If the user belongs to exactly one
+ * organization and no explicit orgId is provided, that one is used.
+ */
+export async function requireOrganizationContext(
+  request: Request,
+): Promise<OrganizationContext> {
+  const context = await requireUser(request);
+
+  const url = new URL(request.url);
+  const explicitOrgId =
+    url.searchParams.get("org_id") ??
+    request.headers.get("x-organization-id");
+
+  const { data: memberships, error } = await context.db
+    .from("organization_members")
+    .select("org_id, role")
+    .eq("user_id", context.userId)
+    .eq("status", "active")
+    .order("created_at", { ascending: true });
+
+  if (error || !memberships || memberships.length === 0) {
+    throw new ApiError(404, ERROR_CODE.notFound, "You do not have a business set up yet.");
+  }
+
+  if (explicitOrgId) {
+    if (!UUID_RE.test(explicitOrgId)) {
+      throw new ApiError(400, ERROR_CODE.validationFailed, "Invalid organization identifier.");
+    }
+    const match = memberships.find((m) => m.org_id === explicitOrgId);
+    if (!match) {
+      throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
+    }
+    return { ...context, orgId: match.org_id as string, role: match.role as string };
+  }
+
+  if (memberships.length === 1) {
+    const m = memberships[0]!;
+    return { ...context, orgId: m.org_id as string, role: m.role as string };
+  }
+
+  throw new ApiError(
+    400,
+    ERROR_CODE.validationFailed,
+    "You belong to multiple organizations. Specify which one with org_id.",
+  );
+}

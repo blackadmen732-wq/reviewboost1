@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/server/auth";
+import { requireOrganizationContext } from "@/lib/server/auth";
 import { handle, json, preflight } from "@/lib/server/http";
 import { listCustomerResponses } from "@/lib/server/owner-service";
 
@@ -22,7 +22,7 @@ const ROUTE = "/api/v1/customer-responses";
 
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    const context = await requireUser(request);
+    const context = await requireOrganizationContext(request);
     const url = new URL(request.url);
 
     const limitParam = url.searchParams.get("limit");
@@ -36,6 +36,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         limit: Number.isFinite(parsedLimit) ? (parsedLimit as number) : 25,
       },
       requestId,
+      context.orgId,
     );
 
     return json(request, requestId, 200, { ...page, requestId });

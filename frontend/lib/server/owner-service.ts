@@ -199,12 +199,16 @@ export async function getOnboardingState(context: AuthenticatedContext, requestI
 
 // ----------------------------------------------------------------- stands --
 
-export async function listStands(context: AuthenticatedContext, requestId: string) {
-  const { data, error } = await context.db
+export async function listStands(context: AuthenticatedContext, requestId: string, orgId?: string) {
+  let query = context.db
     .from("review_stands")
     .select("id, org_id, location_id, label, stand_type, status, public_token_prefix, created_at, last_opened_at")
     .order("created_at", { ascending: false })
     .limit(MAX_PAGE_SIZE);
+
+  if (orgId) query = query.eq("org_id", orgId);
+
+  const { data, error } = await query;
 
   if (error) databaseFailure("list_stands", error, requestId);
 
@@ -354,6 +358,7 @@ export async function listCustomerResponses(
   context: AuthenticatedContext,
   page: Page,
   requestId: string,
+  orgId?: string,
 ) {
   const limit = pageSize(page.limit);
 
@@ -362,6 +367,8 @@ export async function listCustomerResponses(
     .select("id, location_id, rating, note_encrypted, submitted_at, read_at, resolved_at")
     .order("submitted_at", { ascending: false })
     .limit(limit + 1);
+
+  if (orgId) query = query.eq("org_id", orgId);
 
   if (page.cursor) query = query.lt("submitted_at", page.cursor);
 
@@ -402,7 +409,7 @@ export async function listCustomerResponses(
  * A test asserts the serialised response contains no rating, star, or Google
  * field.
  */
-export async function listTeamPraise(context: AuthenticatedContext, page: Page, requestId: string) {
+export async function listTeamPraise(context: AuthenticatedContext, page: Page, requestId: string, orgId?: string) {
   const limit = pageSize(page.limit);
 
   let query = context.db
@@ -410,6 +417,8 @@ export async function listTeamPraise(context: AuthenticatedContext, page: Page, 
     .select("id, location_id, first_name_encrypted, praise_note_encrypted, status, created_at")
     .order("created_at", { ascending: false })
     .limit(limit + 1);
+
+  if (orgId) query = query.eq("org_id", orgId);
 
   if (page.cursor) query = query.lt("created_at", page.cursor);
 

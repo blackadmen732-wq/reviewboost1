@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/server/auth";
+import { requireOrganizationContext } from "@/lib/server/auth";
 import { handle, json, preflight } from "@/lib/server/http";
 import { listStands } from "@/lib/server/owner-service";
 
@@ -19,8 +19,8 @@ const ROUTE = "/api/v1/review-stands";
 
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    const context = await requireUser(request);
-    const stands = await listStands(context, requestId);
+    const context = await requireOrganizationContext(request);
+    const stands = await listStands(context, requestId, context.orgId);
     return json(request, requestId, 200, { data: stands, requestId });
   });
 }

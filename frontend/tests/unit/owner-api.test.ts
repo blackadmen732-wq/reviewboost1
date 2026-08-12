@@ -28,10 +28,12 @@ interface Recorded {
 const recorded: Recorded[] = [];
 let authUser: { id: string } | null = { id: "user-1" };
 let tableRows: unknown[] = [];
+let membershipRows: unknown[] = [{ org_id: "org-1", role: "owner" }];
 let rpcResult: { data: unknown; error: unknown } = { data: null, error: null };
 let serviceRoleUsed = false;
 
-function queryBuilder(columns: string) {
+function queryBuilder(columns: string, rows?: unknown[]) {
+  const effectiveRows = rows ?? tableRows;
   const builder: Record<string, unknown> = {};
   const chain = () => builder;
 
@@ -39,9 +41,9 @@ function queryBuilder(columns: string) {
     builder[method] = chain;
   }
   builder["maybeSingle"] = () =>
-    Promise.resolve({ data: tableRows[0] ?? null, error: null });
+    Promise.resolve({ data: effectiveRows[0] ?? null, error: null });
   builder["then"] = (resolve: (value: { data: unknown; error: unknown }) => unknown) =>
-    resolve({ data: tableRows, error: null });
+    resolve({ data: effectiveRows, error: null });
 
   void columns;
   return builder;
@@ -58,7 +60,8 @@ function fakeClient() {
     from: (table: string) => ({
       select: (columns: string) => {
         recorded.push({ kind: "from", name: table, columns });
-        return queryBuilder(columns);
+        const rows = table === "organization_members" ? membershipRows : undefined;
+        return queryBuilder(columns, rows);
       },
       update: () => ({
         eq: () => ({
@@ -120,6 +123,7 @@ beforeEach(() => {
   recorded.length = 0;
   authUser = { id: "user-1" };
   tableRows = [];
+  membershipRows = [{ org_id: "org-1", role: "owner" }];
   serviceRoleUsed = false;
   rpcResult = {
     data: [{ org_id: "org-1", location_id: "loc-1", stand_id: "11111111-1111-1111-1111-111111111111" }],
