@@ -194,9 +194,11 @@ grant execute on function public.rpc_create_organization(text, text, text, text,
 grant execute on function public.rpc_set_stand_token_ciphertext(uuid, text, smallint) to authenticated;
 
 -- ============================================================
--- 5. REVOKE DIRECT UPDATE ON organization_members
+-- 5. RESTRICT UPDATE ON organization_members TO RPC-USED COLUMNS
 -- ============================================================
--- Direct UPDATE lets an owner/admin bypass self-promotion, last-owner,
--- and self-suspension checks. All writes go through the RPCs.
+-- A table-wide UPDATE grant lets an owner/admin bypass self-promotion,
+-- last-owner, and self-suspension checks via the Data API. Restrict to
+-- only the columns the SECURITY INVOKER RPCs need (role, status).
 
 revoke update on public.organization_members from authenticated;
+grant update (role, status) on public.organization_members to authenticated;
