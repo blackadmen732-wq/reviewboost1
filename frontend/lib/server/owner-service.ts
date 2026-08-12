@@ -199,16 +199,13 @@ export async function getOnboardingState(context: AuthenticatedContext, requestI
 
 // ----------------------------------------------------------------- stands --
 
-export async function listStands(context: AuthenticatedContext, requestId: string, orgId?: string) {
-  let query = context.db
+export async function listStands(context: AuthenticatedContext, requestId: string, orgId: string) {
+  const { data, error } = await context.db
     .from("review_stands")
     .select("id, org_id, location_id, label, stand_type, status, public_token_prefix, created_at, last_opened_at")
+    .eq("org_id", orgId)
     .order("created_at", { ascending: false })
     .limit(MAX_PAGE_SIZE);
-
-  if (orgId) query = query.eq("org_id", orgId);
-
-  const { data, error } = await query;
 
   if (error) databaseFailure("list_stands", error, requestId);
 
@@ -238,6 +235,7 @@ export async function listStands(context: AuthenticatedContext, requestId: strin
 export async function rotateStandToken(
   context: AuthenticatedContext,
   standId: string,
+  orgId: string,
   requestId: string,
 ): Promise<{ standId: string; standUrl: string; standToken: string }> {
   const token = generateToken();
@@ -251,6 +249,7 @@ export async function rotateStandToken(
       token_rotated_at: new Date().toISOString(),
     })
     .eq("id", standId)
+    .eq("org_id", orgId)
     .select("id, org_id")
     .maybeSingle();
 
@@ -313,12 +312,14 @@ async function storeReprintableToken(
 export async function getStandTokenForReprint(
   context: AuthenticatedContext,
   standId: string,
+  orgId: string,
   requestId: string,
 ): Promise<{ token: string; standUrl: string; label: string } | null> {
   const { data, error } = await context.db
     .from("review_stands")
     .select("id, label, public_token_encrypted")
     .eq("id", standId)
+    .eq("org_id", orgId)
     .maybeSingle();
 
   if (error) databaseFailure("stand_reprint", error, requestId);
@@ -358,17 +359,16 @@ export async function listCustomerResponses(
   context: AuthenticatedContext,
   page: Page,
   requestId: string,
-  orgId?: string,
+  orgId: string,
 ) {
   const limit = pageSize(page.limit);
 
   let query = context.db
     .from("customer_responses")
     .select("id, location_id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .eq("org_id", orgId)
     .order("submitted_at", { ascending: false })
     .limit(limit + 1);
-
-  if (orgId) query = query.eq("org_id", orgId);
 
   if (page.cursor) query = query.lt("submitted_at", page.cursor);
 
@@ -409,16 +409,15 @@ export async function listCustomerResponses(
  * A test asserts the serialised response contains no rating, star, or Google
  * field.
  */
-export async function listTeamPraise(context: AuthenticatedContext, page: Page, requestId: string, orgId?: string) {
+export async function listTeamPraise(context: AuthenticatedContext, page: Page, requestId: string, orgId: string) {
   const limit = pageSize(page.limit);
 
   let query = context.db
     .from("team_praise_records")
     .select("id, location_id, first_name_encrypted, praise_note_encrypted, status, created_at")
+    .eq("org_id", orgId)
     .order("created_at", { ascending: false })
     .limit(limit + 1);
-
-  if (orgId) query = query.eq("org_id", orgId);
 
   if (page.cursor) query = query.lt("created_at", page.cursor);
 

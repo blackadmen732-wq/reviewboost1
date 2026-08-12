@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/server/auth";
+import { requireOrganizationContext } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight } from "@/lib/server/http";
 import { rotateStandToken } from "@/lib/server/owner-service";
@@ -30,7 +30,7 @@ export async function POST(
   { params }: { params: Promise<{ standId: string }> },
 ): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    const context = await requireUser(request);
+    const context = await requireOrganizationContext(request);
     const { standId } = await params;
 
     if (!UUID.test(standId)) {
@@ -39,7 +39,7 @@ export async function POST(
       });
     }
 
-    const rotated = await rotateStandToken(context, standId, requestId);
+    const rotated = await rotateStandToken(context, standId, context.orgId, requestId);
 
     // The new token is returned once. Reprint the stand now — this response is
     // the only place it will ever appear.

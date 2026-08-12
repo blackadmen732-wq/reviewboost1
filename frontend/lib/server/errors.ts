@@ -33,6 +33,7 @@ export const ERROR_CODE = {
   // boundary behind "missing" leaves someone retrying a thing that will never
   // work.
   forbidden: "forbidden",
+  organizationSelectionRequired: "organization_selection_required",
   requestTimeout: "request_timeout",
   internalError: "internal_error",
   serviceUnavailable: "service_unavailable",

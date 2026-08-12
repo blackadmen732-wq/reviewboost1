@@ -102,6 +102,14 @@ export function requireRole(role: string, allowed: readonly string[]): void {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ORG_COOKIE = "rb-active-org";
+
+function parseCookieValue(request: Request, name: string): string | undefined {
+  const header = request.headers.get("cookie") ?? "";
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = header.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`));
+  return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+}
 
 export interface OrganizationContext extends AuthenticatedContext {
   orgId: string;
@@ -111,19 +119,25 @@ export interface OrganizationContext extends AuthenticatedContext {
 /**
  * Resolve the caller and their active organization.
  *
- * The organization is identified by a query parameter or header, validated
- * against the user's actual memberships. If the user belongs to exactly one
- * organization and no explicit orgId is provided, that one is used.
+ * Priority: X-Organization-Id header (API/mobile) > rb-active-org cookie
+ * (browser). Query-string org_id is accepted as a fallback but is not the
+ * normal browser mechanism.
+ *
+ * The selected value is validated against the user's actual memberships
+ * every time. It is selection only, never authorization — RLS is the
+ * security boundary.
  */
 export async function requireOrganizationContext(
   request: Request,
 ): Promise<OrganizationContext> {
   const context = await requireUser(request);
 
+  const headerOrgId = request.headers.get("x-organization-id");
+  const cookieOrgId = parseCookieValue(request, ORG_COOKIE);
   const url = new URL(request.url);
-  const explicitOrgId =
-    url.searchParams.get("org_id") ??
-    request.headers.get("x-organization-id");
+  const queryOrgId = url.searchParams.get("org_id");
+
+  const explicitOrgId = headerOrgId ?? cookieOrgId ?? queryOrgId;
 
   const { data: memberships, error } = await context.db
     .from("organization_members")
@@ -154,7 +168,7 @@ export async function requireOrganizationContext(
 
   throw new ApiError(
     400,
-    ERROR_CODE.validationFailed,
-    "You belong to multiple organizations. Specify which one with org_id.",
+    ERROR_CODE.organizationSelectionRequired,
+    "You belong to multiple organizations. Select which one to use.",
   );
 }

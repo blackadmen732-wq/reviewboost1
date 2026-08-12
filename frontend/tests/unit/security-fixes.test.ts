@@ -35,14 +35,19 @@ describe("owner route protection", () => {
 
 describe("QR stand card security", () => {
   it("fetches QR with bearer token and credentials: omit", () => {
-    const filePath = path.resolve(__dirname, "../../features/dashboard/stand-card.tsx");
-    const source = fs.readFileSync(filePath, "utf-8");
+    const hookPath = path.resolve(__dirname, "../../lib/hooks/use-authenticated-qr.ts");
+    const hookSource = fs.readFileSync(hookPath, "utf-8");
 
-    expect(source).toContain("Authorization:");
-    expect(source).toContain('credentials: "omit"');
-    expect(source).not.toContain("<img\n          src={qrSrc}");
-    expect(source).toContain("URL.createObjectURL");
-    expect(source).toContain("URL.revokeObjectURL");
+    expect(hookSource).toContain("Authorization:");
+    expect(hookSource).toContain('credentials: "omit"');
+    expect(hookSource).toContain("URL.createObjectURL");
+    expect(hookSource).toContain("URL.revokeObjectURL");
+
+    const cardPath = path.resolve(__dirname, "../../features/dashboard/stand-card.tsx");
+    const cardSource = fs.readFileSync(cardPath, "utf-8");
+
+    expect(cardSource).toContain("useAuthenticatedQr");
+    expect(cardSource).not.toContain("<img\n          src={qrSrc}");
   });
 
   it("does not use a plain anchor tag for download", () => {

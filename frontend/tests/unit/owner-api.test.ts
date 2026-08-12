@@ -63,14 +63,18 @@ function fakeClient() {
         const rows = table === "organization_members" ? membershipRows : undefined;
         return queryBuilder(columns, rows);
       },
-      update: () => ({
-        eq: () => ({
-          select: (columns: string) => {
-            recorded.push({ kind: "from", name: `${table}.update`, columns });
-            return queryBuilder(columns);
-          },
-        }),
-      }),
+      update: () => {
+        const updateChain: Record<string, unknown> = {};
+        updateChain["eq"] = () => updateChain;
+        updateChain["is"] = () => updateChain;
+        updateChain["select"] = (columns: string) => {
+          recorded.push({ kind: "from", name: `${table}.update`, columns });
+          return queryBuilder(columns);
+        };
+        updateChain["maybeSingle"] = () =>
+          Promise.resolve({ data: tableRows[0] ?? null, error: null });
+        return updateChain;
+      },
     }),
     rpc: (name: string, args: Record<string, unknown>) => {
       recorded.push({ kind: "rpc", name, args });
@@ -361,7 +365,7 @@ describe("stand token rotation", () => {
     );
 
     expect(response.status).toBe(400);
-    expect(recorded.filter((entry) => entry.kind === "from")).toHaveLength(0);
+    expect(recorded.filter((entry) => entry.kind === "from" && entry.name !== "organization_members")).toHaveLength(0);
   });
 
   it("is a 404 for a stand belonging to another tenant", async () => {

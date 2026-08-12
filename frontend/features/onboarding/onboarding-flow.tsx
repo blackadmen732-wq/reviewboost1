@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeft, Check, ExternalLink, Store } from "lucide-react";
+import { ArrowLeft, Check, Download, ExternalLink, Printer, RefreshCw, Store } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
+import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
 import { isValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
@@ -42,6 +43,8 @@ export function OnboardingFlow() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Created | null>(null);
+
+  const qr = useAuthenticatedQr(created?.standId ?? null);
 
   const trimmedUrl = googleUrl.trim();
   const urlLooksRight = trimmedUrl !== "" && isValidatedGoogleReviewUrl(trimmedUrl);
@@ -277,25 +280,49 @@ export function OnboardingFlow() {
 
       {created ? (
         <div className="w-full rounded-[var(--radius-card)] border border-border bg-surface p-6 shadow-[var(--shadow-card)]">
-          {/* The QR is the reward. It is the first tangible thing they have
-              made, and it is on screen before any dashboard. */}
-          {/* A server-rendered SVG from our own route, not a raster asset:
-              next/image cannot optimise it and would only add a proxy hop in
-              front of the one image that must appear instantly. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`/api/v1/review-stands/${created.standId}/qr`}
-            alt="Your QR code"
-            className="mx-auto aspect-square w-full max-w-[220px]"
-          />
+          {qr.status === "error" || qr.status === "expired" ? (
+            <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-sm text-muted">
+                  {qr.status === "expired" ? "Please sign in again" : "Could not load QR code"}
+                </p>
+                <button
+                  type="button"
+                  onClick={qr.reload}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-brand-text"
+                >
+                  <RefreshCw className="size-3.5" aria-hidden="true" />
+                  Try again
+                </button>
+              </div>
+            </div>
+          ) : qr.objectUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={qr.objectUrl}
+              alt="Your QR code"
+              className="mx-auto aspect-square w-full max-w-[220px]"
+            />
+          ) : (
+            <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center">
+              <div className="size-8 animate-spin rounded-full border-4 border-border border-t-brand-text" />
+            </div>
+          )}
         </div>
       ) : null}
 
       <div className="flex w-full flex-col gap-3">
-        <Button size="lg" asChild>
-          <a href={created ? `/api/v1/review-stands/${created.standId}/qr` : "/home"} download>
-            Download my code
-          </a>
+        <Button size="lg" onClick={() => window.print()}>
+          <Printer className="size-5" aria-hidden="true" />
+          Print this code
+        </Button>
+        <Button
+          variant="secondary"
+          loading={qr.downloading}
+          onClick={() => qr.download("reviewboost-qr.svg")}
+        >
+          <Download className="size-5" aria-hidden="true" />
+          Save to my phone
         </Button>
         <Button variant="ghost" asChild>
           <a href="/home">Go to my dashboard</a>

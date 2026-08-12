@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/server/auth";
+import { requireOrganizationContext } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
 import { parseOrThrow } from "@/lib/server/validation";
@@ -54,7 +54,7 @@ export async function PATCH(
   { params }: { params: Promise<{ praiseId: string }> },
 ): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    const context = await requireUser(request);
+    const context = await requireOrganizationContext(request);
     const { praiseId } = await params;
 
     if (!UUID.test(praiseId)) {
@@ -82,6 +82,7 @@ export async function PATCH(
           .from("staff_members")
           .select("id")
           .eq("id", body.staffId)
+          .eq("org_id", context.orgId)
           .maybeSingle();
 
         if (staffError) {
@@ -119,6 +120,7 @@ export async function PATCH(
       .from("team_praise_records")
       .update(changes)
       .eq("id", praiseId)
+      .eq("org_id", context.orgId)
       .select("id, status")
       .maybeSingle();
 

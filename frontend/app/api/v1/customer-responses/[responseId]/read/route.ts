@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/server/auth";
+import { requireOrganizationContext } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight } from "@/lib/server/http";
 
@@ -27,7 +27,7 @@ export async function POST(
   { params }: { params: Promise<{ responseId: string }> },
 ): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    const context = await requireUser(request);
+    const context = await requireOrganizationContext(request);
     const { responseId } = await params;
 
     if (!UUID.test(responseId)) {
@@ -38,11 +38,9 @@ export async function POST(
 
     const { data, error } = await context.db
       .from("customer_responses")
-      // Only `read_at`. The rating and the customer's own words are never
-      // writable by anyone — fabricating a response would corrupt the only
-      // honest signal the product produces.
       .update({ read_at: new Date().toISOString() })
       .eq("id", responseId)
+      .eq("org_id", context.orgId)
       .is("read_at", null)
       .select("id")
       .maybeSingle();

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/server/auth";
+import { requireOrganizationContext } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
 import { parseOrThrow } from "@/lib/server/validation";
@@ -36,7 +36,7 @@ export async function POST(
   { params }: { params: Promise<{ responseId: string }> },
 ): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    const context = await requireUser(request);
+    const context = await requireOrganizationContext(request);
     const { responseId } = await params;
 
     if (!UUID.test(responseId)) {
@@ -52,12 +52,11 @@ export async function POST(
       .from("customer_responses")
       .update(
         body.resolved
-          ? // Resolving implies reading it. Leaving something unread but sorted
-            // keeps the badge lit for work that is already finished.
-            { resolved_at: now, resolved_by: context.userId, read_at: now }
+          ? { resolved_at: now, resolved_by: context.userId, read_at: now }
           : { resolved_at: null, resolved_by: null },
       )
       .eq("id", responseId)
+      .eq("org_id", context.orgId)
       .select("id, resolved_at")
       .maybeSingle();
 

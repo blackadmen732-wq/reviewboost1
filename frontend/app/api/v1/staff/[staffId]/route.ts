@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/server/auth";
+import { requireOrganizationContext } from "@/lib/server/auth";
 import { encrypt } from "@/lib/server/crypto";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
@@ -36,7 +36,7 @@ export async function PATCH(
   { params }: { params: Promise<{ staffId: string }> },
 ): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    const context = await requireUser(request);
+    const context = await requireOrganizationContext(request);
     const { staffId } = await params;
 
     if (!UUID.test(staffId)) {
@@ -52,12 +52,11 @@ export async function PATCH(
     if (body.roleLabel !== undefined) changes.role_label = body.roleLabel === "" ? null : body.roleLabel;
     if (body.isActive !== undefined) changes.is_active = body.isActive;
 
-    // RLS scopes this to the caller's organization, so no org filter is needed
-    // and a missing one returns fewer rows rather than somebody else's.
     const { data, error } = await context.db
       .from("staff_members")
       .update(changes)
       .eq("id", staffId)
+      .eq("org_id", context.orgId)
       .select("id")
       .maybeSingle();
 

@@ -1,11 +1,12 @@
 "use client";
 
 import { Download, Printer, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { AlertDialog } from "@/components/ui/dialog";
 import { notify } from "@/components/ui/toast";
+import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 interface StandCardProps {
@@ -15,109 +16,10 @@ interface StandCardProps {
   tokenPrefix: string;
 }
 
-async function fetchQrBlob(standId: string, accessToken: string): Promise<Blob> {
-  const res = await fetch(`/api/v1/review-stands/${standId}/qr`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    credentials: "omit",
-  });
-  if (res.status === 401 || res.status === 403) throw new Error("unauthorized");
-  if (!res.ok) throw new Error("qr_failed");
-  return res.blob();
-}
-
 export function StandCard({ standId, label, status, tokenPrefix }: StandCardProps) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [qrObjectUrl, setQrObjectUrl] = useState<string | null>(null);
-  const [qrError, setQrError] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const objectUrlRef = useRef<string | null>(null);
-  const loadGeneration = useRef(0);
-
-  const loadQr = useCallback(async () => {
-    const generation = ++loadGeneration.current;
-
-    const { data: { session } } = await supabaseBrowser().auth.getSession();
-    if (!session) {
-      setQrError(true);
-      return;
-    }
-
-    try {
-      const blob = await fetchQrBlob(standId, session.access_token);
-      if (generation !== loadGeneration.current) return;
-
-      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-      const url = URL.createObjectURL(blob);
-      objectUrlRef.current = url;
-      setQrObjectUrl(url);
-      setQrError(false);
-    } catch {
-      if (generation !== loadGeneration.current) return;
-      setQrError(true);
-    }
-  }, [standId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const generation = ++loadGeneration.current;
-
-    (async () => {
-      const { data: { session } } = await supabaseBrowser().auth.getSession();
-      if (cancelled || generation !== loadGeneration.current) return;
-
-      if (!session) {
-        setQrError(true);
-        return;
-      }
-
-      try {
-        const blob = await fetchQrBlob(standId, session.access_token);
-        if (cancelled || generation !== loadGeneration.current) return;
-
-        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-        const url = URL.createObjectURL(blob);
-        objectUrlRef.current = url;
-        setQrObjectUrl(url);
-        setQrError(false);
-      } catch {
-        if (cancelled || generation !== loadGeneration.current) return;
-        setQrError(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
-      }
-    };
-  }, [standId]);
-
-  async function handleDownload() {
-    setDownloading(true);
-    const { data: { session } } = await supabaseBrowser().auth.getSession();
-    if (!session) {
-      setDownloading(false);
-      notify.error("Please sign in again", "Your session expired.");
-      return;
-    }
-
-    try {
-      const blob = await fetchQrBlob(standId, session.access_token);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `reviewboost-${tokenPrefix}.svg`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      notify.error("Could not download the code", "Please try again.");
-    } finally {
-      setDownloading(false);
-    }
-  }
+  const qr = useAuthenticatedQr(standId);
 
   async function rotate() {
     setBusy(true);
@@ -145,7 +47,7 @@ export function StandCard({ standId, label, status, tokenPrefix }: StandCardProp
       return;
     }
 
-    void loadQr();
+    qr.reload();
     notify.success("New code ready", "Print it and replace the old one.");
   }
 
@@ -161,14 +63,26 @@ export function StandCard({ standId, label, status, tokenPrefix }: StandCardProp
       </div>
 
       <div className="mb-5 rounded-[var(--radius-control)] bg-white p-4">
-        {qrError ? (
+        {qr.status === "error" || qr.status === "expired" ? (
           <div className="mx-auto flex aspect-square w-full max-w-[240px] items-center justify-center">
-            <p className="text-sm text-muted">Could not load QR code</p>
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-sm text-muted">
+                {qr.status === "expired" ? "Please sign in again" : "Could not load QR code"}
+              </p>
+              <button
+                type="button"
+                onClick={qr.reload}
+                className="inline-flex items-center gap-1 text-sm font-medium text-brand-text"
+              >
+                <RefreshCw className="size-3.5" aria-hidden="true" />
+                Try again
+              </button>
+            </div>
           </div>
-        ) : qrObjectUrl ? (
+        ) : qr.objectUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={qrObjectUrl}
+            src={qr.objectUrl}
             alt={`QR code for ${label}`}
             className="mx-auto aspect-square w-full max-w-[240px]"
           />
@@ -185,7 +99,11 @@ export function StandCard({ standId, label, status, tokenPrefix }: StandCardProp
           Print this code
         </Button>
 
-        <Button variant="secondary" onClick={handleDownload} loading={downloading}>
+        <Button
+          variant="secondary"
+          onClick={() => qr.download(`reviewboost-${tokenPrefix}.svg`)}
+          loading={qr.downloading}
+        >
           <Download className="size-5" aria-hidden="true" />
           Save to my phone
         </Button>

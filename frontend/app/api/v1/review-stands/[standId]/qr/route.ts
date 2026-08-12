@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import QRCode from "qrcode";
 
-import { requireUser } from "@/lib/server/auth";
+import { requireOrganizationContext } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, preflight } from "@/lib/server/http";
 import { getStandTokenForReprint } from "@/lib/server/owner-service";
@@ -35,7 +35,7 @@ export async function GET(
   { params }: { params: Promise<{ standId: string }> },
 ): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    const context = await requireUser(request);
+    const context = await requireOrganizationContext(request);
     const { standId } = await params;
 
     if (!UUID.test(standId)) {
@@ -44,7 +44,7 @@ export async function GET(
       });
     }
 
-    const stand = await getStandTokenForReprint(context, standId, requestId);
+    const stand = await getStandTokenForReprint(context, standId, context.orgId, requestId);
 
     if (stand === null) {
       throw new ApiError(

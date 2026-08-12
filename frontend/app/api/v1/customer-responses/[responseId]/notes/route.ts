@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/server/auth";
+import { requireOrganizationContext } from "@/lib/server/auth";
 import { encrypt } from "@/lib/server/crypto";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
@@ -52,7 +52,7 @@ export async function POST(
   { params }: { params: Promise<{ responseId: string }> },
 ): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    const context = await requireUser(request);
+    const context = await requireOrganizationContext(request);
     const { responseId } = await params;
 
     if (!UUID.test(responseId)) {
@@ -63,14 +63,11 @@ export async function POST(
 
     const body = parseOrThrow(bodySchema, await readJsonBody(request));
 
-    // The org comes from the feedback row rather than from the request, so a
-    // caller cannot name an organization they do not belong to. RLS already
-    // refuses the read if it is not theirs, which makes this the authoritative
-    // answer rather than a hint to be checked.
     const { data: response, error: lookupError } = await context.db
       .from("customer_responses")
       .select("id, org_id")
       .eq("id", responseId)
+      .eq("org_id", context.orgId)
       .maybeSingle();
 
     if (lookupError) {
@@ -96,11 +93,11 @@ export async function POST(
       throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
     }
 
-    // Writing down what you did counts as having seen it.
     await context.db
       .from("customer_responses")
       .update({ read_at: new Date().toISOString() })
       .eq("id", responseId)
+      .eq("org_id", context.orgId)
       .is("read_at", null);
 
     return json(request, requestId, 201, {
