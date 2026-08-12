@@ -8,7 +8,7 @@ afterEach(() => {
 });
 
 describe("production customer API client", () => {
-  it("sends credentials and the stable idempotency key", async () => {
+  it("omits credentials on public requests and sends the stable idempotency key", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ responseId: "response-1" }), {
         status: 201,
@@ -27,7 +27,7 @@ describe("production customer API client", () => {
 
     const request = fetchMock.mock.calls[0]?.[0] as Request;
     expect(request).toBeInstanceOf(Request);
-    expect(request.credentials).toBe("include");
+    expect(request.credentials).toBe("omit");
     expect(request.headers.get("Idempotency-Key")).toBe("response-key-123456789");
     await expect(request.clone().json()).resolves.toEqual({
       sessionId: "session-1",

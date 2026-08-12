@@ -15,7 +15,7 @@ const baseUrl =
 
 const client = createClient<paths>({
   baseUrl,
-  credentials: "include",
+  credentials: "omit",
   fetch: (request) => globalThis.fetch(request),
   headers: {
     Accept: "application/json",
