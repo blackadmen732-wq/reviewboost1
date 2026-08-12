@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/server/auth";
+import { requireOrganizationContext } from "@/lib/server/auth";
 import { encrypt } from "@/lib/server/crypto";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
@@ -35,31 +35,13 @@ const createSchema = z.strictObject({
 
 export async function POST(request: NextRequest): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    const context = await requireUser(request);
+    const context = await requireOrganizationContext(request);
     const body = parseOrThrow(createSchema, await readJsonBody(request));
-
-    // The organization comes from the caller's own membership, never from the
-    // request body — otherwise anyone could staff another business's roster.
-    const { data: membership, error: membershipError } = await context.db
-      .from("organization_members")
-      .select("org_id")
-      .eq("user_id", context.userId)
-      .eq("status", "active")
-      .limit(1)
-      .maybeSingle();
-
-    if (membershipError) {
-      throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
-    }
-
-    if (!membership) {
-      throw new ApiError(404, ERROR_CODE.notFound, "You do not have a business set up yet.");
-    }
 
     const { data, error } = await context.db
       .from("staff_members")
       .insert({
-        org_id: membership.org_id,
+        org_id: context.orgId,
         name_encrypted: encrypt(body.name),
         ...(body.roleLabel ? { role_label: body.roleLabel } : {}),
       })
