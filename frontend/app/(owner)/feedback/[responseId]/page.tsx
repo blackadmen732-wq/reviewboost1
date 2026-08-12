@@ -35,9 +35,9 @@ export default async function FeedbackDetailPage({
   params: Promise<{ responseId: string }>;
 }) {
   const { responseId } = await params;
-  await requireOwner(`/feedback/${responseId}`);
+  const { organization } = await requireOwner(`/feedback/${responseId}`);
 
-  const found = await getReview(responseId);
+  const found = await getReview(organization.orgId, responseId);
 
   // getReview returns null for "does not exist" and "another business's" alike,
   // because RLS makes them indistinguishable. Telling them apart would confirm

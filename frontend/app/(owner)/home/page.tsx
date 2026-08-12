@@ -31,7 +31,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function HomePage() {
   const { organization } = await requireOwner("/home");
-  const counts = await getOwnerCounts();
+  const counts = await getOwnerCounts(organization.orgId, organization.timezone);
 
   const hour = localHour(organization.timezone);
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";

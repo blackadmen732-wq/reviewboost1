@@ -41,13 +41,13 @@ export const dynamic = "force-dynamic";
  * asking.
  */
 export default async function PraisePage() {
-  await requireOwner("/praise");
+  const { organization } = await requireOwner("/praise");
 
   const [unmatched, everything, staff, tally] = await Promise.all([
-    listPraise({ unmatchedOnly: true, limit: 50 }),
-    listPraise({ limit: 50 }),
-    listStaff(),
-    getStaffPraiseTally(),
+    listPraise(organization.orgId, { unmatchedOnly: true, limit: 50 }),
+    listPraise(organization.orgId, { limit: 50 }),
+    listStaff(organization.orgId),
+    getStaffPraiseTally(organization.orgId),
   ]);
 
   const handled = everything.items.filter((item) => item.status !== "unmatched");

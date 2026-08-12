@@ -42,27 +42,21 @@ export const dynamic = "force-dynamic";
  * score.
  */
 export default async function ReviewsPage() {
-  await requireOwner("/reviews");
+  const { organization } = await requireOwner("/reviews");
   return (
     <AppShell>
       <h1 className="mb-2 text-2xl font-semibold tracking-[-0.02em] text-ink">Reviews</h1>
       <p className="mb-6 text-base text-muted">Every rating customers gave you.</p>
-      <ReviewsBody />
+      <ReviewsBody orgId={organization.orgId} timezone={organization.timezone} />
     </AppShell>
   );
 }
 
-/**
- * `searchParams` is read here rather than in the page so the shell and heading
- * stream immediately and only this part waits on the database. On a phone
- * connection outside a restaurant that is the difference between a blank screen
- * and a screen that is visibly working.
- */
-async function ReviewsBody() {
+async function ReviewsBody({ orgId, timezone }: { orgId: string; timezone: string }) {
   const [breakdown, counts, page] = await Promise.all([
-    getRatingBreakdown(),
-    getOwnerCounts(),
-    listReviews({ limit: 50 }),
+    getRatingBreakdown(orgId),
+    getOwnerCounts(orgId, timezone),
+    listReviews(orgId, { limit: 50 }),
   ]);
 
   if (breakdown.total === 0) {

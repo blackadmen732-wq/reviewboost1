@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
@@ -13,35 +14,20 @@ export { localHour, startOfLocalDay, startOfLocalMonth } from "@/lib/utils/local
 /**
  * Every read the owner interface performs, in one place.
  *
- * WHY THIS EXISTS
- * ---------------
- * Five pages had each written their own Supabase queries, and every one had
- * re-derived the same joins, the same casts, and the same "which organization am
- * I in" lookup. Page six would have copy-pasted page one, and the day a query
- * needed fixing it would have needed fixing six times — with the sixth quietly
- * missed.
- *
- * The pages are now about layout and words. Everything that talks to the
- * database lives here.
- *
- * ON CACHING
- * ----------
- * `cache()` deduplicates within a single render pass only. Home asks who the
- * current owner is several times across its sections; without this that is
- * several identical round trips before anything paints. It is not a cache across
- * requests — two owners never share anything, and nobody sees a stale number.
- *
  * ON ISOLATION
  * ------------
- * Almost nothing here carries `where org_id`. That is deliberate, not an
- * oversight: every query runs through the caller's own RLS-scoped client, so the
- * database returns only their rows. A clause forgotten here returns *fewer*
- * rows, never somebody else's. Adding manual filters would quietly move tenant
- * isolation out of the database and into whoever writes the next function.
+ * Every query carries an explicit `eq("org_id", orgId)` in addition to RLS.
+ * RLS prevents cross-tenant reads, but a user who belongs to two organizations
+ * would see combined results without the explicit filter. The org_id filter
+ * ensures clean per-organization views; RLS is defense in depth.
  */
+
+const ORG_COOKIE = "rb-active-org";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface CurrentOrganization {
   orgId: string;
+  membershipId: string;
   name: string;
   timezone: string;
   role: string;
@@ -50,54 +36,91 @@ export interface CurrentOrganization {
 export interface OwnerContext {
   user: User;
   organization: CurrentOrganization;
+  organizations: CurrentOrganization[];
 }
 
+type OrgFields = { name: string; timezone: string };
+type MembershipRow = {
+  id: string;
+  org_id: string;
+  role: string;
+  organizations: OrgFields | OrgFields[] | null;
+};
+
 /**
- * The organization the signed-in user belongs to, or null.
- *
- * V1 is one business per owner, so this takes the first active membership. When
- * multi-location arrives, this is the one function that changes.
+ * All active memberships for the signed-in user.
  */
-export const getCurrentOrganization = cache(async (): Promise<CurrentOrganization | null> => {
+export const listUserOrganizations = cache(async (): Promise<CurrentOrganization[]> => {
   const supabase = await supabaseServer();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) return [];
 
   const { data } = await supabase
     .from("organization_members")
-    .select("org_id, role, organizations(name, timezone)")
+    .select("id, org_id, role, organizations(name, timezone)")
     .eq("user_id", user.id)
     .eq("status", "active")
-    .order("created_at", { ascending: true })
-    .limit(1);
+    .order("created_at", { ascending: true });
 
-  const row = data?.[0] as
-    | { org_id: string; role: string; organizations: { name: string; timezone: string } | null }
-    | undefined;
-
-  if (!row) return null;
-
-  return {
-    orgId: row.org_id,
-    name: row.organizations?.name ?? "Your business",
-    timezone: row.organizations?.timezone ?? "UTC",
-    role: row.role,
-  };
+  return (data ?? []).map((row) => {
+    const r = row as MembershipRow;
+    const org = Array.isArray(r.organizations) ? r.organizations[0] : r.organizations;
+    return {
+      orgId: r.org_id,
+      membershipId: r.id,
+      name: org?.name ?? "Your business",
+      timezone: org?.timezone ?? "UTC",
+      role: r.role,
+    };
+  });
 });
+
+/**
+ * Resolve the active organization from cookie, validated against memberships.
+ *
+ * If the user has one membership, that one is used regardless of cookie.
+ * If the user has multiple, the cookie must match a valid membership.
+ * Returns null if no memberships exist or if multi-org with no valid selection.
+ */
+export const getActiveOrganization = cache(
+  async (): Promise<{
+    active: CurrentOrganization | null;
+    all: CurrentOrganization[];
+    needsSelection: boolean;
+  }> => {
+    const organizations = await listUserOrganizations();
+
+    if (organizations.length === 0) {
+      return { active: null, all: [], needsSelection: false };
+    }
+
+    if (organizations.length === 1) {
+      return { active: organizations[0] ?? null, all: organizations, needsSelection: false };
+    }
+
+    const store = await cookies();
+    const cookieOrgId = store.get(ORG_COOKIE)?.value;
+
+    if (cookieOrgId && UUID_RE.test(cookieOrgId)) {
+      const match = organizations.find((o) => o.orgId === cookieOrgId);
+      if (match) {
+        return { active: match, all: organizations, needsSelection: false };
+      }
+    }
+
+    return { active: null, all: organizations, needsSelection: true };
+  },
+);
 
 /**
  * The gate every owner page opens with.
  *
- * Both redirects were previously hand-written on each page, and they had already
- * drifted: some sent signed-out visitors to `/login` without remembering where
- * they were going, and only Home bothered to catch the half-finished-setup case.
- * One version means one behaviour.
- *
- * Note `redirect()` throws — control never returns — so callers can treat the
- * result as always present.
+ * Validates the active organization against the user's memberships.
+ * If the user belongs to multiple organizations and none is selected,
+ * redirects to the organization picker.
  */
 export const requireOwner = cache(async (nextPath: string): Promise<OwnerContext> => {
   const supabase = await supabaseServer();
@@ -108,14 +131,15 @@ export const requireOwner = cache(async (nextPath: string): Promise<OwnerContext
 
   if (!user) redirect(`/login?next=${encodeURIComponent(nextPath)}`);
 
-  const organization = await getCurrentOrganization();
+  const { active, all, needsSelection } = await getActiveOrganization();
 
-  // No organization means setup never finished. Sending them to an empty
-  // dashboard reads as "broken product"; sending them back to onboarding reads
-  // as "you're nearly there".
-  if (!organization) redirect("/onboarding");
+  if (all.length === 0) redirect("/onboarding");
 
-  return { user, organization };
+  if (needsSelection) {
+    redirect(`/select-org?next=${encodeURIComponent(nextPath)}`);
+  }
+
+  return { user, organization: active!, organizations: all };
 });
 
 export interface Page<T> {
@@ -179,6 +203,7 @@ export interface Review {
  * shipping the key there.
  */
 export async function listReviews(
+  orgId: string,
   options: {
     cursor?: string | undefined;
     limit?: number | undefined;
@@ -194,6 +219,7 @@ export async function listReviews(
   let query = supabase
     .from("customer_responses")
     .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .eq("org_id", orgId)
     .order("submitted_at", { ascending: false })
     .limit(limit + 1);
 
@@ -263,12 +289,13 @@ export interface ActionNote {
  * part that changes the business. Appended to, never edited: something that can
  * be quietly rewritten afterwards is not a record.
  */
-export async function listActionNotes(responseId: string): Promise<ActionNote[]> {
+export async function listActionNotes(orgId: string, responseId: string): Promise<ActionNote[]> {
   const supabase = await supabaseServer();
 
   const { data } = await supabase
     .from("response_notes")
     .select("id, body_encrypted, author_id, created_at")
+    .eq("org_id", orgId)
     .eq("response_id", responseId)
     .order("created_at", { ascending: true });
 
@@ -304,6 +331,7 @@ export async function listActionNotes(responseId: string): Promise<ActionNote[]>
 
 /** One piece of feedback with its full history, for the detail screen. */
 export async function getReview(
+  orgId: string,
   responseId: string,
 ): Promise<{ review: Review; actions: ActionNote[] } | null> {
   const supabase = await supabaseServer();
@@ -311,6 +339,7 @@ export async function getReview(
   const { data } = await supabase
     .from("customer_responses")
     .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .eq("org_id", orgId)
     .eq("id", responseId)
     .maybeSingle();
 
@@ -319,7 +348,7 @@ export async function getReview(
   // apart would confirm that somebody else's feedback exists.
   if (!data) return null;
 
-  const actions = await listActionNotes(responseId);
+  const actions = await listActionNotes(orgId, responseId);
 
   return {
     review: {
@@ -337,7 +366,7 @@ export async function getReview(
 }
 
 /** How many responses sit at each star value — the Reviews page breakdown. */
-export async function getRatingBreakdown(): Promise<{
+export async function getRatingBreakdown(orgId: string): Promise<{
   counts: Record<1 | 2 | 3 | 4 | 5, number>;
   total: number;
   average: number | null;
@@ -349,6 +378,7 @@ export async function getRatingBreakdown(): Promise<{
       supabase
         .from("customer_responses")
         .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
         .eq("rating", rating),
     ),
   );
@@ -395,12 +425,13 @@ export interface StaffMember {
  * free; a chain with thousands is the point at which this decision needs
  * revisiting.
  */
-export const listStaff = cache(async (): Promise<StaffMember[]> => {
+export const listStaff = cache(async (orgId: string): Promise<StaffMember[]> => {
   const supabase = await supabaseServer();
 
   const { data } = await supabase
     .from("staff_members")
     .select("id, name_encrypted, role_label, is_active")
+    .eq("org_id", orgId)
     .order("created_at", { ascending: true });
 
   return (data ?? [])
@@ -428,6 +459,7 @@ export const listStaff = cache(async (): Promise<StaffMember[]> => {
  * been about the wait or the parking.
  */
 export async function listPraise(
+  orgId: string,
   options: {
     cursor?: string | undefined;
     limit?: number | undefined;
@@ -442,13 +474,14 @@ export async function listPraise(
     .select(
       "id, first_name_encrypted, praise_note_encrypted, status, created_at, matched_staff_id, shared_at",
     )
+    .eq("org_id", orgId)
     .order("created_at", { ascending: false })
     .limit(limit + 1);
 
   if (options.cursor) query = query.lt("created_at", options.cursor);
   if (options.unmatchedOnly) query = query.eq("status", "unmatched");
 
-  const [{ data }, staff] = await Promise.all([query, listStaff()]);
+  const [{ data }, staff] = await Promise.all([query, listStaff(orgId)]);
   const staffNames = new Map(staff.map((member) => [member.staffId, member.name]));
 
   return paginate(
@@ -491,15 +524,16 @@ export interface StaffPraiseTally {
  * achievement yet, it is a decision waiting to be made, and it belongs in the
  * needs-you list rather than silently inflating somebody's total.
  */
-export async function getStaffPraiseTally(): Promise<StaffPraiseTally[]> {
+export async function getStaffPraiseTally(orgId: string): Promise<StaffPraiseTally[]> {
   const supabase = await supabaseServer();
 
   const [{ data }, staff] = await Promise.all([
     supabase
       .from("team_praise_records")
       .select("matched_staff_id, shared_at")
+      .eq("org_id", orgId)
       .not("matched_staff_id", "is", null),
-    listStaff(),
+    listStaff(orgId),
   ]);
 
   const counts = new Map<string, { count: number; unshared: number }>();
@@ -542,15 +576,16 @@ export interface Stand {
  * that works in development and errors in production. V1 has one location, so
  * this is a single cached read either way.
  */
-export const listStands = cache(async (): Promise<Stand[]> => {
+export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
   const supabase = await supabaseServer();
 
   const [{ data }, location] = await Promise.all([
     supabase
       .from("review_stands")
       .select("id, label, status, public_token_prefix")
+      .eq("org_id", orgId)
       .order("created_at", { ascending: true }),
-    getPrimaryLocation(),
+    getPrimaryLocation(orgId),
   ]);
 
   return (data ?? []).map((row) => ({
@@ -568,12 +603,13 @@ export interface OwnerLocation {
   googleReviewUrl: string | null;
 }
 
-export const getPrimaryLocation = cache(async (): Promise<OwnerLocation | null> => {
+export const getPrimaryLocation = cache(async (orgId: string): Promise<OwnerLocation | null> => {
   const supabase = await supabaseServer();
 
   const { data } = await supabase
     .from("locations")
     .select("id, name, google_review_url")
+    .eq("org_id", orgId)
     .order("created_at", { ascending: true })
     .limit(1);
 
@@ -606,11 +642,9 @@ export interface OwnerCounts {
  * together, and issuing them from separate components would serialise them
  * behind each other's awaits.
  */
-export const getOwnerCounts = cache(async (): Promise<OwnerCounts> => {
+export const getOwnerCounts = cache(async (orgId: string, timezone: string): Promise<OwnerCounts> => {
   const supabase = await supabaseServer();
-  const organization = await getCurrentOrganization();
 
-  const timezone = organization?.timezone ?? "UTC";
   const dayStart = startOfLocalDay(timezone);
   const monthStart = startOfLocalMonth(timezone);
 
@@ -618,25 +652,25 @@ export const getOwnerCounts = cache(async (): Promise<OwnerCounts> => {
     supabase
       .from("customer_responses")
       .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
       .gte("submitted_at", dayStart.toISOString()),
     supabase
       .from("customer_responses")
       .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
       .is("read_at", null),
     supabase
       .from("team_praise_records")
       .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
       .eq("status", "unmatched")
       .gte("created_at", monthStart.toISOString()),
-    supabase.from("review_stands").select("id", { count: "exact", head: true }).eq("status", "active"),
-    getPrimaryLocation(),
-    // The headline average covers the most recent 50, not all time. An owner
-    // cares whether things are good *now*; a lifetime average stops moving after
-    // a few hundred reviews and becomes useless as a signal — and worse, hides
-    // exactly the recent slump they need to see.
+    supabase.from("review_stands").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "active"),
+    getPrimaryLocation(orgId),
     supabase
       .from("customer_responses")
       .select("rating")
+      .eq("org_id", orgId)
       .order("submitted_at", { ascending: false })
       .limit(50),
   ]);
@@ -689,6 +723,7 @@ export interface CustomerVisit {
  * in production. Two indexed lookups over at most 50 ids is a rounding error.
  */
 export async function listVisits(
+  orgId: string,
   options: { cursor?: string | undefined; limit?: number | undefined } = {},
 ): Promise<Page<CustomerVisit>> {
   const supabase = await supabaseServer();
@@ -697,6 +732,7 @@ export async function listVisits(
   let query = supabase
     .from("customer_responses")
     .select("id, rating, note_encrypted, submitted_at, stand_id")
+    .eq("org_id", orgId)
     .order("submitted_at", { ascending: false })
     .limit(limit + 1);
 
@@ -713,7 +749,7 @@ export async function listVisits(
     ids.length > 0
       ? supabase.from("team_praise_records").select("response_id").in("response_id", ids)
       : Promise.resolve({ data: [] as Array<{ response_id: string }> }),
-    listStands(),
+    listStands(orgId),
   ]);
 
   const clicked = new Set((clicks.data ?? []).map((row) => row.response_id as string));
@@ -748,7 +784,7 @@ export async function listVisits(
  * The moment this number is broken down by star rating it becomes a gating
  * metric, so it is not, and must not be.
  */
-export async function getVisitSummary(): Promise<{
+export async function getVisitSummary(orgId: string): Promise<{
   visits: number;
   wroteNote: number;
   wentToGoogle: number;
@@ -757,13 +793,14 @@ export async function getVisitSummary(): Promise<{
   const supabase = await supabaseServer();
 
   const [visits, notes, clicks, praise] = await Promise.all([
-    supabase.from("customer_responses").select("id", { count: "exact", head: true }),
+    supabase.from("customer_responses").select("id", { count: "exact", head: true }).eq("org_id", orgId),
     supabase
       .from("customer_responses")
       .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
       .not("note_encrypted", "is", null),
-    supabase.from("google_review_clicks").select("id", { count: "exact", head: true }),
-    supabase.from("team_praise_records").select("id", { count: "exact", head: true }),
+    supabase.from("google_review_clicks").select("id", { count: "exact", head: true }).eq("org_id", orgId),
+    supabase.from("team_praise_records").select("id", { count: "exact", head: true }).eq("org_id", orgId),
   ]);
 
   return {

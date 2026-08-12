@@ -38,9 +38,12 @@ export const dynamic = "force-dynamic";
  * refuses to produce.
  */
 export default async function CustomersPage() {
-  await requireOwner("/customers");
+  const { organization } = await requireOwner("/customers");
 
-  const [summary, page] = await Promise.all([getVisitSummary(), listVisits({ limit: 50 })]);
+  const [summary, page] = await Promise.all([
+    getVisitSummary(organization.orgId),
+    listVisits(organization.orgId, { limit: 50 }),
+  ]);
 
   return (
     <AppShell>

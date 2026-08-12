@@ -37,17 +37,14 @@ export default async function FeedbackPage({
 }: {
   searchParams: Promise<{ show?: string }>;
 }) {
-  await requireOwner("/feedback");
+  const { organization } = await requireOwner("/feedback");
 
   const { show } = await searchParams;
-  // Open is the default. The reason to open this screen is to find what still
-  // needs doing; making an owner filter for that every time is making them work
-  // for the answer they came for.
   const showAll = show === "all";
 
   const [{ items }, counts] = await Promise.all([
-    listReviews({ withNotesOnly: true, limit: 50, ...(showAll ? {} : { openOnly: true }) }),
-    getOwnerCounts(),
+    listReviews(organization.orgId, { withNotesOnly: true, limit: 50, ...(showAll ? {} : { openOnly: true }) }),
+    getOwnerCounts(organization.orgId, organization.timezone),
   ]);
 
   return (

@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function SettingsPage() {
   const { user, organization } = await requireOwner("/settings");
-  const location = await getPrimaryLocation();
+  const location = await getPrimaryLocation(organization.orgId);
 
   return (
     <AppShell businessName={organization.name}>

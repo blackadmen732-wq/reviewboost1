@@ -20,8 +20,8 @@ export const dynamic = "force-dynamic";
  * internal noun; the thing they are holding is a code.
  */
 export default async function StandsPage() {
-  await requireOwner("/stands");
-  const stands = await listStands();
+  const { organization } = await requireOwner("/stands");
+  const stands = await listStands(organization.orgId);
 
   return (
     <AppShell>
