@@ -59,14 +59,41 @@ export function StandCard({ standId, label, status, tokenPrefix }: StandCardProp
   }, [standId]);
 
   useEffect(() => {
-    void loadQr();
+    let cancelled = false;
+    const generation = ++loadGeneration.current;
+
+    (async () => {
+      const { data: { session } } = await supabaseBrowser().auth.getSession();
+      if (cancelled || generation !== loadGeneration.current) return;
+
+      if (!session) {
+        setQrError(true);
+        return;
+      }
+
+      try {
+        const blob = await fetchQrBlob(standId, session.access_token);
+        if (cancelled || generation !== loadGeneration.current) return;
+
+        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+        const url = URL.createObjectURL(blob);
+        objectUrlRef.current = url;
+        setQrObjectUrl(url);
+        setQrError(false);
+      } catch {
+        if (cancelled || generation !== loadGeneration.current) return;
+        setQrError(true);
+      }
+    })();
+
     return () => {
+      cancelled = true;
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
         objectUrlRef.current = null;
       }
     };
-  }, [loadQr]);
+  }, [standId]);
 
   async function handleDownload() {
     setDownloading(true);
