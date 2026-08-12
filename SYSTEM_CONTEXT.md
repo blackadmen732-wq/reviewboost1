@@ -3,9 +3,7 @@
 Source of truth for what ReviewBoost is, what is approved, what is proposed, and
 what actually exists.
 
-**This document contains no status claims.** Branch, commit, test counts, and
-what has or has not been executed live in [`STATUS.md`](./STATUS.md), dated.
-Engineering lessons live in [`LESSONS.md`](./LESSONS.md).
+**This document contains no status claims.**
 
 ---
 
@@ -301,8 +299,7 @@ refresh tokens and reuse detection; account lockout; TOTP; AES-256-GCM for PII
 with keyed HMAC lookups; CSRF; layered rate limiting; recursive log redaction.
 
 **None of this has run against a real database.** Tenant isolation in particular
-is designed and untested — see `LESSONS.md` §5.2 for the corrected Supabase
-guidance, which differs from what the current code assumes.
+is designed and untested.
 
 ### Non-negotiable — APPROVED
 
