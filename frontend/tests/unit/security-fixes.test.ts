@@ -26,7 +26,7 @@ describe("owner route protection", () => {
     const filePath = path.resolve(__dirname, "../../proxy.ts");
     const source = fs.readFileSync(filePath, "utf-8");
 
-    const required = ["/home", "/feedback", "/praise", "/stands", "/settings", "/onboarding", "/reviews", "/customers"];
+    const required = ["/home", "/feedback", "/praise", "/stands", "/settings", "/onboarding", "/reviews", "/customers", "/select-org"];
     for (const prefix of required) {
       expect(source, `missing ${prefix}`).toContain(`"${prefix}"`);
     }
