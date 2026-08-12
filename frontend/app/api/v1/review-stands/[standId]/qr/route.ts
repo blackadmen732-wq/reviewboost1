@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import QRCode from "qrcode";
 
-import { requireOrganizationContext } from "@/lib/server/auth";
+import { requireOrganizationContext, requireRole } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, preflight } from "@/lib/server/http";
 import { getStandTokenForReprint } from "@/lib/server/owner-service";
@@ -36,6 +36,7 @@ export async function GET(
 ): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
     const context = await requireOrganizationContext(request);
+    requireRole(context.role, ["owner", "admin"]);
     const { standId } = await params;
 
     if (!UUID.test(standId)) {

@@ -239,7 +239,7 @@ export async function listReviews(
   const ids = rows.map((row) => row.id as string);
   const { data: noteRows } =
     ids.length > 0
-      ? await supabase.from("response_notes").select("response_id").in("response_id", ids)
+      ? await supabase.from("response_notes").select("response_id").eq("org_id", orgId).in("response_id", ids)
       : { data: [] as Array<{ response_id: string }> };
 
   const noteCounts = new Map<string, number>();
@@ -744,10 +744,10 @@ export async function listVisits(
 
   const [clicks, praise, stands] = await Promise.all([
     ids.length > 0
-      ? supabase.from("google_review_clicks").select("response_id").in("response_id", ids)
+      ? supabase.from("google_review_clicks").select("response_id").eq("org_id", orgId).in("response_id", ids)
       : Promise.resolve({ data: [] as Array<{ response_id: string }> }),
     ids.length > 0
-      ? supabase.from("team_praise_records").select("response_id").in("response_id", ids)
+      ? supabase.from("team_praise_records").select("response_id").eq("org_id", orgId).in("response_id", ids)
       : Promise.resolve({ data: [] as Array<{ response_id: string }> }),
     listStands(orgId),
   ]);

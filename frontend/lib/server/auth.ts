@@ -89,7 +89,7 @@ export async function requireMembership(
   // non-member and a non-existent organization look identical here — which is
   // what we want.
   if (error || !data) {
-    throw new ApiError(404, ERROR_CODE.reviewLinkInactive, "Not found.");
+    throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
   }
 
   return { role: data.role as string };
@@ -97,7 +97,7 @@ export async function requireMembership(
 
 export function requireRole(role: string, allowed: readonly string[]): void {
   if (!allowed.includes(role)) {
-    throw new ApiError(403, ERROR_CODE.validationFailed, "You do not have permission to do that.");
+    throw new ApiError(403, ERROR_CODE.forbidden, "You do not have permission to do that.");
   }
 }
 

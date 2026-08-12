@@ -58,7 +58,7 @@ function redact(value: unknown, depth = 0): unknown {
   if (Array.isArray(value)) return value.map((entry) => redact(entry, depth + 1));
 
   if (value instanceof Error) {
-    return { name: value.name, message: value.message };
+    return { name: value.name, message: REDACTED };
   }
 
   if (typeof value === "object") {

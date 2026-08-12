@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { requireOrganizationContext } from "@/lib/server/auth";
+import { requireOrganizationContext, requireRole } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight } from "@/lib/server/http";
 import { rotateStandToken } from "@/lib/server/owner-service";
@@ -31,6 +31,7 @@ export async function POST(
 ): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
     const context = await requireOrganizationContext(request);
+    requireRole(context.role, ["owner", "admin"]);
     const { standId } = await params;
 
     if (!UUID.test(standId)) {
