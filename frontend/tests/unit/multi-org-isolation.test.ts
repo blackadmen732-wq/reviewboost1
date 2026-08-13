@@ -67,7 +67,10 @@ function fakeClient() {
         insert: () => queryBuilder(),
       };
     },
-    rpc: () => Promise.resolve({ data: null, error: null }),
+    rpc: (name: string) => {
+      recorded.push({ kind: "rpc", name });
+      return Promise.resolve({ data: null, error: null });
+    },
   };
 }
 
@@ -199,7 +202,7 @@ describe("requireOrganizationContext", () => {
 });
 
 describe("mutation route org_id scoping", () => {
-  it("resolve route scopes update to active org", async () => {
+  it("resolve route uses RPC scoped by response id", async () => {
     tableRows = [{ id: "resp-1", resolved_at: new Date().toISOString() }];
     const { POST } = await import(
       "@/app/api/v1/customer-responses/[responseId]/resolve/route"
@@ -213,12 +216,12 @@ describe("mutation route org_id scoping", () => {
       { params: Promise.resolve({ responseId }) },
     );
 
-    const orgFilters = recorded.filter((e) => e.kind === "eq" && e.name === "org_id");
-    expect(orgFilters.length).toBeGreaterThanOrEqual(1);
-    expect(orgFilters[0]?.value).toBe("11111111-1111-1111-1111-111111111111");
+    const rpcCalls = recorded.filter((e) => e.kind === "rpc");
+    expect(rpcCalls.length).toBeGreaterThanOrEqual(1);
+    expect(rpcCalls[0]?.name).toBe("rpc_resolve_response");
   });
 
-  it("read route scopes update to active org", async () => {
+  it("read route uses RPC scoped by response id", async () => {
     const { POST } = await import(
       "@/app/api/v1/customer-responses/[responseId]/read/route"
     );
@@ -229,9 +232,9 @@ describe("mutation route org_id scoping", () => {
       { params: Promise.resolve({ responseId }) },
     );
 
-    const orgFilters = recorded.filter((e) => e.kind === "eq" && e.name === "org_id");
-    expect(orgFilters.length).toBeGreaterThanOrEqual(1);
-    expect(orgFilters[0]?.value).toBe("11111111-1111-1111-1111-111111111111");
+    const rpcCalls = recorded.filter((e) => e.kind === "rpc");
+    expect(rpcCalls.length).toBeGreaterThanOrEqual(1);
+    expect(rpcCalls[0]?.name).toBe("rpc_mark_response_read");
   });
 
   it("staff update scopes to active org", async () => {
@@ -251,7 +254,7 @@ describe("mutation route org_id scoping", () => {
     expect(orgFilters[0]?.value).toBe("11111111-1111-1111-1111-111111111111");
   });
 
-  it("team praise update scopes both praise and staff lookup to active org", async () => {
+  it("team praise update uses match RPC instead of direct table update", async () => {
     tableRows = [{ id: "staff-1" }];
     const { PATCH } = await import("@/app/api/v1/team-praise/[praiseId]/route");
     const praiseId = "33333333-3333-3333-3333-333333333333";
@@ -263,8 +266,9 @@ describe("mutation route org_id scoping", () => {
       { params: Promise.resolve({ praiseId }) },
     );
 
-    const orgFilters = recorded.filter((e) => e.kind === "eq" && e.name === "org_id");
-    expect(orgFilters.length).toBeGreaterThanOrEqual(2);
+    const rpcCalls = recorded.filter((e) => e.kind === "rpc");
+    expect(rpcCalls.length).toBeGreaterThanOrEqual(1);
+    expect(rpcCalls[0]?.name).toBe("rpc_match_praise");
   });
 });
 

@@ -310,8 +310,8 @@ select is_empty(
 
 select tests.set_actor('aa000000-0000-0000-0000-000000000001');
 
--- Allowed action
-select lives_ok(
+-- Blocked: authenticated cannot call audit RPC (revoked in hardening migration)
+select throws_ok(
     $$ select public.rpc_record_audit_event(
         'a0000000-c015-e570-0000-00000000000a',
         'stand.token_rotated',
@@ -319,9 +319,10 @@ select lives_ok(
         'd0000000-0000-0000-0000-00000000000a',
         'test-req-id',
         '{}'::jsonb) $$,
-    'allowed audit action succeeds');
+    '42501', null,
+    'authenticated cannot call audit RPC directly');
 
--- Blocked: arbitrary action
+-- Blocked: arbitrary action (also blocked by revoke)
 select throws_ok(
     $$ select public.rpc_record_audit_event(
         'a0000000-c015-e570-0000-00000000000a',
@@ -333,7 +334,7 @@ select throws_ok(
     '42501', null,
     'arbitrary audit action is rejected');
 
--- Blocked: null action
+-- Blocked: null action (also blocked by revoke)
 select throws_ok(
     $$ select public.rpc_record_audit_event(
         'a0000000-c015-e570-0000-00000000000a',

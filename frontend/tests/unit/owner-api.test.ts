@@ -305,7 +305,7 @@ describe("Team Praise stays rating-blind", () => {
     const { GET } = await import("@/app/api/v1/team-praise/route");
     await GET(request("GET", "/api/v1/team-praise"));
 
-    const query = recorded.find((entry) => entry.name === "team_praise_records");
+    const query = recorded.find((entry) => entry.name === "praise_safe_view" || entry.name === "team_praise_records");
     // The barrier is the select list. A column that is never selected cannot be
     // serialised by accident.
     expect(query?.columns).not.toContain("rating");
@@ -370,6 +370,7 @@ describe("stand token rotation", () => {
 
   it("is a 404 for a stand belonging to another tenant", async () => {
     tableRows = [];
+    rpcResult = { data: null, error: { message: "not_found_or_forbidden", code: "P0001" } };
     const { POST } = await import("@/app/api/v1/review-stands/[standId]/rotate-token/route");
     const standId = "11111111-1111-1111-1111-111111111111";
 
@@ -378,6 +379,7 @@ describe("stand token rotation", () => {
       { params: Promise.resolve({ standId }) },
     );
 
+    rpcResult = { data: null, error: null };
     // Invisible under RLS, so a cross-tenant attempt and a typo look identical.
     expect(response.status).toBe(404);
   });

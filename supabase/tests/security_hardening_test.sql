@@ -44,32 +44,32 @@ values
     ('bb000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'h-outsider@test.com', '', now(), now());
 
 insert into public.organizations (id, name, slug)
-values ('a1000000-hard-e570-0000-00000000000a', 'Hardening Test Org', 'hardening-test');
+values ('a1000000-da0d-e570-0000-00000000000a', 'Hardening Test Org', 'hardening-test');
 
 insert into public.organization_members (id, org_id, user_id, role, status)
 values
-    ('c1000000-0000-0000-0000-000000000001', 'a1000000-hard-e570-0000-00000000000a', 'bb000000-0000-0000-0000-000000000001', 'owner', 'active'),
-    ('c1000000-0000-0000-0000-000000000002', 'a1000000-hard-e570-0000-00000000000a', 'bb000000-0000-0000-0000-000000000002', 'admin', 'active'),
-    ('c1000000-0000-0000-0000-000000000003', 'a1000000-hard-e570-0000-00000000000a', 'bb000000-0000-0000-0000-000000000003', 'member', 'active');
+    ('c1000000-0000-0000-0000-000000000001', 'a1000000-da0d-e570-0000-00000000000a', 'bb000000-0000-0000-0000-000000000001', 'owner', 'active'),
+    ('c1000000-0000-0000-0000-000000000002', 'a1000000-da0d-e570-0000-00000000000a', 'bb000000-0000-0000-0000-000000000002', 'admin', 'active'),
+    ('c1000000-0000-0000-0000-000000000003', 'a1000000-da0d-e570-0000-00000000000a', 'bb000000-0000-0000-0000-000000000003', 'member', 'active');
 
 insert into public.locations (id, org_id, name, google_review_url)
-values ('d1000000-0000-0000-0000-00000000000a', 'a1000000-hard-e570-0000-00000000000a', 'Hardening Location', 'https://g.page/r/hardening/review');
+values ('d1000000-0000-0000-0000-00000000000a', 'a1000000-da0d-e570-0000-00000000000a', 'Hardening Location', 'https://g.page/r/hardening/review');
 
 insert into public.review_stands (id, org_id, location_id, public_token_hash, public_token_prefix)
-values ('e1000000-0000-0000-0000-00000000000a', 'a1000000-hard-e570-0000-00000000000a', 'd1000000-0000-0000-0000-00000000000a', 'hash-hard-test', 'hardpfx1');
+values ('e1000000-0000-0000-0000-00000000000a', 'a1000000-da0d-e570-0000-00000000000a', 'd1000000-0000-0000-0000-00000000000a', 'hash-hard-test', 'hardpfx1');
 
 -- Staff member for FK tests
 insert into public.staff_members (id, org_id, name_encrypted)
-values ('f3000000-0000-0000-0000-00000000000a', 'a1000000-hard-e570-0000-00000000000a', 'v1:enc-hard-staff');
+values ('f3000000-0000-0000-0000-00000000000a', 'a1000000-da0d-e570-0000-00000000000a', 'v1:enc-hard-staff');
 
 insert into public.public_review_sessions (id, org_id, location_id, stand_id, session_token_hash, locale, expires_at)
-values ('e2000000-0000-0000-0000-00000000000a', 'a1000000-hard-e570-0000-00000000000a', 'd1000000-0000-0000-0000-00000000000a', 'e1000000-0000-0000-0000-00000000000a', 'hard-session-hash', 'en', now() + interval '1 hour');
+values ('e2000000-0000-0000-0000-00000000000a', 'a1000000-da0d-e570-0000-00000000000a', 'd1000000-0000-0000-0000-00000000000a', 'e1000000-0000-0000-0000-00000000000a', 'hard-session-hash', 'en', now() + interval '1 hour');
 
 insert into public.customer_responses (id, org_id, location_id, stand_id, session_id, response_token_hash, rating, submitted_at)
-values ('f4000000-0000-0000-0000-00000000000a', 'a1000000-hard-e570-0000-00000000000a', 'd1000000-0000-0000-0000-00000000000a', 'e1000000-0000-0000-0000-00000000000a', 'e2000000-0000-0000-0000-00000000000a', 'hard-response-hash', 3, now());
+values ('f4000000-0000-0000-0000-00000000000a', 'a1000000-da0d-e570-0000-00000000000a', 'd1000000-0000-0000-0000-00000000000a', 'e1000000-0000-0000-0000-00000000000a', 'e2000000-0000-0000-0000-00000000000a', 'hard-response-hash', 3, now());
 
 insert into public.team_praise_records (id, org_id, location_id, response_id, first_name_encrypted, praise_note_encrypted)
-values ('f5000000-0000-0000-0000-00000000000a', 'a1000000-hard-e570-0000-00000000000a', 'd1000000-0000-0000-0000-00000000000a', 'f4000000-0000-0000-0000-00000000000a', 'v1:enc-hard-name', 'v1:enc-hard-note');
+values ('f5000000-0000-0000-0000-00000000000a', 'a1000000-da0d-e570-0000-00000000000a', 'd1000000-0000-0000-0000-00000000000a', 'f4000000-0000-0000-0000-00000000000a', 'v1:enc-hard-name', 'v1:enc-hard-note');
 
 -- ============================================================
 -- 1. STAFF MEMBERS — direct INSERT blocked
@@ -79,7 +79,7 @@ select tests.set_actor('bb000000-0000-0000-0000-000000000001');
 
 select throws_ok(
     $$ insert into public.staff_members (org_id, name_encrypted)
-       values ('a1000000-hard-e570-0000-00000000000a', 'v1:direct-insert') $$,
+       values ('a1000000-da0d-e570-0000-00000000000a', 'v1:direct-insert') $$,
     '42501', null,
     'direct INSERT on staff_members is blocked');
 
@@ -121,7 +121,7 @@ select tests.set_actor('bb000000-0000-0000-0000-000000000001');
 
 select lives_ok(
     $$ select public.rpc_create_staff(
-        'a1000000-hard-e570-0000-00000000000a',
+        'a1000000-da0d-e570-0000-00000000000a',
         'v1:rpc-created-staff',
         'Barista') $$,
     'rpc_create_staff succeeds for org member');
@@ -134,7 +134,7 @@ select tests.set_actor('bb000000-0000-0000-0000-000000000004');
 
 select throws_ok(
     $$ select public.rpc_create_staff(
-        'a1000000-hard-e570-0000-00000000000a',
+        'a1000000-da0d-e570-0000-00000000000a',
         'v1:outsider-staff',
         null) $$,
     'P0001', null,
@@ -148,7 +148,7 @@ select tests.set_actor('bb000000-0000-0000-0000-000000000001');
 
 select throws_ok(
     $$ select public.rpc_record_audit_event(
-        'a1000000-hard-e570-0000-00000000000a',
+        'a1000000-da0d-e570-0000-00000000000a',
         'stand.token_rotated',
         'review_stand',
         'e1000000-0000-0000-0000-00000000000a',
@@ -182,7 +182,7 @@ select throws_ok(
 select lives_ok(
     $$ select public.rpc_rotate_stand_token(
         'e1000000-0000-0000-0000-00000000000a',
-        'a1000000-hard-e570-0000-00000000000a',
+        'a1000000-da0d-e570-0000-00000000000a',
         'new-hash-from-rpc',
         'newpfx',
         1::smallint,
@@ -192,7 +192,7 @@ select lives_ok(
 -- Verify audit event was created
 select results_eq(
     $$ select count(*)::integer from public.audit_events
-       where org_id = 'a1000000-hard-e570-0000-00000000000a'
+       where org_id = 'a1000000-da0d-e570-0000-00000000000a'
          and action = 'stand.token_rotated'
          and target_id = 'e1000000-0000-0000-0000-00000000000a' $$,
     array[1],
@@ -207,7 +207,7 @@ select tests.set_actor('bb000000-0000-0000-0000-000000000004');
 select throws_ok(
     $$ select public.rpc_rotate_stand_token(
         'e1000000-0000-0000-0000-00000000000a',
-        'a1000000-hard-e570-0000-00000000000a',
+        'a1000000-da0d-e570-0000-00000000000a',
         'outsider-hash',
         'outpfx',
         1::smallint,
@@ -226,7 +226,7 @@ select tests.set_actor('bb000000-0000-0000-0000-000000000003');
 select throws_ok(
     $$ select public.rpc_rotate_stand_token(
         'e1000000-0000-0000-0000-00000000000a',
-        'a1000000-hard-e570-0000-00000000000a',
+        'a1000000-da0d-e570-0000-00000000000a',
         'member-hash',
         'mempfx',
         1::smallint,
@@ -243,7 +243,7 @@ select tests.set_actor('bb000000-0000-0000-0000-000000000001');
 select lives_ok(
     $$ select * from public.rpc_add_response_note(
         'f4000000-0000-0000-0000-00000000000a',
-        'a1000000-hard-e570-0000-00000000000a',
+        'a1000000-da0d-e570-0000-00000000000a',
         'v1:encrypted-note-body') $$,
     'rpc_add_response_note succeeds for org member');
 
@@ -256,7 +256,7 @@ select tests.set_actor('bb000000-0000-0000-0000-000000000004');
 select throws_ok(
     $$ select * from public.rpc_add_response_note(
         'f4000000-0000-0000-0000-00000000000a',
-        'a1000000-hard-e570-0000-00000000000a',
+        'a1000000-da0d-e570-0000-00000000000a',
         'v1:outsider-note') $$,
     'P0001', null,
     'outsider cannot add response note');

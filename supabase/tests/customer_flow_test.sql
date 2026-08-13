@@ -627,14 +627,18 @@ select is_empty(
     'a member never sees another business team');
 
 select lives_ok(
-    $$ insert into public.staff_members (org_id, name_encrypted)
-       values ('a0000000-0000-0000-0000-00000000000a', 'ciphertext-new-starter') $$,
-    'a member can add somebody to their own team');
+    $$ select public.rpc_create_staff(
+        'a0000000-0000-0000-0000-00000000000a',
+        'ciphertext-new-starter',
+        null) $$,
+    'a member can add somebody to their own team via RPC');
 
 select throws_ok(
-    $$ insert into public.staff_members (org_id, name_encrypted)
-       values ('b0000000-0000-0000-0000-00000000000b', 'ciphertext-planted') $$,
-    '42501', null,
+    $$ select public.rpc_create_staff(
+        'b0000000-0000-0000-0000-00000000000b',
+        'ciphertext-planted',
+        null) $$,
+    'P0001', null,
     'a member cannot plant somebody on another business team');
 
 -- Somebody who leaves is deactivated, never removed, so the praise they earned
