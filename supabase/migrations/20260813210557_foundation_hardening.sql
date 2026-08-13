@@ -561,6 +561,13 @@ begin
 end;
 $$;
 
+-- Drop the old 6-param overload so the 8-param version (with defaults) is the
+-- only one and PostgreSQL resolves calls unambiguously.
+drop function if exists public.rpc_rotate_stand_token(uuid, uuid, text, text, smallint, text);
+
+grant execute on function public.rpc_rotate_stand_token(uuid, uuid, text, text, smallint, text, text, smallint) to authenticated;
+revoke all on function public.rpc_rotate_stand_token(uuid, uuid, text, text, smallint, text, text, smallint) from public, anon;
+
 -- Revoke the standalone ciphertext RPC — ciphertext is now set atomically
 revoke execute on function public.rpc_set_stand_token_ciphertext(uuid, text, smallint) from authenticated;
 
@@ -679,6 +686,36 @@ revoke all on function public.rpc_create_organization(text, text, text, text, te
 -- praise_safe_view which excludes response_id.
 
 revoke select on public.team_praise_records from authenticated;
+
+-- praise_safe_view was security_invoker = true, meaning it ran as the
+-- querying role. Now that SELECT is revoked on the base table, the view
+-- would fail. Re-create it as security_invoker = false (runs as the view
+-- owner, postgres) with an explicit org-membership WHERE clause so it
+-- still enforces tenant isolation without relying on RLS.
+create or replace view public.praise_safe_view
+with (security_invoker = false) as
+select
+    tpr.id,
+    tpr.org_id,
+    tpr.location_id,
+    tpr.first_name_encrypted,
+    tpr.praise_note_encrypted,
+    tpr.encryption_key_version,
+    tpr.status,
+    tpr.matched_staff_id,
+    tpr.matched_by_user_id,
+    tpr.matched_at,
+    tpr.shared_at,
+    tpr.shared_by,
+    tpr.created_at,
+    tpr.updated_at
+from public.team_praise_records tpr
+where exists (
+    select 1 from public.organization_members om
+    where om.org_id = tpr.org_id
+      and om.user_id = auth.uid()
+      and om.status = 'active'
+);
 
 -- The praise RPCs are SECURITY INVOKER and need SELECT on team_praise_records
 -- to look up org_id. Convert them to SECURITY DEFINER.

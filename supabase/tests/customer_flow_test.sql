@@ -22,7 +22,7 @@ create extension if not exists pgtap with schema extensions;
 -- below have somewhere to live.
 create schema if not exists tests;
 
-select plan(87);
+select plan(88);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -655,6 +655,12 @@ select lives_ok(
     $$ update public.staff_members set is_active = false
         where id = 'a6000000-0000-0000-0000-00000000000a' $$,
     'a member can mark somebody as having left');
+
+-- Re-activate for the matching tests
+select lives_ok(
+    $$ update public.staff_members set is_active = true
+        where id = 'a6000000-0000-0000-0000-00000000000a' $$,
+    'a member who left can come back');
 
 -- ---- matching ----
 
