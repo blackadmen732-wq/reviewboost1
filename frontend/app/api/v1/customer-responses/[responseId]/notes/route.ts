@@ -5,6 +5,7 @@ import { requireOrganizationContext } from "@/lib/server/auth";
 import { encrypt } from "@/lib/server/crypto";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
+import { logger } from "@/lib/server/logger";
 import { MAX_NOTE_BYTES, MAX_NOTE_LENGTH, byteLength, parseOrThrow } from "@/lib/server/validation";
 
 /**
@@ -73,21 +74,15 @@ export async function POST(
       if (error.message?.includes("not_found_or_forbidden")) {
         throw new ApiError(404, ERROR_CODE.notFound, "That feedback could not be found.");
       }
+      logger.error("notes.add_failed", { requestId, route: ROUTE, code: error.code });
       throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
     }
 
     const row = Array.isArray(data) ? data[0] : data;
 
     if (!row?.note_id || !row?.created_at) {
+      logger.error("notes.empty_result", { requestId, route: ROUTE });
       throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
-    }
-
-    const { error: readError } = await context.db.rpc("rpc_mark_response_read", {
-      p_response_id: responseId,
-    });
-
-    if (readError) {
-      console.warn(JSON.stringify({ requestId, route: ROUTE, msg: "mark_read_failed", code: readError.code }));
     }
 
     return json(request, requestId, 201, {

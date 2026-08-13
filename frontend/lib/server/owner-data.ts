@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
 import { tryDecrypt } from "@/lib/server/crypto";
+import { ApiError, ERROR_CODE } from "@/lib/server/errors";
+import { logger } from "@/lib/server/logger";
 import { supabaseServer } from "@/lib/supabase/server";
 import { startOfLocalDay, startOfLocalMonth } from "@/lib/utils/local-day";
 
@@ -142,6 +144,15 @@ export const requireOwner = cache(async (nextPath: string): Promise<OwnerContext
   return { user, organization: active!, organizations: all };
 });
 
+function dataFailure(context: string, error: unknown): never {
+  logger.error("owner.data_error", { context, error });
+  throw new ApiError(
+    503,
+    ERROR_CODE.serviceUnavailable,
+    "This service is temporarily unavailable. Please try again shortly.",
+  );
+}
+
 export interface Page<T> {
   items: T[];
   hasMore: boolean;
@@ -154,13 +165,22 @@ function clampLimit(limit: number | undefined): number {
   return Math.min(Math.max(limit ?? 25, 1), MAX_PAGE);
 }
 
-/**
- * Fetch one row more than asked for.
- *
- * The cheapest possible "is there a next page": no second count query, which on
- * a growing table is the expensive one.
- */
-function paginate<T, R extends { submitted_at?: string; created_at?: string }>(
+function encodeCursor(ts: string, id: string): string {
+  return Buffer.from(`${ts}\0${id}`).toString("base64url");
+}
+
+function decodeCursor(cursor: string): { ts: string; id: string } | null {
+  try {
+    const decoded = Buffer.from(cursor, "base64url").toString();
+    const sep = decoded.indexOf("\0");
+    if (sep < 0) return null;
+    return { ts: decoded.slice(0, sep), id: decoded.slice(sep + 1) };
+  } catch {
+    return null;
+  }
+}
+
+function paginate<T, R extends { id?: string; submitted_at?: string; created_at?: string }>(
   rows: R[],
   limit: number,
   map: (row: R) => T,
@@ -169,11 +189,13 @@ function paginate<T, R extends { submitted_at?: string; created_at?: string }>(
   const hasMore = rows.length > limit;
   const visible = hasMore ? rows.slice(0, limit) : rows;
   const last = visible[visible.length - 1];
+  const lastTs = last?.[cursorField] as string | undefined;
+  const lastId = last?.id as string | undefined;
 
   return {
     items: visible.map(map),
     hasMore,
-    nextCursor: hasMore ? ((last?.[cursorField] as string | undefined) ?? null) : null,
+    nextCursor: hasMore && lastTs && lastId ? encodeCursor(lastTs, lastId) : null,
   };
 }
 
@@ -221,15 +243,22 @@ export async function listReviews(
     .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
     .eq("org_id", orgId)
     .order("submitted_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(limit + 1);
 
-  if (options.cursor) query = query.lt("submitted_at", options.cursor);
+  if (options.cursor) {
+    const parsed = decodeCursor(options.cursor);
+    if (parsed) {
+      query = query.or(`submitted_at.lt.${parsed.ts},and(submitted_at.eq.${parsed.ts},id.lt.${parsed.id})`);
+    }
+  }
   if (options.rating !== undefined) query = query.eq("rating", options.rating);
   if (options.unreadOnly) query = query.is("read_at", null);
   if (options.withNotesOnly) query = query.not("note_encrypted", "is", null);
   if (options.openOnly) query = query.is("resolved_at", null);
 
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) dataFailure("list_reviews", error);
   const rows = data ?? [];
 
   // How many times the business has acted on each item. Fetched as ids and
@@ -237,10 +266,12 @@ export async function listReviews(
   // is a composite key and inference over those is the thing that works in
   // development and errors in production.
   const ids = rows.map((row) => row.id as string);
-  const { data: noteRows } =
+  const noteResult =
     ids.length > 0
       ? await supabase.from("response_notes").select("response_id").eq("org_id", orgId).in("response_id", ids)
-      : { data: [] as Array<{ response_id: string }> };
+      : { data: [] as Array<{ response_id: string }>, error: null };
+  if (noteResult.error) dataFailure("list_reviews.notes", noteResult.error);
+  const noteRows = noteResult.data;
 
   const noteCounts = new Map<string, number>();
   for (const row of noteRows ?? []) {
@@ -292,23 +323,26 @@ export interface ActionNote {
 export async function listActionNotes(orgId: string, responseId: string): Promise<ActionNote[]> {
   const supabase = await supabaseServer();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("response_notes")
     .select("id, body_encrypted, author_id, created_at")
     .eq("org_id", orgId)
     .eq("response_id", responseId)
     .order("created_at", { ascending: true });
 
+  if (error) dataFailure("list_action_notes", error);
   const rows = data ?? [];
   const authorIds = [...new Set(rows.map((row) => row.author_id as string))];
 
   // A separate lookup rather than an embed: `author_id` references auth.users,
   // which PostgREST cannot traverse to public.profiles, so there is no
   // relationship to infer.
-  const { data: profiles } =
+  const profileResult =
     authorIds.length > 0
       ? await supabase.from("profiles").select("id, display_name").in("id", authorIds)
-      : { data: [] as Array<{ id: string; display_name: string | null }> };
+      : { data: [] as Array<{ id: string; display_name: string | null }>, error: null };
+  if (profileResult.error) dataFailure("list_action_notes.profiles", profileResult.error);
+  const profiles = profileResult.data;
 
   const names = new Map(
     (profiles ?? []).map((profile) => [
@@ -336,16 +370,14 @@ export async function getReview(
 ): Promise<{ review: Review; actions: ActionNote[] } | null> {
   const supabase = await supabaseServer();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("customer_responses")
     .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
     .eq("org_id", orgId)
     .eq("id", responseId)
     .maybeSingle();
 
-  // Null covers "does not exist" and "belongs to another tenant" alike. RLS
-  // makes them indistinguishable, which is the correct behaviour: telling them
-  // apart would confirm that somebody else's feedback exists.
+  if (error) dataFailure("get_review", error);
   if (!data) return null;
 
   const actions = await listActionNotes(orgId, responseId);
@@ -428,11 +460,13 @@ export interface StaffMember {
 export const listStaff = cache(async (orgId: string): Promise<StaffMember[]> => {
   const supabase = await supabaseServer();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("staff_members")
     .select("id, name_encrypted, role_label, is_active")
     .eq("org_id", orgId)
     .order("created_at", { ascending: true });
+
+  if (error) dataFailure("list_staff", error);
 
   return (data ?? [])
     .map((row) => ({
@@ -476,12 +510,20 @@ export async function listPraise(
     )
     .eq("org_id", orgId)
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(limit + 1);
 
-  if (options.cursor) query = query.lt("created_at", options.cursor);
+  if (options.cursor) {
+    const parsed = decodeCursor(options.cursor);
+    if (parsed) {
+      query = query.or(`created_at.lt.${parsed.ts},and(created_at.eq.${parsed.ts},id.lt.${parsed.id})`);
+    }
+  }
   if (options.unmatchedOnly) query = query.eq("status", "unmatched");
 
-  const [{ data }, staff] = await Promise.all([query, listStaff(orgId)]);
+  const [queryResult, staff] = await Promise.all([query, listStaff(orgId)]);
+  if (queryResult.error) dataFailure("list_praise", queryResult.error);
+  const data = queryResult.data;
   const staffNames = new Map(staff.map((member) => [member.staffId, member.name]));
 
   return paginate(
@@ -527,7 +569,7 @@ export interface StaffPraiseTally {
 export async function getStaffPraiseTally(orgId: string): Promise<StaffPraiseTally[]> {
   const supabase = await supabaseServer();
 
-  const [{ data }, staff] = await Promise.all([
+  const [praiseResult, staff] = await Promise.all([
     supabase
       .from("praise_safe_view")
       .select("matched_staff_id, shared_at")
@@ -535,6 +577,8 @@ export async function getStaffPraiseTally(orgId: string): Promise<StaffPraiseTal
       .not("matched_staff_id", "is", null),
     listStaff(orgId),
   ]);
+  if (praiseResult.error) dataFailure("staff_praise_tally", praiseResult.error);
+  const data = praiseResult.data;
 
   const counts = new Map<string, { count: number; unshared: number }>();
   for (const row of data ?? []) {
@@ -579,7 +623,7 @@ export interface Stand {
 export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
   const supabase = await supabaseServer();
 
-  const [{ data }, location] = await Promise.all([
+  const [standsResult, location] = await Promise.all([
     supabase
       .from("review_stands")
       .select("id, label, status, public_token_prefix")
@@ -587,6 +631,8 @@ export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
       .order("created_at", { ascending: true }),
     getPrimaryLocation(orgId),
   ]);
+  if (standsResult.error) dataFailure("list_stands", standsResult.error);
+  const data = standsResult.data;
 
   return (data ?? []).map((row) => ({
     standId: row.id as string,
@@ -606,12 +652,14 @@ export interface OwnerLocation {
 export const getPrimaryLocation = cache(async (orgId: string): Promise<OwnerLocation | null> => {
   const supabase = await supabaseServer();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("locations")
     .select("id, name, google_review_url")
     .eq("org_id", orgId)
     .order("created_at", { ascending: true })
     .limit(1);
+
+  if (error) dataFailure("get_primary_location", error);
 
   const row = data?.[0];
   if (!row) return null;
@@ -675,6 +723,12 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
       .limit(50),
   ]);
 
+  if (today.error) dataFailure("owner_counts.today", today.error);
+  if (unread.error) dataFailure("owner_counts.unread", unread.error);
+  if (praise.error) dataFailure("owner_counts.praise", praise.error);
+  if (stands.error) dataFailure("owner_counts.stands", stands.error);
+  if (recent.error) dataFailure("owner_counts.recent", recent.error);
+
   const ratings = (recent.data ?? []).map((row) => row.rating as number);
 
   return {
@@ -734,26 +788,36 @@ export async function listVisits(
     .select("id, rating, note_encrypted, submitted_at, stand_id")
     .eq("org_id", orgId)
     .order("submitted_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(limit + 1);
 
-  if (options.cursor) query = query.lt("submitted_at", options.cursor);
+  if (options.cursor) {
+    const parsed = decodeCursor(options.cursor);
+    if (parsed) {
+      query = query.or(`submitted_at.lt.${parsed.ts},and(submitted_at.eq.${parsed.ts},id.lt.${parsed.id})`);
+    }
+  }
 
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) dataFailure("list_visits", error);
   const rows = data ?? [];
   const ids = rows.map((row) => row.id as string);
 
-  const [clicks, praise, stands] = await Promise.all([
+  const [clicksResult, praiseResult, stands] = await Promise.all([
     ids.length > 0
       ? supabase.from("google_review_clicks").select("response_id").eq("org_id", orgId).in("response_id", ids)
-      : Promise.resolve({ data: [] as Array<{ response_id: string }> }),
+      : Promise.resolve({ data: [] as Array<{ response_id: string }>, error: null }),
     ids.length > 0
-      ? supabase.from("team_praise_records").select("response_id").eq("org_id", orgId).in("response_id", ids)
-      : Promise.resolve({ data: [] as Array<{ response_id: string }> }),
+      ? supabase.rpc("rpc_response_has_praise", { p_org_id: orgId, p_response_ids: ids })
+      : Promise.resolve({ data: [] as Array<{ response_id: string }>, error: null }),
     listStands(orgId),
   ]);
 
-  const clicked = new Set((clicks.data ?? []).map((row) => row.response_id as string));
-  const praised = new Set((praise.data ?? []).map((row) => row.response_id as string));
+  if (clicksResult.error) dataFailure("list_visits.clicks", clicksResult.error);
+  if (praiseResult.error) dataFailure("list_visits.praise", praiseResult.error);
+
+  const clicked = new Set((clicksResult.data ?? []).map((row) => row.response_id as string));
+  const praised = new Set((praiseResult.data ?? []).map((row: { response_id: string }) => row.response_id));
   const standLabels = new Map(stands.map((stand) => [stand.standId, stand.label]));
 
   return paginate(
@@ -792,7 +856,7 @@ export async function getVisitSummary(orgId: string): Promise<{
 }> {
   const supabase = await supabaseServer();
 
-  const [visits, notes, clicks, praise] = await Promise.all([
+  const [visits, notes, clicks, praiseResult] = await Promise.all([
     supabase.from("customer_responses").select("id", { count: "exact", head: true }).eq("org_id", orgId),
     supabase
       .from("customer_responses")
@@ -800,13 +864,18 @@ export async function getVisitSummary(orgId: string): Promise<{
       .eq("org_id", orgId)
       .not("note_encrypted", "is", null),
     supabase.from("google_review_clicks").select("id", { count: "exact", head: true }).eq("org_id", orgId),
-    supabase.from("team_praise_records").select("id", { count: "exact", head: true }).eq("org_id", orgId),
+    supabase.rpc("rpc_praise_count", { p_org_id: orgId }),
   ]);
+
+  if (visits.error) dataFailure("visit_summary.visits", visits.error);
+  if (notes.error) dataFailure("visit_summary.notes", notes.error);
+  if (clicks.error) dataFailure("visit_summary.clicks", clicks.error);
+  if (praiseResult.error) dataFailure("visit_summary.praise", praiseResult.error);
 
   return {
     visits: visits.count ?? 0,
     wroteNote: notes.count ?? 0,
     wentToGoogle: clicks.count ?? 0,
-    thankedStaff: praise.count ?? 0,
+    thankedStaff: (praiseResult.data as number | null) ?? 0,
   };
 }

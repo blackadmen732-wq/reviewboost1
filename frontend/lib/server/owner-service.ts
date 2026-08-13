@@ -107,6 +107,8 @@ export async function createOrganization(
     p_stand_label: input.standLabel ?? "Front Desk",
     p_token_key_version: tokenDigestKeyVersion(),
     p_request_id: requestId,
+    p_token_ciphertext: encrypt(token),
+    p_cipher_key_version: KEY_VERSION,
   });
 
   if (error) {
@@ -128,8 +130,6 @@ export async function createOrganization(
     : undefined;
 
   if (!row) databaseFailure("create_organization", new Error("empty result"), requestId);
-
-  await storeReprintableToken(context, row.stand_id, token, requestId);
 
   return {
     organizationId: row.org_id,
@@ -247,6 +247,8 @@ export async function rotateStandToken(
     p_new_token_prefix: tokenPrefix(token),
     p_key_version: tokenDigestKeyVersion(),
     p_request_id: requestId,
+    p_token_ciphertext: encrypt(token),
+    p_cipher_key_version: KEY_VERSION,
   });
 
   if (error) {
@@ -256,38 +258,11 @@ export async function rotateStandToken(
     databaseFailure("rotate_stand", error, requestId);
   }
 
-  await storeReprintableToken(context, standId, token, requestId);
-
   return {
     standId,
     standUrl: standUrl(publicFrontendUrl(), token),
     standToken: token,
   };
-}
-
-/**
- * Keep a reprintable copy of the token.
- *
- * Best-effort on purpose. If this fails the stand still works — resolution uses
- * the digest, which is already committed — and the owner simply cannot reprint
- * without rotating. Failing the whole creation over it would be worse: they
- * would have no stand at all.
- */
-async function storeReprintableToken(
-  context: AuthenticatedContext,
-  standId: string,
-  token: string,
-  requestId: string,
-): Promise<void> {
-  const { error } = await context.db.rpc("rpc_set_stand_token_ciphertext", {
-    p_stand_id: standId,
-    p_ciphertext: encrypt(token),
-    p_key_version: KEY_VERSION,
-  });
-
-  if (error) {
-    logger.warn("owner.reprint_copy_failed", { requestId, standId, error });
-  }
 }
 
 /**

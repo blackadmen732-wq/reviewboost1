@@ -289,19 +289,15 @@ select throws_ok(
     'cannot directly update praise_note_encrypted');
 
 -- ============================================================
--- 15. PRAISE — status column still updatable (for archive)
+-- 15. PRAISE — all direct UPDATE now blocked (RPCs only)
 -- ============================================================
 
-select lives_ok(
+select throws_ok(
     $$ update public.team_praise_records
        set status = 'archived'
        where id = 'f5000000-0000-0000-0000-00000000000a' $$,
-    'owner can update praise status (archive)');
-
--- Reset
-select tests.set_service();
-update public.team_praise_records set status = 'unmatched' where id = 'f5000000-0000-0000-0000-00000000000a';
-select tests.set_actor('bb000000-0000-0000-0000-000000000001');
+    '42501', null,
+    'direct UPDATE on praise status is blocked (use RPCs)');
 
 -- ============================================================
 -- 16. PRAISE MATCH/UNMATCH RPCs — work correctly

@@ -80,12 +80,13 @@ values ('f1000000-0000-0000-0000-00000000000a', 'a0000000-c015-e570-0000-0000000
 
 select tests.set_actor('aa000000-0000-0000-0000-000000000001');
 
--- Allowed: triage columns
-select lives_ok(
+-- Blocked: all direct UPDATE revoked (triage goes through RPCs now)
+select throws_ok(
     $$ update public.customer_responses
        set read_at = now()
        where id = 'f0000000-0000-0000-0000-00000000000a' $$,
-    'owner can mark response as read');
+    '42501', null,
+    'direct UPDATE on read_at is blocked (use rpc_mark_response_read)');
 
 -- Blocked: rating column
 select throws_ok(
@@ -123,15 +124,16 @@ select throws_ok(
 -- 2. TEAM PRAISE — column restriction
 -- ============================================================
 
--- Allowed: matching fields
-select lives_ok(
+-- Blocked: all direct UPDATE revoked (matching goes through RPCs now)
+select throws_ok(
     $$ update public.team_praise_records
        set status = 'matched',
            matched_staff_id = 'f2000000-0000-0000-0000-00000000000a',
            matched_by_user_id = 'aa000000-0000-0000-0000-000000000001',
            matched_at = now()
        where id = 'f1000000-0000-0000-0000-00000000000a' $$,
-    'owner can match praise');
+    '42501', null,
+    'direct UPDATE on praise matching fields is blocked (use rpc_match_praise)');
 
 -- Blocked: encrypted fields
 select throws_ok(
@@ -261,20 +263,14 @@ select throws_ok(
 
 select tests.set_actor('aa000000-0000-0000-0000-000000000004');
 
--- Reset read_at for clean test
-select tests.set_service();
-update public.customer_responses
-set read_at = null
-where id = 'f0000000-0000-0000-0000-00000000000a';
-
 select tests.set_actor('aa000000-0000-0000-0000-000000000004');
 
--- Viewer cannot triage responses (RLS blocks it)
-select is_empty(
+-- Viewer cannot triage responses (all UPDATE revoked)
+select throws_ok(
     $$ update public.customer_responses
        set read_at = now()
-       where id = 'f0000000-0000-0000-0000-00000000000a'
-       returning id $$,
+       where id = 'f0000000-0000-0000-0000-00000000000a' $$,
+    '42501', null,
     'viewer cannot triage customer responses');
 
 -- ============================================================

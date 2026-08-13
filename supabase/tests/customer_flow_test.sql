@@ -536,22 +536,20 @@ select throws_ok(
 -- ---- resolution ----
 
 select lives_ok(
-    $$ update public.customer_responses
-          set resolved_at = now(), resolved_by = 'aaaaaaaa-0000-0000-0000-000000000001'
-        where id = 'a5000000-0000-0000-0000-00000000000a' $$,
+    $$ select public.rpc_resolve_response(
+        'a5000000-0000-0000-0000-00000000000a') $$,
     'an owner can mark their own feedback sorted');
 
--- resolved_at and resolved_by travel together or not at all, so "sorted" always
--- has a name against it.
+-- Direct UPDATE is now blocked — resolution goes through RPCs
 select throws_ok(
     $$ update public.customer_responses set resolved_at = now(), resolved_by = null
         where id = 'a5000000-0000-0000-0000-00000000000a' $$,
-    '23514', null,
-    'feedback cannot be sorted by nobody');
+    '42501', null,
+    'direct UPDATE on customer_responses is blocked');
 
 select lives_ok(
-    $$ update public.customer_responses set resolved_at = null, resolved_by = null
-        where id = 'a5000000-0000-0000-0000-00000000000a' $$,
+    $$ select public.rpc_reopen_response(
+        'a5000000-0000-0000-0000-00000000000a') $$,
     'an owner can reopen their own feedback');
 
 -- The customer's own words stay immutable. Nothing in this workflow may edit
@@ -661,53 +659,46 @@ select lives_ok(
 -- ---- matching ----
 
 select lives_ok(
-    $$ update public.team_praise_records
-          set matched_staff_id = 'a6000000-0000-0000-0000-00000000000a',
-              matched_at = now(),
-              matched_by_user_id = 'aaaaaaaa-0000-0000-0000-000000000001',
-              status = 'matched'
-        where id = 'a7000000-0000-0000-0000-00000000000a' $$,
+    $$ select public.rpc_match_praise(
+        'a7000000-0000-0000-0000-00000000000a',
+        'a6000000-0000-0000-0000-00000000000a') $$,
     'praise can be matched to somebody on the team');
 
--- The composite foreign key carries org_id, so praise cannot be matched to
--- somebody at a different business even with a valid-looking uuid.
+-- Direct UPDATE is fully revoked — matching goes through RPCs only.
+-- The composite FK and CHECK constraints still exist as defense-in-depth
+-- but cannot be tested via direct UPDATE because the grant is gone.
 select throws_ok(
     $$ update public.team_praise_records
           set matched_staff_id = 'b6000000-0000-0000-0000-00000000000b',
               matched_at = now(),
               status = 'matched'
         where id = 'a7000000-0000-0000-0000-00000000000a' $$,
-    '23503', null,
-    'praise cannot be matched to another business staff');
+    '42501', null,
+    'direct UPDATE on praise matching is blocked (cross-org FK still enforced by RPCs)');
 
--- Matched implies a matcher and a moment. Half-written state is how "who
--- decided this?" becomes unanswerable later.
 select throws_ok(
     $$ update public.team_praise_records
           set matched_staff_id = 'a6000000-0000-0000-0000-00000000000a', matched_at = null
         where id = 'a7000000-0000-0000-0000-00000000000a' $$,
-    '23514', null,
-    'a match cannot exist without a moment');
+    '42501', null,
+    'direct UPDATE on praise is blocked (CHECK constraints enforced by RPCs)');
 
 select throws_ok(
     $$ update public.team_praise_records set shared_at = now(), shared_by = null
         where id = 'a7000000-0000-0000-0000-00000000000a' $$,
-    '23514', null,
-    'praise cannot be passed on by nobody');
+    '42501', null,
+    'direct UPDATE on praise sharing is blocked (RPCs enforce completeness)');
 
 select lives_ok(
-    $$ update public.team_praise_records
-          set shared_at = now(), shared_by = 'aaaaaaaa-0000-0000-0000-000000000001'
-        where id = 'a7000000-0000-0000-0000-00000000000a' $$,
+    $$ select public.rpc_mark_praise_shared(
+        'a7000000-0000-0000-0000-00000000000a') $$,
     'praise can be recorded as passed on');
 
 -- Unmatching must be possible: an owner who picked the wrong Sam cannot be
 -- stuck with it.
 select lives_ok(
-    $$ update public.team_praise_records
-          set matched_staff_id = null, matched_at = null,
-              matched_by_user_id = null, status = 'unmatched'
-        where id = 'a7000000-0000-0000-0000-00000000000a' $$,
+    $$ select public.rpc_unmatch_praise(
+        'a7000000-0000-0000-0000-00000000000a') $$,
     'a wrong match can be undone');
 
 -- ---- the rating is not reachable from praise ----
