@@ -331,8 +331,6 @@ set matched_staff_id = 'f3000000-0000-0000-0000-00000000000a',
     status = 'matched'
 where id = 'f5000000-0000-0000-0000-00000000000a';
 
-select tests.set_actor('bb000000-0000-0000-0000-000000000001');
-
 select throws_ok(
     $$ delete from public.staff_members
        where id = 'f3000000-0000-0000-0000-00000000000a' $$,
@@ -340,7 +338,6 @@ select throws_ok(
     'cannot delete staff member with matched praise (ON DELETE RESTRICT)');
 
 -- Clean up match
-select tests.set_service();
 update public.team_praise_records
 set matched_staff_id = null, matched_at = null, matched_by_user_id = null, status = 'unmatched'
 where id = 'f5000000-0000-0000-0000-00000000000a';

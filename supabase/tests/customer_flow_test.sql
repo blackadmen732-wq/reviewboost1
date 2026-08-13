@@ -478,11 +478,10 @@ values ('b0000000-0000-0000-0000-00000000000b',
 select tests.set_actor('aaaaaaaa-0000-0000-0000-000000000001');
 
 select lives_ok(
-    $$ insert into public.response_notes (org_id, response_id, author_id, body_encrypted)
-       values ('a0000000-0000-0000-0000-00000000000a',
-               'a5000000-0000-0000-0000-00000000000a',
-               'aaaaaaaa-0000-0000-0000-000000000001',
-               'ciphertext-called-them-back') $$,
+    $$ select * from public.rpc_add_response_note(
+        'a5000000-0000-0000-0000-00000000000a',
+        'a0000000-0000-0000-0000-00000000000a',
+        'ciphertext-called-them-back') $$,
     'an owner can record what they did about their own feedback');
 
 select isnt_empty(
