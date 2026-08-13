@@ -36,23 +36,15 @@ export async function POST(
       });
     }
 
-    const { data, error } = await context.db
-      .from("customer_responses")
-      .update({ read_at: new Date().toISOString() })
-      .eq("id", responseId)
-      .eq("org_id", context.orgId)
-      .is("read_at", null)
-      .select("id")
-      .maybeSingle();
+    const { error } = await context.db.rpc("rpc_mark_response_read", {
+      p_response_id: responseId,
+    });
 
-    if (error) {
+    if (error && !error.message?.includes("not_found_or_forbidden")) {
       throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
     }
 
-    // No row means it belongs to another tenant, does not exist, or was already
-    // read. All three are a no-op from the caller's point of view, and telling
-    // them apart would leak which responses exist.
-    return json(request, requestId, 200, { data: { responseId, isRead: true, changed: Boolean(data) }, requestId });
+    return json(request, requestId, 200, { data: { responseId, isRead: true, changed: !error }, requestId });
   });
 }
 

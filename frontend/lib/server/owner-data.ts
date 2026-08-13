@@ -470,7 +470,7 @@ export async function listPraise(
   const limit = clampLimit(options.limit);
 
   let query = supabase
-    .from("team_praise_records")
+    .from("praise_safe_view")
     .select(
       "id, first_name_encrypted, praise_note_encrypted, status, created_at, matched_staff_id, shared_at",
     )
@@ -529,7 +529,7 @@ export async function getStaffPraiseTally(orgId: string): Promise<StaffPraiseTal
 
   const [{ data }, staff] = await Promise.all([
     supabase
-      .from("team_praise_records")
+      .from("praise_safe_view")
       .select("matched_staff_id, shared_at")
       .eq("org_id", orgId)
       .not("matched_staff_id", "is", null),
@@ -660,7 +660,7 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
       .eq("org_id", orgId)
       .is("read_at", null),
     supabase
-      .from("team_praise_records")
+      .from("praise_safe_view")
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
       .eq("status", "unmatched")

@@ -64,76 +64,73 @@ export async function PATCH(
     }
 
     const body = parseOrThrow(updateSchema, await readJsonBody(request));
-    const now = new Date().toISOString();
-    const changes: Record<string, string | null> = {};
+    let resultStatus: string | null = null;
 
     if (body.staffId !== undefined) {
       if (body.staffId === null) {
-        changes.matched_staff_id = null;
-        changes.matched_at = null;
-        changes.matched_by_user_id = null;
-        changes.status = "unmatched";
-      } else {
-        // Checked explicitly rather than left to the foreign key. The composite
-        // FK carrying org_id would refuse a cross-tenant staff id anyway, but it
-        // would surface as an opaque 503 — and "we could not find that person"
-        // is the answer an owner can act on.
-        const { data: staff, error: staffError } = await context.db
-          .from("staff_members")
-          .select("id")
-          .eq("id", body.staffId)
-          .eq("org_id", context.orgId)
-          .maybeSingle();
-
-        if (staffError) {
+        const { error } = await context.db.rpc("rpc_unmatch_praise", {
+          p_praise_id: praiseId,
+        });
+        if (error) {
+          if (error.message?.includes("not_found_or_forbidden")) {
+            throw new ApiError(404, ERROR_CODE.notFound, "We could not find that praise.");
+          }
           throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
         }
-
-        if (!staff) {
-          throw new ApiError(404, ERROR_CODE.notFound, "We could not find that person.");
+        resultStatus = "unmatched";
+      } else {
+        const { error } = await context.db.rpc("rpc_match_praise", {
+          p_praise_id: praiseId,
+          p_staff_id: body.staffId,
+        });
+        if (error) {
+          if (error.message?.includes("invalid_staff_member")) {
+            throw new ApiError(404, ERROR_CODE.notFound, "We could not find that person.");
+          }
+          if (error.message?.includes("not_found_or_forbidden")) {
+            throw new ApiError(404, ERROR_CODE.notFound, "We could not find that praise.");
+          }
+          throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
         }
-
-        changes.matched_staff_id = body.staffId;
-        changes.matched_at = now;
-        changes.matched_by_user_id = context.userId;
-        changes.status = "matched";
+        resultStatus = "matched";
       }
     }
 
     if (body.shared !== undefined) {
-      changes.shared_at = body.shared ? now : null;
-      changes.shared_by = body.shared ? context.userId : null;
+      const rpcName = body.shared ? "rpc_mark_praise_shared" : "rpc_unmark_praise_shared";
+      const { error } = await context.db.rpc(rpcName, {
+        p_praise_id: praiseId,
+      });
+      if (error && !error.message?.includes("not_found_or_forbidden")) {
+        throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
+      }
     }
 
     if (body.archived !== undefined) {
-      // Archiving is for praise that is not usable — a customer naming the
-      // business itself, or typing nonsense. It never deletes: the customer
-      // said it, and the record of what was said is not ours to erase.
-      changes.status = body.archived
-        ? "archived"
-        : changes.status !== undefined
-          ? changes.status
-          : "unmatched";
+      const newStatus = body.archived ? "archived" : (resultStatus ?? "unmatched");
+      const { error } = await context.db
+        .from("team_praise_records")
+        .update({ status: newStatus })
+        .eq("id", praiseId)
+        .eq("org_id", context.orgId);
+      if (error) {
+        throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
+      }
+      resultStatus = newStatus;
     }
 
-    const { data, error } = await context.db
-      .from("team_praise_records")
-      .update(changes)
-      .eq("id", praiseId)
-      .eq("org_id", context.orgId)
-      .select("id, status")
-      .maybeSingle();
-
-    if (error) {
-      throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
-    }
-
-    if (!data) {
-      throw new ApiError(404, ERROR_CODE.notFound, "We could not find that praise.");
+    if (resultStatus === null) {
+      const { data: current } = await context.db
+        .from("praise_safe_view")
+        .select("status")
+        .eq("id", praiseId)
+        .eq("org_id", context.orgId)
+        .maybeSingle();
+      resultStatus = (current?.status as string) ?? "unmatched";
     }
 
     return json(request, requestId, 200, {
-      data: { praiseId, status: data.status as string },
+      data: { praiseId, status: resultStatus },
       requestId,
     });
   });

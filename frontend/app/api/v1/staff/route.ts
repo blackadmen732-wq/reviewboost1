@@ -38,25 +38,18 @@ export async function POST(request: NextRequest): Promise<Response> {
     const context = await requireOrganizationContext(request);
     const body = parseOrThrow(createSchema, await readJsonBody(request));
 
-    const { data, error } = await context.db
-      .from("staff_members")
-      .insert({
-        org_id: context.orgId,
-        name_encrypted: encrypt(body.name),
-        ...(body.roleLabel ? { role_label: body.roleLabel } : {}),
-      })
-      .select("id")
-      .single();
+    const { data, error } = await context.db.rpc("rpc_create_staff", {
+      p_org_id: context.orgId,
+      p_name_encrypted: encrypt(body.name),
+      p_role_label: body.roleLabel ?? null,
+    });
 
     if (error) {
       throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
     }
 
-    // Deliberately no duplicate check. Two people really can both be called
-    // Sam, and a product that refuses the second one is wrong about the world
-    // in a way the owner cannot argue with.
     return json(request, requestId, 201, {
-      data: { staffId: data.id as string, name: body.name },
+      data: { staffId: data as string, name: body.name },
       requestId,
     });
   });

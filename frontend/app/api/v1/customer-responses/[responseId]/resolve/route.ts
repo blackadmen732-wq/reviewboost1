@@ -46,32 +46,21 @@ export async function POST(
     }
 
     const body = parseOrThrow(bodySchema, await readJsonBody(request));
-    const now = new Date().toISOString();
 
-    const { data, error } = await context.db
-      .from("customer_responses")
-      .update(
-        body.resolved
-          ? { resolved_at: now, resolved_by: context.userId, read_at: now }
-          : { resolved_at: null, resolved_by: null },
-      )
-      .eq("id", responseId)
-      .eq("org_id", context.orgId)
-      .select("id, resolved_at")
-      .maybeSingle();
+    const rpcName = body.resolved ? "rpc_resolve_response" : "rpc_reopen_response";
+    const { error } = await context.db.rpc(rpcName, {
+      p_response_id: responseId,
+    });
 
     if (error) {
+      if (error.message?.includes("not_found_or_forbidden")) {
+        throw new ApiError(404, ERROR_CODE.notFound, "That feedback could not be found.");
+      }
       throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
     }
 
-    // No row means another tenant's, or gone. Both are the same answer here;
-    // distinguishing them would confirm that somebody else's feedback exists.
-    if (!data) {
-      throw new ApiError(404, ERROR_CODE.notFound, "That feedback could not be found.");
-    }
-
     return json(request, requestId, 200, {
-      data: { responseId, isResolved: data.resolved_at !== null },
+      data: { responseId, isResolved: body.resolved },
       requestId,
     });
   });

@@ -63,45 +63,28 @@ export async function POST(
 
     const body = parseOrThrow(bodySchema, await readJsonBody(request));
 
-    const { data: response, error: lookupError } = await context.db
-      .from("customer_responses")
-      .select("id, org_id")
-      .eq("id", responseId)
-      .eq("org_id", context.orgId)
-      .maybeSingle();
-
-    if (lookupError) {
-      throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
-    }
-
-    if (!response) {
-      throw new ApiError(404, ERROR_CODE.notFound, "That feedback could not be found.");
-    }
-
-    const { data, error } = await context.db
-      .from("response_notes")
-      .insert({
-        org_id: response.org_id,
-        response_id: responseId,
-        author_id: context.userId,
-        body_encrypted: encrypt(body.body),
-      })
-      .select("id, created_at")
-      .single();
+    const { data, error } = await context.db.rpc("rpc_add_response_note", {
+      p_response_id: responseId,
+      p_org_id: context.orgId,
+      p_body_encrypted: encrypt(body.body),
+    });
 
     if (error) {
+      if (error.message?.includes("not_found_or_forbidden")) {
+        throw new ApiError(404, ERROR_CODE.notFound, "That feedback could not be found.");
+      }
       throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
     }
 
-    await context.db
-      .from("customer_responses")
-      .update({ read_at: new Date().toISOString() })
-      .eq("id", responseId)
-      .eq("org_id", context.orgId)
-      .is("read_at", null);
+    const row = Array.isArray(data) ? data[0] : data;
+
+    // Mark as read when adding a note — writing about it means you've seen it.
+    await context.db.rpc("rpc_mark_response_read", {
+      p_response_id: responseId,
+    });
 
     return json(request, requestId, 201, {
-      data: { noteId: data.id as string, createdAt: data.created_at as string },
+      data: { noteId: row?.note_id as string, createdAt: row?.created_at as string },
       requestId,
     });
   });

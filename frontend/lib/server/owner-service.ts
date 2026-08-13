@@ -240,37 +240,26 @@ export async function rotateStandToken(
 ): Promise<{ standId: string; standUrl: string; standToken: string }> {
   const token = generateToken();
 
-  const { data, error } = await context.db
-    .from("review_stands")
-    .update({
-      public_token_hash: digestStandToken(token),
-      public_token_prefix: tokenPrefix(token),
-      public_token_key_version: tokenDigestKeyVersion(),
-      token_rotated_at: new Date().toISOString(),
-    })
-    .eq("id", standId)
-    .eq("org_id", orgId)
-    .select("id, org_id")
-    .maybeSingle();
-
-  if (error) databaseFailure("rotate_stand", error, requestId);
-  // Invisible under RLS if it belongs to another tenant, so a cross-tenant
-  // attempt and a genuine typo are indistinguishable.
-  if (!data) throw new ApiError(404, ERROR_CODE.reviewLinkInactive, "Not found.");
-
-  await context.db.rpc("rpc_record_audit_event", {
-    p_org_id: data.org_id,
-    p_action: "stand.token_rotated",
-    p_target_type: "review_stand",
-    p_target_id: standId,
+  const { error } = await context.db.rpc("rpc_rotate_stand_token", {
+    p_stand_id: standId,
+    p_org_id: orgId,
+    p_new_token_hash: digestStandToken(token),
+    p_new_token_prefix: tokenPrefix(token),
+    p_key_version: tokenDigestKeyVersion(),
     p_request_id: requestId,
-    p_metadata: {},
   });
 
-  await storeReprintableToken(context, data.id as string, token, requestId);
+  if (error) {
+    if (error.message?.includes("not_found_or_forbidden")) {
+      throw new ApiError(404, ERROR_CODE.reviewLinkInactive, "Not found.");
+    }
+    databaseFailure("rotate_stand", error, requestId);
+  }
+
+  await storeReprintableToken(context, standId, token, requestId);
 
   return {
-    standId: data.id as string,
+    standId,
     standUrl: standUrl(publicFrontendUrl(), token),
     standToken: token,
   };
@@ -413,7 +402,7 @@ export async function listTeamPraise(context: AuthenticatedContext, page: Page, 
   const limit = pageSize(page.limit);
 
   let query = context.db
-    .from("team_praise_records")
+    .from("praise_safe_view")
     .select("id, location_id, first_name_encrypted, praise_note_encrypted, status, created_at")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false })
