@@ -25,16 +25,21 @@ create or replace function public.rpc_create_staff(
 )
 returns uuid
 language plpgsql
-security invoker
+security definer
 set search_path = ''
 as $$
 declare
+    v_actor uuid := (select auth.uid());
     v_id uuid;
 begin
+    if v_actor is null then
+        raise exception 'authentication required' using errcode = '42501';
+    end if;
+
     if not exists (
         select 1 from public.organization_members
         where org_id = p_org_id
-          and user_id = (select auth.uid())
+          and user_id = v_actor
           and status = 'active'
     ) then
         raise exception 'not_found_or_forbidden'
@@ -147,6 +152,8 @@ revoke all on function public.rpc_rotate_stand_token(uuid, uuid, text, text, sma
 -- Direct INSERT on response_notes bypasses org_id verification.
 -- This RPC verifies the response belongs to the caller's org.
 
+revoke insert on public.response_notes from authenticated;
+
 create or replace function public.rpc_add_response_note(
     p_response_id    uuid,
     p_org_id         uuid,
@@ -154,10 +161,16 @@ create or replace function public.rpc_add_response_note(
 )
 returns table(note_id uuid, created_at timestamptz)
 language plpgsql
-security invoker
+security definer
 set search_path = ''
 as $$
+declare
+    v_actor uuid := (select auth.uid());
 begin
+    if v_actor is null then
+        raise exception 'authentication required' using errcode = '42501';
+    end if;
+
     if not exists (
         select 1 from public.customer_responses
         where id = p_response_id
@@ -167,9 +180,19 @@ begin
             using errcode = 'P0001';
     end if;
 
+    if not exists (
+        select 1 from public.organization_members
+        where org_id = p_org_id
+          and user_id = v_actor
+          and status = 'active'
+    ) then
+        raise exception 'not_found_or_forbidden'
+            using errcode = 'P0001';
+    end if;
+
     return query
     insert into public.response_notes (org_id, response_id, author_id, body_encrypted)
-    values (p_org_id, p_response_id, (select auth.uid()), p_body_encrypted)
+    values (p_org_id, p_response_id, v_actor, p_body_encrypted)
     returning id as note_id, public.response_notes.created_at;
 end;
 $$;
@@ -192,15 +215,17 @@ security invoker
 set search_path = ''
 as $$
 begin
+    if not exists (
+        select 1 from public.customer_responses where id = p_response_id
+    ) then
+        raise exception 'not_found_or_forbidden'
+            using errcode = 'P0001';
+    end if;
+
     update public.customer_responses
     set read_at = now()
     where id = p_response_id
       and read_at is null;
-
-    if not found then
-        raise exception 'not_found_or_forbidden'
-            using errcode = 'P0001';
-    end if;
 end;
 $$;
 
@@ -214,6 +239,13 @@ security invoker
 set search_path = ''
 as $$
 begin
+    if not exists (
+        select 1 from public.customer_responses where id = p_response_id
+    ) then
+        raise exception 'not_found_or_forbidden'
+            using errcode = 'P0001';
+    end if;
+
     update public.customer_responses
     set
         resolved_at = now(),
@@ -221,11 +253,6 @@ begin
         read_at = coalesce(read_at, now())
     where id = p_response_id
       and resolved_at is null;
-
-    if not found then
-        raise exception 'not_found_or_forbidden'
-            using errcode = 'P0001';
-    end if;
 end;
 $$;
 
@@ -240,15 +267,6 @@ $$;
 -- but the column grant still allows direct writes. Tighten it.
 
 revoke update on public.team_praise_records from authenticated;
-grant update (status) on public.team_praise_records to authenticated;
-
--- The existing match/unmatch/share RPCs are SECURITY INVOKER and
--- update matched_staff_id, matched_at, matched_by_user_id, shared_at,
--- shared_by. Since we just revoked those columns from the UPDATE grant,
--- those RPCs will fail. They need to be SECURITY DEFINER for the
--- columns they write, or we need to grant those columns back.
--- The safer approach: grant the columns the RPCs need, since the RPCs
--- already validate business rules.
 
 grant update (status, matched_staff_id, matched_by_user_id, matched_at, shared_at, shared_by)
     on public.team_praise_records to authenticated;

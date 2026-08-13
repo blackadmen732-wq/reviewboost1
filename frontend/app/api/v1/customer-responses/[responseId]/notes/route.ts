@@ -78,13 +78,20 @@ export async function POST(
 
     const row = Array.isArray(data) ? data[0] : data;
 
-    // Mark as read when adding a note — writing about it means you've seen it.
-    await context.db.rpc("rpc_mark_response_read", {
+    if (!row?.note_id || !row?.created_at) {
+      throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
+    }
+
+    const { error: readError } = await context.db.rpc("rpc_mark_response_read", {
       p_response_id: responseId,
     });
 
+    if (readError) {
+      console.warn(JSON.stringify({ requestId, route: ROUTE, msg: "mark_read_failed", code: readError.code }));
+    }
+
     return json(request, requestId, 201, {
-      data: { noteId: row?.note_id as string, createdAt: row?.created_at as string },
+      data: { noteId: row.note_id as string, createdAt: row.created_at as string },
       requestId,
     });
   });

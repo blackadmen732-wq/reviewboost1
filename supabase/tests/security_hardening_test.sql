@@ -11,7 +11,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(25);
+select plan(24);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -331,6 +331,8 @@ set matched_staff_id = 'f3000000-0000-0000-0000-00000000000a',
     status = 'matched'
 where id = 'f5000000-0000-0000-0000-00000000000a';
 
+select tests.set_actor('bb000000-0000-0000-0000-000000000001');
+
 select throws_ok(
     $$ delete from public.staff_members
        where id = 'f3000000-0000-0000-0000-00000000000a' $$,
@@ -338,6 +340,7 @@ select throws_ok(
     'cannot delete staff member with matched praise (ON DELETE RESTRICT)');
 
 -- Clean up match
+select tests.set_service();
 update public.team_praise_records
 set matched_staff_id = null, matched_at = null, matched_by_user_id = null, status = 'unmatched'
 where id = 'f5000000-0000-0000-0000-00000000000a';
@@ -350,7 +353,7 @@ select tests.set_actor('bb000000-0000-0000-0000-000000000001');
 
 select throws_ok(
     $$ update public.organization_members
-       set org_id = 'a1000000-hard-e570-0000-00000000000b'
+       set org_id = 'a1000000-da0d-e570-0000-00000000000b'
        where id = 'c1000000-0000-0000-0000-000000000003' $$,
     '42501', null,
     'cannot reassign membership org_id');
