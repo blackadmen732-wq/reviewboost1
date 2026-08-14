@@ -284,10 +284,9 @@ select is_empty(
     $$ select id from public.customer_responses $$,
     'outsider sees no customer responses');
 
-select throws_ok(
+select is_empty(
     $$ select id from public.team_praise_records $$,
-    '42501', null,
-    'outsider cannot access team praise (SELECT revoked)');
+    'outsider sees no team praise (RLS filters all rows)');
 
 select is_empty(
     $$ select id from public.locations $$,

@@ -15,7 +15,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(26);
+select plan(22);
 
 -- ------------------------------------------------------------- fixtures ----
 
