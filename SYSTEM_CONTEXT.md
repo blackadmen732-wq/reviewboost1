@@ -68,9 +68,9 @@ policy, which forbids discouraging negative reviews and forbids selectively
 soliciting positive ones — and it carries platform-enforcement and
 consumer-protection risk.
 
-**This behaviour exists in the repository today** (`qr_stands.review_threshold`
-and the conditional redirect on the public route). It is required work to remove,
-not a documentation correction.
+The current Supabase schema has no `review_threshold` column and never will.
+A pgTAP test asserts its absence. The old Express backend's gating logic has
+been removed entirely.
 
 ### Prohibited language
 
@@ -91,8 +91,8 @@ high error correction so it survives being scuffed or partially covered.
 
 The internal identifier never leaves the server, so stands cannot be enumerated.
 
-**Also carries `review_threshold` — the REJECTED gating field.** It must be
-removed together with the conditional redirect.
+The `review_threshold` gating field from the old Express backend has been
+removed. The current schema has no such column; a pgTAP test asserts this.
 
 ### The tap flow — APPROVED
 
@@ -250,19 +250,18 @@ Design rules:
 
 ### Current repository — IMPLEMENTED — UNVERIFIED
 
-Node/Express, PostgreSQL via direct connection, Redis and BullMQ, custom JWT
-authentication. Layered: HTTP → services → repositories → database, with a
-dependency-free domain layer.
+Next.js 16, App Router, TypeScript strict. PostgreSQL via Supabase with Row
+Level Security. Supabase Auth (GoTrue). Vercel for web deployment.
 
-**No component has been exercised against real infrastructure.**
+**No component has been exercised against real production infrastructure.**
 
 ### Intended platform — PROPOSED
 
 Not agreed. Each item requires an architecture decision record before adoption.
 
-- Next.js 16, App Router, TypeScript strict
-- Supabase — PostgreSQL, Auth, Storage, Row Level Security
-- Vercel for web deployment
+- Next.js 16, App Router, TypeScript strict (implemented)
+- Supabase — PostgreSQL, Auth, Storage, Row Level Security (implemented)
+- Vercel for web deployment (implemented)
 - Durable background execution via an **explicitly selected** job platform
 - Twilio for SMS
 - Stripe for billing
