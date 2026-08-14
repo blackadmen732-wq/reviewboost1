@@ -237,7 +237,7 @@ describe("mutation route org_id scoping", () => {
     expect(rpcCalls[0]?.name).toBe("rpc_mark_response_read");
   });
 
-  it("staff update scopes to active org", async () => {
+  it("staff update uses RPC instead of direct table update", async () => {
     tableRows = [{ id: "staff-1" }];
     const { PATCH } = await import("@/app/api/v1/staff/[staffId]/route");
     const staffId = "22222222-2222-2222-2222-222222222222";
@@ -249,9 +249,9 @@ describe("mutation route org_id scoping", () => {
       { params: Promise.resolve({ staffId }) },
     );
 
-    const orgFilters = recorded.filter((e) => e.kind === "eq" && e.name === "org_id");
-    expect(orgFilters.length).toBeGreaterThanOrEqual(1);
-    expect(orgFilters[0]?.value).toBe("11111111-1111-1111-1111-111111111111");
+    const rpcCalls = recorded.filter((e) => e.kind === "rpc");
+    expect(rpcCalls.length).toBeGreaterThanOrEqual(1);
+    expect(rpcCalls[0]?.name).toBe("rpc_update_staff");
   });
 
   it("team praise update uses match RPC instead of direct table update", async () => {
