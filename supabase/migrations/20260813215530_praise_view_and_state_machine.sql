@@ -682,9 +682,11 @@ grant execute on function public.rpc_rotate_stand_token(uuid, uuid, text, text, 
 drop function if exists public.rpc_set_stand_token_ciphertext(uuid, text, smallint);
 drop function if exists app.set_stand_token_ciphertext(uuid, text, smallint);
 
--- 5d. Drop old 11-param overloads of create_organization (from onboarding migration)
+-- 5d. Drop ALL overloads of create_organization so we can recreate without defaults
 drop function if exists public.rpc_create_organization(text, text, text, text, text, text, text, text, text, smallint, text);
 drop function if exists app.create_organization_with_first_stand(text, text, text, text, text, text, text, text, text, smallint, text);
+drop function if exists public.rpc_create_organization(text, text, text, text, text, text, text, text, text, smallint, text, text, smallint);
+drop function if exists app.create_organization_with_first_stand(text, text, text, text, text, text, text, text, text, smallint, text, text, smallint);
 
 -- 5e. Recreate 13-param create_organization with no defaults on security params
 create or replace function app.create_organization_with_first_stand(
@@ -759,9 +761,6 @@ begin
     return query select new_org, new_location, new_stand;
 end;
 $$;
-
--- Drop old 13-param version with defaults before creating new wrapper
-drop function if exists public.rpc_create_organization(text, text, text, text, text, text, text, text, text, smallint, text, text, smallint);
 
 create or replace function public.rpc_create_organization(
     p_name                text,
