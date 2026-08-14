@@ -11,7 +11,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(47);
+select plan(68);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -623,6 +623,202 @@ select throws_ok(
        where id = 'd1000000-0000-0000-0000-00000000000a' $$,
     '42501', null,
     'direct UPDATE on locations is denied');
+
+-- ============================================================
+-- 37. GOOGLE URL VALIDATOR — valid g.page short link
+-- ============================================================
+
+select tests.set_service();
+
+select ok(
+    public._validate_google_review_url('https://g.page/r/myplace/review'),
+    'g.page short link is valid');
+
+-- ============================================================
+-- 38. GOOGLE URL VALIDATOR — valid maps.app.goo.gl
+-- ============================================================
+
+select ok(
+    public._validate_google_review_url('https://maps.app.goo.gl/abc123'),
+    'maps.app.goo.gl short link is valid');
+
+-- ============================================================
+-- 39. GOOGLE URL VALIDATOR — valid search.google.com writereview
+-- ============================================================
+
+select ok(
+    public._validate_google_review_url('https://search.google.com/local/writereview?placeid=ChIJ12345'),
+    'search.google.com writereview is valid');
+
+-- ============================================================
+-- 40. GOOGLE URL VALIDATOR — valid www.google.com/maps/
+-- ============================================================
+
+select ok(
+    public._validate_google_review_url('https://www.google.com/maps/place/My+Cafe'),
+    'www.google.com/maps/ is valid');
+
+-- ============================================================
+-- 41. GOOGLE URL VALIDATOR — valid maps.google.com/maps/
+-- ============================================================
+
+select ok(
+    public._validate_google_review_url('https://maps.google.com/maps/place/My+Cafe'),
+    'maps.google.com/maps/ is valid');
+
+-- ============================================================
+-- 42. GOOGLE URL VALIDATOR — host-only URL (no trailing slash)
+-- ============================================================
+
+select ok(
+    public._validate_google_review_url('https://g.page'),
+    'host-only g.page URL (no slash) is valid');
+
+-- ============================================================
+-- 43. GOOGLE URL VALIDATOR — credentials rejected
+-- ============================================================
+
+select ok(
+    not public._validate_google_review_url('https://user:pass@g.page/r/test/review'),
+    'credentials in URL authority rejected');
+
+-- ============================================================
+-- 44. GOOGLE URL VALIDATOR — port with valid host
+-- ============================================================
+
+select ok(
+    not public._validate_google_review_url('https://g.page:8443/r/test/review'),
+    'port in URL authority rejected (not standard Google)');
+
+-- ============================================================
+-- 45. GOOGLE URL VALIDATOR — HTTP rejected
+-- ============================================================
+
+select ok(
+    not public._validate_google_review_url('http://g.page/r/test/review'),
+    'http scheme rejected');
+
+-- ============================================================
+-- 46. GOOGLE URL VALIDATOR — malicious host
+-- ============================================================
+
+select ok(
+    not public._validate_google_review_url('https://evil.example.com/maps/place/fake'),
+    'malicious host rejected');
+
+-- ============================================================
+-- 47b. GOOGLE URL VALIDATOR — query string on short link
+-- ============================================================
+
+select ok(
+    public._validate_google_review_url('https://g.page/r/test/review?utm_source=qr'),
+    'query string on short link still valid');
+
+-- ============================================================
+-- 48. GOOGLE URL VALIDATOR — oversized URL
+-- ============================================================
+
+select ok(
+    not public._validate_google_review_url('https://g.page/r/' || repeat('x', 2040)),
+    'oversized URL rejected');
+
+-- ============================================================
+-- 49. GOOGLE URL VALIDATOR — NULL input
+-- ============================================================
+
+select ok(
+    not public._validate_google_review_url(null),
+    'NULL input returns false');
+
+-- ============================================================
+-- 50. GOOGLE URL VALIDATOR — empty string
+-- ============================================================
+
+select ok(
+    not public._validate_google_review_url(''),
+    'empty string returns false');
+
+-- ============================================================
+-- 51. APP SCHEMA — no USAGE for public/anon/authenticated
+-- ============================================================
+
+select tests.set_actor('bb000000-0000-0000-0000-000000000001');
+
+select results_eq(
+    $$ select count(*)::integer
+       from information_schema.role_usage_grants
+       where object_schema = 'app'
+         and grantee in ('anon', 'authenticated', 'public') $$,
+    array[0],
+    'app schema has no USAGE for public, anon, or authenticated');
+
+-- ============================================================
+-- 52. APP SCHEMA — no EXECUTE for public/anon/authenticated
+-- ============================================================
+
+select results_eq(
+    $$ select count(*)::integer
+       from information_schema.role_routine_grants
+       where specific_schema = 'app'
+         and grantee in ('anon', 'authenticated', 'public') $$,
+    array[0],
+    'app schema functions have no EXECUTE for public, anon, or authenticated');
+
+-- ============================================================
+-- 53. REVIEW STANDS — direct UPDATE denied
+-- ============================================================
+
+select throws_ok(
+    $$ update public.review_stands
+       set label = 'Tampered Label'
+       where id = 'e1000000-0000-0000-0000-00000000000a' $$,
+    '42501', null,
+    'direct UPDATE on review_stands label is denied');
+
+select throws_ok(
+    $$ update public.review_stands
+       set status = 'inactive'
+       where id = 'e1000000-0000-0000-0000-00000000000a' $$,
+    '42501', null,
+    'direct UPDATE on review_stands status is denied');
+
+-- ============================================================
+-- 54. REVIEW STANDS — rpc_update_stand works for owner
+-- ============================================================
+
+select lives_ok(
+    $$ select public.rpc_update_stand(
+        'e1000000-0000-0000-0000-00000000000a',
+        'Updated Label', null) $$,
+    'owner can update stand via RPC');
+
+-- ============================================================
+-- 55. REVIEW STANDS — rpc_update_stand blocked for outsider
+-- ============================================================
+
+select tests.set_actor('bb000000-0000-0000-0000-000000000004');
+
+select throws_ok(
+    $$ select public.rpc_update_stand(
+        'e1000000-0000-0000-0000-00000000000a',
+        'Outsider Label', null) $$,
+    'P0001', null,
+    'outsider cannot update stand via RPC');
+
+-- ============================================================
+-- 56. REVIEW STANDS — rpc_update_stand blocked for member
+-- ============================================================
+
+select tests.set_actor('bb000000-0000-0000-0000-000000000003');
+
+select throws_ok(
+    $$ select public.rpc_update_stand(
+        'e1000000-0000-0000-0000-00000000000a',
+        'Member Label', null) $$,
+    'P0001', null,
+    'member cannot update stand via RPC');
+
+select tests.set_actor('bb000000-0000-0000-0000-000000000001');
 
 -- ============================================================
 
