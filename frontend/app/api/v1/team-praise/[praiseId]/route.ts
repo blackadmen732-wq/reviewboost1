@@ -107,16 +107,14 @@ export async function PATCH(
     }
 
     if (body.archived !== undefined) {
-      const newStatus = body.archived ? "archived" : (resultStatus ?? "unmatched");
-      const { error } = await context.db
-        .from("team_praise_records")
-        .update({ status: newStatus })
-        .eq("id", praiseId)
-        .eq("org_id", context.orgId);
-      if (error) {
+      const rpcName = body.archived ? "rpc_archive_praise" : "rpc_restore_praise";
+      const { error } = await context.db.rpc(rpcName, {
+        p_praise_id: praiseId,
+      });
+      if (error && !error.message?.includes("not_found_or_forbidden")) {
         throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
       }
-      resultStatus = newStatus;
+      resultStatus = body.archived ? "archived" : "unmatched";
     }
 
     if (resultStatus === null) {

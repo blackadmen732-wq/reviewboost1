@@ -186,7 +186,9 @@ select lives_ok(
         'new-hash-from-rpc',
         'newpfx',
         1::smallint,
-        'test-rotation') $$,
+        'test-rotation',
+        'v1:enc-rotated-token',
+        1::smallint) $$,
     'rpc_rotate_stand_token succeeds for owner');
 
 -- Verify audit event was created
@@ -211,7 +213,9 @@ select throws_ok(
         'outsider-hash',
         'outpfx',
         1::smallint,
-        'outsider-rotation') $$,
+        'outsider-rotation',
+        'v1:enc-outsider-token',
+        1::smallint) $$,
     'P0001', null,
     'outsider cannot rotate stand token');
 
@@ -230,7 +234,9 @@ select throws_ok(
         'member-hash',
         'mempfx',
         1::smallint,
-        'member-rotation') $$,
+        'member-rotation',
+        'v1:enc-member-token',
+        1::smallint) $$,
     'P0001', null,
     'member cannot rotate stand token');
 

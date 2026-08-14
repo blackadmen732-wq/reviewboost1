@@ -83,8 +83,7 @@ export default async function CustomersPage() {
                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                   {visit.leftNote ? <Tag icon={MessageSquare}>Wrote a message</Tag> : null}
                   {visit.clickedGoogle ? <Tag icon={ExternalLink}>Went to Google</Tag> : null}
-                  {visit.praisedSomeone ? <Tag icon={Sparkles}>Named someone</Tag> : null}
-                  {!visit.leftNote && !visit.clickedGoogle && !visit.praisedSomeone ? (
+                  {!visit.leftNote && !visit.clickedGoogle ? (
                     <span className="text-sm text-muted">Rated and left</span>
                   ) : null}
                   {visit.standLabel ? (

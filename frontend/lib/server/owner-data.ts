@@ -60,12 +60,14 @@ export const listUserOrganizations = cache(async (): Promise<CurrentOrganization
   } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("organization_members")
     .select("id, org_id, role, organizations(name, timezone)")
     .eq("user_id", user.id)
     .eq("status", "active")
     .order("created_at", { ascending: true });
+
+  if (error) dataFailure("list_user_organizations", error);
 
   return (data ?? []).map((row) => {
     const r = row as MembershipRow;
@@ -174,7 +176,12 @@ function decodeCursor(cursor: string): { ts: string; id: string } | null {
     const decoded = Buffer.from(cursor, "base64url").toString();
     const sep = decoded.indexOf("\0");
     if (sep < 0) return null;
-    return { ts: decoded.slice(0, sep), id: decoded.slice(sep + 1) };
+    const ts = decoded.slice(0, sep);
+    const id = decoded.slice(sep + 1);
+    if (!UUID_RE.test(id)) return null;
+    if (Number.isNaN(Date.parse(ts))) return null;
+    if (decoded.length !== ts.length + 1 + id.length) return null;
+    return { ts, id };
   } catch {
     return null;
   }
@@ -414,6 +421,10 @@ export async function getRatingBreakdown(orgId: string): Promise<{
         .eq("rating", rating),
     ),
   );
+
+  for (const r of results) {
+    if (r.error) dataFailure("rating_breakdown", r.error);
+  }
 
   const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<1 | 2 | 3 | 4 | 5, number>;
   let total = 0;
@@ -753,7 +764,6 @@ export interface CustomerVisit {
   submittedAt: string;
   leftNote: boolean;
   clickedGoogle: boolean;
-  praisedSomeone: boolean;
   standLabel: string | null;
 }
 
@@ -803,21 +813,16 @@ export async function listVisits(
   const rows = data ?? [];
   const ids = rows.map((row) => row.id as string);
 
-  const [clicksResult, praiseResult, stands] = await Promise.all([
+  const [clicksResult, stands] = await Promise.all([
     ids.length > 0
       ? supabase.from("google_review_clicks").select("response_id").eq("org_id", orgId).in("response_id", ids)
-      : Promise.resolve({ data: [] as Array<{ response_id: string }>, error: null }),
-    ids.length > 0
-      ? supabase.rpc("rpc_response_has_praise", { p_org_id: orgId, p_response_ids: ids })
       : Promise.resolve({ data: [] as Array<{ response_id: string }>, error: null }),
     listStands(orgId),
   ]);
 
   if (clicksResult.error) dataFailure("list_visits.clicks", clicksResult.error);
-  if (praiseResult.error) dataFailure("list_visits.praise", praiseResult.error);
 
   const clicked = new Set((clicksResult.data ?? []).map((row) => row.response_id as string));
-  const praised = new Set((praiseResult.data ?? []).map((row: { response_id: string }) => row.response_id));
   const standLabels = new Map(stands.map((stand) => [stand.standId, stand.label]));
 
   return paginate(
@@ -827,12 +832,8 @@ export async function listVisits(
       responseId: row.id as string,
       rating: row.rating as number,
       submittedAt: row.submitted_at as string,
-      // Whether a note exists, never the note itself. This screen is a summary,
-      // and decrypting fifty notes to render fifty booleans is wasted work on
-      // data that should not leave the feedback screen anyway.
       leftNote: row.note_encrypted !== null,
       clickedGoogle: clicked.has(row.id as string),
-      praisedSomeone: praised.has(row.id as string),
       standLabel: standLabels.get(row.stand_id as string) ?? null,
     }),
     "submitted_at",
