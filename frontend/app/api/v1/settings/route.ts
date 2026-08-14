@@ -82,6 +82,7 @@ export async function PATCH(request: NextRequest): Promise<Response> {
 
     if (body.businessName !== undefined || body.timezone !== undefined) {
       const { error } = await context.db.rpc("rpc_update_organization", {
+        p_org_id: context.orgId,
         ...(body.businessName !== undefined && { p_name: body.businessName }),
         ...(body.timezone !== undefined && { p_timezone: body.timezone }),
       });
