@@ -15,8 +15,7 @@ supabase/
   tests/           pgTAP database tests
   seed.sql         Development seed data
   config.toml      Supabase local config
-openapi/           OpenAPI specs (single source of truth for contracts)
-scripts/backend/   Utility scripts (seed-stand.mjs)
+openapi/           OpenAPI spec (single source of truth for contracts)
 docs/backend/      Architecture and environment documentation
 ```
 
