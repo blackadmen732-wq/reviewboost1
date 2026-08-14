@@ -11,7 +11,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(69);
+select plan(85);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -739,42 +739,64 @@ select ok(
     'empty string returns false');
 
 -- ============================================================
--- 51. APP SCHEMA — no USAGE for public/anon/authenticated
+-- 51. APP SCHEMA — has_schema_privilege checks
 -- ============================================================
 
-select tests.set_actor('bb000000-0000-0000-0000-000000000001');
+select tests.set_service();
 
-select results_eq(
-    $$ select count(*)::integer
-       from information_schema.role_usage_grants
-       where object_schema = 'app'
-         and grantee in ('anon', 'public') $$,
-    array[0],
-    'app schema has no USAGE for public or anon');
+select ok(
+    not has_schema_privilege('public', 'app', 'USAGE'),
+    'PUBLIC has no USAGE on app schema');
+
+select ok(
+    not has_schema_privilege('anon', 'app', 'USAGE'),
+    'anon has no USAGE on app schema');
+
+select ok(
+    has_schema_privilege('authenticated', 'app', 'USAGE'),
+    'authenticated has USAGE on app schema (needed by RLS helpers)');
+
+select ok(
+    has_schema_privilege('service_role', 'app', 'USAGE'),
+    'service_role has USAGE on app schema');
 
 -- ============================================================
--- 52. APP SCHEMA — no EXECUTE for public/anon/authenticated
+-- 52. APP SCHEMA — has_function_privilege checks
 -- ============================================================
 
-select results_eq(
-    $$ select count(*)::integer
-       from information_schema.role_routine_grants
-       where specific_schema = 'app'
-         and grantee in ('anon', 'public') $$,
-    array[0],
-    'app schema functions have no EXECUTE for public or anon');
+select ok(
+    not has_function_privilege('public', 'app.is_org_member(uuid)', 'EXECUTE'),
+    'PUBLIC cannot EXECUTE app.is_org_member');
 
-select results_eq(
-    $$ select count(*)::integer
-       from information_schema.role_routine_grants
-       where specific_schema = 'app'
-         and grantee = 'authenticated' $$,
-    array[3],
-    'only 3 app functions are callable by authenticated (RLS helpers)');
+select ok(
+    not has_function_privilege('anon', 'app.is_org_member(uuid)', 'EXECUTE'),
+    'anon cannot EXECUTE app.is_org_member');
+
+select ok(
+    has_function_privilege('authenticated', 'app.is_org_member(uuid)', 'EXECUTE'),
+    'authenticated can EXECUTE app.is_org_member (RLS helper)');
+
+select ok(
+    has_function_privilege('authenticated', 'app.has_org_role(uuid, public.member_role[])', 'EXECUTE'),
+    'authenticated can EXECUTE app.has_org_role (RLS helper)');
+
+select ok(
+    has_function_privilege('authenticated', 'app.shares_organization(uuid)', 'EXECUTE'),
+    'authenticated can EXECUTE app.shares_organization (RLS helper)');
+
+select ok(
+    not has_function_privilege('public', 'app.shares_organization(uuid)', 'EXECUTE'),
+    'PUBLIC cannot EXECUTE app.shares_organization');
+
+select ok(
+    not has_function_privilege('anon', 'app.has_org_role(uuid, public.member_role[])', 'EXECUTE'),
+    'anon cannot EXECUTE app.has_org_role');
 
 -- ============================================================
 -- 53. REVIEW STANDS — direct UPDATE denied
 -- ============================================================
+
+select tests.set_actor('bb000000-0000-0000-0000-000000000001');
 
 select throws_ok(
     $$ update public.review_stands
@@ -791,17 +813,102 @@ select throws_ok(
     'direct UPDATE on review_stands status is denied');
 
 -- ============================================================
--- 54. REVIEW STANDS — rpc_update_stand works for owner
+-- 54. REVIEW STANDS — rpc_update_stand changes the correct row
 -- ============================================================
+
+select tests.set_service();
+delete from public.audit_events
+where org_id = 'a1000000-da0d-e570-0000-00000000000a'
+  and action = 'stand.updated';
+select tests.set_actor('bb000000-0000-0000-0000-000000000001');
 
 select lives_ok(
     $$ select public.rpc_update_stand(
         'e1000000-0000-0000-0000-00000000000a',
-        'Updated Label', null) $$,
+        'Renamed Stand', 'paused') $$,
     'owner can update stand via RPC');
 
+select tests.set_service();
+
+select results_eq(
+    $$ select label from public.review_stands
+       where id = 'e1000000-0000-0000-0000-00000000000a' $$,
+    array['Renamed Stand'],
+    'rpc_update_stand changed the label on the correct row');
+
+select results_eq(
+    $$ select status::text from public.review_stands
+       where id = 'e1000000-0000-0000-0000-00000000000a' $$,
+    array['paused'],
+    'rpc_update_stand changed the status on the correct row');
+
 -- ============================================================
--- 55. REVIEW STANDS — rpc_update_stand blocked for outsider
+-- 55. REVIEW STANDS — exactly one audit event for update
+-- ============================================================
+
+select results_eq(
+    $$ select count(*)::integer from public.audit_events
+       where org_id = 'a1000000-da0d-e570-0000-00000000000a'
+         and action = 'stand.updated'
+         and target_id = 'e1000000-0000-0000-0000-00000000000a' $$,
+    array[1],
+    'rpc_update_stand created exactly one audit event');
+
+-- ============================================================
+-- 56. REVIEW STANDS — identical retry creates no duplicate audit
+-- ============================================================
+
+select tests.set_actor('bb000000-0000-0000-0000-000000000001');
+
+select lives_ok(
+    $$ select public.rpc_update_stand(
+        'e1000000-0000-0000-0000-00000000000a',
+        'Renamed Stand', 'paused') $$,
+    'identical retry succeeds silently');
+
+select tests.set_service();
+
+select results_eq(
+    $$ select count(*)::integer from public.audit_events
+       where org_id = 'a1000000-da0d-e570-0000-00000000000a'
+         and action = 'stand.updated'
+         and target_id = 'e1000000-0000-0000-0000-00000000000a' $$,
+    array[1],
+    'identical retry created no additional audit event');
+
+-- ============================================================
+-- 57. REVIEW STANDS — invalid label rejected
+-- ============================================================
+
+select tests.set_actor('bb000000-0000-0000-0000-000000000001');
+
+select throws_ok(
+    $$ select public.rpc_update_stand(
+        'e1000000-0000-0000-0000-00000000000a',
+        '', null) $$,
+    'P0001', null,
+    'empty label is rejected');
+
+select throws_ok(
+    $$ select public.rpc_update_stand(
+        'e1000000-0000-0000-0000-00000000000a',
+        repeat('x', 81), null) $$,
+    'P0001', null,
+    'oversized label is rejected');
+
+-- ============================================================
+-- 58. REVIEW STANDS — invalid status rejected
+-- ============================================================
+
+select throws_ok(
+    $$ select public.rpc_update_stand(
+        'e1000000-0000-0000-0000-00000000000a',
+        null, 'deleted') $$,
+    'P0001', null,
+    'invalid stand status is rejected');
+
+-- ============================================================
+-- 59. REVIEW STANDS — rpc_update_stand blocked for outsider
 -- ============================================================
 
 select tests.set_actor('bb000000-0000-0000-0000-000000000004');
@@ -814,7 +921,7 @@ select throws_ok(
     'outsider cannot update stand via RPC');
 
 -- ============================================================
--- 56. REVIEW STANDS — rpc_update_stand blocked for member
+-- 60. REVIEW STANDS — rpc_update_stand blocked for member
 -- ============================================================
 
 select tests.set_actor('bb000000-0000-0000-0000-000000000003');
