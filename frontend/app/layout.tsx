@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import type { ReactNode } from "react";
+import { Analytics } from "@vercel/analytics/next";
 
 import { Providers } from "@/components/providers";
 import { PwaRegister } from "@/components/pwa-register";
@@ -69,6 +70,7 @@ export default function RootLayout({
         <Providers>{children}</Providers>
         <Toaster />
         <PwaRegister />
+        <Analytics />
       </body>
     </html>
   );
