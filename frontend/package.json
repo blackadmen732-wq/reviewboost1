@@ -15,7 +15,7 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "api:generate": "openapi-typescript contracts/customer-flow.openapi.yaml -o lib/api/generated/customer-flow.ts",
+    "api:generate": "openapi-typescript ../openapi/customer-flow.openapi.yaml -o lib/api/generated/customer-flow.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:a11y": "vitest run tests/accessibility",
