@@ -81,10 +81,13 @@ export default async function CustomersPage() {
                 {/* Tags rather than sentences: this is a scannable row, and an
                     owner is comparing across it, not reading it. */}
                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  {/* Deliberately no per-visit "named someone" tag: pairing that
+                      with the rating on this same row would recreate the exact
+                      rating-to-praise correlation the product refuses to expose.
+                      "Named staff" only appears as an org-wide total above. */}
                   {visit.leftNote ? <Tag icon={MessageSquare}>Wrote a message</Tag> : null}
                   {visit.clickedGoogle ? <Tag icon={ExternalLink}>Went to Google</Tag> : null}
-                  {visit.praisedSomeone ? <Tag icon={Sparkles}>Named someone</Tag> : null}
-                  {!visit.leftNote && !visit.clickedGoogle && !visit.praisedSomeone ? (
+                  {!visit.leftNote && !visit.clickedGoogle ? (
                     <span className="text-sm text-muted">Rated and left</span>
                   ) : null}
                   {visit.standLabel ? (

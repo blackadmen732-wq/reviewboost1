@@ -753,7 +753,6 @@ export interface CustomerVisit {
   submittedAt: string;
   leftNote: boolean;
   clickedGoogle: boolean;
-  praisedSomeone: boolean;
   standLabel: string | null;
 }
 
@@ -775,6 +774,14 @@ export interface CustomerVisit {
  * carrying `org_id`, and relationship inference over composite keys is exactly
  * the kind of thing that resolves in development and returns an ambiguity error
  * in production. Two indexed lookups over at most 50 ids is a rounding error.
+ *
+ * There is deliberately no per-visit praise flag here. `rpc_response_has_praise`
+ * used to answer "did this specific rated response also produce praise?" — but
+ * returning that alongside `rating` on the same row is exactly the rating-to-
+ * praise correlation the rating-blind boundary exists to prevent, so the RPC was
+ * dropped and this join with it. `getVisitSummary` below still reports an
+ * aggregate "Named staff" count across the whole org, which carries no link
+ * back to any individual rating.
  */
 export async function listVisits(
   orgId: string,
@@ -803,21 +810,16 @@ export async function listVisits(
   const rows = data ?? [];
   const ids = rows.map((row) => row.id as string);
 
-  const [clicksResult, praiseResult, stands] = await Promise.all([
+  const [clicksResult, stands] = await Promise.all([
     ids.length > 0
       ? supabase.from("google_review_clicks").select("response_id").eq("org_id", orgId).in("response_id", ids)
-      : Promise.resolve({ data: [] as Array<{ response_id: string }>, error: null }),
-    ids.length > 0
-      ? supabase.rpc("rpc_response_has_praise", { p_org_id: orgId, p_response_ids: ids })
       : Promise.resolve({ data: [] as Array<{ response_id: string }>, error: null }),
     listStands(orgId),
   ]);
 
   if (clicksResult.error) dataFailure("list_visits.clicks", clicksResult.error);
-  if (praiseResult.error) dataFailure("list_visits.praise", praiseResult.error);
 
   const clicked = new Set((clicksResult.data ?? []).map((row) => row.response_id as string));
-  const praised = new Set((praiseResult.data ?? []).map((row: { response_id: string }) => row.response_id));
   const standLabels = new Map(stands.map((stand) => [stand.standId, stand.label]));
 
   return paginate(
@@ -832,7 +834,6 @@ export async function listVisits(
       // data that should not leave the feedback screen anyway.
       leftNote: row.note_encrypted !== null,
       clickedGoogle: clicked.has(row.id as string),
-      praisedSomeone: praised.has(row.id as string),
       standLabel: standLabels.get(row.stand_id as string) ?? null,
     }),
     "submitted_at",
