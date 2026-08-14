@@ -118,12 +118,15 @@ export async function PATCH(
     }
 
     if (resultStatus === null) {
-      const { data: current } = await context.db
+      const { data: current, error: statusError } = await context.db
         .from("praise_safe_view")
         .select("status")
         .eq("id", praiseId)
         .eq("org_id", context.orgId)
         .maybeSingle();
+      if (statusError) {
+        throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
+      }
       resultStatus = (current?.status as string) ?? "unmatched";
     }
 
