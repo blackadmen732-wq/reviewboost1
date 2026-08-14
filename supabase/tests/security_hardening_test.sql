@@ -95,25 +95,21 @@ select throws_ok(
     'key_version column cannot be updated directly');
 
 -- ============================================================
--- 3. STAFF MEMBERS — allowed columns still work
+-- 3. STAFF MEMBERS — direct UPDATE fully revoked, RPC works
 -- ============================================================
 
-select lives_ok(
+select throws_ok(
     $$ update public.staff_members
        set name_encrypted = 'v1:updated-name'
        where id = 'f3000000-0000-0000-0000-00000000000a' $$,
-    'owner can update staff name_encrypted');
+    '42501', null,
+    'direct UPDATE on staff_members is denied');
 
 select lives_ok(
-    $$ update public.staff_members
-       set is_active = false
-       where id = 'f3000000-0000-0000-0000-00000000000a' $$,
-    'owner can deactivate staff');
-
--- Re-activate for later tests
-select tests.set_service();
-update public.staff_members set is_active = true where id = 'f3000000-0000-0000-0000-00000000000a';
-select tests.set_actor('bb000000-0000-0000-0000-000000000001');
+    $$ select public.rpc_update_staff(
+        'f3000000-0000-0000-0000-00000000000a',
+        'v1:updated-name', null, null, false) $$,
+    'owner can update staff via RPC');
 
 -- ============================================================
 -- 4. STAFF RPC — creates staff successfully

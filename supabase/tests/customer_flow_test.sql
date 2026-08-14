@@ -342,12 +342,10 @@ select throws_ok(
     '42501', null,
     'tenant A cannot insert into tenant B');
 
-select results_eq(
-    $$ with attempt as (
-         update public.locations set name = 'Hijacked'
-          where org_id = 'b0000000-0000-0000-0000-00000000000b' returning 1)
-       select count(*)::int from attempt $$,
-    $$ values (0) $$,
+select throws_ok(
+    $$ update public.locations set name = 'Hijacked'
+       where org_id = 'b0000000-0000-0000-0000-00000000000b' $$,
+    '42501', null,
     'tenant A cannot update tenant B''s locations');
 
 select throws_ok(
