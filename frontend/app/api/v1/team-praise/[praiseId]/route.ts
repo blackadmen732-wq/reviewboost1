@@ -101,9 +101,13 @@ export async function PATCH(
       const { error } = await context.db.rpc(rpcName, {
         p_praise_id: praiseId,
       });
-      if (error && !error.message?.includes("not_found_or_forbidden")) {
+      if (error) {
+        if (error.message?.includes("not_found_or_forbidden")) {
+          throw new ApiError(404, ERROR_CODE.notFound, "We could not find that praise.");
+        }
         throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
       }
+      resultStatus = body.shared ? "shared" : "unmatched";
     }
 
     if (body.archived !== undefined) {
@@ -111,7 +115,10 @@ export async function PATCH(
       const { error } = await context.db.rpc(rpcName, {
         p_praise_id: praiseId,
       });
-      if (error && !error.message?.includes("not_found_or_forbidden")) {
+      if (error) {
+        if (error.message?.includes("not_found_or_forbidden")) {
+          throw new ApiError(404, ERROR_CODE.notFound, "We could not find that praise.");
+        }
         throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
       }
       resultStatus = body.archived ? "archived" : "unmatched";
