@@ -650,14 +650,16 @@ select throws_ok(
     'the roster cannot be truncated away');
 
 select lives_ok(
-    $$ update public.staff_members set is_active = false
-        where id = 'a6000000-0000-0000-0000-00000000000a' $$,
+    $$ select public.rpc_update_staff(
+        'a6000000-0000-0000-0000-00000000000a',
+        null, null, false, false) $$,
     'a member can mark somebody as having left');
 
 -- Re-activate for the matching tests
 select lives_ok(
-    $$ update public.staff_members set is_active = true
-        where id = 'a6000000-0000-0000-0000-00000000000a' $$,
+    $$ select public.rpc_update_staff(
+        'a6000000-0000-0000-0000-00000000000a',
+        null, null, true, false) $$,
     'a member who left can come back');
 
 -- ---- matching ----
