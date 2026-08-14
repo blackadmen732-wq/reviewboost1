@@ -11,7 +11,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(68);
+select plan(69);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -748,9 +748,9 @@ select results_eq(
     $$ select count(*)::integer
        from information_schema.role_usage_grants
        where object_schema = 'app'
-         and grantee in ('anon', 'authenticated', 'public') $$,
+         and grantee in ('anon', 'public') $$,
     array[0],
-    'app schema has no USAGE for public, anon, or authenticated');
+    'app schema has no USAGE for public or anon');
 
 -- ============================================================
 -- 52. APP SCHEMA — no EXECUTE for public/anon/authenticated
@@ -760,9 +760,17 @@ select results_eq(
     $$ select count(*)::integer
        from information_schema.role_routine_grants
        where specific_schema = 'app'
-         and grantee in ('anon', 'authenticated', 'public') $$,
+         and grantee in ('anon', 'public') $$,
     array[0],
-    'app schema functions have no EXECUTE for public, anon, or authenticated');
+    'app schema functions have no EXECUTE for public or anon');
+
+select results_eq(
+    $$ select count(*)::integer
+       from information_schema.role_routine_grants
+       where specific_schema = 'app'
+         and grantee = 'authenticated' $$,
+    array[3],
+    'only 3 app functions are callable by authenticated (RLS helpers)');
 
 -- ============================================================
 -- 53. REVIEW STANDS — direct UPDATE denied
