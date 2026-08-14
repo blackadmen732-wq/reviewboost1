@@ -11,7 +11,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(24);
+select plan(47);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -44,23 +44,30 @@ values
     ('bb000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'h-outsider@test.com', '', now(), now());
 
 insert into public.organizations (id, name, slug)
-values ('a1000000-da0d-e570-0000-00000000000a', 'Hardening Test Org', 'hardening-test');
+values
+    ('a1000000-da0d-e570-0000-00000000000a', 'Hardening Test Org', 'hardening-test'),
+    ('a1000000-da0d-e570-0000-00000000000b', 'Second Org', 'second-org');
 
 insert into public.organization_members (id, org_id, user_id, role, status)
 values
     ('c1000000-0000-0000-0000-000000000001', 'a1000000-da0d-e570-0000-00000000000a', 'bb000000-0000-0000-0000-000000000001', 'owner', 'active'),
     ('c1000000-0000-0000-0000-000000000002', 'a1000000-da0d-e570-0000-00000000000a', 'bb000000-0000-0000-0000-000000000002', 'admin', 'active'),
-    ('c1000000-0000-0000-0000-000000000003', 'a1000000-da0d-e570-0000-00000000000a', 'bb000000-0000-0000-0000-000000000003', 'member', 'active');
+    ('c1000000-0000-0000-0000-000000000003', 'a1000000-da0d-e570-0000-00000000000a', 'bb000000-0000-0000-0000-000000000003', 'member', 'active'),
+    ('c1000000-0000-0000-0000-000000000010', 'a1000000-da0d-e570-0000-00000000000b', 'bb000000-0000-0000-0000-000000000001', 'owner', 'active');
 
 insert into public.locations (id, org_id, name, google_review_url)
-values ('d1000000-0000-0000-0000-00000000000a', 'a1000000-da0d-e570-0000-00000000000a', 'Hardening Location', 'https://g.page/r/hardening/review');
+values
+    ('d1000000-0000-0000-0000-00000000000a', 'a1000000-da0d-e570-0000-00000000000a', 'Hardening Location', 'https://g.page/r/hardening/review'),
+    ('d1000000-0000-0000-0000-00000000000b', 'a1000000-da0d-e570-0000-00000000000b', 'Second Location', 'https://g.page/r/second/review');
 
 insert into public.review_stands (id, org_id, location_id, public_token_hash, public_token_prefix)
 values ('e1000000-0000-0000-0000-00000000000a', 'a1000000-da0d-e570-0000-00000000000a', 'd1000000-0000-0000-0000-00000000000a', 'hash-hard-test', 'hardpfx1');
 
--- Staff member for FK tests
+-- Staff members for FK tests
 insert into public.staff_members (id, org_id, name_encrypted)
-values ('f3000000-0000-0000-0000-00000000000a', 'a1000000-da0d-e570-0000-00000000000a', 'v1:enc-hard-staff');
+values
+    ('f3000000-0000-0000-0000-00000000000a', 'a1000000-da0d-e570-0000-00000000000a', 'v1:enc-hard-staff'),
+    ('f3000000-0000-0000-0000-00000000000b', 'a1000000-da0d-e570-0000-00000000000b', 'v1:enc-second-staff');
 
 insert into public.public_review_sessions (id, org_id, location_id, stand_id, session_token_hash, locale, expires_at)
 values ('e2000000-0000-0000-0000-00000000000a', 'a1000000-da0d-e570-0000-00000000000a', 'd1000000-0000-0000-0000-00000000000a', 'e1000000-0000-0000-0000-00000000000a', 'hard-session-hash', 'en', now() + interval '1 hour');
@@ -359,6 +366,263 @@ select throws_ok(
        where id = 'c1000000-0000-0000-0000-000000000003' $$,
     '42501', null,
     'cannot swap membership user_id');
+
+-- ============================================================
+-- 19. MULTI-ORG — owner updates only the requested org
+-- ============================================================
+
+-- bb..001 owns both orgs. Update second org, verify first is untouched.
+select tests.set_actor('bb000000-0000-0000-0000-000000000001');
+
+select lives_ok(
+    $$ select public.rpc_update_organization(
+        'a1000000-da0d-e570-0000-00000000000b',
+        'Renamed Second Org',
+        null) $$,
+    'multi-org owner updates only the targeted org');
+
+select results_eq(
+    $$ select name from public.organizations
+       where id = 'a1000000-da0d-e570-0000-00000000000a' $$,
+    array['Hardening Test Org'],
+    'first org name is untouched after updating second org');
+
+-- ============================================================
+-- 20. CROSS-TENANT — outsider cannot update org
+-- ============================================================
+
+select tests.set_actor('bb000000-0000-0000-0000-000000000004');
+
+select throws_ok(
+    $$ select public.rpc_update_organization(
+        'a1000000-da0d-e570-0000-00000000000a',
+        'Hacked Org', null) $$,
+    'P0001', null,
+    'outsider cannot update another org');
+
+-- ============================================================
+-- 21. CROSS-TENANT — outsider cannot update location
+-- ============================================================
+
+select throws_ok(
+    $$ select public.rpc_update_location(
+        'd1000000-0000-0000-0000-00000000000a',
+        'Hacked Location', null, false) $$,
+    'P0001', null,
+    'outsider cannot update another org location');
+
+-- ============================================================
+-- 22. CROSS-TENANT — outsider cannot update staff
+-- ============================================================
+
+select throws_ok(
+    $$ select public.rpc_update_staff(
+        'f3000000-0000-0000-0000-00000000000a',
+        'v1:hacked-staff', null, null, false) $$,
+    'P0001', null,
+    'outsider cannot update another org staff');
+
+-- ============================================================
+-- 23. MEMBER — cannot update org settings
+-- ============================================================
+
+select tests.set_actor('bb000000-0000-0000-0000-000000000003');
+
+select throws_ok(
+    $$ select public.rpc_update_organization(
+        'a1000000-da0d-e570-0000-00000000000a',
+        'Member Rename', null) $$,
+    'P0001', null,
+    'member cannot update org settings');
+
+-- ============================================================
+-- 24b. MEMBER — cannot update staff
+-- ============================================================
+
+select throws_ok(
+    $$ select public.rpc_update_staff(
+        'f3000000-0000-0000-0000-00000000000a',
+        'v1:member-edit', null, null, false) $$,
+    'P0001', null,
+    'member cannot update staff');
+
+-- ============================================================
+-- 25. OWNER — can update org settings
+-- ============================================================
+
+select tests.set_actor('bb000000-0000-0000-0000-000000000001');
+
+select lives_ok(
+    $$ select public.rpc_update_organization(
+        'a1000000-da0d-e570-0000-00000000000a',
+        'Owner Renamed Org', null) $$,
+    'owner can update org settings');
+
+-- ============================================================
+-- 26. ADMIN — can update staff
+-- ============================================================
+
+select tests.set_actor('bb000000-0000-0000-0000-000000000002');
+
+select lives_ok(
+    $$ select public.rpc_update_staff(
+        'f3000000-0000-0000-0000-00000000000a',
+        'v1:admin-updated', null, null, false) $$,
+    'admin can update staff');
+
+-- ============================================================
+-- 27. OWNER — can update location
+-- ============================================================
+
+select tests.set_actor('bb000000-0000-0000-0000-000000000001');
+
+select lives_ok(
+    $$ select public.rpc_update_location(
+        'd1000000-0000-0000-0000-00000000000a',
+        'Owner Renamed Location', null, false) $$,
+    'owner can update location');
+
+-- ============================================================
+-- 28. VALIDATION — invalid timezone rejected
+-- ============================================================
+
+select throws_ok(
+    $$ select public.rpc_update_organization(
+        'a1000000-da0d-e570-0000-00000000000a',
+        null, 'Not/A/Timezone') $$,
+    'P0001', null,
+    'invalid timezone is rejected at DB layer');
+
+-- ============================================================
+-- 29. VALIDATION — empty org name rejected
+-- ============================================================
+
+select throws_ok(
+    $$ select public.rpc_update_organization(
+        'a1000000-da0d-e570-0000-00000000000a',
+        '', null) $$,
+    'P0001', null,
+    'empty org name is rejected at DB layer');
+
+-- ============================================================
+-- 30. VALIDATION — oversized org name rejected
+-- ============================================================
+
+select throws_ok(
+    $$ select public.rpc_update_organization(
+        'a1000000-da0d-e570-0000-00000000000a',
+        repeat('x', 161), null) $$,
+    'P0001', null,
+    'oversized org name is rejected at DB layer');
+
+-- ============================================================
+-- 31. VALIDATION — invalid Google URL rejected
+-- ============================================================
+
+select throws_ok(
+    $$ select public.rpc_update_location(
+        'd1000000-0000-0000-0000-00000000000a',
+        null, 'https://evil.example.com/phishing', false) $$,
+    'P0001', null,
+    'invalid Google review URL is rejected at DB layer');
+
+-- ============================================================
+-- 32. VALIDATION — http:// Google URL rejected
+-- ============================================================
+
+select throws_ok(
+    $$ select public.rpc_update_location(
+        'd1000000-0000-0000-0000-00000000000a',
+        null, 'http://g.page/r/test/review', false) $$,
+    'P0001', null,
+    'non-https Google review URL is rejected');
+
+-- ============================================================
+-- 33. IDEMPOTENT — repeated org update creates no duplicate audit
+-- ============================================================
+
+-- First, set org to a known state
+select tests.set_service();
+update public.organizations set name = 'Idempotent Test', timezone = 'UTC'
+where id = 'a1000000-da0d-e570-0000-00000000000a';
+delete from public.audit_events
+where org_id = 'a1000000-da0d-e570-0000-00000000000a'
+  and action = 'organization.updated';
+select tests.set_actor('bb000000-0000-0000-0000-000000000001');
+
+-- First call: changes name, should create audit event
+select lives_ok(
+    $$ select public.rpc_update_organization(
+        'a1000000-da0d-e570-0000-00000000000a',
+        'Changed Name', null) $$,
+    'org update with real change succeeds');
+
+-- Second call: same values, should NOT create another audit event
+select lives_ok(
+    $$ select public.rpc_update_organization(
+        'a1000000-da0d-e570-0000-00000000000a',
+        'Changed Name', null) $$,
+    'repeated identical org update succeeds silently');
+
+select results_eq(
+    $$ select count(*)::integer from public.audit_events
+       where org_id = 'a1000000-da0d-e570-0000-00000000000a'
+         and action = 'organization.updated' $$,
+    array[1],
+    'repeated identical org update created exactly one audit event');
+
+-- ============================================================
+-- 34. IDEMPOTENT — repeated staff update creates no duplicate audit
+-- ============================================================
+
+select tests.set_service();
+delete from public.audit_events
+where org_id = 'a1000000-da0d-e570-0000-00000000000a'
+  and action = 'staff.updated'
+  and target_id = 'f3000000-0000-0000-0000-00000000000a';
+select tests.set_actor('bb000000-0000-0000-0000-000000000001');
+
+select lives_ok(
+    $$ select public.rpc_update_staff(
+        'f3000000-0000-0000-0000-00000000000a',
+        'v1:idempotent-name', null, true, false) $$,
+    'staff update with real change succeeds');
+
+select lives_ok(
+    $$ select public.rpc_update_staff(
+        'f3000000-0000-0000-0000-00000000000a',
+        'v1:idempotent-name', null, true, false) $$,
+    'repeated identical staff update succeeds silently');
+
+select results_eq(
+    $$ select count(*)::integer from public.audit_events
+       where org_id = 'a1000000-da0d-e570-0000-00000000000a'
+         and action = 'staff.updated'
+         and target_id = 'f3000000-0000-0000-0000-00000000000a' $$,
+    array[1],
+    'repeated identical staff update created exactly one audit event');
+
+-- ============================================================
+-- 35. DIRECT TABLE UPDATE — organizations still denied
+-- ============================================================
+
+select throws_ok(
+    $$ update public.organizations
+       set name = 'Direct Attack'
+       where id = 'a1000000-da0d-e570-0000-00000000000a' $$,
+    '42501', null,
+    'direct UPDATE on organizations is denied');
+
+-- ============================================================
+-- 36. DIRECT TABLE UPDATE — locations still denied
+-- ============================================================
+
+select throws_ok(
+    $$ update public.locations
+       set name = 'Direct Attack'
+       where id = 'd1000000-0000-0000-0000-00000000000a' $$,
+    '42501', null,
+    'direct UPDATE on locations is denied');
 
 -- ============================================================
 
