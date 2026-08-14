@@ -47,25 +47,19 @@ export async function PATCH(
 
     const body = parseOrThrow(updateSchema, await readJsonBody(request));
 
-    const changes: Record<string, string | boolean | null> = {};
-    if (body.name !== undefined) changes.name_encrypted = encrypt(body.name);
-    if (body.roleLabel !== undefined) changes.role_label = body.roleLabel === "" ? null : body.roleLabel;
-    if (body.isActive !== undefined) changes.is_active = body.isActive;
-
-    const { data, error } = await context.db
-      .from("staff_members")
-      .update(changes)
-      .eq("id", staffId)
-      .eq("org_id", context.orgId)
-      .select("id")
-      .maybeSingle();
+    const { error } = await context.db.rpc("rpc_update_staff", {
+      p_staff_id: staffId,
+      ...(body.name !== undefined && { p_name_encrypted: encrypt(body.name) }),
+      ...(body.roleLabel !== undefined && body.roleLabel !== "" && { p_role_label: body.roleLabel }),
+      ...(body.roleLabel === "" && { p_clear_role_label: true }),
+      ...(body.isActive !== undefined && { p_is_active: body.isActive }),
+    });
 
     if (error) {
+      if (error.message?.includes("not_found_or_forbidden")) {
+        throw new ApiError(404, ERROR_CODE.notFound, "We could not find that person.");
+      }
       throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
-    }
-
-    if (!data) {
-      throw new ApiError(404, ERROR_CODE.notFound, "We could not find that person.");
     }
 
     return json(request, requestId, 200, { data: { staffId }, requestId });
