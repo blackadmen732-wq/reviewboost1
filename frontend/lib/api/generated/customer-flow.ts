@@ -11,7 +11,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Resolve one active public review link without exposing tenant data */
+        /**
+         * Resolve one active review link without exposing tenant data
+         * @description Read-only. Records no scan, so a link preview, a crawler, or a page refresh cannot inflate a business's numbers — the scan is recorded when a session is created.
+         *
+         *     Unknown, paused, retired, and not-yet-configured stands return an identical 404. Distinguishing them would confirm to anyone holding a guessed token that it was once real.
+         */
         get: operations["getCustomerReviewContext"];
         put?: never;
         post?: never;
@@ -30,7 +35,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start an anonymous customer session */
+        /**
+         * Start an anonymous session and record one logical scan
+         * @description The returned `sessionId` is 256 bits of entropy, stored only as a keyed digest. It is a capability, not an identity: it says this browser is partway through the flow at this stand, and nothing about who the customer is.
+         */
         post: operations["createCustomerReviewSession"];
         delete?: never;
         options?: never;
@@ -47,7 +55,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Persist an honest rating and optional private note */
+        /**
+         * Persist an honest rating and an optional private note
+         * @description Every rating from one to five is stored and handled identically. The note is optional for all five and is encrypted at rest. One response per session.
+         *
+         *     The request schema is strict: a phone number, email address, marketing consent flag, or tenant identifier is rejected, not ignored.
+         */
         post: operations["submitCustomerResponse"];
         delete?: never;
         options?: never;
@@ -64,7 +77,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record that the public Google action was selected, not that a review was posted */
+        /**
+         * Record that the Google action was selected
+         * @description Records the selection and nothing more. It does not mean a review was written, submitted, or published, or that a rating changed on Google — ReviewBoost cannot observe any of that, and no metric built on it may imply otherwise.
+         *
+         *     Never redirects: the client owns the navigation, so a tracking failure can never stand between a customer and the public review page. Deduplicated per response, so 204 is returned on a first record and on a replay alike.
+         */
         post: operations["recordGoogleReviewClick"];
         delete?: never;
         options?: never;
@@ -81,7 +99,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Persist private praise without rating data or automatic staff matching */
+        /**
+         * Persist private praise, with no rating data and no auto-matching
+         * @description Stored unmatched, with the name and note encrypted at rest. ReviewBoost never guesses which colleague the customer meant: matching is a human decision made later, with the rating deliberately out of view.
+         *
+         *     The response carries only the new id. `team_praise_records` has no rating column at all, so the barrier holds in the schema rather than in a query someone must remember to trim. Accepted after every rating, including a one — praise and a complaint are not mutually exclusive.
+         */
         post: operations["submitTeamPraise"];
         delete?: never;
         options?: never;
@@ -95,10 +118,14 @@ export interface components {
     schemas: {
         /** @enum {string} */
         Locale: "en" | "es" | "ht";
+        /** @description Contains no organization id, location id, stand id, or subscription state. A caller who learned the tenant could write unlimited fabricated feedback into it. */
         CustomerReviewContext: {
             business: {
                 name: string;
-                /** Format: uri */
+                /**
+                 * Format: uri
+                 * @description Always null until the owner dashboard exists.
+                 */
                 logoUrl: string | null;
             };
             location: {
@@ -106,7 +133,7 @@ export interface components {
             };
             /**
              * Format: uri
-             * @description Backend-validated HTTPS Google review destination
+             * @description Validated server-side against an allowlist of Google hosts, and re-validated by the client. A stand whose destination does not validate cannot serve the flow and returns review_link_inactive.
              */
             googleReviewUrl: string;
             supportedLocales: components["schemas"]["Locale"][];
@@ -120,7 +147,9 @@ export interface components {
         };
         SubmitResponseRequest: {
             sessionId: string;
+            /** @description Stored exactly as chosen. Nothing downstream branches on it. */
             rating: number;
+            /** @description Optional for every rating, including four and five. Encrypted at rest. */
             note?: string;
         };
         SubmitResponseResponse: {
@@ -133,9 +162,11 @@ export interface components {
         TeamPraiseRequest: {
             sessionId: string;
             responseId: string;
+            /** @description Unicode, stored as written. Never transliterated. */
             firstName: string;
             note?: string;
         };
+        /** @description Carries only the id. No rating, stars, Google state, bonus, payroll, phone, email, or marketing field is ever serialised here. */
         TeamPraiseResponse: {
             teamPraiseId: string;
         };
@@ -145,7 +176,11 @@ export interface components {
         };
         ErrorResponse: {
             error: {
-                code: string;
+                /**
+                 * @description Stable and machine-readable. Clients branch on this and never on the message, so wording can change without breaking anyone.
+                 * @enum {string}
+                 */
+                code: "validation_failed" | "review_link_inactive" | "session_invalid" | "session_expired" | "response_conflict" | "idempotency_conflict" | "idempotency_in_progress" | "rate_limited" | "request_timeout" | "internal_error" | "service_unavailable";
                 message: string;
                 details?: components["schemas"]["FieldError"][];
             };
@@ -153,8 +188,86 @@ export interface components {
         };
     };
     responses: {
-        /** @description Unknown and inactive tokens deliberately share this response */
+        /** @description Unknown, paused, retired, and not-yet-configured stands deliberately share this exact response — status, code, and message. */
         InactiveReviewLink: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": {
+                 *         "code": "review_link_inactive",
+                 *         "message": "This review link is not active."
+                 *       },
+                 *       "requestId": "6f9619ff-8b86-d011-b42d-00c04fc964ff"
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Malformed input, or a field the endpoint does not accept. */
+        ValidationFailed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": {
+                 *         "code": "validation_failed",
+                 *         "message": "The request could not be accepted.",
+                 *         "details": [
+                 *           {
+                 *             "field": "rating",
+                 *             "message": "Invalid input: expected number, received string"
+                 *           }
+                 *         ]
+                 *       },
+                 *       "requestId": "6f9619ff-8b86-d011-b42d-00c04fc964ff"
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description The session, response, and stand do not all agree. */
+        SessionInvalid: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": {
+                 *         "code": "session_invalid",
+                 *         "message": "This session is no longer available."
+                 *       },
+                 *       "requestId": "6f9619ff-8b86-d011-b42d-00c04fc964ff"
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description The session outlived its 24-hour window. The customer should scan again. */
+        SessionExpired: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": {
+                 *         "code": "session_expired",
+                 *         "message": "This session has expired. Please scan the code again."
+                 *       },
+                 *       "requestId": "6f9619ff-8b86-d011-b42d-00c04fc964ff"
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description That session already has a response, or that response already has praise. */
+        ResponseConflict: {
             headers: {
                 [name: string]: unknown;
             };
@@ -162,8 +275,46 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description Recoverable or blocking API error */
-        ApiError: {
+        /** @description The same key was reused with a different body. Never answered with the stored result: that would silently discard what the customer submitted. */
+        IdempotencyConflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": {
+                 *         "code": "idempotency_conflict",
+                 *         "message": "This request was already made with different data. Use a new request key."
+                 *       },
+                 *       "requestId": "6f9619ff-8b86-d011-b42d-00c04fc964ff"
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description A per-stand or per-device budget was exhausted. */
+        RateLimited: {
+            headers: {
+                /** @description Seconds until the window resets. */
+                "Retry-After"?: number;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Opaque by design. Stack traces, SQL text, Supabase messages, table names, and secrets never cross the wire; the request id is the link to the server-side log. */
+        InternalError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description A dependency is temporarily unavailable. */
+        ServiceUnavailable: {
             headers: {
                 [name: string]: unknown;
             };
@@ -173,11 +324,20 @@ export interface components {
         };
     };
     parameters: {
+        /** @description The stand's public token. At least 256 bits of entropy, stored only as a keyed digest, and never sequential — it is the sole thing authorising a write into a business's data, so guessability is the whole security argument. */
         ReviewToken: string;
+        /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response, praise record, or scan. The client must reuse the same key across an offline retry. */
         IdempotencyKey: string;
+        /** @description Echoed back, so a trace survives the hop. */
+        RequestId: string;
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description Present on every response, success or failure. */
+        RequestId: string;
+        /** @description Per-customer and never shared. */
+        NoStore: "no-store";
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -185,8 +345,12 @@ export interface operations {
     getCustomerReviewContext: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Echoed back, so a trace survives the hop. */
+                "X-Request-Id"?: components["parameters"]["RequestId"];
+            };
             path: {
+                /** @description The stand's public token. At least 256 bits of entropy, stored only as a keyed digest, and never sequential — it is the sole thing authorising a write into a business's data, so guessability is the whole security argument. */
                 token: components["parameters"]["ReviewToken"];
             };
             cookie?: never;
@@ -196,23 +360,32 @@ export interface operations {
             /** @description Active review context */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    "Cache-Control": components["headers"]["NoStore"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerReviewContext"];
                 };
             };
+            400: components["responses"]["ValidationFailed"];
             404: components["responses"]["InactiveReviewLink"];
-            default: components["responses"]["ApiError"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     createCustomerReviewSession: {
         parameters: {
             query?: never;
             header: {
+                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response, praise record, or scan. The client must reuse the same key across an offline retry. */
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Echoed back, so a trace survives the hop. */
+                "X-Request-Id"?: components["parameters"]["RequestId"];
             };
             path: {
+                /** @description The stand's public token. At least 256 bits of entropy, stored only as a keyed digest, and never sequential — it is the sole thing authorising a write into a business's data, so guessability is the whole security argument. */
                 token: components["parameters"]["ReviewToken"];
             };
             cookie?: never;
@@ -223,35 +396,45 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Existing idempotent session result */
+            /** @description Idempotent replay. Nothing was created on this call. */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["CreateSessionResponse"];
                 };
             };
-            /** @description Session persisted */
+            /** @description Session created */
             201: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["CreateSessionResponse"];
                 };
             };
+            400: components["responses"]["ValidationFailed"];
             404: components["responses"]["InactiveReviewLink"];
-            default: components["responses"]["ApiError"];
+            409: components["responses"]["IdempotencyConflict"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     submitCustomerResponse: {
         parameters: {
             query?: never;
             header: {
+                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response, praise record, or scan. The client must reuse the same key across an offline retry. */
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Echoed back, so a trace survives the hop. */
+                "X-Request-Id"?: components["parameters"]["RequestId"];
             };
             path: {
+                /** @description The stand's public token. At least 256 bits of entropy, stored only as a keyed digest, and never sequential — it is the sole thing authorising a write into a business's data, so guessability is the whole security argument. */
                 token: components["parameters"]["ReviewToken"];
             };
             cookie?: never;
@@ -262,35 +445,46 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Existing idempotent response result */
+            /** @description Idempotent replay. Nothing was created on this call. */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["SubmitResponseResponse"];
                 };
             };
-            /** @description Response persisted; this is terminal */
+            /** @description Response persisted. This is terminal. */
             201: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["SubmitResponseResponse"];
                 };
             };
-            404: components["responses"]["InactiveReviewLink"];
-            default: components["responses"]["ApiError"];
+            400: components["responses"]["ValidationFailed"];
+            404: components["responses"]["SessionInvalid"];
+            409: components["responses"]["ResponseConflict"];
+            410: components["responses"]["SessionExpired"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     recordGoogleReviewClick: {
         parameters: {
             query?: never;
             header: {
+                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response, praise record, or scan. The client must reuse the same key across an offline retry. */
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Echoed back, so a trace survives the hop. */
+                "X-Request-Id"?: components["parameters"]["RequestId"];
             };
             path: {
+                /** @description The stand's public token. At least 256 bits of entropy, stored only as a keyed digest, and never sequential — it is the sole thing authorising a write into a business's data, so guessability is the whole security argument. */
                 token: components["parameters"]["ReviewToken"];
             };
             cookie?: never;
@@ -301,24 +495,33 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Click recorded */
+            /** @description Selection recorded */
             204: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            404: components["responses"]["InactiveReviewLink"];
-            default: components["responses"]["ApiError"];
+            400: components["responses"]["ValidationFailed"];
+            404: components["responses"]["SessionInvalid"];
+            409: components["responses"]["IdempotencyConflict"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     submitTeamPraise: {
         parameters: {
             query?: never;
             header: {
+                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response, praise record, or scan. The client must reuse the same key across an offline retry. */
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Echoed back, so a trace survives the hop. */
+                "X-Request-Id"?: components["parameters"]["RequestId"];
             };
             path: {
+                /** @description The stand's public token. At least 256 bits of entropy, stored only as a keyed digest, and never sequential — it is the sole thing authorising a write into a business's data, so guessability is the whole security argument. */
                 token: components["parameters"]["ReviewToken"];
             };
             cookie?: never;
@@ -329,26 +532,32 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Existing idempotent Team Praise result */
+            /** @description Idempotent replay. Nothing was created on this call. */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TeamPraiseResponse"];
                 };
             };
-            /** @description Team Praise persisted */
+            /** @description Praise persisted */
             201: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TeamPraiseResponse"];
                 };
             };
-            404: components["responses"]["InactiveReviewLink"];
-            default: components["responses"]["ApiError"];
+            400: components["responses"]["ValidationFailed"];
+            404: components["responses"]["SessionInvalid"];
+            409: components["responses"]["ResponseConflict"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
 }
