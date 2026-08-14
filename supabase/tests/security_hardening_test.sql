@@ -785,7 +785,7 @@ select throws_ok(
 
 select throws_ok(
     $$ update public.review_stands
-       set status = 'inactive'
+       set status = 'paused'
        where id = 'e1000000-0000-0000-0000-00000000000a' $$,
     '42501', null,
     'direct UPDATE on review_stands status is denied');
