@@ -13,7 +13,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(33);
+select plan(36);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -287,6 +287,23 @@ select is_empty(
 select is_empty(
     $$ select id from public.team_praise_records $$,
     'outsider sees no team praise (RLS filters all rows)');
+
+-- response_id is excluded from column-level grants
+select throws_ok(
+    $$ select response_id from public.team_praise_records $$,
+    '42501', null,
+    'response_id cannot be selected (excluded from column grants)');
+
+-- table-wide SELECT is revoked; only named safe columns work
+select throws_ok(
+    $$ select * from public.team_praise_records $$,
+    '42501', null,
+    'SELECT * on team_praise_records is denied (table-wide SELECT revoked)');
+
+-- safe columns return zero rows for outsider (not an error)
+select is_empty(
+    $$ select id, org_id, status, first_name_encrypted from public.team_praise_records $$,
+    'outsider can select safe columns but RLS returns zero rows');
 
 select is_empty(
     $$ select id from public.locations $$,

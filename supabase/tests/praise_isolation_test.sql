@@ -15,7 +15,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(22);
+select plan(26);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -258,6 +258,39 @@ select throws_ok(
         'cf200000-0000-0000-0000-00000000000a') $$,
     'P0001', null,
     'Org B cannot match Org A praise');
+
+-- ============================================================
+-- 13. ANONYMOUS DENIAL — anon cannot access praise
+-- ============================================================
+
+select set_config('role', 'anon', true);
+select set_config('request.jwt.claims', '', true);
+
+select throws_ok(
+    $$ select id from public.praise_safe_view $$,
+    '42501', null,
+    'anon role cannot select from praise_safe_view');
+
+select throws_ok(
+    $$ select id from public.team_praise_records $$,
+    '42501', null,
+    'anon role cannot select from team_praise_records');
+
+-- ============================================================
+-- 14. FORBIDDEN COLUMN — response_id blocked for authenticated
+-- ============================================================
+
+select tests.set_actor('cc000000-0000-0000-0000-000000000001');
+
+select throws_ok(
+    $$ select response_id from public.team_praise_records $$,
+    '42501', null,
+    'authenticated cannot select response_id (column grant excluded)');
+
+select throws_ok(
+    $$ select * from public.team_praise_records $$,
+    '42501', null,
+    'authenticated cannot SELECT * (table-wide SELECT revoked)');
 
 -- ============================================================
 
