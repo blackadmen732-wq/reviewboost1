@@ -80,31 +80,21 @@ export async function PATCH(request: NextRequest): Promise<Response> {
       );
     }
 
-    const organizationChanges: Record<string, string> = {};
-    if (body.businessName !== undefined) organizationChanges.name = body.businessName;
-    if (body.timezone !== undefined) organizationChanges.timezone = body.timezone;
-
-    if (Object.keys(organizationChanges).length > 0) {
-      const { error } = await context.db
-        .from("organizations")
-        .update(organizationChanges)
-        .eq("id", context.orgId);
+    if (body.businessName !== undefined || body.timezone !== undefined) {
+      const { error } = await context.db.rpc("rpc_update_organization", {
+        ...(body.businessName !== undefined && { p_name: body.businessName }),
+        ...(body.timezone !== undefined && { p_timezone: body.timezone }),
+      });
 
       if (error) {
+        if (error.message?.includes("not_found_or_forbidden")) {
+          throw new ApiError(403, ERROR_CODE.forbidden, "Only the owner can change these settings.");
+        }
         throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
       }
     }
 
-    const locationChanges: Record<string, string | null> = {};
-    if (body.locationName !== undefined) locationChanges.name = body.locationName;
-    if (body.googleReviewUrl !== undefined) {
-      locationChanges.google_review_url = body.googleReviewUrl === "" ? null : body.googleReviewUrl;
-    }
-
-    if (Object.keys(locationChanges).length > 0) {
-      // Targets the primary location explicitly. An unfiltered update would
-      // rewrite every location in the organization the moment a second one
-      // exists — the kind of bug that only appears after the product succeeds.
+    if (body.locationName !== undefined || body.googleReviewUrl !== undefined) {
       const { data: location, error: locationLookupError } = await context.db
         .from("locations")
         .select("id")
@@ -121,12 +111,17 @@ export async function PATCH(request: NextRequest): Promise<Response> {
         throw new ApiError(404, ERROR_CODE.notFound, "You do not have a place set up yet.");
       }
 
-      const { error } = await context.db
-        .from("locations")
-        .update(locationChanges)
-        .eq("id", location.id);
+      const { error } = await context.db.rpc("rpc_update_location", {
+        p_location_id: location.id,
+        ...(body.locationName !== undefined && { p_name: body.locationName }),
+        ...(body.googleReviewUrl !== undefined && body.googleReviewUrl !== "" && { p_google_review_url: body.googleReviewUrl }),
+        ...(body.googleReviewUrl === "" && { p_clear_google_url: true }),
+      });
 
       if (error) {
+        if (error.message?.includes("not_found_or_forbidden")) {
+          throw new ApiError(403, ERROR_CODE.forbidden, "Only the owner can change these settings.");
+        }
         throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
       }
     }
