@@ -1,0 +1,413 @@
+@import "tailwindcss";
+/* Supplies the data-[state] enter/exit utilities Radix drives. Without it the
+   dialog and sheet classes are inert and panels pop instead of moving. */
+@import "tw-animate-css";
+
+@theme inline {
+  --color-canvas: var(--rb-canvas);
+  --color-surface: var(--rb-surface);
+  --color-quiet: var(--rb-quiet);
+  --color-ink: var(--rb-ink);
+  --color-muted: var(--rb-muted);
+  --color-border: var(--rb-border);
+  --color-brand: var(--rb-brand);
+  --color-brand-hover: var(--rb-brand-hover);
+  --color-brand-active: var(--rb-brand-active);
+  --color-brand-soft: var(--rb-brand-soft);
+  --color-brand-text: var(--rb-brand-text);
+  --color-on-brand: var(--rb-on-brand);
+  --color-star: var(--rb-star);
+  --color-danger: var(--rb-danger);
+  --color-info: var(--rb-info);
+  --font-sans: var(--font-geist-sans);
+}
+
+:root {
+  color-scheme: light dark;
+  --rb-canvas: #f8f5f0;
+  --rb-surface: #ffffff;
+  --rb-quiet: #f2efe9;
+  --rb-ink: #1a1712;
+  --rb-muted: #5c5349;
+  --rb-border: #e8e1d7;
+  --rb-border-strong: #cfc5b6;
+  --rb-brand: #00a86b;
+  --rb-brand-hover: #009a61;
+  --rb-brand-active: #008f5b;
+  --rb-brand-soft: #e5f6ef;
+  /* Brand green as *text* is only 2.83:1 on cream. This darker green is
+     4.96:1, so links and inline emphasis stay readable. */
+  --rb-brand-text: #007a4d;
+  /* Dark ink on brand green is 6.13:1. White would be 3.08:1 — large text
+     only — so primary buttons never use white labels. */
+  --rb-on-brand: #0d2118;
+  /* Deliberately deeper than the #F2A900 in the brand sheet. That gold is
+     2.01:1 on white — below the 3:1 floor for a meaningful graphic — and the
+     star rating is the single most important thing on the screen, read on a
+     phone in daylight. This is 3.42:1 on white, 3.14:1 on cream, and still
+     unmistakably gold. Unfilled stars stay outline-only, so filled versus
+     unfilled is a shape difference and never colour alone. */
+  --rb-star: #bf7d00;
+  --rb-warning: #9a6417;
+  --rb-danger: #b33a3a;
+  --rb-danger-soft: #faeaea;
+  --rb-info: #356d8c;
+  --rb-focus-soft: rgb(0 168 107 / 28%);
+  --radius-control: 14px;
+  --radius-card: 20px;
+  --shadow-control: 0 1px 2px rgb(38 32 24 / 4%);
+  --shadow-button:
+    0 2px 0 rgb(0 74 47 / 22%), 0 8px 18px -10px rgb(0 168 107 / 70%);
+  --shadow-button-hover:
+    0 2px 0 rgb(0 62 39 / 26%), 0 12px 24px -12px rgb(0 168 107 / 76%);
+  --shadow-card:
+    0 1px 2px rgb(38 32 24 / 3%), 0 18px 50px -28px rgb(38 32 24 / 20%);
+  --shadow-float: 0 -12px 36px -28px rgb(38 32 24 / 28%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --rb-canvas: #14120f;
+    --rb-surface: #1c1915;
+    --rb-quiet: #262119;
+    --rb-ink: #f7f4ee;
+    --rb-muted: #b5aea2;
+    --rb-border: #332e26;
+    --rb-border-strong: #4f483c;
+    --rb-brand: #00a86b;
+    --rb-brand-hover: #17c07f;
+    --rb-brand-active: #21cf8c;
+    --rb-brand-soft: #123b2c;
+    --rb-brand-text: #4fd69b;
+    --rb-on-brand: #06231a;
+    --rb-star: #f7b928;
+    --rb-danger: #f08a8a;
+    --rb-danger-soft: #452323;
+    --rb-info: #8bc2df;
+    --rb-focus-soft: rgb(0 168 107 / 34%);
+    --shadow-control: 0 1px 2px rgb(0 0 0 / 24%);
+    --shadow-button:
+      0 2px 0 rgb(0 0 0 / 32%), 0 10px 22px -12px rgb(0 168 107 / 66%);
+    --shadow-button-hover:
+      0 2px 0 rgb(0 0 0 / 38%), 0 14px 28px -14px rgb(0 168 107 / 72%);
+    --shadow-card:
+      0 1px 2px rgb(0 0 0 / 30%), 0 24px 64px -30px rgb(0 0 0 / 85%);
+    --shadow-float: 0 -12px 36px -26px rgb(0 0 0 / 85%);
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --rb-canvas: #f8f5f0;
+  --rb-surface: #fff;
+  --rb-quiet: #f2efe9;
+  --rb-ink: #111;
+  --rb-muted: #555;
+  --rb-border: #e8e1d7;
+  --rb-border-strong: #cfc5b6;
+  --rb-brand: #00a86b;
+  --rb-brand-hover: #009a61;
+  --rb-brand-active: #008f5b;
+  --rb-brand-soft: #e5f6ef;
+  /* Brand green as *text* is only 2.83:1 on cream. This darker green is
+     4.96:1, so links and inline emphasis stay readable. */
+  --rb-brand-text: #007a4d;
+  /* Dark ink on brand green is 6.13:1. White would be 3.08:1 — large text
+     only — so primary buttons never use white labels. */
+  --rb-on-brand: #0d2118;
+  /* Deliberately deeper than the #F2A900 in the brand sheet. That gold is
+     2.01:1 on white — below the 3:1 floor for a meaningful graphic — and the
+     star rating is the single most important thing on the screen, read on a
+     phone in daylight. This is 3.42:1 on white, 3.14:1 on cream, and still
+     unmistakably gold. Unfilled stars stay outline-only, so filled versus
+     unfilled is a shape difference and never colour alone. */
+  --rb-star: #bf7d00;
+  --rb-danger: #b33a3a;
+  --rb-danger-soft: #faeaea;
+  --rb-info: #356d8c;
+  --rb-focus-soft: rgb(0 168 107 / 28%);
+}
+:root[data-theme="dark"],
+.dark {
+  color-scheme: dark;
+  --rb-canvas: #14120f;
+  --rb-surface: #1c1915;
+  --rb-quiet: #262119;
+  --rb-ink: #f7f4ee;
+  --rb-muted: #b5aea2;
+  --rb-border: #332e26;
+  --rb-border-strong: #4f483c;
+  --rb-brand: #00a86b;
+  --rb-brand-hover: #17c07f;
+  --rb-brand-active: #21cf8c;
+  --rb-brand-soft: #123b2c;
+  --rb-brand-text: #4fd69b;
+  --rb-on-brand: #06231a;
+  --rb-star: #f7b928;
+  --rb-danger: #f08a8a;
+  --rb-danger-soft: #452323;
+  --rb-info: #8bc2df;
+  --rb-focus-soft: rgb(0 168 107 / 34%);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  min-width: 320px;
+  background: var(--rb-canvas);
+  font-family:
+    var(--font-geist-sans),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-padding-block-end: 120px;
+}
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  background: var(--rb-canvas);
+  color: var(--rb-ink);
+}
+button,
+input,
+select,
+textarea {
+  color: inherit;
+  font: inherit;
+}
+button,
+a,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+a {
+  color: inherit;
+}
+::selection {
+  background: var(--rb-brand-soft);
+  color: var(--rb-ink);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.inline-notice {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+  border: 1px solid var(--rb-border);
+  border-radius: var(--radius-control);
+  padding: 14px 16px;
+  background: var(--rb-quiet);
+  color: var(--rb-ink);
+  text-align: start;
+}
+.inline-notice--error {
+  border-color: color-mix(in srgb, var(--rb-danger) 42%, var(--rb-border));
+  background: var(--rb-danger-soft);
+}
+.inline-notice--error > svg {
+  color: var(--rb-danger);
+}
+.inline-notice--offline > svg,
+.inline-notice--info > svg {
+  color: var(--rb-info);
+}
+.inline-notice__title,
+.inline-notice__body,
+.inline-notice__body p {
+  margin: 0;
+}
+.inline-notice__title {
+  margin-block-end: 2px;
+  font-weight: 650;
+}
+.inline-notice__body {
+  color: var(--rb-ink);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+.skeleton {
+  display: block;
+  border-radius: 9px;
+  background: linear-gradient(
+    90deg,
+    var(--rb-quiet) 0%,
+    color-mix(in srgb, var(--rb-quiet) 72%, var(--rb-border)) 50%,
+    var(--rb-quiet) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.45s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+@media (forced-colors: active) {
+  :root {
+    --rb-brand: ButtonText;
+    --rb-brand-hover: Highlight;
+    --rb-brand-soft: Canvas;
+    --rb-star: Highlight;
+  }
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    forced-color-adjust: auto;
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   Native feel
+   --------------------------------------------------------------------------
+   The details that decide whether a web app in a phone shell reads as an app or
+   as a website someone bookmarked. Each one is a thing people notice only when
+   it is missing.
+   -------------------------------------------------------------------------- */
+
+html {
+  /* Stops iOS enlarging text when a phone is rotated, which otherwise breaks
+     every carefully-sized heading in landscape. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+
+  /* Reserves the scrollbar's width on desktop whether or not it is showing, so
+     navigating from a short screen to a long one does not shift the whole
+     layout sideways by 15px. Ignored on phones, where scrollbars are overlays. */
+  scrollbar-gutter: stable;
+}
+
+body {
+  /* The grey flash on every tap is the single loudest "this is a web page"
+     signal on iOS. Focus rings still work; this only removes the flash. */
+  -webkit-tap-highlight-color: transparent;
+  /* Keeps the page from rubber-banding past its edges inside a shell, where
+     the white gutter behind it looks like a rendering fault. */
+  overscroll-behavior-y: none;
+}
+
+/* Long-press on a button or a nav item should not offer "Copy" and "Look Up".
+   Real text stays selectable. */
+button,
+[role="button"],
+a,
+nav,
+label {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+/* Mobile browsers wait ~300ms after a tap to see whether a second one is
+   coming, so it can be a double-tap zoom. On every control in this product that
+   wait is pure latency: the whole interface is already sized for a thumb and
+   nothing here benefits from zooming.
+
+   Removing it is the difference between a button that responds and one that
+   feels a beat behind — the most common reason a well-built web app still reads
+   as "not quite an app". Applied to controls only, so pinch-zoom on content
+   stays available to anyone who needs it. */
+button,
+[role="button"],
+a,
+label,
+summary,
+input[type="checkbox"],
+input[type="radio"] {
+  touch-action: manipulation;
+}
+
+/* Dragging a QR code out of the page as a ghost image is a desktop-browser
+   behaviour that looks like a glitch on a screen someone is holding up to a
+   customer. */
+img {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+input,
+textarea,
+p,
+h1, h2, h3,
+[data-selectable] {
+  user-select: text;
+}
+
+/* Installed and native shells report standalone. Safe-area padding is applied
+   only there — in a normal browser tab the chrome already handles it, and
+   double padding leaves an obvious gap. */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* iOS zooms the whole page when a field smaller than 16px is focused, and
+   never zooms back out. Every input is at least 16px for that reason alone. */
+input,
+select,
+textarea {
+  font-size: max(1rem, 16px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* Screen entrance. Short enough to feel instant, long enough to register that
+   one screen replaced another — which is the difference between an app and a
+   set of linked documents. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-page-enter {
+  animation: page-enter 180ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}

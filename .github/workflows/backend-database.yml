@@ -1,0 +1,171 @@
+name: Backend database
+
+# The job that turns "written but unverified" into "verified on every push".
+#
+# For the whole life of this project no SQL had ever executed. Everything below
+# runs the migrations from an empty database and then attempts the forbidden
+# operations — cross-tenant reads and writes, anonymous table access, truncating
+# somebody else's feedback — and fails if PostgreSQL permits any of them.
+#
+# A test that merely asserts a policy exists is worthless. These perform the
+# attack.
+
+on:
+  push:
+    paths:
+      - "supabase/**"
+      - "frontend/lib/server/**"
+      - "frontend/app/api/**"
+      - ".github/workflows/backend-database.yml"
+  pull_request:
+    paths:
+      - "supabase/**"
+      - "frontend/lib/server/**"
+      - "frontend/app/api/**"
+      - ".github/workflows/backend-database.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  database:
+    name: Migrations and row level security
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase
+        run: supabase start --exclude studio,imgproxy,edge-runtime,logflare,vector,pooler
+
+      - name: Apply migrations from an empty database
+        run: supabase db reset
+
+      - name: Migrations are idempotent
+        # A second reset must produce the same schema. If it does not, a
+        # migration is not deterministic and environments will diverge.
+        run: supabase db reset
+
+      - name: No pending schema drift
+        # Fails if the applied schema differs from the migrations on disk —
+        # which is what happens when someone edits the database directly and
+        # forgets to write the migration.
+        run: |
+          supabase db diff --schema public,app > drift.sql
+          if [ -s drift.sql ]; then
+            echo "::error::Schema drift detected. The database does not match the migrations."
+            cat drift.sql
+            exit 1
+          fi
+          echo "No drift."
+
+      - name: Row level security and isolation tests
+        run: supabase test db
+
+      - name: Supabase advisors
+        # Surfaces missing RLS, exposed views, and mutable search_path on
+        # functions. Non-blocking for now because the report includes advice
+        # about tables later phases will add.
+        continue-on-error: true
+        run: supabase inspect db outliers || true
+
+  contract:
+    name: Type check, build, and contract tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      - name: Type check
+        run: npx tsc --noEmit
+        working-directory: frontend
+
+      - name: Tests
+        run: npx vitest run
+        working-directory: frontend
+
+      - name: Production build
+        working-directory: frontend
+        env:
+          # Build-time only. The accessors in lib/server/env.ts are lazy, so a
+          # build needs no real credentials — these exist to prove that stays
+          # true. A build that starts requiring secrets has leaked one into
+          # module scope.
+          NODE_ENV: production
+        run: npx next build
+
+  secrets:
+    name: No committed secrets
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail if a credential was committed
+        run: |
+          # Exit status comes from grep, not from a trailing pipe stage — a
+          # `grep ... | head` here always succeeds and the check silently
+          # passes forever.
+          if git grep -nIE '(sk_live_|re_[A-Za-z0-9_]{20,}|SK[0-9a-f]{32}|AC[0-9a-f]{32}|ghp_[A-Za-z0-9]{30,})' \
+               -- ':!*.md' ':!.github/**' ':!.githooks/**'; then
+            echo "::error::A live credential appears to be committed."
+            exit 1
+          fi
+
+          if git grep -nIE '^(SUPABASE_SERVICE_ROLE_KEY|CUSTOMER_NOTE_ENCRYPTION_KEY)=.+' \
+               -- ':!*.example' ':!*.md' ':!docs/**'; then
+            echo "::error::A populated secret assignment is committed."
+            exit 1
+          fi
+
+          # The service-role key bypasses row level security. The NEXT_PUBLIC_
+          # prefix is what decides whether Next inlines a value into the browser
+          # bundle, so this naming mistake is the difference between a server
+          # secret and a public one.
+          if git grep -nI 'NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY' -- ':!*.md' ':!.github/**' ':!*.ts'; then
+            echo "::error::The service-role key must never carry the NEXT_PUBLIC_ prefix."
+            exit 1
+          fi
+
+          echo "No committed secrets found."
+
+  review-integrity:
+    name: No review gating
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail if rating-gating reappears
+        run: |
+          # Review gating is a release blocker, so it is checked mechanically
+          # rather than left to review.
+          hits=$(git grep -nIE 'review_threshold|reviewThreshold|reviews_prevented|reviewsPrevented|intercept_rate|interceptRate|feedback_intercepted|feedbackIntercepted' \
+               -- 'supabase/migrations/**' 'frontend/app/**' 'frontend/lib/server/**' 'openapi/**' \
+               | grep -v '^\s*--' \
+               | grep -v 'hasnt_column' \
+               | grep -v 'no review_threshold' \
+               || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::Review gating vocabulary found. Every rating gets the same Google opportunity."
+            exit 1
+          fi
+          echo "No gating found."

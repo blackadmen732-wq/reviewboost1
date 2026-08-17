@@ -1,0 +1,517 @@
+openapi: 3.1.0
+info:
+  title: ReviewBoost public customer API
+  version: 1.0.0
+  description: >-
+    The five anonymous endpoints the customer review page calls. Backend-owned
+    and authoritative: `frontend/contracts/customer-flow.openapi.yaml` was the
+    frontend's statement of what it needed, and this document is the backend's
+    answer. They agree on every shape; this one additionally records the error
+    codes, the idempotency semantics, and the review-integrity guarantee.
+
+
+    REVIEW INTEGRITY — binding, and a release blocker
+
+
+    Every rating from one to five receives the same neutral Google review
+    opportunity. `googleReviewUrl` is returned by the context endpoint, which
+    runs before any rating exists and is never re-fetched with one, so the
+    opportunity structurally cannot vary by rating. The private note and Team
+    Praise are additive: extra things a customer may do, never a substitute for
+    the public review. There is no rating threshold, no rating-dependent action,
+    and no metric describing a review as prevented or intercepted.
+servers:
+  - url: /
+    description: Same origin as the customer page. No CORS preflight occurs.
+
+tags:
+  - name: public
+    description: Anonymous. Authorised solely by the stand token in the path.
+
+paths:
+  /api/v1/public/q/{token}:
+    get:
+      operationId: getCustomerReviewContext
+      tags: [public]
+      summary: Resolve one active review link without exposing tenant data
+      description: >-
+        Read-only. Records no scan, so a link preview, a crawler, or a page
+        refresh cannot inflate a business's numbers — the scan is recorded when
+        a session is created.
+
+
+        Unknown, paused, retired, and not-yet-configured stands return an
+        identical 404. Distinguishing them would confirm to anyone holding a
+        guessed token that it was once real.
+      parameters:
+        - $ref: "#/components/parameters/ReviewToken"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: Active review context
+          headers:
+            X-Request-Id: { $ref: "#/components/headers/RequestId" }
+            Cache-Control: { $ref: "#/components/headers/NoStore" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerReviewContext" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "404": { $ref: "#/components/responses/InactiveReviewLink" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /api/v1/public/q/{token}/sessions:
+    post:
+      operationId: createCustomerReviewSession
+      tags: [public]
+      summary: Start an anonymous session and record one logical scan
+      description: >-
+        The returned `sessionId` is 256 bits of entropy, stored only as a keyed
+        digest. It is a capability, not an identity: it says this browser is
+        partway through the flow at this stand, and nothing about who the
+        customer is.
+      parameters:
+        - $ref: "#/components/parameters/ReviewToken"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSessionRequest" }
+      responses:
+        "200":
+          description: Idempotent replay. Nothing was created on this call.
+          headers:
+            X-Request-Id: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateSessionResponse" }
+        "201":
+          description: Session created
+          headers:
+            X-Request-Id: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateSessionResponse" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "404": { $ref: "#/components/responses/InactiveReviewLink" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /api/v1/public/q/{token}/responses:
+    post:
+      operationId: submitCustomerResponse
+      tags: [public]
+      summary: Persist an honest rating and an optional private note
+      description: >-
+        Every rating from one to five is stored and handled identically. The
+        note is optional for all five and is encrypted at rest. One response per
+        session.
+
+
+        The request schema is strict: a phone number, email address, marketing
+        consent flag, or tenant identifier is rejected, not ignored.
+      parameters:
+        - $ref: "#/components/parameters/ReviewToken"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitResponseRequest" }
+      responses:
+        "200":
+          description: Idempotent replay. Nothing was created on this call.
+          headers:
+            X-Request-Id: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmitResponseResponse" }
+        "201":
+          description: Response persisted. This is terminal.
+          headers:
+            X-Request-Id: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmitResponseResponse" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "404": { $ref: "#/components/responses/SessionInvalid" }
+        "409": { $ref: "#/components/responses/ResponseConflict" }
+        "410": { $ref: "#/components/responses/SessionExpired" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /api/v1/public/q/{token}/google-click:
+    post:
+      operationId: recordGoogleReviewClick
+      tags: [public]
+      summary: Record that the Google action was selected
+      description: >-
+        Records the selection and nothing more. It does not mean a review was
+        written, submitted, or published, or that a rating changed on Google —
+        ReviewBoost cannot observe any of that, and no metric built on it may
+        imply otherwise.
+
+
+        Never redirects: the client owns the navigation, so a tracking failure
+        can never stand between a customer and the public review page.
+        Deduplicated per response, so 204 is returned on a first record and on a
+        replay alike.
+      parameters:
+        - $ref: "#/components/parameters/ReviewToken"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GoogleClickRequest" }
+      responses:
+        "204":
+          description: Selection recorded
+          headers:
+            X-Request-Id: { $ref: "#/components/headers/RequestId" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "404": { $ref: "#/components/responses/SessionInvalid" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /api/v1/public/q/{token}/team-praise:
+    post:
+      operationId: submitTeamPraise
+      tags: [public]
+      summary: Persist private praise, with no rating data and no auto-matching
+      description: >-
+        Stored unmatched, with the name and note encrypted at rest. ReviewBoost
+        never guesses which colleague the customer meant: matching is a human
+        decision made later, with the rating deliberately out of view.
+
+
+        The response carries only the new id. `team_praise_records` has no
+        rating column at all, so the barrier holds in the schema rather than in
+        a query someone must remember to trim. Accepted after every rating,
+        including a one — praise and a complaint are not mutually exclusive.
+      parameters:
+        - $ref: "#/components/parameters/ReviewToken"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TeamPraiseRequest" }
+      responses:
+        "200":
+          description: Idempotent replay. Nothing was created on this call.
+          headers:
+            X-Request-Id: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TeamPraiseResponse" }
+        "201":
+          description: Praise persisted
+          headers:
+            X-Request-Id: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TeamPraiseResponse" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "404": { $ref: "#/components/responses/SessionInvalid" }
+        "409": { $ref: "#/components/responses/ResponseConflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+components:
+  parameters:
+    ReviewToken:
+      name: token
+      in: path
+      required: true
+      description: >-
+        The stand's public token. At least 256 bits of entropy, stored only as a
+        keyed digest, and never sequential — it is the sole thing authorising a
+        write into a business's data, so guessability is the whole security
+        argument.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+        pattern: "^[A-Za-z0-9_-]+$"
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >-
+        Mandatory. The customer flow runs on a phone, so a request that times
+        out is the normal case, not the exceptional one — a retry without a key
+        would write a second response, praise record, or scan. The client must
+        reuse the same key across an offline retry.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+        pattern: "^[A-Za-z0-9._:-]+$"
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: Echoed back, so a trace survives the hop.
+      schema:
+        type: string
+        maxLength: 100
+        pattern: "^[A-Za-z0-9._-]+$"
+
+  headers:
+    RequestId:
+      description: Present on every response, success or failure.
+      schema: { type: string }
+    NoStore:
+      description: Per-customer and never shared.
+      schema: { type: string, const: "no-store" }
+
+  responses:
+    InactiveReviewLink:
+      description: >-
+        Unknown, paused, retired, and not-yet-configured stands deliberately
+        share this exact response — status, code, and message.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          example:
+            error:
+              code: review_link_inactive
+              message: This review link is not active.
+            requestId: 6f9619ff-8b86-d011-b42d-00c04fc964ff
+    ValidationFailed:
+      description: Malformed input, or a field the endpoint does not accept.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          example:
+            error:
+              code: validation_failed
+              message: The request could not be accepted.
+              details:
+                - field: rating
+                  message: "Invalid input: expected number, received string"
+            requestId: 6f9619ff-8b86-d011-b42d-00c04fc964ff
+    SessionInvalid:
+      description: The session, response, and stand do not all agree.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          example:
+            error: { code: session_invalid, message: This session is no longer available. }
+            requestId: 6f9619ff-8b86-d011-b42d-00c04fc964ff
+    SessionExpired:
+      description: The session outlived its 24-hour window. The customer should scan again.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          example:
+            error:
+              code: session_expired
+              message: This session has expired. Please scan the code again.
+            requestId: 6f9619ff-8b86-d011-b42d-00c04fc964ff
+    ResponseConflict:
+      description: That session already has a response, or that response already has praise.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    IdempotencyConflict:
+      description: >-
+        The same key was reused with a different body. Never answered with the
+        stored result: that would silently discard what the customer submitted.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          example:
+            error:
+              code: idempotency_conflict
+              message: This request was already made with different data. Use a new request key.
+            requestId: 6f9619ff-8b86-d011-b42d-00c04fc964ff
+    RateLimited:
+      description: A per-stand or per-device budget was exhausted.
+      headers:
+        Retry-After:
+          description: Seconds until the window resets.
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    InternalError:
+      description: >-
+        Opaque by design. Stack traces, SQL text, Supabase messages, table
+        names, and secrets never cross the wire; the request id is the link to
+        the server-side log.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    ServiceUnavailable:
+      description: A dependency is temporarily unavailable.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  schemas:
+    Locale:
+      type: string
+      enum: [en, es, ht]
+
+    CustomerReviewContext:
+      type: object
+      additionalProperties: false
+      required: [business, location, googleReviewUrl, supportedLocales, defaultLocale]
+      description: >-
+        Contains no organization id, location id, stand id, or subscription
+        state. A caller who learned the tenant could write unlimited fabricated
+        feedback into it.
+      properties:
+        business:
+          type: object
+          additionalProperties: false
+          required: [name, logoUrl]
+          properties:
+            name: { type: string, minLength: 1, maxLength: 160 }
+            logoUrl:
+              type: [string, "null"]
+              format: uri
+              description: Always null until the owner dashboard exists.
+        location:
+          type: object
+          additionalProperties: false
+          required: [name]
+          properties:
+            name: { type: [string, "null"], maxLength: 160 }
+        googleReviewUrl:
+          type: string
+          format: uri
+          description: >-
+            Validated server-side against an allowlist of Google hosts, and
+            re-validated by the client. A stand whose destination does not
+            validate cannot serve the flow and returns review_link_inactive.
+        supportedLocales:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/Locale" }
+        defaultLocale: { $ref: "#/components/schemas/Locale" }
+
+    CreateSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [locale]
+      properties:
+        locale: { $ref: "#/components/schemas/Locale" }
+
+    CreateSessionResponse:
+      type: object
+      additionalProperties: false
+      required: [sessionId]
+      properties:
+        sessionId: { type: string, minLength: 1, maxLength: 160 }
+
+    SubmitResponseRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId, rating]
+      properties:
+        sessionId: { type: string, minLength: 1, maxLength: 160 }
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Stored exactly as chosen. Nothing downstream branches on it.
+        note:
+          type: string
+          maxLength: 2000
+          description: Optional for every rating, including four and five. Encrypted at rest.
+
+    SubmitResponseResponse:
+      type: object
+      additionalProperties: false
+      required: [responseId]
+      properties:
+        responseId: { type: string, minLength: 1, maxLength: 160 }
+
+    GoogleClickRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId, responseId]
+      properties:
+        sessionId: { type: string }
+        responseId: { type: string }
+
+    TeamPraiseRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId, responseId, firstName]
+      properties:
+        sessionId: { type: string }
+        responseId: { type: string }
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Unicode, stored as written. Never transliterated.
+        note: { type: string, maxLength: 2000 }
+
+    TeamPraiseResponse:
+      type: object
+      additionalProperties: false
+      required: [teamPraiseId]
+      description: >-
+        Carries only the id. No rating, stars, Google state, bonus, payroll,
+        phone, email, or marketing field is ever serialised here.
+      properties:
+        teamPraiseId: { type: string, minLength: 1, maxLength: 160 }
+
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, message]
+      properties:
+        field: { type: string }
+        message: { type: string }
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error, requestId]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: >-
+                Stable and machine-readable. Clients branch on this and never on
+                the message, so wording can change without breaking anyone.
+              enum:
+                - validation_failed
+                - review_link_inactive
+                - session_invalid
+                - session_expired
+                - response_conflict
+                - idempotency_conflict
+                - idempotency_in_progress
+                - rate_limited
+                - request_timeout
+                - internal_error
+                - service_unavailable
+            message: { type: string }
+            details:
+              type: array
+              items: { $ref: "#/components/schemas/FieldError" }
+        requestId: { type: string }
