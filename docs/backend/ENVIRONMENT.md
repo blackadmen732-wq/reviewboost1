@@ -58,11 +58,12 @@ role key on startup. Copy them into `frontend/.env.local`.
    the new key. All public reads and writes accept both keys during rotation.
 6. Monitor: `SELECT count(*) FROM review_stands WHERE public_token_key_version < {new_version}`.
    When zero, all stands have migrated.
-7. Remove `TOKEN_DIGEST_KEY_PREVIOUS` and deploy again.
-
-Session and response tokens do not need previous-key fallback — they are created
-and stored under the current key, then matched by exact equality. They expire
-within 24 hours, so a rotation naturally drains them.
+7. Wait at least 24 hours after step 5 (the maximum session and response token
+   lifetime). Session and response tokens are stored as current-key digests but
+   recomputed on every subsequent request. During rotation, lookups try both
+   keys, but the previous key must remain available until every token created
+   under it has expired.
+8. Remove `TOKEN_DIGEST_KEY_PREVIOUS` and deploy again.
 
 ## Separation of Environments
 

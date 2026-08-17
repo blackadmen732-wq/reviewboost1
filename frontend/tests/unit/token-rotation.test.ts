@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 /**
- * Tests that every public write passes `p_previous_token_hash` to Supabase,
- * ensuring stand resolution works during TOKEN_DIGEST_KEY rotation.
+ * Tests that every public write passes previous-key digests to Supabase,
+ * ensuring stand, session, and response resolution works during
+ * TOKEN_DIGEST_KEY rotation.
  *
  * The tests mock crypto and Supabase at the module boundary — they verify the
  * service layer's wiring, not the database functions (those are tested by pgTAP).
@@ -13,7 +14,9 @@ vi.mock("server-only", () => ({}));
 const CURRENT_HASH = "current-stand-hash";
 const PREVIOUS_HASH = "previous-stand-hash";
 const SESSION_HASH = "session-hash";
+const PREVIOUS_SESSION_HASH = "previous-session-hash";
 const RESPONSE_HASH = "response-hash";
+const PREVIOUS_RESPONSE_HASH = "previous-response-hash";
 const IDEM_HASH = "idem-hash";
 const REQUEST_HASH = "req-hash";
 const CLIENT_HASH = "client-hash";
@@ -29,7 +32,9 @@ vi.mock("@/lib/server/crypto", () => ({
   digestStandToken: () => CURRENT_HASH,
   digestStandTokenWithPreviousKey: () => PREVIOUS_HASH,
   digestSessionToken: () => SESSION_HASH,
+  digestSessionTokenWithPreviousKey: () => PREVIOUS_SESSION_HASH,
   digestResponseToken: () => RESPONSE_HASH,
+  digestResponseTokenWithPreviousKey: () => PREVIOUS_RESPONSE_HASH,
   digestIdempotencyKey: () => IDEM_HASH,
   digestRequestBody: () => REQUEST_HASH,
   clientFingerprint: () => CLIENT_HASH,
@@ -109,7 +114,7 @@ vi.mock("node:crypto", async (importOriginal) => {
 
 const meta = { address: "127.0.0.1", userAgent: "test", requestId: "req-1" };
 
-describe("token rotation — previous hash forwarding", () => {
+describe("token rotation — previous stand hash forwarding", () => {
   beforeEach(() => {
     rpcCalls = [];
     rpcResult = [{ outcome: "created", response_status: 201, response_body_encrypted: ENCRYPTED }];
@@ -169,6 +174,55 @@ describe("token rotation — previous hash forwarding", () => {
   });
 });
 
+describe("token rotation — previous session/response hash forwarding", () => {
+  beforeEach(() => {
+    rpcCalls = [];
+    rpcResult = [{ outcome: "created", response_status: 201, response_body_encrypted: ENCRYPTED }];
+  });
+
+  it("submitResponse passes p_previous_session_token_hash", async () => {
+    const { submitResponse } = await import("@/lib/server/customer-flow-service");
+    await submitResponse(
+      "raw-token",
+      { sessionId: "s", rating: 5, idempotencyKey: "k10" },
+      meta,
+    );
+
+    const call = rpcCalls.find((c) => c.name === "rpc_public_submit_response");
+    expect(call).toBeDefined();
+    expect(call!.params.p_previous_session_token_hash).toBe(PREVIOUS_SESSION_HASH);
+  });
+
+  it("recordGoogleClick passes p_previous_session_token_hash and p_previous_response_token_hash", async () => {
+    rpcResult = [{ outcome: "created", response_status: 204, response_body_encrypted: null }];
+    const { recordGoogleClick } = await import("@/lib/server/customer-flow-service");
+    await recordGoogleClick(
+      "raw-token",
+      { sessionId: "s", responseId: "r", idempotencyKey: "k11" },
+      meta,
+    );
+
+    const call = rpcCalls.find((c) => c.name === "rpc_public_record_google_click");
+    expect(call).toBeDefined();
+    expect(call!.params.p_previous_session_token_hash).toBe(PREVIOUS_SESSION_HASH);
+    expect(call!.params.p_previous_response_token_hash).toBe(PREVIOUS_RESPONSE_HASH);
+  });
+
+  it("submitTeamPraise passes p_previous_session_token_hash and p_previous_response_token_hash", async () => {
+    const { submitTeamPraise } = await import("@/lib/server/customer-flow-service");
+    await submitTeamPraise(
+      "raw-token",
+      { sessionId: "s", responseId: "r", firstName: "Alice", idempotencyKey: "k12" },
+      meta,
+    );
+
+    const call = rpcCalls.find((c) => c.name === "rpc_public_submit_team_praise");
+    expect(call).toBeDefined();
+    expect(call!.params.p_previous_session_token_hash).toBe(PREVIOUS_SESSION_HASH);
+    expect(call!.params.p_previous_response_token_hash).toBe(PREVIOUS_RESPONSE_HASH);
+  });
+});
+
 describe("token rotation — null previous hash when no rotation", () => {
   beforeEach(() => {
     rpcCalls = [];
@@ -177,7 +231,9 @@ describe("token rotation — null previous hash when no rotation", () => {
 
   it("passes null when digestStandTokenWithPreviousKey returns null", async () => {
     const cryptoMock = await import("@/lib/server/crypto");
-    const spy = vi.spyOn(cryptoMock, "digestStandTokenWithPreviousKey" as never).mockReturnValue(null as never);
+    const standSpy = vi.spyOn(cryptoMock, "digestStandTokenWithPreviousKey" as never).mockReturnValue(null as never);
+    const sessSpy = vi.spyOn(cryptoMock, "digestSessionTokenWithPreviousKey" as never).mockReturnValue(null as never);
+    const respSpy = vi.spyOn(cryptoMock, "digestResponseTokenWithPreviousKey" as never).mockReturnValue(null as never);
 
     const { createSession } = await import("@/lib/server/customer-flow-service");
     await createSession("raw-token", { locale: "en", idempotencyKey: "k5" }, meta);
@@ -185,7 +241,30 @@ describe("token rotation — null previous hash when no rotation", () => {
     const call = rpcCalls.find((c) => c.name === "rpc_public_create_session");
     expect(call!.params.p_previous_token_hash).toBeNull();
 
-    spy.mockRestore();
+    standSpy.mockRestore();
+    sessSpy.mockRestore();
+    respSpy.mockRestore();
+  });
+
+  it("passes null session/response previous hashes when no rotation", async () => {
+    const cryptoMock = await import("@/lib/server/crypto");
+    const sessSpy = vi.spyOn(cryptoMock, "digestSessionTokenWithPreviousKey" as never).mockReturnValue(null as never);
+    const respSpy = vi.spyOn(cryptoMock, "digestResponseTokenWithPreviousKey" as never).mockReturnValue(null as never);
+
+    rpcResult = [{ outcome: "created", response_status: 204, response_body_encrypted: null }];
+    const { recordGoogleClick } = await import("@/lib/server/customer-flow-service");
+    await recordGoogleClick(
+      "raw-token",
+      { sessionId: "s", responseId: "r", idempotencyKey: "k13" },
+      meta,
+    );
+
+    const call = rpcCalls.find((c) => c.name === "rpc_public_record_google_click");
+    expect(call!.params.p_previous_session_token_hash).toBeNull();
+    expect(call!.params.p_previous_response_token_hash).toBeNull();
+
+    sessSpy.mockRestore();
+    respSpy.mockRestore();
   });
 });
 

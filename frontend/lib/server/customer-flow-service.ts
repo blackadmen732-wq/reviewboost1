@@ -15,7 +15,9 @@ import {
   digestIdempotencyKey,
   digestRequestBody,
   digestResponseToken,
+  digestResponseTokenWithPreviousKey,
   digestSessionToken,
+  digestSessionTokenWithPreviousKey,
   digestStandToken,
   digestStandTokenWithPreviousKey,
   encrypt,
@@ -419,6 +421,7 @@ export async function submitResponse(
     p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
     p_response_body_encrypted: encrypt(JSON.stringify(body)),
     p_previous_token_hash: digestStandTokenWithPreviousKey(token),
+    p_previous_session_token_hash: digestSessionTokenWithPreviousKey(input.sessionId),
   });
 
   if (error) fail("submit_response", error, meta.requestId);
@@ -466,6 +469,8 @@ export async function recordGoogleClick(
     p_response_token_hash: digestResponseToken(input.responseId),
     p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
     p_previous_token_hash: digestStandTokenWithPreviousKey(token),
+    p_previous_session_token_hash: digestSessionTokenWithPreviousKey(input.sessionId),
+    p_previous_response_token_hash: digestResponseTokenWithPreviousKey(input.responseId),
   });
 
   if (error) fail("google_click", error, meta.requestId);
@@ -539,6 +544,8 @@ export async function submitTeamPraise(
     p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
     p_response_body_encrypted: encrypt(JSON.stringify(body)),
     p_previous_token_hash: digestStandTokenWithPreviousKey(token),
+    p_previous_session_token_hash: digestSessionTokenWithPreviousKey(input.sessionId),
+    p_previous_response_token_hash: digestResponseTokenWithPreviousKey(input.responseId),
   });
 
   if (error) fail("team_praise", error, meta.requestId);

@@ -82,12 +82,23 @@ export function digestStandTokenWithPreviousKey(token: string): string | null {
   return previous === null ? null : keyedDigest(token, "stand_token", previous);
 }
 
-// Session and response tokens are created and stored under the current key,
-// then matched by exact equality — no recomputation, so no fallback needed.
+// Session and response tokens are stored as current-key digests, but looked up
+// on later requests by recomputing the digest. During rotation, the lookup must
+// try both keys because the stored hash may use either.
 export const digestSessionToken = (token: string) =>
   keyedDigest(token, "session_token", tokenDigestKey());
 export const digestResponseToken = (token: string) =>
   keyedDigest(token, "response_token", tokenDigestKey());
+
+export function digestSessionTokenWithPreviousKey(token: string): string | null {
+  const previous = previousTokenDigestKey();
+  return previous === null ? null : keyedDigest(token, "session_token", previous);
+}
+
+export function digestResponseTokenWithPreviousKey(token: string): string | null {
+  const previous = previousTokenDigestKey();
+  return previous === null ? null : keyedDigest(token, "response_token", previous);
+}
 
 export const digestIdempotencyKey = (key: string) => keyedDigest(key, "idempotency_key");
 export const digestRequestBody = (canonical: string) => keyedDigest(canonical, "idempotency_request");
