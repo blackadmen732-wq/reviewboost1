@@ -36,15 +36,15 @@ grant execute on all functions in schema tests to public;
 select tests.reset_role();
 
 insert into public.organizations (id, name, slug, status)
-values ('00000000-rot0-0000-0000-000000000001', 'Rotation Org', 'rotation-org', 'active');
+values ('00000000-a010-0000-0000-000000000001', 'Rotation Org', 'rotation-org', 'active');
 
 insert into public.locations (id, org_id, name, google_review_url, status)
-values ('00000000-rot0-0000-0000-000000000002', '00000000-rot0-0000-0000-000000000001',
+values ('00000000-a010-0000-0000-000000000002', '00000000-a010-0000-0000-000000000001',
         'Rotation Location', 'https://g.page/r/rotation/review', 'active');
 
 insert into public.review_stands (id, org_id, location_id, public_token_hash, public_token_prefix, status, public_token_key_version)
-values ('00000000-rot0-0000-0000-000000000003', '00000000-rot0-0000-0000-000000000001',
-        '00000000-rot0-0000-0000-000000000002', 'rot-current-hash', 'rot0pfx1', 'active', 2);
+values ('00000000-a010-0000-0000-000000000003', '00000000-a010-0000-0000-000000000001',
+        '00000000-a010-0000-0000-000000000002', 'rot-current-hash', 'a010pfx1', 'active', 2);
 
 -- ============================================================
 -- TASK 1: PRIVILEGE EXECUTION — service_role through full chain
@@ -80,7 +80,7 @@ select is(
 select is(
     (select outcome from public.rpc_public_submit_team_praise(
         'rot-current-hash', 'rot-idem-tp-1', 'rot-req-tp-1', 'rot-sess-hash-1',
-        'rot-resp-hash-1', '00000000-rot0-0000-0000-000000000099'::uuid,
+        'rot-resp-hash-1', '00000000-a010-0000-0000-000000000099'::uuid,
         'v1:enc-name', null, 1::smallint, 86400, null, null, null, null)),
     'created',
     'service_role executes rpc_public_submit_team_praise through the full chain');
@@ -109,10 +109,10 @@ select tests.reset_role();
 -- Create a session with old-key hash so we can look it up with previous fallback.
 insert into public.public_review_sessions
     (id, org_id, location_id, stand_id, session_token_hash, locale, expires_at)
-values ('00000000-rot0-0000-0000-000000000010',
-        '00000000-rot0-0000-0000-000000000001',
-        '00000000-rot0-0000-0000-000000000002',
-        '00000000-rot0-0000-0000-000000000003',
+values ('00000000-a010-0000-0000-000000000010',
+        '00000000-a010-0000-0000-000000000001',
+        '00000000-a010-0000-0000-000000000002',
+        '00000000-a010-0000-0000-000000000003',
         'old-key-sess-hash', 'en', now() + interval '1 hour');
 
 select tests.set_service_role();
@@ -137,19 +137,19 @@ select tests.reset_role();
 -- Create session and response with old-key hashes
 insert into public.public_review_sessions
     (id, org_id, location_id, stand_id, session_token_hash, locale, expires_at)
-values ('00000000-rot0-0000-0000-000000000011',
-        '00000000-rot0-0000-0000-000000000001',
-        '00000000-rot0-0000-0000-000000000002',
-        '00000000-rot0-0000-0000-000000000003',
+values ('00000000-a010-0000-0000-000000000011',
+        '00000000-a010-0000-0000-000000000001',
+        '00000000-a010-0000-0000-000000000002',
+        '00000000-a010-0000-0000-000000000003',
         'old-key-sess-hash-2', 'en', now() + interval '1 hour');
 
 insert into public.customer_responses
     (id, org_id, location_id, stand_id, session_id, response_token_hash, rating)
-values ('00000000-rot0-0000-0000-000000000012',
-        '00000000-rot0-0000-0000-000000000001',
-        '00000000-rot0-0000-0000-000000000002',
-        '00000000-rot0-0000-0000-000000000003',
-        '00000000-rot0-0000-0000-000000000011',
+values ('00000000-a010-0000-0000-000000000012',
+        '00000000-a010-0000-0000-000000000001',
+        '00000000-a010-0000-0000-000000000002',
+        '00000000-a010-0000-0000-000000000003',
+        '00000000-a010-0000-0000-000000000011',
         'old-key-resp-hash', 3);
 
 select tests.set_service_role();
@@ -170,7 +170,7 @@ select is(
     (select outcome from public.rpc_public_submit_team_praise(
         'rot-current-hash', 'rot-idem-tp-prev', 'rot-req-tp-prev',
         'new-key-sess-hash-2', 'new-key-resp-hash',
-        '00000000-rot0-0000-0000-000000000098'::uuid,
+        '00000000-a010-0000-0000-000000000098'::uuid,
         'v1:enc-prev-name', null, 1::smallint, 86400, null,
         null,
         'old-key-sess-hash-2',
@@ -191,10 +191,10 @@ select tests.reset_role();
 -- A second stand resolvable by either hash.
 insert into public.review_stands
     (id, org_id, location_id, public_token_hash, public_token_prefix, status, public_token_key_version)
-values ('00000000-rot0-0000-0000-000000000004',
-        '00000000-rot0-0000-0000-000000000001',
-        '00000000-rot0-0000-0000-000000000002',
-        'rot-new-hash-2', 'rot0pfx2', 'active', 2);
+values ('00000000-a010-0000-0000-000000000004',
+        '00000000-a010-0000-0000-000000000001',
+        '00000000-a010-0000-0000-000000000002',
+        'rot-new-hash-2', 'a010pfx2', 'active', 2);
 
 select tests.set_service_role();
 
@@ -211,7 +211,7 @@ select is(
 select tests.reset_role();
 update public.review_stands
    set public_token_hash = 'rot-upgraded-hash-2'
- where id = '00000000-rot0-0000-0000-000000000004';
+ where id = '00000000-a010-0000-0000-000000000004';
 select tests.set_service_role();
 
 -- 10. Retry with upgraded hash → same stand_id → replay
@@ -231,16 +231,16 @@ select tests.reset_role();
 -- A third stand for backward-compat testing.
 insert into public.review_stands
     (id, org_id, location_id, public_token_hash, public_token_prefix, status, public_token_key_version)
-values ('00000000-rot0-0000-0000-000000000005',
-        '00000000-rot0-0000-0000-000000000001',
-        '00000000-rot0-0000-0000-000000000002',
-        'rot-compat-hash', 'rot0pfx3', 'active', 1);
+values ('00000000-a010-0000-0000-000000000005',
+        '00000000-a010-0000-0000-000000000001',
+        '00000000-a010-0000-0000-000000000002',
+        'rot-compat-hash', 'a010pfx3', 'active', 1);
 
 -- Manually insert a completed idempotency record with old scope pattern (token hash).
 insert into public.idempotency_records
     (org_id, operation, scope_key, idempotency_key, request_hash, state, response_status,
      response_body_encrypted, completed_at, expires_at)
-values ('00000000-rot0-0000-0000-000000000001', 'session', 'rot-compat-hash',
+values ('00000000-a010-0000-0000-000000000001', 'session', 'rot-compat-hash',
         'rot-idem-compat', 'rot-req-compat', 'completed', 201::smallint,
         'v1:compat-body', now(), now() + interval '1 hour');
 
@@ -259,15 +259,15 @@ select tests.reset_role();
 
 insert into public.review_stands
     (id, org_id, location_id, public_token_hash, public_token_prefix, status, public_token_key_version)
-values ('00000000-rot0-0000-0000-000000000006',
-        '00000000-rot0-0000-0000-000000000001',
-        '00000000-rot0-0000-0000-000000000002',
-        'rot-conflict-hash', 'rot0pfx4', 'active', 1);
+values ('00000000-a010-0000-0000-000000000006',
+        '00000000-a010-0000-0000-000000000001',
+        '00000000-a010-0000-0000-000000000002',
+        'rot-conflict-hash', 'a010pfx4', 'active', 1);
 
 insert into public.idempotency_records
     (org_id, operation, scope_key, idempotency_key, request_hash, state, response_status,
      response_body_encrypted, completed_at, expires_at)
-values ('00000000-rot0-0000-0000-000000000001', 'session', 'rot-conflict-hash',
+values ('00000000-a010-0000-0000-000000000001', 'session', 'rot-conflict-hash',
         'rot-idem-conflict', 'rot-req-OLD', 'completed', 201::smallint,
         null, now(), now() + interval '1 hour');
 
@@ -296,10 +296,10 @@ select tests.reset_role();
 
 insert into public.review_stands
     (id, org_id, location_id, public_token_hash, public_token_prefix, status, public_token_key_version)
-values ('00000000-rot0-0000-0000-000000000007',
-        '00000000-rot0-0000-0000-000000000001',
-        '00000000-rot0-0000-0000-000000000002',
-        'lifecycle-old-hash', 'rot0pfx5', 'active', 1);
+values ('00000000-a010-0000-0000-000000000007',
+        '00000000-a010-0000-0000-000000000001',
+        '00000000-a010-0000-0000-000000000002',
+        'lifecycle-old-hash', 'a010pfx5', 'active', 1);
 
 select tests.set_service_role();
 
@@ -315,7 +315,7 @@ select is(
 select tests.reset_role();
 update public.review_stands
    set public_token_hash = 'lifecycle-new-hash', public_token_key_version = 2
- where id = '00000000-rot0-0000-0000-000000000007';
+ where id = '00000000-a010-0000-0000-000000000007';
 select tests.set_service_role();
 
 -- 14. Step 2: submit response after rotation — finds session via previous hash
@@ -345,7 +345,7 @@ select is(
     (select outcome from public.rpc_public_submit_team_praise(
         'lifecycle-new-hash', 'lifecycle-tp', 'lifecycle-req-tp',
         'lifecycle-sess-newkey', 'lifecycle-resp-newkey',
-        '00000000-rot0-0000-0000-000000000097'::uuid,
+        '00000000-a010-0000-0000-000000000097'::uuid,
         'v1:enc-lifecycle-name', null, 1::smallint, 86400, null,
         'lifecycle-old-hash',
         'lifecycle-sess',
@@ -366,7 +366,7 @@ select tests.reset_role();
 
 select results_eq(
     $$ select count(*)::integer from public.public_review_sessions
-       where stand_id = '00000000-rot0-0000-0000-000000000007' $$,
+       where stand_id = '00000000-a010-0000-0000-000000000007' $$,
     array[1],
     'lifecycle: exactly one session exists after retry');
 
