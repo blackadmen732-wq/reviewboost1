@@ -7,14 +7,14 @@
  * environments where the developer has the service role key.
  *
  *   SUPABASE_URL=https://xyz.supabase.co \
- *   SUPABASE_SERVICE_ROLE_KEY=... \
- *   CUSTOMER_NOTE_ENCRYPTION_KEY=... \
+ *   SUPABASE_SERVICE_ROLE_KEY="<service-role-key>" \
+ *   CUSTOMER_NOTE_ENCRYPTION_KEY="<base64-key>" \
  *   PUBLIC_FRONTEND_URL=https://preview.example.com \
- *     node scripts/backend/seed-stand-remote.mjs
+ *     node scripts/backend/seed-stand-remote.mjs --i-am-targeting-staging
  *
  *   # Or with an explicit digest key and location:
- *   TOKEN_DIGEST_KEY=... \
- *     node scripts/backend/seed-stand-remote.mjs --location <uuid>
+ *   TOKEN_DIGEST_KEY="<base64-key>" \
+ *     node scripts/backend/seed-stand-remote.mjs --i-am-targeting-staging --location <uuid>
  *
  * The token is printed once and is not recoverable from the database.
  */
@@ -31,6 +31,15 @@ if (env.NODE_ENV === "production") {
 
 if (env.VERCEL_ENV === "production") {
   console.error("Refused: this script must not run on a production Vercel deployment.");
+  exit(1);
+}
+
+if (!argv.includes("--i-am-targeting-staging")) {
+  console.error(
+    "Safety: pass --i-am-targeting-staging to confirm you are not pointing at production.\n" +
+      "The script decides the target from SUPABASE_URL alone, and NODE_ENV is often unset\n" +
+      "in a developer shell, so this flag is an explicit acknowledgement.",
+  );
   exit(1);
 }
 
