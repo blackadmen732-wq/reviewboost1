@@ -82,8 +82,8 @@ export function digestStandTokenWithPreviousKey(token: string): string | null {
   return previous === null ? null : keyedDigest(token, "stand_token", previous);
 }
 
-// Sessions and responses expire within 24 hours, so a rotation drains them on
-// its own and they need no fallback path.
+// Session and response tokens are created and stored under the current key,
+// then matched by exact equality — no recomputation, so no fallback needed.
 export const digestSessionToken = (token: string) =>
   keyedDigest(token, "session_token", tokenDigestKey());
 export const digestResponseToken = (token: string) =>
