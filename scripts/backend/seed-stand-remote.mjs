@@ -72,7 +72,20 @@ function argument(name, fallback) {
 const locationId = argument("location", "aaaa1111-1111-1111-1111-111111111111");
 const label = argument("label", "Staging Stand");
 const frontendOrigin = env.PUBLIC_FRONTEND_URL?.trim() ?? "http://localhost:3000";
-const keyVersion = Number(env.TOKEN_DIGEST_KEY_VERSION ?? "1") || 1;
+
+const hasExplicitDigestKey = !!env.TOKEN_DIGEST_KEY?.trim();
+const rawKeyVersion = env.TOKEN_DIGEST_KEY_VERSION?.trim();
+
+if (hasExplicitDigestKey && !rawKeyVersion) {
+  console.error(
+    "TOKEN_DIGEST_KEY_VERSION is required when TOKEN_DIGEST_KEY is set.\n" +
+      "Without it the stand is marked version 1 while its digest uses the current key,\n" +
+      "and the lazy upgrade can never resolve the mismatch.",
+  );
+  exit(1);
+}
+
+const keyVersion = Number(rawKeyVersion ?? "1") || 1;
 
 // --------------------------------------------------------- token + digest --
 
