@@ -52,6 +52,9 @@ role key on startup. Copy them into `frontend/.env.local`.
 
 1. Generate a new key: `openssl rand -base64 32`
 2. Set `TOKEN_DIGEST_KEY_PREVIOUS` to the current `TOKEN_DIGEST_KEY` value.
+   If `TOKEN_DIGEST_KEY` was never explicitly set, use the current
+   `CUSTOMER_NOTE_ENCRYPTION_KEY` value instead — that is the effective digest
+   key when the dedicated variable is absent.
 3. Set `TOKEN_DIGEST_KEY` to the new key.
 4. Increment `TOKEN_DIGEST_KEY_VERSION`.
 5. Deploy. Stands migrate lazily: each customer scan re-digests the stand under
