@@ -90,7 +90,7 @@ select is(
 -- ============================================================
 
 select tests.reset_role();
-perform set_config('role', 'anon', true);
+select set_config('role', 'anon', true);
 
 -- 5. anon blocked from create_session
 select throws_ok(

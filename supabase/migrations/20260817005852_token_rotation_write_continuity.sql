@@ -48,9 +48,9 @@ as $$
 declare
     stand      record;
     claim      record;
-    scope_key  text;
-    operation  text := 'session';
-    old_replay record;
+    scope_key    text;
+    v_operation  text := 'session';
+    old_replay   record;
 begin
     select * into stand
       from app.resolve_public_stand(p_token_hash, p_previous_token_hash);
@@ -62,7 +62,7 @@ begin
     scope_key := stand.stand_id::text;
 
     select * into claim
-      from app.claim_idempotency(stand.org_id, operation, scope_key, p_idempotency_key,
+      from app.claim_idempotency(stand.org_id, v_operation, scope_key, p_idempotency_key,
                                  p_request_hash, p_idempotency_ttl_seconds);
 
     -- Backward compatibility: check for completed records under the old scope
@@ -72,14 +72,16 @@ begin
         select ir.state, ir.request_hash, ir.response_status, ir.response_body_encrypted
           into old_replay
           from public.idempotency_records ir
-         where ir.operation = operation
+         where ir.org_id = stand.org_id
+           and ir.operation = v_operation
            and ir.idempotency_key = p_idempotency_key
            and ir.expires_at > now()
            and (ir.scope_key = p_token_hash
-                or (p_previous_token_hash is not null and ir.scope_key = p_previous_token_hash));
+                or (p_previous_token_hash is not null and ir.scope_key = p_previous_token_hash))
+         limit 1;
 
         if found then
-            perform app.release_idempotency(operation, scope_key, p_idempotency_key);
+            perform app.release_idempotency(v_operation, scope_key, p_idempotency_key);
 
             if old_replay.request_hash <> p_request_hash then
                 return query select 'conflict'::text, null::smallint, null::text;
@@ -113,7 +115,7 @@ begin
          where s.id = stand.stand_id;
     end if;
 
-    perform app.complete_idempotency(operation, scope_key, p_idempotency_key,
+    perform app.complete_idempotency(v_operation, scope_key, p_idempotency_key,
                                      201::smallint, p_response_body_encrypted);
 
     return query select 'created'::text, 201::smallint, p_response_body_encrypted;
@@ -145,9 +147,9 @@ declare
     stand      record;
     claim      record;
     session    public.public_review_sessions%rowtype;
-    scope_key  text;
-    operation  text := 'response';
-    old_replay record;
+    scope_key    text;
+    v_operation  text := 'response';
+    old_replay   record;
 begin
     select * into stand
       from app.resolve_public_stand(p_token_hash, p_previous_token_hash);
@@ -159,21 +161,23 @@ begin
     scope_key := stand.stand_id::text;
 
     select * into claim
-      from app.claim_idempotency(stand.org_id, operation, scope_key, p_idempotency_key,
+      from app.claim_idempotency(stand.org_id, v_operation, scope_key, p_idempotency_key,
                                  p_request_hash, p_idempotency_ttl_seconds);
 
     if claim.outcome = 'claimed' then
         select ir.state, ir.request_hash, ir.response_status, ir.response_body_encrypted
           into old_replay
           from public.idempotency_records ir
-         where ir.operation = operation
+         where ir.org_id = stand.org_id
+           and ir.operation = v_operation
            and ir.idempotency_key = p_idempotency_key
            and ir.expires_at > now()
            and (ir.scope_key = p_token_hash
-                or (p_previous_token_hash is not null and ir.scope_key = p_previous_token_hash));
+                or (p_previous_token_hash is not null and ir.scope_key = p_previous_token_hash))
+         limit 1;
 
         if found then
-            perform app.release_idempotency(operation, scope_key, p_idempotency_key);
+            perform app.release_idempotency(v_operation, scope_key, p_idempotency_key);
 
             if old_replay.request_hash <> p_request_hash then
                 return query select 'conflict'::text, null::smallint, null::text;
@@ -203,19 +207,19 @@ begin
        and s.stand_id = stand.stand_id;
 
     if session.id is null then
-        perform app.release_idempotency(operation, scope_key, p_idempotency_key);
+        perform app.release_idempotency(v_operation, scope_key, p_idempotency_key);
         return query select 'session_invalid'::text, null::smallint, null::text;
         return;
     end if;
 
     if session.expires_at <= now() then
-        perform app.release_idempotency(operation, scope_key, p_idempotency_key);
+        perform app.release_idempotency(v_operation, scope_key, p_idempotency_key);
         return query select 'session_expired'::text, null::smallint, null::text;
         return;
     end if;
 
     if exists (select 1 from public.customer_responses r where r.session_id = session.id) then
-        perform app.release_idempotency(operation, scope_key, p_idempotency_key);
+        perform app.release_idempotency(v_operation, scope_key, p_idempotency_key);
         return query select 'response_conflict'::text, null::smallint, null::text;
         return;
     end if;
@@ -227,7 +231,7 @@ begin
         (stand.org_id, stand.location_id, stand.stand_id, session.id, p_response_token_hash,
          p_rating, p_note_encrypted, p_note_key_version);
 
-    perform app.complete_idempotency(operation, scope_key, p_idempotency_key,
+    perform app.complete_idempotency(v_operation, scope_key, p_idempotency_key,
                                      201::smallint, p_response_body_encrypted);
 
     return query select 'created'::text, 201::smallint, p_response_body_encrypted;
@@ -256,9 +260,9 @@ declare
     stand      record;
     claim      record;
     resp       public.customer_responses%rowtype;
-    scope_key  text;
-    operation  text := 'google-click';
-    old_replay record;
+    scope_key    text;
+    v_operation  text := 'google-click';
+    old_replay   record;
 begin
     select * into stand
       from app.resolve_public_stand(p_token_hash, p_previous_token_hash);
@@ -270,21 +274,23 @@ begin
     scope_key := stand.stand_id::text;
 
     select * into claim
-      from app.claim_idempotency(stand.org_id, operation, scope_key, p_idempotency_key,
+      from app.claim_idempotency(stand.org_id, v_operation, scope_key, p_idempotency_key,
                                  p_request_hash, p_idempotency_ttl_seconds);
 
     if claim.outcome = 'claimed' then
         select ir.state, ir.request_hash, ir.response_status, ir.response_body_encrypted
           into old_replay
           from public.idempotency_records ir
-         where ir.operation = operation
+         where ir.org_id = stand.org_id
+           and ir.operation = v_operation
            and ir.idempotency_key = p_idempotency_key
            and ir.expires_at > now()
            and (ir.scope_key = p_token_hash
-                or (p_previous_token_hash is not null and ir.scope_key = p_previous_token_hash));
+                or (p_previous_token_hash is not null and ir.scope_key = p_previous_token_hash))
+         limit 1;
 
         if found then
-            perform app.release_idempotency(operation, scope_key, p_idempotency_key);
+            perform app.release_idempotency(v_operation, scope_key, p_idempotency_key);
 
             if old_replay.request_hash <> p_request_hash then
                 return query select 'conflict'::text, null::smallint, null::text;
@@ -318,7 +324,7 @@ begin
                 and s.session_token_hash = p_previous_session_token_hash));
 
     if resp.id is null then
-        perform app.release_idempotency(operation, scope_key, p_idempotency_key);
+        perform app.release_idempotency(v_operation, scope_key, p_idempotency_key);
         return query select 'response_not_found'::text, null::smallint, null::text;
         return;
     end if;
@@ -327,7 +333,7 @@ begin
     values (resp.org_id, resp.location_id, resp.id)
     on conflict (response_id) do nothing;
 
-    perform app.complete_idempotency(operation, scope_key, p_idempotency_key,
+    perform app.complete_idempotency(v_operation, scope_key, p_idempotency_key,
                                      204::smallint, null);
 
     return query select 'created'::text, 204::smallint, null::text;
@@ -361,9 +367,9 @@ declare
     stand      record;
     claim      record;
     resp       public.customer_responses%rowtype;
-    scope_key  text;
-    operation  text := 'team-praise';
-    old_replay record;
+    scope_key    text;
+    v_operation  text := 'team-praise';
+    old_replay   record;
 begin
     select * into stand
       from app.resolve_public_stand(p_token_hash, p_previous_token_hash);
@@ -375,21 +381,23 @@ begin
     scope_key := stand.stand_id::text;
 
     select * into claim
-      from app.claim_idempotency(stand.org_id, operation, scope_key, p_idempotency_key,
+      from app.claim_idempotency(stand.org_id, v_operation, scope_key, p_idempotency_key,
                                  p_request_hash, p_idempotency_ttl_seconds);
 
     if claim.outcome = 'claimed' then
         select ir.state, ir.request_hash, ir.response_status, ir.response_body_encrypted
           into old_replay
           from public.idempotency_records ir
-         where ir.operation = operation
+         where ir.org_id = stand.org_id
+           and ir.operation = v_operation
            and ir.idempotency_key = p_idempotency_key
            and ir.expires_at > now()
            and (ir.scope_key = p_token_hash
-                or (p_previous_token_hash is not null and ir.scope_key = p_previous_token_hash));
+                or (p_previous_token_hash is not null and ir.scope_key = p_previous_token_hash))
+         limit 1;
 
         if found then
-            perform app.release_idempotency(operation, scope_key, p_idempotency_key);
+            perform app.release_idempotency(v_operation, scope_key, p_idempotency_key);
 
             if old_replay.request_hash <> p_request_hash then
                 return query select 'conflict'::text, null::smallint, null::text;
@@ -423,13 +431,13 @@ begin
                 and s.session_token_hash = p_previous_session_token_hash));
 
     if resp.id is null then
-        perform app.release_idempotency(operation, scope_key, p_idempotency_key);
+        perform app.release_idempotency(v_operation, scope_key, p_idempotency_key);
         return query select 'response_not_found'::text, null::smallint, null::text;
         return;
     end if;
 
     if exists (select 1 from public.team_praise_records t where t.response_id = resp.id) then
-        perform app.release_idempotency(operation, scope_key, p_idempotency_key);
+        perform app.release_idempotency(v_operation, scope_key, p_idempotency_key);
         return query select 'praise_conflict'::text, null::smallint, null::text;
         return;
     end if;
@@ -441,7 +449,7 @@ begin
         (p_praise_id, resp.org_id, resp.location_id, resp.id, p_first_name_encrypted,
          p_note_encrypted, p_key_version, 'unmatched');
 
-    perform app.complete_idempotency(operation, scope_key, p_idempotency_key,
+    perform app.complete_idempotency(v_operation, scope_key, p_idempotency_key,
                                      201::smallint, p_response_body_encrypted);
 
     return query select 'created'::text, 201::smallint, p_response_body_encrypted;
