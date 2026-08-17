@@ -6,14 +6,13 @@
  * no Docker container and no local psql. It is intended for preview/staging
  * environments where the developer has the service role key.
  *
- *   SUPABASE_URL=https://xyz.supabase.co \
- *   SUPABASE_SERVICE_ROLE_KEY="<service-role-key>" \
- *   CUSTOMER_NOTE_ENCRYPTION_KEY="<base64-key>" \
- *   PUBLIC_FRONTEND_URL=https://preview.example.com \
+ *   Set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CUSTOMER_NOTE_ENCRYPTION_KEY,
+ *   and PUBLIC_FRONTEND_URL in your shell, then run:
+ *
  *     node scripts/backend/seed-stand-remote.mjs --i-am-targeting-staging
  *
- *   # Or with an explicit digest key and location:
- *   TOKEN_DIGEST_KEY="<base64-key>" \
+ *   With an explicit digest key and location:
+ *
  *     node scripts/backend/seed-stand-remote.mjs --i-am-targeting-staging --location <uuid>
  *
  * The token is printed once and is not recoverable from the database.
