@@ -15,7 +15,9 @@ import {
   digestIdempotencyKey,
   digestRequestBody,
   digestResponseToken,
+  digestResponseTokenWithPreviousKey,
   digestSessionToken,
+  digestSessionTokenWithPreviousKey,
   digestStandToken,
   digestStandTokenWithPreviousKey,
   encrypt,
@@ -364,10 +366,9 @@ export async function createSession(
     p_client_hash: clientFingerprint(meta.address, meta.userAgent),
     p_session_ttl_seconds: SESSION_TTL_SECONDS,
     p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
-    // Bots get a working session but are never counted, so scan numbers stay
-    // meaningful to the business paying for them.
     p_record_scan: !looksLikeBot(meta.userAgent),
     p_response_body_encrypted: encrypt(JSON.stringify(body)),
+    p_previous_token_hash: digestStandTokenWithPreviousKey(token),
   });
 
   if (error) fail("create_session", error, meta.requestId);
@@ -419,6 +420,8 @@ export async function submitResponse(
     p_note_key_version: KEY_VERSION,
     p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
     p_response_body_encrypted: encrypt(JSON.stringify(body)),
+    p_previous_token_hash: digestStandTokenWithPreviousKey(token),
+    p_previous_session_token_hash: digestSessionTokenWithPreviousKey(input.sessionId),
   });
 
   if (error) fail("submit_response", error, meta.requestId);
@@ -465,6 +468,9 @@ export async function recordGoogleClick(
     p_session_token_hash: digestSessionToken(input.sessionId),
     p_response_token_hash: digestResponseToken(input.responseId),
     p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
+    p_previous_token_hash: digestStandTokenWithPreviousKey(token),
+    p_previous_session_token_hash: digestSessionTokenWithPreviousKey(input.sessionId),
+    p_previous_response_token_hash: digestResponseTokenWithPreviousKey(input.responseId),
   });
 
   if (error) fail("google_click", error, meta.requestId);
@@ -537,6 +543,9 @@ export async function submitTeamPraise(
     p_key_version: KEY_VERSION,
     p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
     p_response_body_encrypted: encrypt(JSON.stringify(body)),
+    p_previous_token_hash: digestStandTokenWithPreviousKey(token),
+    p_previous_session_token_hash: digestSessionTokenWithPreviousKey(input.sessionId),
+    p_previous_response_token_hash: digestResponseTokenWithPreviousKey(input.responseId),
   });
 
   if (error) fail("team_praise", error, meta.requestId);
