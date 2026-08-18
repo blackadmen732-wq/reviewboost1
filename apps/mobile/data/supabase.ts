@@ -17,12 +17,12 @@ const SecureStoreAdapter = {
     }
     SecureStore.setItem(key, value);
   },
-  removeItem: (key: string): void => {
+  removeItem: async (key: string): Promise<void> => {
     if (Platform.OS === "web") {
       localStorage.removeItem(key);
       return;
     }
-    SecureStore.deleteItemAsync(key);
+    await SecureStore.deleteItemAsync(key);
   },
 };
 

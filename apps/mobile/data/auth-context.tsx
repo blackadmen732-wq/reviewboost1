@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react";
 import type { Session } from "@supabase/supabase-js";
@@ -13,12 +14,14 @@ import type { Organization } from "./types";
 interface AuthState {
   isLoggedIn: boolean;
   isLoading: boolean;
+  orgLoading: boolean;
+  orgError: string | null;
   email: string | null;
   name: string | null;
   organizations: Organization[];
   activeOrg: Organization | null;
   login: (email: string, password: string) => Promise<string | null>;
-  logout: () => Promise<void>;
+  logout: () => Promise<string | null>;
   selectOrg: (orgId: string) => void;
 }
 
@@ -29,6 +32,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [activeOrg, setActiveOrg] = useState<Organization | null>(null);
+  const [orgLoading, setOrgLoading] = useState(false);
+  const [orgError, setOrgError] = useState<string | null>(null);
+  const authGeneration = useRef(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -44,8 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (s) {
         fetchOrganizations(s.user.id);
       } else {
+        authGeneration.current += 1;
         setOrganizations([]);
         setActiveOrg(null);
+        setOrgLoading(false);
+        setOrgError(null);
       }
     });
 
@@ -53,6 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function fetchOrganizations(userId: string) {
+    const gen = ++authGeneration.current;
+    setOrgLoading(true);
+    setOrgError(null);
+
     const { data, error } = await supabase
       .from("organization_members")
       .select("id, org_id, role, organizations(name, timezone)")
@@ -60,8 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("status", "active")
       .order("created_at", { ascending: true });
 
+    if (gen !== authGeneration.current) return;
+
     if (error || !data) {
       setOrganizations([]);
+      setOrgError(error?.message ?? "Failed to load organizations");
+      setOrgLoading(false);
       return;
     }
 
@@ -80,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     setOrganizations(orgs);
+    setOrgLoading(false);
   }
 
   const login = useCallback(
@@ -94,11 +112,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+  const logout = useCallback(async (): Promise<string | null> => {
+    const { error } = await supabase.auth.signOut();
+    if (error) return error.message;
     setSession(null);
     setOrganizations([]);
     setActiveOrg(null);
+    return null;
   }, []);
 
   const selectOrg = useCallback(
@@ -116,6 +136,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         isLoggedIn: !!session,
         isLoading,
+        orgLoading,
+        orgError,
         email: user?.email ?? null,
         name: user?.user_metadata?.full_name ?? user?.email ?? null,
         organizations,
