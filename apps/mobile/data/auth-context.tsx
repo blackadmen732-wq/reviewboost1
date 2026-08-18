@@ -39,7 +39,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
-      if (s) fetchOrganizations(s.user.id);
       setIsLoading(false);
     });
 
@@ -47,9 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
-      if (s) {
-        fetchOrganizations(s.user.id);
-      } else {
+      if (!s) {
         authGeneration.current += 1;
         setOrganizations([]);
         setActiveOrg(null);
@@ -60,6 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (session?.user.id) {
+      fetchOrganizations(session.user.id);
+    }
+  }, [session?.user.id]);
 
   async function fetchOrganizations(userId: string) {
     const gen = ++authGeneration.current;
@@ -97,6 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     setOrganizations(orgs);
+    setActiveOrg((current) =>
+      current ? orgs.find((o) => o.orgId === current.orgId) ?? null : null,
+    );
     setOrgLoading(false);
   }
 
