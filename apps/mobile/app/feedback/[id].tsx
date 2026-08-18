@@ -1,13 +1,17 @@
 import { View, Text, ScrollView, StyleSheet } from "react-native";
 import { useLocalSearchParams, Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "@/data/auth-context";
 import { MOCK_FEEDBACK, MOCK_NOTES } from "@/data/mock";
 import { Stars } from "@/components/stars";
 import { relativeTime } from "@/components/relative-time";
 
 export default function FeedbackDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const item = MOCK_FEEDBACK.find((f) => f.id === id);
+  const { activeOrg } = useAuth();
+  const item = MOCK_FEEDBACK.find(
+    (f) => f.id === id && f.orgId === activeOrg?.orgId,
+  );
   const notes = MOCK_NOTES[id ?? ""] ?? [];
 
   if (!item) {

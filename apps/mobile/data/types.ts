@@ -14,6 +14,8 @@ export interface Location {
 
 export interface FeedbackItem {
   id: string;
+  orgId: string;
+  locationId: string;
   rating: number;
   note: string | null;
   submittedAt: string;
@@ -24,6 +26,8 @@ export interface FeedbackItem {
 
 export interface LiveFeedEntry {
   id: string;
+  orgId: string;
+  locationId: string;
   type: "tap" | "feedback";
   rating: number | null;
   submittedAt: string;

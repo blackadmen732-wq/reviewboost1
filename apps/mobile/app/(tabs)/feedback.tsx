@@ -1,6 +1,7 @@
 import { View, Text, FlatList, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useAuth } from "@/data/auth-context";
 import { MOCK_FEEDBACK } from "@/data/mock";
 import { Stars } from "@/components/stars";
 import { relativeTime } from "@/components/relative-time";
@@ -43,10 +44,13 @@ function FeedbackRow({ item }: { item: FeedbackItem }) {
 }
 
 export default function FeedbackListScreen() {
+  const { activeOrg } = useAuth();
+  const items = MOCK_FEEDBACK.filter((f) => f.orgId === activeOrg?.orgId);
+
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <FlatList
-        data={MOCK_FEEDBACK}
+        data={items}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <FeedbackRow item={item} />}
         contentContainerStyle={styles.list}
