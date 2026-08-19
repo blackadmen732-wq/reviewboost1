@@ -6,7 +6,7 @@ import { useAuth } from "@/data/auth-context";
 import type { Organization } from "@/data/types";
 
 export default function SelectOrgScreen() {
-  const { organizations, selectOrg, name, logout, orgLoading, orgError } = useAuth();
+  const { organizations, selectOrg, name, logout, orgLoading, orgError, retryOrgs } = useAuth();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
@@ -68,7 +68,12 @@ export default function SelectOrgScreen() {
           orgLoading ? (
             <ActivityIndicator size="large" color="#2563EB" style={styles.spinner} />
           ) : orgError ? (
-            <Text style={styles.errorText}>{orgError}</Text>
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{orgError}</Text>
+              <Pressable style={styles.retryButton} onPress={retryOrgs} accessibilityRole="button">
+                <Text style={styles.retryText}>Try again</Text>
+              </Pressable>
+            </View>
           ) : (
             <Text style={styles.empty}>No organizations found for this account</Text>
           )
@@ -105,6 +110,15 @@ const styles = StyleSheet.create({
   orgName: { fontSize: 18, fontWeight: "600", color: "#111827" },
   role: { fontSize: 14, color: "#6B7280", marginTop: 2, textTransform: "capitalize" },
   empty: { textAlign: "center", color: "#9CA3AF", marginTop: 40, fontSize: 15 },
-  errorText: { textAlign: "center", color: "#DC2626", marginTop: 12, fontSize: 14 },
+  errorContainer: { alignItems: "center", marginTop: 40 },
+  errorText: { textAlign: "center", color: "#DC2626", fontSize: 14 },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+  },
+  retryText: { color: "#FFFFFF", fontWeight: "600", fontSize: 14 },
   spinner: { marginTop: 40 },
 });

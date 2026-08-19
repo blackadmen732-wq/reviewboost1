@@ -23,6 +23,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<string | null>;
   logout: () => Promise<string | null>;
   selectOrg: (orgId: string) => void;
+  retryOrgs: () => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -135,6 +136,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [organizations],
   );
 
+  const retryOrgs = useCallback(() => {
+    if (session?.user.id) {
+      fetchOrganizations(session.user.id);
+    }
+  }, [session?.user.id]);
+
   const user = session?.user ?? null;
 
   return (
@@ -151,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         selectOrg,
+        retryOrgs,
       }}
     >
       {children}
