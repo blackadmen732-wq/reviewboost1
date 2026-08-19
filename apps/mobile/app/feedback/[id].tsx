@@ -1,20 +1,36 @@
-import { View, Text, ScrollView, StyleSheet } from "react-native";
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable } from "react-native";
 import { useLocalSearchParams, Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MOCK_FEEDBACK, MOCK_NOTES } from "@/data/mock";
+import { useEffect } from "react";
+import { useFeedbackDetail } from "@/data/use-feedback";
 import { Stars } from "@/components/stars";
 import { relativeTime } from "@/components/relative-time";
 
 export default function FeedbackDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const item = MOCK_FEEDBACK.find((f) => f.id === id);
-  const notes = MOCK_NOTES[id ?? ""] ?? [];
+  const { item, notes, loading, error, markRead, resolve, reopen } =
+    useFeedbackDetail(id);
 
-  if (!item) {
+  useEffect(() => {
+    if (item && !item.isRead) {
+      markRead();
+    }
+  }, [item?.id, item?.isRead]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Stack.Screen options={{ title: "Feedback", headerShown: true }} />
+        <ActivityIndicator style={styles.spinner} size="large" color="#2563EB" />
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !item) {
     return (
       <SafeAreaView style={styles.container}>
         <Stack.Screen options={{ title: "Not found", headerShown: true }} />
-        <Text style={styles.empty}>Feedback not found</Text>
+        <Text style={styles.empty}>{error ?? "Feedback not found"}</Text>
       </SafeAreaView>
     );
   }
@@ -52,9 +68,27 @@ export default function FeedbackDetailScreen() {
         {item.note && (
           <View style={styles.noteSection}>
             <Text style={styles.sectionTitle}>Customer note</Text>
-            <Text style={styles.noteText}>{item.note}</Text>
+            {item.note === "[encrypted]" ? (
+              <Text style={[styles.noteText, styles.encryptedHint]}>
+                Note content is encrypted
+              </Text>
+            ) : (
+              <Text style={styles.noteText}>{item.note}</Text>
+            )}
           </View>
         )}
+
+        <View style={styles.actionRow}>
+          {item.isResolved ? (
+            <Pressable style={styles.actionButton} onPress={reopen}>
+              <Text style={styles.actionText}>Reopen</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={[styles.actionButton, styles.resolveButton]} onPress={resolve}>
+              <Text style={[styles.actionText, styles.resolveText]}>Mark resolved</Text>
+            </Pressable>
+          )}
+        </View>
 
         {notes.length > 0 && (
           <View style={styles.notesSection}>
@@ -67,7 +101,13 @@ export default function FeedbackDetailScreen() {
                   <Text style={styles.noteAuthor}>{note.authorName}</Text>
                   <Text style={styles.noteTime}>{relativeTime(note.createdAt)}</Text>
                 </View>
-                <Text style={styles.noteBody}>{note.body}</Text>
+                {note.body === "[encrypted]" ? (
+                  <Text style={[styles.noteBody, styles.encryptedHint]}>
+                    Note content is encrypted
+                  </Text>
+                ) : (
+                  <Text style={styles.noteBody}>{note.body}</Text>
+                )}
               </View>
             ))}
           </View>
@@ -99,6 +139,19 @@ const styles = StyleSheet.create({
   noteSection: { marginTop: 24 },
   sectionTitle: { fontSize: 14, fontWeight: "600", color: "#6B7280", marginBottom: 8 },
   noteText: { fontSize: 16, color: "#111827", lineHeight: 24 },
+  encryptedHint: { fontStyle: "italic", color: "#9CA3AF" },
+  actionRow: { marginTop: 20 },
+  actionButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignSelf: "flex-start",
+  },
+  actionText: { fontSize: 14, fontWeight: "600", color: "#374151" },
+  resolveButton: { backgroundColor: "#16A34A", borderColor: "#16A34A" },
+  resolveText: { color: "#FFFFFF" },
   notesSection: { marginTop: 28 },
   ownerNote: {
     backgroundColor: "#F9FAFB",
@@ -118,4 +171,5 @@ const styles = StyleSheet.create({
   noteTime: { fontSize: 12, color: "#9CA3AF" },
   noteBody: { fontSize: 14, color: "#374151", lineHeight: 20 },
   empty: { textAlign: "center", color: "#9CA3AF", marginTop: 40, fontSize: 15 },
+  spinner: { marginTop: 60 },
 });

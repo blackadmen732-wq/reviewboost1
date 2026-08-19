@@ -1,7 +1,8 @@
-import { View, Text, FlatList, Pressable, StyleSheet } from "react-native";
+import { View, Text, FlatList, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { MOCK_FEEDBACK } from "@/data/mock";
+import { useFeedbackList } from "@/data/use-feedback";
+import { useAuth } from "@/data/auth-context";
 import { Stars } from "@/components/stars";
 import { relativeTime } from "@/components/relative-time";
 import type { FeedbackItem } from "@/data/types";
@@ -27,9 +28,14 @@ function FeedbackRow({ item }: { item: FeedbackItem }) {
         <Text style={styles.time}>{relativeTime(item.submittedAt)}</Text>
       </View>
 
-      {item.note && (
+      {item.note && item.note !== "[encrypted]" && (
         <Text style={styles.note} numberOfLines={2}>
           {item.note}
+        </Text>
+      )}
+      {item.note === "[encrypted]" && (
+        <Text style={[styles.note, styles.encryptedHint]} numberOfLines={1}>
+          Customer left a note
         </Text>
       )}
 
@@ -43,14 +49,46 @@ function FeedbackRow({ item }: { item: FeedbackItem }) {
 }
 
 export default function FeedbackListScreen() {
+  const { activeOrg } = useAuth();
+  const { items, loading, error, refetch } = useFeedbackList();
+
+  if (!activeOrg) {
+    return (
+      <SafeAreaView style={styles.container} edges={["bottom"]}>
+        <Text style={styles.empty}>Select an organization to view feedback</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (loading && items.length === 0) {
+    return (
+      <SafeAreaView style={styles.container} edges={["bottom"]}>
+        <ActivityIndicator style={styles.spinner} size="large" color="#2563EB" />
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container} edges={["bottom"]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Pressable style={styles.retryButton} onPress={refetch}>
+          <Text style={styles.retryText}>Retry</Text>
+        </Pressable>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <FlatList
-        data={MOCK_FEEDBACK}
+        data={items}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <FeedbackRow item={item} />}
         contentContainerStyle={styles.list}
         ListEmptyComponent={<Text style={styles.empty}>No feedback yet</Text>}
+        onRefresh={refetch}
+        refreshing={loading}
       />
     </SafeAreaView>
   );
@@ -79,6 +117,18 @@ const styles = StyleSheet.create({
   resolvedCheck: { fontSize: 14, color: "#16A34A", fontWeight: "700" },
   time: { fontSize: 12, color: "#9CA3AF" },
   note: { fontSize: 14, color: "#374151", marginTop: 8, lineHeight: 20 },
+  encryptedHint: { fontStyle: "italic", color: "#9CA3AF" },
   noteCount: { fontSize: 12, color: "#6B7280", marginTop: 6 },
   empty: { textAlign: "center", color: "#9CA3AF", marginTop: 40, fontSize: 15 },
+  spinner: { marginTop: 60 },
+  errorText: { textAlign: "center", color: "#DC2626", marginTop: 40, fontSize: 15 },
+  retryButton: {
+    alignSelf: "center",
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+  },
+  retryText: { color: "#FFFFFF", fontWeight: "600", fontSize: 14 },
 });
