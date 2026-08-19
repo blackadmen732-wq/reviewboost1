@@ -26,5 +26,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "image-size": "npm:image-size-next@2.1.1"
+  }
 }
