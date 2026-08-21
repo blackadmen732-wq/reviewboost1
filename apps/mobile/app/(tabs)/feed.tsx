@@ -42,6 +42,7 @@ function FeedCard({ item }: { item: LiveFeedEntry }) {
 
 export default function FeedScreen() {
   const { activeOrg } = useAuth();
+  const feed = MOCK_LIVE_FEED.filter((e) => e.orgId === activeOrg?.orgId);
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
@@ -49,7 +50,7 @@ export default function FeedScreen() {
         <Text style={styles.orgName}>{activeOrg?.name ?? "—"}</Text>
       </View>
       <FlatList
-        data={MOCK_LIVE_FEED}
+        data={feed}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <FeedCard item={item} />}
         contentContainerStyle={styles.list}

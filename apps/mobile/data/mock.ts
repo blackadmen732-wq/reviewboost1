@@ -50,6 +50,8 @@ export const MOCK_LOCATIONS: Location[] = [
 export const MOCK_FEEDBACK: FeedbackItem[] = [
   {
     id: "fb-1",
+    orgId: "org-1",
+    locationId: "loc-1",
     rating: 2,
     note: "Coffee was cold and the barista seemed rushed. I've been coming here for two years and this is the first time I've been disappointed.",
     submittedAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
@@ -59,6 +61,8 @@ export const MOCK_FEEDBACK: FeedbackItem[] = [
   },
   {
     id: "fb-2",
+    orgId: "org-1",
+    locationId: "loc-2",
     rating: 5,
     note: "Absolutely love this place! Best latte in town.",
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
@@ -68,6 +72,8 @@ export const MOCK_FEEDBACK: FeedbackItem[] = [
   },
   {
     id: "fb-3",
+    orgId: "org-1",
+    locationId: "loc-1",
     rating: 3,
     note: "Food was fine. Service could be faster during lunch rush.",
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
@@ -77,6 +83,8 @@ export const MOCK_FEEDBACK: FeedbackItem[] = [
   },
   {
     id: "fb-4",
+    orgId: "org-1",
+    locationId: "loc-1",
     rating: 1,
     note: "Found a hair in my food. Will not be returning.",
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
@@ -86,6 +94,8 @@ export const MOCK_FEEDBACK: FeedbackItem[] = [
   },
   {
     id: "fb-5",
+    orgId: "org-1",
+    locationId: "loc-2",
     rating: 4,
     note: null,
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
@@ -95,6 +105,8 @@ export const MOCK_FEEDBACK: FeedbackItem[] = [
   },
   {
     id: "fb-6",
+    orgId: "org-2",
+    locationId: "loc-3",
     rating: 5,
     note: "The new seasonal menu is incredible. Keep it up!",
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
@@ -107,6 +119,8 @@ export const MOCK_FEEDBACK: FeedbackItem[] = [
 export const MOCK_LIVE_FEED: LiveFeedEntry[] = [
   {
     id: "lf-1",
+    orgId: "org-1",
+    locationId: "loc-1",
     type: "feedback",
     rating: 2,
     submittedAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
@@ -114,6 +128,8 @@ export const MOCK_LIVE_FEED: LiveFeedEntry[] = [
   },
   {
     id: "lf-2",
+    orgId: "org-1",
+    locationId: "loc-1",
     type: "tap",
     rating: null,
     submittedAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
@@ -121,6 +137,8 @@ export const MOCK_LIVE_FEED: LiveFeedEntry[] = [
   },
   {
     id: "lf-3",
+    orgId: "org-1",
+    locationId: "loc-2",
     type: "feedback",
     rating: 5,
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
@@ -128,6 +146,8 @@ export const MOCK_LIVE_FEED: LiveFeedEntry[] = [
   },
   {
     id: "lf-4",
+    orgId: "org-1",
+    locationId: "loc-1",
     type: "tap",
     rating: null,
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
@@ -135,6 +155,8 @@ export const MOCK_LIVE_FEED: LiveFeedEntry[] = [
   },
   {
     id: "lf-5",
+    orgId: "org-1",
+    locationId: "loc-1",
     type: "feedback",
     rating: 3,
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
@@ -142,10 +164,12 @@ export const MOCK_LIVE_FEED: LiveFeedEntry[] = [
   },
   {
     id: "lf-6",
+    orgId: "org-2",
+    locationId: "loc-3",
     type: "tap",
     rating: null,
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 10).toISOString(),
-    locationName: "Airport Terminal B",
+    locationName: "Main Street",
   },
 ];
 

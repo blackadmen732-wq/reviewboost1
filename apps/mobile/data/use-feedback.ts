@@ -23,7 +23,7 @@ export function useFeedbackList() {
     const { data, error: err } = await supabase
       .from("customer_responses")
       .select(
-        "id, rating, note_encrypted, submitted_at, read_at, resolved_at, response_notes(count)",
+        "id, org_id, location_id, rating, note_encrypted, submitted_at, read_at, resolved_at, response_notes(count)",
       )
       .eq("org_id", activeOrg.orgId)
       .order("submitted_at", { ascending: false })
@@ -44,6 +44,8 @@ export function useFeedbackList() {
           | undefined;
         return {
           id: row.id as string,
+          orgId: row.org_id as string,
+          locationId: row.location_id as string,
           rating: row.rating as number,
           note: row.note_encrypted ? "[encrypted]" : null,
           submittedAt: row.submitted_at as string,
@@ -83,7 +85,7 @@ export function useFeedbackDetail(id: string | undefined) {
       const [responseResult, notesResult] = await Promise.all([
         supabase
           .from("customer_responses")
-          .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+          .select("id, org_id, location_id, rating, note_encrypted, submitted_at, read_at, resolved_at")
           .eq("id", id)
           .eq("org_id", activeOrg.orgId)
           .single(),
@@ -106,6 +108,8 @@ export function useFeedbackDetail(id: string | undefined) {
       const row = responseResult.data;
       setItem({
         id: row.id,
+        orgId: row.org_id,
+        locationId: row.location_id,
         rating: row.rating,
         note: row.note_encrypted ? "[encrypted]" : null,
         submittedAt: row.submitted_at,
