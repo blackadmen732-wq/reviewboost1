@@ -7,6 +7,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/data/auth-context";
@@ -14,12 +15,25 @@ import { useAuth } from "@/data/auth-context";
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleLogin = () => {
-    if (!email.trim() || !password.trim()) return;
-    login(email, password);
+  const canSubmit = email.trim().length > 0 && password.trim().length > 0 && !submitting;
+
+  const handleLogin = async () => {
+    if (!canSubmit) return;
+    setError(null);
+    setSubmitting(true);
+
+    const err = await login(email, password);
+
+    setSubmitting(false);
+    if (err) {
+      setError(err);
+      return;
+    }
     router.replace("/select-org");
   };
 
@@ -32,6 +46,12 @@ export default function LoginScreen() {
         <Text style={styles.brand}>ReviewBoost</Text>
         <Text style={styles.subtitle}>Owner sign-in</Text>
 
+        {error && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -41,6 +61,7 @@ export default function LoginScreen() {
           autoCapitalize="none"
           keyboardType="email-address"
           autoComplete="email"
+          editable={!submitting}
         />
         <TextInput
           style={styles.input}
@@ -50,14 +71,19 @@ export default function LoginScreen() {
           onChangeText={setPassword}
           secureTextEntry
           autoComplete="password"
+          editable={!submitting}
         />
 
         <Pressable
-          style={[styles.button, (!email.trim() || !password.trim()) && styles.buttonDisabled]}
+          style={[styles.button, !canSubmit && styles.buttonDisabled]}
           onPress={handleLogin}
-          disabled={!email.trim() || !password.trim()}
+          disabled={!canSubmit}
         >
-          <Text style={styles.buttonText}>Sign in</Text>
+          {submitting ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.buttonText}>Sign in</Text>
+          )}
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -75,6 +101,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 32,
   },
+  errorBox: {
+    backgroundColor: "#FEF2F2",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+  errorText: { color: "#DC2626", fontSize: 14, textAlign: "center" },
   input: {
     borderWidth: 1,
     borderColor: "#D1D5DB",

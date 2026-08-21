@@ -4,27 +4,35 @@
   "main": "index.ts",
   "dependencies": {
     "@expo/metro-runtime": "^57.0.11",
+    "@react-native-async-storage/async-storage": "^3.1.1",
+    "@supabase/supabase-js": "^2.112.3",
+    "aes-js": "^3.1.2",
     "expo": "~57.0.14",
     "expo-constants": "^57.0.12",
     "expo-linking": "^57.0.6",
     "expo-router": "^57.0.14",
+    "expo-secure-store": "^57.0.1",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.2",
+    "react-native-get-random-values": "^2.0.0",
     "react-native-safe-area-context": "^5.9.0",
     "react-native-screens": "^4.27.0",
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
+    "@types/aes-js": "^3.1.4",
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.11"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "vitest run"
   },
   "private": true
 }
