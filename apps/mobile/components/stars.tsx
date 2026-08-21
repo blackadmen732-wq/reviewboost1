@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
+import { colors } from "@/theme";
 
 export function Stars({ rating, size = 16 }: { rating: number; size?: number }) {
   return (
@@ -6,9 +7,9 @@ export function Stars({ rating, size = 16 }: { rating: number; size?: number }) 
       {[1, 2, 3, 4, 5].map((n) => (
         <Text
           key={n}
-          style={[styles.star, { fontSize: size, color: n <= rating ? "#F59E0B" : "#D1D5DB" }]}
+          style={[styles.star, { fontSize: size, color: n <= rating ? colors.starFilled : colors.starEmpty }]}
         >
-          ★
+          {"★"}
         </Text>
       ))}
     </View>

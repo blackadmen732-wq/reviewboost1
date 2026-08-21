@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/data/auth-context";
+import { colors, radii, fonts } from "@/theme";
 import type { Organization } from "@/data/types";
 
 export default function SelectOrgScreen() {
@@ -66,7 +67,7 @@ export default function SelectOrgScreen() {
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           orgLoading ? (
-            <ActivityIndicator size="large" color="#2563EB" style={styles.spinner} />
+            <ActivityIndicator size="large" color={colors.brand} style={styles.spinner} />
           ) : orgError ? (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{orgError}</Text>
@@ -84,41 +85,41 @@ export default function SelectOrgScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  container: { flex: 1, backgroundColor: colors.canvas },
   header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   headerText: { flex: 1 },
-  greeting: { fontSize: 24, fontWeight: "700", color: "#111827" },
-  subtitle: { fontSize: 15, color: "#6B7280", marginTop: 4 },
+  greeting: { fontSize: 24, ...fonts.heading, color: colors.ink },
+  subtitle: { fontSize: 15, color: colors.inkMuted, marginTop: 4 },
   logoutButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: radii.badge,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: colors.borderLight,
     marginTop: 4,
   },
-  logoutText: { fontSize: 13, color: "#6B7280", fontWeight: "500" },
+  logoutText: { fontSize: 13, color: colors.inkMuted, ...fonts.label },
   list: { padding: 24, gap: 12 },
   card: {
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: radii.card,
     padding: 16,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.surface,
   },
-  orgName: { fontSize: 18, fontWeight: "600", color: "#111827" },
-  role: { fontSize: 14, color: "#6B7280", marginTop: 2, textTransform: "capitalize" },
-  empty: { textAlign: "center", color: "#9CA3AF", marginTop: 40, fontSize: 15 },
+  orgName: { fontSize: 18, ...fonts.subheading, color: colors.ink },
+  role: { fontSize: 14, color: colors.inkMuted, marginTop: 2, textTransform: "capitalize" },
+  empty: { textAlign: "center", color: colors.inkFaint, marginTop: 40, fontSize: 15 },
   errorContainer: { alignItems: "center", marginTop: 40 },
-  errorText: { textAlign: "center", color: "#DC2626", fontSize: 14 },
+  errorText: { textAlign: "center", color: colors.danger, fontSize: 14 },
   retryButton: {
     marginTop: 16,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: "#2563EB",
-    borderRadius: 8,
+    backgroundColor: colors.brand,
+    borderRadius: radii.badge,
   },
-  retryText: { color: "#FFFFFF", fontWeight: "600", fontSize: 14 },
+  retryText: { color: colors.white, ...fonts.subheading, fontSize: 14 },
   spinner: { marginTop: 40 },
 });

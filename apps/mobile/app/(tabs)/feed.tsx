@@ -4,6 +4,7 @@ import { useAuth } from "@/data/auth-context";
 import { MOCK_LIVE_FEED } from "@/data/mock";
 import { Stars } from "@/components/stars";
 import { relativeTime } from "@/components/relative-time";
+import { colors, radii, fonts } from "@/theme";
 import type { LiveFeedEntry } from "@/data/types";
 
 function FeedCard({ item }: { item: LiveFeedEntry }) {
@@ -13,13 +14,13 @@ function FeedCard({ item }: { item: LiveFeedEntry }) {
         <View
           style={[
             styles.badge,
-            { backgroundColor: item.type === "feedback" ? "#EFF6FF" : "#F0FDF4" },
+            { backgroundColor: item.type === "feedback" ? colors.infoBg : colors.successBg },
           ]}
         >
           <Text
             style={[
               styles.badgeText,
-              { color: item.type === "feedback" ? "#2563EB" : "#16A34A" },
+              { color: item.type === "feedback" ? colors.info : colors.success },
             ]}
           >
             {item.type === "feedback" ? "Feedback" : "Stand tap"}
@@ -59,28 +60,28 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB" },
+  container: { flex: 1, backgroundColor: colors.canvas },
   orgBar: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  orgName: { fontSize: 15, fontWeight: "600", color: "#111827" },
+  orgName: { fontSize: 15, ...fonts.subheading, color: colors.ink },
   list: { padding: 16, gap: 10 },
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radii.card,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
   },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  badgeText: { fontSize: 12, fontWeight: "600" },
-  time: { fontSize: 12, color: "#9CA3AF" },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.badge },
+  badgeText: { fontSize: 12, ...fonts.subheading },
+  time: { fontSize: 12, color: colors.inkFaint },
   ratingRow: { marginTop: 8 },
-  location: { fontSize: 13, color: "#6B7280", marginTop: 6 },
-  empty: { textAlign: "center", color: "#9CA3AF", marginTop: 40, fontSize: 15 },
+  location: { fontSize: 13, color: colors.inkMuted, marginTop: 6 },
+  empty: { textAlign: "center", color: colors.inkFaint, marginTop: 40, fontSize: 15 },
 });

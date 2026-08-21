@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/data/auth-context";
+import { colors, radii, fonts } from "@/theme";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -55,7 +56,7 @@ export default function LoginScreen() {
         <TextInput
           style={styles.input}
           placeholder="Email"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.inkFaint}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -66,7 +67,7 @@ export default function LoginScreen() {
         <TextInput
           style={styles.input}
           placeholder="Password"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.inkFaint}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -80,7 +81,7 @@ export default function LoginScreen() {
           disabled={!canSubmit}
         >
           {submitting ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.white} />
           ) : (
             <Text style={styles.buttonText}>Sign in</Text>
           )}
@@ -91,42 +92,42 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  container: { flex: 1, backgroundColor: colors.canvas },
   inner: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
-  brand: { fontSize: 32, fontWeight: "700", color: "#111827", textAlign: "center" },
+  brand: { fontSize: 32, ...fonts.heading, color: colors.brand, textAlign: "center" },
   subtitle: {
     fontSize: 16,
-    color: "#6B7280",
+    color: colors.inkMuted,
     textAlign: "center",
     marginTop: 4,
     marginBottom: 32,
   },
   errorBox: {
-    backgroundColor: "#FEF2F2",
-    borderRadius: 8,
+    backgroundColor: colors.dangerBg,
+    borderRadius: radii.badge,
     padding: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#FECACA",
+    borderColor: colors.dangerBorder,
   },
-  errorText: { color: "#DC2626", fontSize: 14, textAlign: "center" },
+  errorText: { color: colors.danger, fontSize: 14, textAlign: "center" },
   input: {
     borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 10,
+    borderColor: colors.borderLight,
+    borderRadius: radii.control,
     padding: 14,
     fontSize: 16,
-    color: "#111827",
-    backgroundColor: "#F9FAFB",
+    color: colors.ink,
+    backgroundColor: colors.surface,
     marginBottom: 12,
   },
   button: {
-    backgroundColor: "#2563EB",
-    borderRadius: 10,
+    backgroundColor: colors.brand,
+    borderRadius: radii.control,
     padding: 16,
     alignItems: "center",
     marginTop: 8,
   },
   buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
+  buttonText: { color: colors.white, fontSize: 16, ...fonts.subheading },
 });

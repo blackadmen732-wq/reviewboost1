@@ -5,6 +5,7 @@ import { useFeedbackList } from "@/data/use-feedback";
 import { useAuth } from "@/data/auth-context";
 import { Stars } from "@/components/stars";
 import { relativeTime } from "@/components/relative-time";
+import { colors, radii, fonts } from "@/theme";
 import type { FeedbackItem } from "@/data/types";
 
 function FeedbackRow({ item }: { item: FeedbackItem }) {
@@ -22,7 +23,7 @@ function FeedbackRow({ item }: { item: FeedbackItem }) {
       <View style={styles.topRow}>
         <View style={styles.statusRow}>
           {!item.isRead && <View style={styles.unreadDot} />}
-          {item.isResolved && <Text style={styles.resolvedCheck}>✓</Text>}
+          {item.isResolved && <Text style={styles.resolvedCheck}>{"✓"}</Text>}
           <Stars rating={item.rating} size={14} />
         </View>
         <Text style={styles.time}>{relativeTime(item.submittedAt)}</Text>
@@ -63,7 +64,7 @@ export default function FeedbackListScreen() {
   if (loading && items.length === 0) {
     return (
       <SafeAreaView style={styles.container} edges={["bottom"]}>
-        <ActivityIndicator style={styles.spinner} size="large" color="#2563EB" />
+        <ActivityIndicator style={styles.spinner} size="large" color={colors.brand} />
       </SafeAreaView>
     );
   }
@@ -95,16 +96,16 @@ export default function FeedbackListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB" },
+  container: { flex: 1, backgroundColor: colors.canvas },
   list: { padding: 16, gap: 10 },
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radii.card,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
   },
-  cardUnread: { borderColor: "#2563EB", backgroundColor: "#FAFBFF" },
+  cardUnread: { borderColor: colors.brand, backgroundColor: "#f2faf6" },
   cardResolved: { opacity: 0.7 },
   topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -112,23 +113,23 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#2563EB",
+    backgroundColor: colors.brand,
   },
-  resolvedCheck: { fontSize: 14, color: "#16A34A", fontWeight: "700" },
-  time: { fontSize: 12, color: "#9CA3AF" },
-  note: { fontSize: 14, color: "#374151", marginTop: 8, lineHeight: 20 },
-  encryptedHint: { fontStyle: "italic", color: "#9CA3AF" },
-  noteCount: { fontSize: 12, color: "#6B7280", marginTop: 6 },
-  empty: { textAlign: "center", color: "#9CA3AF", marginTop: 40, fontSize: 15 },
+  resolvedCheck: { fontSize: 14, color: colors.success, ...fonts.heading },
+  time: { fontSize: 12, color: colors.inkFaint },
+  note: { fontSize: 14, color: colors.ink, marginTop: 8, lineHeight: 20 },
+  encryptedHint: { fontStyle: "italic", color: colors.inkFaint },
+  noteCount: { fontSize: 12, color: colors.inkMuted, marginTop: 6 },
+  empty: { textAlign: "center", color: colors.inkFaint, marginTop: 40, fontSize: 15 },
   spinner: { marginTop: 60 },
-  errorText: { textAlign: "center", color: "#DC2626", marginTop: 40, fontSize: 15 },
+  errorText: { textAlign: "center", color: colors.danger, marginTop: 40, fontSize: 15 },
   retryButton: {
     alignSelf: "center",
     marginTop: 16,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: "#2563EB",
-    borderRadius: 8,
+    backgroundColor: colors.brand,
+    borderRadius: radii.badge,
   },
-  retryText: { color: "#FFFFFF", fontWeight: "600", fontSize: 14 },
+  retryText: { color: colors.white, ...fonts.subheading, fontSize: 14 },
 });
