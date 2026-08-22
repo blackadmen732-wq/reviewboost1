@@ -3,7 +3,8 @@
 Source of truth for what ReviewBoost is, what is approved, what is proposed, and
 what actually exists.
 
-**This document contains no status claims.**
+State labels describe repository implementation and verification evidence; they
+do not claim production readiness.
 
 ---
 
@@ -68,10 +69,6 @@ policy, which forbids discouraging negative reviews and forbids selectively
 soliciting positive ones — and it carries platform-enforcement and
 consumer-protection risk.
 
-The current Supabase schema has no `review_threshold` column and never will.
-A pgTAP test asserts its absence. The old Express backend's gating logic has
-been removed entirely.
-
 ### Prohibited language
 
 Not permitted in product copy, dashboards, marketing, or internal documents:
@@ -90,9 +87,6 @@ carries a label, brand colours, and an active flag, and renders as PNG or SVG at
 high error correction so it survives being scuffed or partially covered.
 
 The internal identifier never leaves the server, so stands cannot be enumerated.
-
-The `review_threshold` gating field from the old Express backend has been
-removed. The current schema has no such column; a pgTAP test asserts this.
 
 ### The tap flow — APPROVED
 
@@ -232,9 +226,12 @@ deduplication window; opt-out notice present.
 
 ---
 
-## 7. Owner dashboard — PROPOSED
+## 7. Owner dashboard — IMPLEMENTED — UNVERIFIED
 
-Data assembly exists in code; no interface has been built.
+The Next.js application contains owner pages for sign-in, onboarding,
+organization selection, home, feedback, praise, reviews, stands, customers, and
+settings. The interface and server-side data assembly exist, but have not been
+live-tested against production infrastructure.
 
 Design rules:
 
@@ -248,12 +245,17 @@ Design rules:
 
 ## 8. Architecture
 
-### Current repository — IMPLEMENTED — UNVERIFIED
+### Current repository — IMPLEMENTED — PARTIALLY VERIFIED
 
 Next.js 16, App Router, TypeScript strict. PostgreSQL via Supabase with Row
-Level Security. Supabase Auth (GoTrue). Vercel for web deployment.
+Level Security and Supabase Auth (GoTrue). An Expo 57 / React Native mobile
+foundation uses Expo Router and Supabase authentication.
 
-**No component has been exercised against real production infrastructure.**
+Database migrations and 253 planned pgTAP assertions have run successfully in
+CI, including tenant-isolation and privilege checks. The Next.js and Expo
+applications have not been live-tested against production infrastructure. The
+repository contains no Vercel project configuration from which to infer the
+settings of a live deployment.
 
 ### Intended platform — PROPOSED
 
@@ -261,7 +263,7 @@ Not agreed. Each item requires an architecture decision record before adoption.
 
 - Next.js 16, App Router, TypeScript strict (implemented)
 - Supabase — PostgreSQL, Auth, Storage, Row Level Security (implemented)
-- Vercel for web deployment (implemented)
+- Vercel for web deployment (intended; live project configuration is not stored here)
 - Durable background execution via an **explicitly selected** job platform
 - Twilio for SMS
 - Stripe for billing
@@ -291,14 +293,17 @@ system.**
 
 ## 9. Security
 
-### Implemented in the current repository — UNVERIFIED
+### Implemented in the current repository — PARTIALLY VERIFIED
 
 Tenant isolation via row security; short-lived access tokens with rotating
 refresh tokens and reuse detection; account lockout; TOTP; AES-256-GCM for PII
 with keyed HMAC lookups; CSRF; layered rate limiting; recursive log redaction.
 
-**None of this has run against a real database.** Tenant isolation in particular
-is designed and untested.
+Migrations and pgTAP security tests, including tenant-isolation and privilege
+attacks, have run successfully against CI databases. This is not evidence of a
+production security review or a live production deployment. Application-level
+security controls have automated test coverage but have not been live-tested
+against production infrastructure.
 
 ### Non-negotiable — APPROVED
 
@@ -319,15 +324,17 @@ is designed and untested.
 
 ### Does not exist
 
-Frontend of any kind · NFC encoding · hardware catalogue, ordering, fulfilment ·
-Google Business Profile integration · POS integrations · AI reply drafting ·
-admin portal · monitoring and alerting · backups and restore drill · load testing ·
-contacts as first-class entities · campaign scheduling · print templates
+NFC encoding · hardware catalogue, ordering, fulfilment · Google Business
+Profile integration · POS integrations · AI reply drafting · admin portal ·
+monitoring and alerting · backups and restore drill · load testing · contacts as
+first-class entities · campaign scheduling · print templates
 
 ### Exists but unverified
 
-Every line of backend code in this repository. No SQL has been executed. No
-provider has been contacted.
+The Next.js web application and Expo mobile foundation have not been live-tested
+against production infrastructure. External provider integrations have not been
+contacted. Database migrations and pgTAP tests are excluded from this category:
+they have run successfully in CI.
 
 ### Must be removed
 
