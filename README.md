@@ -10,6 +10,7 @@ Google review opportunity regardless of the rating they selected.
 
 ```
 frontend/          Next.js 16 App Router (TypeScript strict)
+apps/mobile/       Expo 57 / React Native mobile foundation
 supabase/
   migrations/      Ordered SQL migrations (Supabase CLI)
   tests/           pgTAP database tests
@@ -23,7 +24,7 @@ docs/backend/      Architecture and environment documentation
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - Supabase CLI (`npx supabase`)
 - Docker (for local Supabase)
 
@@ -39,6 +40,20 @@ cd frontend && npm install
 # Run the dev server
 npm run dev
 ```
+
+The web application includes the public customer flow and an authenticated
+owner dashboard. To run the separate Expo mobile foundation:
+
+```bash
+cd apps/mobile
+npm install
+npm start
+```
+
+Both applications are implemented, but the full live flow has not been verified.
+The mobile application uses Supabase for authentication and organization
+loading; its Feed and Feedback screens still use organization-filtered mock data.
+It is not a production-complete mobile product.
 
 ### Database
 

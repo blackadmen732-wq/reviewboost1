@@ -1,6 +1,6 @@
 # ReviewBoost Foundation Status
 
-Last updated: 2026-08-14
+Last updated: 2026-08-22
 
 ## What is done
 
@@ -22,26 +22,53 @@ Last updated: 2026-08-14
 - [x] Obsolete function overloads dropped (set_stand_token_ciphertext, old create_organization)
 - [x] All security-critical params required (no unsafe defaults)
 
-### Frontend/API
+### Next.js web application and API
 
+- [x] Public customer rating flow and equal Google review opportunity
+- [x] Owner sign-in, onboarding, organization selection, dashboard, feedback, praise, stands, and settings pages
+- [x] Next.js route handlers for the public flow and owner operations
 - [x] Team praise route uses RPCs for all operations (no direct UPDATE)
 - [x] Praise-to-rating correlation removed (rpc_response_has_praise dropped, praisedSomeone removed)
 - [x] Error handling on all database queries (503 on failure, never silent empty)
 - [x] Cursor validation (UUID + timestamp checked before interpolation)
 - [x] TypeScript strict, ESLint clean
 
+### Expo mobile foundation
+
+- [x] Expo Router application under `apps/mobile/`
+- [x] Supabase authentication and organization loading
+- [x] Protected routes for the Feed and Feedback foundations
+- [x] Feed and Feedback mock data filtered by the selected organization
+
 ### Tests (pgTAP)
 
-- [x] column_security_test.sql (33 tests)
+- [x] column_security_test.sql (36 tests)
 - [x] customer_flow_test.sql (88 tests)
-- [x] security_hardening_test.sql (24 tests)
+- [x] security_hardening_test.sql (85 tests)
 - [x] praise_isolation_test.sql (26 tests)
+- [x] token_rotation_test.sql (18 tests)
 
-## What is not done
+The migrations, including a second clean reset and schema-drift check, and all
+253 planned pgTAP assertions have run successfully in CI. This verifies the
+database build and tested authorization behavior in CI; it does not verify a
+production Supabase project.
+
+## Built but not live-tested
+
+- The Next.js web application and its route handlers exist and have automated
+  type, lint, unit/component, contract, build, accessibility, end-to-end, and
+  visual-test coverage in the repository. They have not been exercised against
+  real production infrastructure as part of this status review.
+- The Expo mobile foundation uses Supabase for authentication and organization
+  loading. Its Feed and Feedback screens use organization-filtered mock data,
+  not live backend data, and it is not a completed mobile release.
+- Database migrations and pgTAP tests are CI-verified, but production deployment,
+  operations, backup, and recovery readiness are not established here.
+
+## What is not built
 
 ### Not built (and not in scope for this foundation)
 
-- Frontend UI (pages exist but are not verified against real infrastructure)
 - SMS/Twilio integration
 - Stripe billing integration
 - Google Business Profile integration
@@ -57,6 +84,7 @@ Last updated: 2026-08-14
 
 ### Known issues
 
-- Vercel deployment configured with wrong root directory (`backend/` instead of `frontend/`)
-- SYSTEM_CONTEXT.md references `review_threshold` field that still needs removal
-- No production environment has been provisioned
+- Deployments succeed through external Vercel configuration, but the complete
+  live product flow remains unverified.
+- Production infrastructure and provider integrations have not been live-tested
+  by the evidence recorded here.
