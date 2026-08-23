@@ -156,24 +156,34 @@ worth doing for its own sake.
 
 ## 5. The three revenue lines
 
-### 5.1 Subscription — IMPLEMENTED — UNVERIFIED
+### 5.1 Subscription — NOT BUILT
 
-Plans defined in code so pricing changes appear in a diff. Trial without a card.
+No subscription plans, billing enforcement, trial flow, cancellation flow, or
+Stripe integration exists in the current repository.
 
-Stored in **integer minor currency units**, with the currency recorded on every
-entry. Never floating point.
+#### Subscription requirements — PROPOSED
 
-Enforcement points designed: campaign creation, quota reservation, immediately
-before each send, during long campaigns, and during reconciliation.
-**No Stripe call has been exercised.**
+- Define plans in code so pricing changes appear in a diff.
+- Offer a trial without a card.
+- Store amounts in **integer minor currency units**, with the currency recorded
+  on every entry. Never use floating point.
+- Enforce plans at campaign creation, quota reservation, immediately before each
+  send, during long campaigns, and during reconciliation.
+- Make cancellation self-service, without retention traps.
 
-Cancellation must be self-service. No retention traps.
+Any future Stripe behavior must be designed and verified when the integration is
+built.
 
 ### 5.2 Hardware — NOT BUILT
 
 See §3.
 
-### 5.3 SMS usage — IMPLEMENTED — UNVERIFIED
+### 5.3 SMS usage — NOT BUILT
+
+No SMS provider integration, segment accounting, usage billing, or cost-preview
+endpoint exists in the current repository.
+
+#### SMS usage requirements — PROPOSED
 
 Carriers bill per **segment**, and segment size depends on the alphabet: GSM-7
 gives 160 characters, dropping to 153 once a message splits; UCS-2 gives 70,
@@ -182,13 +192,13 @@ the entire message to UCS-2 and more than halves capacity.
 
 A naive `length / 160` undercharges every Unicode message.
 
-Plans must be denominated in **segments**, not vaguely in "texts".
+- Plans should be denominated in **segments**, not vaguely in "texts".
 
-**Provider cost can fall below one cent and is stored in integer micro-units**,
-not cents.
+- Provider cost can fall below one cent, so future accounting should store it in
+  integer micro-units, not cents.
 
-Live cost preview endpoints exist. The intent is that an owner sees the moment an
-emoji changes the cost, while they can still remove it.
+- A future cost preview should show an owner when a character such as an emoji
+  changes the segment count and cost while they can still edit the message.
 
 ### Quota ledger — PROPOSED
 
