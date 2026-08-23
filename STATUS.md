@@ -37,8 +37,8 @@ Last updated: 2026-08-22
 
 - [x] Expo Router application under `apps/mobile/`
 - [x] Supabase authentication and organization selection
-- [x] Protected routes for the feedback feed and feedback detail foundations
-- [x] Organization-scoped requests
+- [x] Protected routes for the Feed and Feedback foundations
+- [x] Feed and Feedback mock data filtered by the selected organization
 
 ### Tests (pgTAP)
 
@@ -59,9 +59,9 @@ production Supabase project.
   type, lint, unit/component, contract, build, accessibility, end-to-end, and
   visual-test coverage in the repository. They have not been exercised against
   real production infrastructure as part of this status review.
-- The Expo mobile foundation exists and has authenticated, organization-scoped
-  navigation and feedback screens. It has not been live-tested against a
-  production backend and is not a completed mobile release.
+- The Expo mobile foundation uses Supabase for authentication and organization
+  selection. Its Feed and Feedback screens use organization-filtered mock data,
+  not live backend data, and it is not a completed mobile release.
 - Database migrations and pgTAP tests are CI-verified, but production deployment,
   operations, backup, and recovery readiness are not established here.
 
@@ -84,7 +84,7 @@ production Supabase project.
 
 ### Known issues
 
-- No repository-owned Vercel project configuration is present, so this repository
-  does not establish the live deployment settings.
+- Vercel is configured externally and deployment checks have succeeded, but the
+  full live flow has not been verified.
 - Production infrastructure and provider integrations have not been live-tested
   by the evidence recorded here.

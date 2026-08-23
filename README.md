@@ -50,10 +50,10 @@ npm install
 npm start
 ```
 
-Both applications are implemented, but neither has been live-tested against a
-production deployment. The mobile application currently provides authentication,
-organization selection, feedback lists, and feedback detail foundations; it is
-not a production-complete mobile product.
+Both applications are implemented, but the full live flow has not been verified.
+The mobile application uses Supabase for authentication and organization
+selection; its Feed and Feedback screens still use organization-filtered mock
+data. It is not a production-complete mobile product.
 
 ### Database
 
