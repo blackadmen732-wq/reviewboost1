@@ -34,8 +34,5 @@
     "web": "expo start --web",
     "test": "vitest run"
   },
-  "private": true,
-  "overrides": {
-    "image-size": "npm:image-size-next@1.2.2"
-  }
+  "private": true
 }
