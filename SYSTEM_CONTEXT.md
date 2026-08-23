@@ -250,13 +250,13 @@ Design rules:
 Next.js 16, App Router, TypeScript strict. PostgreSQL via Supabase with Row
 Level Security and Supabase Auth (GoTrue). An Expo 57 / React Native mobile
 foundation uses Expo Router and Supabase for authentication and organization
-selection; its Feed and Feedback screens use organization-filtered mock data.
+loading; its Feed and Feedback screens use organization-filtered mock data.
 
 Database migrations and 253 planned pgTAP assertions have run successfully in
-CI, including tenant-isolation and privilege checks. Vercel is configured
-externally and deployment checks have succeeded, but the full live flow,
-including the Next.js and Expo applications against production infrastructure,
-has not been verified.
+CI, including tenant-isolation and privilege checks. Deployments succeed through
+external Vercel configuration, but the complete live product flow, including the
+Next.js and Expo applications against production infrastructure, remains
+unverified.
 
 ### Intended platform — PROPOSED
 
@@ -264,7 +264,7 @@ Not agreed. Each item requires an architecture decision record before adoption.
 
 - Next.js 16, App Router, TypeScript strict (implemented)
 - Supabase — PostgreSQL, Auth, Storage, Row Level Security (implemented)
-- Vercel for web deployment (externally configured; deployment checks successful)
+- Vercel for web deployment (deployments succeed through external configuration)
 - Durable background execution via an **explicitly selected** job platform
 - Twilio for SMS
 - Stripe for billing
@@ -333,7 +333,7 @@ first-class entities · campaign scheduling · print templates
 ### Exists but unverified
 
 The full live Next.js flow has not been verified. The Expo mobile foundation uses
-Supabase authentication and organization selection, while Feed and Feedback
+Supabase authentication and organization loading, while Feed and Feedback
 still use organization-filtered mock data. External provider integrations have
 not been contacted. Database migrations and pgTAP tests are excluded from this
 category: they have run successfully in CI.

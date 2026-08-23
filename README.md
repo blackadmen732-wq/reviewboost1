@@ -52,8 +52,8 @@ npm start
 
 Both applications are implemented, but the full live flow has not been verified.
 The mobile application uses Supabase for authentication and organization
-selection; its Feed and Feedback screens still use organization-filtered mock
-data. It is not a production-complete mobile product.
+loading; its Feed and Feedback screens still use organization-filtered mock data.
+It is not a production-complete mobile product.
 
 ### Database
 
