@@ -1,5 +1,7 @@
 export const colors = {
   brand: "#00a86b",
+  brandText: "#007a4d",
+  onBrand: "#0d2118",
   brandHover: "#009a61",
   brandActive: "#008f5b",
 

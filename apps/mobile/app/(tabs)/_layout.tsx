@@ -8,7 +8,7 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
     Feedback: "✉",
   };
   return (
-    <Text style={{ fontSize: 20, color: focused ? colors.brand : colors.inkFaint }}>
+    <Text style={{ fontSize: 20, color: focused ? colors.brandText : colors.inkFaint }}>
       {icons[label] ?? "●"}
     </Text>
   );
@@ -18,7 +18,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.brand,
+        tabBarActiveTintColor: colors.brandText,
         tabBarInactiveTintColor: colors.inkFaint,
         headerStyle: { backgroundColor: colors.surface },
         headerTitleStyle: { ...fonts.subheading, color: colors.ink },

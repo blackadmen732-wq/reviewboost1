@@ -32,7 +32,7 @@ export default function FeedbackDetailScreen() {
           headerShown: true,
           headerStyle: { backgroundColor: colors.surface },
           headerTitleStyle: { ...fonts.subheading, color: colors.ink },
-          headerTintColor: colors.brand,
+          headerTintColor: colors.brandText,
         }}
       />
       <ScrollView contentContainerStyle={styles.content}>

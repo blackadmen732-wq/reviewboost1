@@ -81,7 +81,7 @@ export default function LoginScreen() {
           disabled={!canSubmit}
         >
           {submitting ? (
-            <ActivityIndicator color={colors.white} />
+            <ActivityIndicator color={colors.onBrand} />
           ) : (
             <Text style={styles.buttonText}>Sign in</Text>
           )}
@@ -94,7 +94,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   inner: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
-  brand: { fontSize: 32, ...fonts.heading, color: colors.brand, textAlign: "center" },
+  brand: { fontSize: 32, ...fonts.heading, color: colors.brandText, textAlign: "center" },
   subtitle: {
     fontSize: 16,
     color: colors.inkMuted,
@@ -129,5 +129,5 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: colors.white, fontSize: 16, ...fonts.subheading },
+  buttonText: { color: colors.onBrand, fontSize: 16, ...fonts.subheading },
 });
