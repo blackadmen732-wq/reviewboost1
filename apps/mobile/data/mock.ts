@@ -57,7 +57,6 @@ export const MOCK_FEEDBACK: FeedbackItem[] = [
     submittedAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
     isRead: false,
     isResolved: false,
-    noteCount: 0,
   },
   {
     id: "fb-2",
@@ -68,7 +67,6 @@ export const MOCK_FEEDBACK: FeedbackItem[] = [
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
     isRead: true,
     isResolved: false,
-    noteCount: 1,
   },
   {
     id: "fb-3",
@@ -79,7 +77,6 @@ export const MOCK_FEEDBACK: FeedbackItem[] = [
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
     isRead: true,
     isResolved: true,
-    noteCount: 2,
   },
   {
     id: "fb-4",
@@ -90,7 +87,6 @@ export const MOCK_FEEDBACK: FeedbackItem[] = [
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
     isRead: false,
     isResolved: false,
-    noteCount: 0,
   },
   {
     id: "fb-5",
@@ -101,7 +97,6 @@ export const MOCK_FEEDBACK: FeedbackItem[] = [
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
     isRead: true,
     isResolved: true,
-    noteCount: 0,
   },
   {
     id: "fb-6",
@@ -112,7 +107,6 @@ export const MOCK_FEEDBACK: FeedbackItem[] = [
     submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
     isRead: true,
     isResolved: false,
-    noteCount: 0,
   },
 ];
 
