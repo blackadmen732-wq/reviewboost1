@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { apiFetch, ApiError } from "./api";
 import type { FeedbackItem } from "./types";
 
@@ -41,6 +41,8 @@ export function useFeedback(orgId: string | undefined) {
   const [loadingMore, setLoadingMore] = useState(false);
   const cursorRef = useRef<string | null>(null);
   const generationRef = useRef(0);
+  const requestIdRef = useRef(0);
+  const loadingMoreRef = useRef(false);
 
   useEffect(() => {
     generationRef.current += 1;
@@ -50,6 +52,7 @@ export function useFeedback(orgId: string | undefined) {
     setLoading(false);
     setRefreshing(false);
     setLoadingMore(false);
+    loadingMoreRef.current = false;
     cursorRef.current = null;
   }, [orgId]);
 
@@ -58,6 +61,7 @@ export function useFeedback(orgId: string | undefined) {
       if (!orgId) return;
 
       const gen = generationRef.current;
+      const reqId = ++requestIdRef.current;
 
       const params = new URLSearchParams();
       if (cursor) params.set("cursor", cursor);
@@ -70,6 +74,7 @@ export function useFeedback(orgId: string | undefined) {
       );
 
       if (gen !== generationRef.current) return;
+      if (reqId !== requestIdRef.current && !append) return;
 
       const mapped = res.data.map((r) => toFeedbackItem(r, orgId));
 
@@ -111,17 +116,36 @@ export function useFeedback(orgId: string | undefined) {
   }, [orgId, fetchPage]);
 
   const loadMore = useCallback(async () => {
-    if (!orgId || !hasMore || loadingMore) return;
+    if (!orgId || !hasMore || loadingMoreRef.current) return;
     const gen = generationRef.current;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
       await fetchPage(cursorRef.current, true);
     } catch {
       // Silently fail on load-more; the user can retry by scrolling again.
     } finally {
-      if (gen === generationRef.current) setLoadingMore(false);
+      if (gen === generationRef.current) {
+        setLoadingMore(false);
+        loadingMoreRef.current = false;
+      }
     }
-  }, [orgId, hasMore, loadingMore, fetchPage]);
+  }, [orgId, hasMore, fetchPage]);
 
-  return { items, loading, refreshing, error, hasMore, loadingMore, load, refresh, loadMore };
+  const safeItems = useMemo(
+    () => (orgId ? items.filter((i) => i.orgId === orgId) : []),
+    [items, orgId],
+  );
+
+  return {
+    items: safeItems,
+    loading,
+    refreshing,
+    error,
+    hasMore,
+    loadingMore,
+    load,
+    refresh,
+    loadMore,
+  };
 }

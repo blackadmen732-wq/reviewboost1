@@ -162,4 +162,133 @@ describe("useFeedback", () => {
     expect(result.current.refreshing).toBe(false);
     expect(result.current.loadingMore).toBe(false);
   });
+
+  it("latest-request-wins: second load() supersedes first", async () => {
+    let resolveFirst: (v: unknown) => void;
+    const firstPromise = new Promise((r) => {
+      resolveFirst = r;
+    });
+    let resolveSecond: (v: unknown) => void;
+    const secondPromise = new Promise((r) => {
+      resolveSecond = r;
+    });
+
+    let callCount = 0;
+    mockApiFetch.mockImplementation(() => {
+      callCount++;
+      return callCount === 1 ? firstPromise : secondPromise;
+    });
+
+    const { result } = renderHook(() => useFeedback("org-a"));
+
+    // Fire two load() calls without awaiting the first.
+    let p1: Promise<void>;
+    let p2: Promise<void>;
+    act(() => {
+      p1 = result.current.load();
+    });
+    act(() => {
+      p2 = result.current.load();
+    });
+
+    // Resolve the second first.
+    await act(async () => {
+      resolveSecond!(makeResponse(["fb-second"]));
+      await p2!;
+    });
+
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].id).toBe("fb-second");
+
+    // Now resolve the first — it must be discarded (latest-request-wins).
+    await act(async () => {
+      resolveFirst!(makeResponse(["fb-first-stale", "fb-first-stale-2"]));
+      await p1!;
+    });
+
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].id).toBe("fb-second");
+  });
+
+  it("prevents duplicate concurrent loadMore calls", async () => {
+    mockApiFetch.mockResolvedValueOnce(
+      makeResponse(["fb-1"], true, "cursor-1"),
+    );
+
+    const { result } = renderHook(() => useFeedback("org-a"));
+    await act(() => result.current.load());
+
+    expect(result.current.hasMore).toBe(true);
+
+    // Make loadMore hang so we can test concurrency guard.
+    let resolveMore: (v: unknown) => void;
+    mockApiFetch.mockImplementation(
+      () => new Promise((r) => { resolveMore = r; }),
+    );
+
+    act(() => {
+      result.current.loadMore();
+    });
+
+    expect(result.current.loadingMore).toBe(true);
+
+    // Second call while first is in-flight — should be a no-op.
+    act(() => {
+      result.current.loadMore();
+    });
+
+    // Only one additional apiFetch call should have been made (the first loadMore).
+    // load() was 1 call, first loadMore is 2nd call. No 3rd call.
+    expect(mockApiFetch).toHaveBeenCalledTimes(2);
+
+    // Resolve to clean up.
+    await act(async () => {
+      resolveMore!(makeResponse(["fb-2"]));
+    });
+
+    expect(result.current.loadingMore).toBe(false);
+  });
+
+  it("never returns items belonging to wrong orgId", async () => {
+    // Simulate a scenario where items state briefly contains wrong-org data
+    // by resolving org-a data just as we switch to org-b. The useMemo filter
+    // ensures the returned items never include wrong-org entries.
+    let resolveOrgA: (v: unknown) => void;
+    const orgAPromise = new Promise((r) => {
+      resolveOrgA = r;
+    });
+
+    mockApiFetch.mockImplementation((_path: string, orgId: string) => {
+      if (orgId === "org-a") return orgAPromise;
+      return Promise.resolve(makeResponse(["fb-b1"]));
+    });
+
+    const { result, rerender } = renderHook(
+      ({ orgId }: { orgId: string | undefined }) => useFeedback(orgId),
+      { initialProps: { orgId: "org-a" } },
+    );
+
+    act(() => {
+      result.current.load();
+    });
+
+    // Switch org before org-a resolves.
+    rerender({ orgId: "org-b" });
+    await act(() => result.current.load());
+
+    // At every point after the switch, items must belong to org-b only.
+    for (const item of result.current.items) {
+      expect(item.orgId).toBe("org-b");
+    }
+
+    // Resolve org-a — should still not leak into results.
+    await act(async () => {
+      resolveOrgA!(makeResponse(["fb-a1", "fb-a2"]));
+    });
+
+    for (const item of result.current.items) {
+      expect(item.orgId).toBe("org-b");
+    }
+    expect(result.current.items).toHaveLength(1);
+  });
 });
