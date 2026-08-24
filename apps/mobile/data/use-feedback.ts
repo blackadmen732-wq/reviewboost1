@@ -43,6 +43,7 @@ export function useFeedback(orgId: string | undefined) {
   const generationRef = useRef(0);
   const requestIdRef = useRef(0);
   const loadingMoreRef = useRef(false);
+  const fetchingRef = useRef(false);
 
   useEffect(() => {
     generationRef.current += 1;
@@ -53,6 +54,7 @@ export function useFeedback(orgId: string | undefined) {
     setRefreshing(false);
     setLoadingMore(false);
     loadingMoreRef.current = false;
+    fetchingRef.current = false;
     cursorRef.current = null;
   }, [orgId]);
 
@@ -88,6 +90,7 @@ export function useFeedback(orgId: string | undefined) {
     if (!orgId) return;
     const gen = generationRef.current;
     const reqId = ++requestIdRef.current;
+    fetchingRef.current = true;
     setLoading(true);
     setRefreshing(false);
     setLoadingMore(false);
@@ -101,6 +104,7 @@ export function useFeedback(orgId: string | undefined) {
       setError(e instanceof ApiError ? e.message : "Failed to load feedback");
     } finally {
       if (gen === generationRef.current && reqId === requestIdRef.current) {
+        fetchingRef.current = false;
         setLoading(false);
       }
     }
@@ -110,6 +114,7 @@ export function useFeedback(orgId: string | undefined) {
     if (!orgId) return;
     const gen = generationRef.current;
     const reqId = ++requestIdRef.current;
+    fetchingRef.current = true;
     setRefreshing(true);
     setLoading(false);
     setLoadingMore(false);
@@ -123,13 +128,14 @@ export function useFeedback(orgId: string | undefined) {
       setError(e instanceof ApiError ? e.message : "Failed to refresh");
     } finally {
       if (gen === generationRef.current && reqId === requestIdRef.current) {
+        fetchingRef.current = false;
         setRefreshing(false);
       }
     }
   }, [orgId, fetchPage]);
 
   const loadMore = useCallback(async () => {
-    if (!orgId || !hasMore || loadingMoreRef.current) return;
+    if (!orgId || !hasMore || loadingMoreRef.current || fetchingRef.current) return;
     const gen = generationRef.current;
     const reqId = requestIdRef.current;
     loadingMoreRef.current = true;

@@ -368,6 +368,34 @@ describe("useFeedback", () => {
     expect(result.current.items[0].id).toBe("fb-refreshed");
   });
 
+  it("loadMore is a no-op while refresh is in progress", async () => {
+    mockApiFetch.mockResolvedValueOnce(
+      makeResponse(["fb-1"], true, "cursor-1"),
+    );
+
+    const { result } = renderHook(() => useFeedback("org-a"));
+    await act(() => result.current.load());
+    expect(result.current.hasMore).toBe(true);
+
+    // Start a refresh that hangs.
+    mockApiFetch.mockImplementation(() => new Promise(() => {}));
+
+    act(() => {
+      result.current.refresh();
+    });
+
+    expect(result.current.refreshing).toBe(true);
+    const callsBefore = mockApiFetch.mock.calls.length;
+
+    // Attempt loadMore while refresh is in flight — should be a no-op.
+    act(() => {
+      result.current.loadMore();
+    });
+
+    expect(mockApiFetch).toHaveBeenCalledTimes(callsBefore);
+    expect(result.current.loadingMore).toBe(false);
+  });
+
   it("never returns items belonging to wrong orgId", async () => {
     // Simulate a scenario where items state briefly contains wrong-org data
     // by resolving org-a data just as we switch to org-b. The useMemo filter
