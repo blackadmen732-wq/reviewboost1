@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { apiFetch, ApiError } from "./api";
 import type { FeedbackItem } from "./types";
 
@@ -40,10 +40,24 @@ export function useFeedback(orgId: string | undefined) {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const cursorRef = useRef<string | null>(null);
+  const generationRef = useRef(0);
+
+  useEffect(() => {
+    generationRef.current += 1;
+    setItems([]);
+    setError(null);
+    setHasMore(false);
+    setLoading(false);
+    setRefreshing(false);
+    setLoadingMore(false);
+    cursorRef.current = null;
+  }, [orgId]);
 
   const fetchPage = useCallback(
     async (cursor: string | null, append: boolean) => {
       if (!orgId) return;
+
+      const gen = generationRef.current;
 
       const params = new URLSearchParams();
       if (cursor) params.set("cursor", cursor);
@@ -54,6 +68,8 @@ export function useFeedback(orgId: string | undefined) {
         `/api/v1/customer-responses?${qs}`,
         orgId,
       );
+
+      if (gen !== generationRef.current) return;
 
       const mapped = res.data.map((r) => toFeedbackItem(r, orgId));
 
@@ -66,39 +82,44 @@ export function useFeedback(orgId: string | undefined) {
 
   const load = useCallback(async () => {
     if (!orgId) return;
+    const gen = generationRef.current;
     setLoading(true);
     setError(null);
     try {
       await fetchPage(null, false);
     } catch (e) {
+      if (gen !== generationRef.current) return;
       setError(e instanceof ApiError ? e.message : "Failed to load feedback");
     } finally {
-      setLoading(false);
+      if (gen === generationRef.current) setLoading(false);
     }
   }, [orgId, fetchPage]);
 
   const refresh = useCallback(async () => {
     if (!orgId) return;
+    const gen = generationRef.current;
     setRefreshing(true);
     setError(null);
     try {
       await fetchPage(null, false);
     } catch (e) {
+      if (gen !== generationRef.current) return;
       setError(e instanceof ApiError ? e.message : "Failed to refresh");
     } finally {
-      setRefreshing(false);
+      if (gen === generationRef.current) setRefreshing(false);
     }
   }, [orgId, fetchPage]);
 
   const loadMore = useCallback(async () => {
     if (!orgId || !hasMore || loadingMore) return;
+    const gen = generationRef.current;
     setLoadingMore(true);
     try {
       await fetchPage(cursorRef.current, true);
     } catch {
       // Silently fail on load-more; the user can retry by scrolling again.
     } finally {
-      setLoadingMore(false);
+      if (gen === generationRef.current) setLoadingMore(false);
     }
   }, [orgId, hasMore, loadingMore, fetchPage]);
 
