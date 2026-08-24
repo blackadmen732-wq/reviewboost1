@@ -49,8 +49,10 @@ export async function apiFetch<T>(
     | undefined;
 
   if (!res.ok) {
+    const err = (body as Record<string, unknown>)?.error;
     const message =
-      (body as Record<string, unknown>)?.error ??
+      (err && typeof err === "object" && (err as Record<string, unknown>).message) ??
+      (typeof err === "string" && err) ??
       (body as Record<string, unknown>)?.message ??
       res.statusText;
     throw new ApiError(String(message), res.status, requestId);
