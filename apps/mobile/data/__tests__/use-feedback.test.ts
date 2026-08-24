@@ -249,6 +249,125 @@ describe("useFeedback", () => {
     expect(result.current.loadingMore).toBe(false);
   });
 
+  it("stale same-org error does not overwrite state after refresh starts", async () => {
+    let rejectLoad: (e: Error) => void;
+    const loadPromise = new Promise((_r, rej) => {
+      rejectLoad = rej;
+    });
+
+    let callCount = 0;
+    mockApiFetch.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return loadPromise;
+      return Promise.resolve(makeResponse(["fb-refreshed"]));
+    });
+
+    const { result } = renderHook(() => useFeedback("org-a"));
+
+    // Start load (will hang).
+    let loadP: Promise<void>;
+    act(() => {
+      loadP = result.current.load();
+    });
+
+    // Start refresh before load finishes — supersedes load.
+    await act(() => result.current.refresh());
+
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.error).toBeNull();
+
+    // Now reject the stale load — error must NOT appear.
+    await act(async () => {
+      rejectLoad!(new api.ApiError("stale load failed", 500));
+      try {
+        await loadP!;
+      } catch {}
+    });
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.items).toHaveLength(1);
+  });
+
+  it("stale load does not clear loading flag while newer load is in flight", async () => {
+    let resolveFirst: (v: unknown) => void;
+    const firstPromise = new Promise((r) => {
+      resolveFirst = r;
+    });
+
+    let callCount = 0;
+    mockApiFetch.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return firstPromise;
+      return new Promise(() => {}); // second load never resolves
+    });
+
+    const { result } = renderHook(() => useFeedback("org-a"));
+
+    // Start first load.
+    let p1: Promise<void>;
+    act(() => {
+      p1 = result.current.load();
+    });
+    expect(result.current.loading).toBe(true);
+
+    // Start second load — supersedes first, loading stays true.
+    act(() => {
+      result.current.load();
+    });
+    expect(result.current.loading).toBe(true);
+
+    // Resolve the first — its finally must NOT clear loading.
+    await act(async () => {
+      resolveFirst!(makeResponse(["fb-stale"]));
+      await p1!;
+    });
+
+    expect(result.current.loading).toBe(true);
+  });
+
+  it("stale loadMore does not append after a newer refresh", async () => {
+    // Initial load with hasMore.
+    mockApiFetch.mockResolvedValueOnce(
+      makeResponse(["fb-1"], true, "cursor-1"),
+    );
+
+    const { result } = renderHook(() => useFeedback("org-a"));
+    await act(() => result.current.load());
+    expect(result.current.items).toHaveLength(1);
+
+    // Start loadMore (will hang).
+    let resolveMore: (v: unknown) => void;
+    let moreCallCount = 0;
+    mockApiFetch.mockImplementation(() => {
+      moreCallCount++;
+      if (moreCallCount === 1) {
+        return new Promise((r) => {
+          resolveMore = r;
+        });
+      }
+      return Promise.resolve(makeResponse(["fb-refreshed"]));
+    });
+
+    let moreP: Promise<void>;
+    act(() => {
+      moreP = result.current.loadMore();
+    });
+
+    // Refresh supersedes the in-flight loadMore.
+    await act(() => result.current.refresh());
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].id).toBe("fb-refreshed");
+
+    // Resolve the stale loadMore — must NOT append.
+    await act(async () => {
+      resolveMore!(makeResponse(["fb-stale-page2"]));
+      await moreP!;
+    });
+
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].id).toBe("fb-refreshed");
+  });
+
   it("never returns items belonging to wrong orgId", async () => {
     // Simulate a scenario where items state briefly contains wrong-org data
     // by resolving org-a data just as we switch to org-b. The useMemo filter
