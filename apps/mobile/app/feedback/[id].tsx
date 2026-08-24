@@ -5,6 +5,7 @@ import { useAuth } from "@/data/auth-context";
 import { MOCK_FEEDBACK, MOCK_NOTES } from "@/data/mock";
 import { Stars } from "@/components/stars";
 import { relativeTime } from "@/components/relative-time";
+import { colors, radii, fonts } from "@/theme";
 
 export default function FeedbackDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,9 +30,9 @@ export default function FeedbackDetailScreen() {
         options={{
           title: "Feedback",
           headerShown: true,
-          headerStyle: { backgroundColor: "#FFFFFF" },
-          headerTitleStyle: { fontWeight: "600", color: "#111827" },
-          headerTintColor: "#2563EB",
+          headerStyle: { backgroundColor: colors.surface },
+          headerTitleStyle: { ...fonts.subheading, color: colors.ink },
+          headerTintColor: colors.brandText,
         }}
       />
       <ScrollView contentContainerStyle={styles.content}>
@@ -82,35 +83,35 @@ export default function FeedbackDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  container: { flex: 1, backgroundColor: colors.surface },
   content: { padding: 20 },
   ratingSection: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  time: { fontSize: 13, color: "#9CA3AF" },
+  time: { fontSize: 13, color: colors.inkFaint },
   statusRow: { flexDirection: "row", gap: 8, marginTop: 12 },
   badge: {
-    backgroundColor: "#EFF6FF",
+    backgroundColor: colors.infoBg,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: radii.badge,
   },
-  badgeText: { fontSize: 12, fontWeight: "600", color: "#2563EB" },
-  badgeResolved: { backgroundColor: "#F0FDF4" },
-  badgeResolvedText: { color: "#16A34A" },
+  badgeText: { fontSize: 12, ...fonts.subheading, color: colors.info },
+  badgeResolved: { backgroundColor: colors.successBg },
+  badgeResolvedText: { color: colors.success },
   noteSection: { marginTop: 24 },
-  sectionTitle: { fontSize: 14, fontWeight: "600", color: "#6B7280", marginBottom: 8 },
-  noteText: { fontSize: 16, color: "#111827", lineHeight: 24 },
+  sectionTitle: { fontSize: 14, ...fonts.subheading, color: colors.inkMuted, marginBottom: 8 },
+  noteText: { fontSize: 16, color: colors.ink, lineHeight: 24 },
   notesSection: { marginTop: 28 },
   ownerNote: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 10,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radii.control,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
   },
   noteHeader: {
     flexDirection: "row",
@@ -118,8 +119,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 6,
   },
-  noteAuthor: { fontSize: 13, fontWeight: "600", color: "#374151" },
-  noteTime: { fontSize: 12, color: "#9CA3AF" },
-  noteBody: { fontSize: 14, color: "#374151", lineHeight: 20 },
-  empty: { textAlign: "center", color: "#9CA3AF", marginTop: 40, fontSize: 15 },
+  noteAuthor: { fontSize: 13, ...fonts.subheading, color: colors.ink },
+  noteTime: { fontSize: 12, color: colors.inkFaint },
+  noteBody: { fontSize: 14, color: colors.ink, lineHeight: 20 },
+  empty: { textAlign: "center", color: colors.inkFaint, marginTop: 40, fontSize: 15 },
 });
