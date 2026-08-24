@@ -18,7 +18,8 @@ import { publicFrontendUrl } from "@/lib/server/env";
  * than reflecting whatever asked.
  */
 
-const ALLOWED_REQUEST_HEADERS = "Content-Type, Accept, Idempotency-Key, X-Request-Id";
+const ALLOWED_REQUEST_HEADERS =
+  "Content-Type, Accept, Idempotency-Key, X-Request-Id, Authorization, X-Organization-Id";
 
 export function requestIdOf(request: Request): string {
   const inbound = request.headers.get("x-request-id");
