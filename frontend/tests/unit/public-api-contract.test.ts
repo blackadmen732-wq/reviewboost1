@@ -634,7 +634,7 @@ describe("rate limiting", () => {
 });
 
 describe("CORS", () => {
-  it("answers preflight and permits Idempotency-Key", async () => {
+  it("answers preflight and permits Idempotency-Key, Authorization, and X-Organization-Id", async () => {
     const { OPTIONS } = await import("@/app/api/v1/public/q/[token]/responses/route");
     const response = await OPTIONS(
       request("OPTIONS", `/api/v1/public/q/${TOKEN}/responses`, {
@@ -643,9 +643,10 @@ describe("CORS", () => {
     );
 
     expect(response.status).toBe(204);
-    expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain(
-      "idempotency-key",
-    );
+    const allowed = response.headers.get("access-control-allow-headers")?.toLowerCase() ?? "";
+    expect(allowed).toContain("idempotency-key");
+    expect(allowed).toContain("authorization");
+    expect(allowed).toContain("x-organization-id");
   });
 
   it("does not reflect an origin it was not configured for", async () => {
