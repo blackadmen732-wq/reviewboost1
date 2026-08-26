@@ -28,6 +28,7 @@ interface Recorded {
 const recorded: Recorded[] = [];
 let authUser: { id: string } | null = { id: "user-1" };
 let tableRows: unknown[] = [];
+const perTableRows: Record<string, unknown[]> = {};
 let membershipRows: unknown[] = [{ org_id: "org-1", role: "owner" }];
 let rpcResult: { data: unknown; error: unknown } = { data: null, error: null };
 let serviceRoleUsed = false;
@@ -60,7 +61,9 @@ function fakeClient() {
     from: (table: string) => ({
       select: (columns: string) => {
         recorded.push({ kind: "from", name: table, columns });
-        const rows = table === "organization_members" ? membershipRows : undefined;
+        const rows = table === "organization_members"
+          ? membershipRows
+          : perTableRows[table] ?? undefined;
         return queryBuilder(columns, rows);
       },
       update: () => {
@@ -127,6 +130,7 @@ beforeEach(() => {
   recorded.length = 0;
   authUser = { id: "user-1" };
   tableRows = [];
+  for (const key of Object.keys(perTableRows)) delete perTableRows[key];
   membershipRows = [{ org_id: "org-1", role: "owner" }];
   serviceRoleUsed = false;
   rpcResult = {
@@ -142,6 +146,7 @@ describe("authentication", () => {
       ["@/app/api/v1/customer-responses/route", "GET", "/api/v1/customer-responses"],
       ["@/app/api/v1/team-praise/route", "GET", "/api/v1/team-praise"],
       ["@/app/api/v1/review-stands/route", "GET", "/api/v1/review-stands"],
+      ["@/app/api/v1/live-feed/route", "GET", "/api/v1/live-feed"],
     ] as const;
 
     for (const [module, method, path] of routes) {
@@ -472,6 +477,104 @@ describe("GET /api/v1/customer-responses/[responseId]", () => {
     expect(query).toBeDefined();
     expect(query?.columns).toContain("id");
     expect(query?.columns).not.toContain("org_id");
+  });
+});
+
+describe("GET /api/v1/live-feed", () => {
+  it("rejects without a bearer token", async () => {
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+    const response = await GET(request("GET", "/api/v1/live-feed", { auth: false }));
+    expect(response.status).toBe(401);
+  });
+
+  it("returns merged tap and feedback events sorted by time", async () => {
+    perTableRows["public_review_sessions"] = [
+      {
+        id: "tap-1",
+        location_id: "loc-1",
+        created_at: "2026-08-20T10:00:00Z",
+        locations: { name: "Downtown" },
+      },
+    ];
+    perTableRows["customer_responses"] = [
+      {
+        id: "fb-1",
+        location_id: "loc-2",
+        rating: 4,
+        submitted_at: "2026-08-20T11:00:00Z",
+        locations: { name: "Airport" },
+      },
+    ];
+
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+    const response = await GET(request("GET", "/api/v1/live-feed"));
+    expect(response.status).toBe(200);
+
+    const body = (await response.json()) as {
+      data: Array<{ id: string; type: string; locationName: string; rating: number | null }>;
+      meta: { hasMore: boolean; nextCursor: string | null };
+    };
+
+    expect(body.data).toHaveLength(2);
+    expect(body.data[0]!.id).toBe("fb-1");
+    expect(body.data[0]!.type).toBe("feedback");
+    expect(body.data[0]!.locationName).toBe("Airport");
+    expect(body.data[0]!.rating).toBe(4);
+    expect(body.data[1]!.id).toBe("tap-1");
+    expect(body.data[1]!.type).toBe("tap");
+    expect(body.data[1]!.locationName).toBe("Downtown");
+    expect(body.data[1]!.rating).toBeNull();
+  });
+
+  it("returns cursor metadata", async () => {
+    perTableRows["public_review_sessions"] = [];
+    perTableRows["customer_responses"] = [];
+
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+    const body = (await (await GET(request("GET", "/api/v1/live-feed"))).json()) as {
+      meta: { hasMore: boolean; nextCursor: string | null };
+    };
+
+    expect(body.meta).toHaveProperty("hasMore");
+    expect(body.meta).toHaveProperty("nextCursor");
+    expect(body.meta.hasMore).toBe(false);
+    expect(body.meta.nextCursor).toBeNull();
+  });
+
+  it("queries both tables with org_id scoping", async () => {
+    perTableRows["public_review_sessions"] = [];
+    perTableRows["customer_responses"] = [];
+
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+    await GET(request("GET", "/api/v1/live-feed"));
+
+    const tapQuery = recorded.find((entry) => entry.name === "public_review_sessions");
+    const fbQuery = recorded.find((entry) => entry.name === "customer_responses");
+    expect(tapQuery).toBeDefined();
+    expect(fbQuery).toBeDefined();
+  });
+
+  it("includes location name via embedded select", async () => {
+    perTableRows["public_review_sessions"] = [];
+    perTableRows["customer_responses"] = [];
+
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+    await GET(request("GET", "/api/v1/live-feed"));
+
+    const tapQuery = recorded.find((entry) => entry.name === "public_review_sessions");
+    const fbQuery = recorded.find((entry) => entry.name === "customer_responses");
+    expect(tapQuery?.columns).toContain("locations(name)");
+    expect(fbQuery?.columns).toContain("locations(name)");
+  });
+
+  it("never uses the service role", async () => {
+    perTableRows["public_review_sessions"] = [];
+    perTableRows["customer_responses"] = [];
+
+    serviceRoleUsed = false;
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+    await GET(request("GET", "/api/v1/live-feed"));
+    expect(serviceRoleUsed).toBe(false);
   });
 });
 

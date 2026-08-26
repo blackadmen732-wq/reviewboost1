@@ -389,6 +389,101 @@ export async function getCustomerResponse(
   };
 }
 
+// ---------------------------------------------------------------- live feed --
+
+/**
+ * The live feed: taps and feedback in one reverse-chronological stream.
+ *
+ * Two tables (`public_review_sessions` for taps, `customer_responses` for
+ * feedback) are queried separately and merge-sorted in application code.
+ * Supabase JS has no UNION, and adding a view would require a migration. Both
+ * tables carry RLS on `org_id`, so the merge cannot leak across tenants.
+ *
+ * The cursor is an ISO timestamp that gates both queries. Because the two
+ * tables use different column names for the event time (`created_at` vs
+ * `submitted_at`), the cursor is applied to each independently.
+ */
+export async function listLiveFeed(
+  context: AuthenticatedContext,
+  page: Page,
+  requestId: string,
+  orgId: string,
+) {
+  const limit = pageSize(page.limit);
+  const fetchSize = limit + 1;
+
+  let tapQuery = context.db
+    .from("public_review_sessions")
+    .select("id, location_id, created_at, locations(name)")
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: false })
+    .limit(fetchSize);
+
+  let feedbackQuery = context.db
+    .from("customer_responses")
+    .select("id, location_id, rating, submitted_at, locations(name)")
+    .eq("org_id", orgId)
+    .order("submitted_at", { ascending: false })
+    .limit(fetchSize);
+
+  if (page.cursor) {
+    tapQuery = tapQuery.lt("created_at", page.cursor);
+    feedbackQuery = feedbackQuery.lt("submitted_at", page.cursor);
+  }
+
+  const [tapResult, feedbackResult] = await Promise.all([tapQuery, feedbackQuery]);
+
+  if (tapResult.error) databaseFailure("live_feed_taps", tapResult.error, requestId);
+  if (feedbackResult.error) databaseFailure("live_feed_feedback", feedbackResult.error, requestId);
+
+  interface RawTap {
+    id: string;
+    location_id: string;
+    created_at: string;
+    locations: { name: string } | null;
+  }
+  interface RawFeedback {
+    id: string;
+    location_id: string;
+    rating: number;
+    submitted_at: string;
+    locations: { name: string } | null;
+  }
+
+  const taps = ((tapResult.data ?? []) as unknown as RawTap[]).map((row) => ({
+    id: row.id,
+    type: "tap" as const,
+    locationId: row.location_id,
+    locationName: row.locations?.name ?? null,
+    rating: null as number | null,
+    submittedAt: row.created_at,
+  }));
+
+  const feedback = ((feedbackResult.data ?? []) as unknown as RawFeedback[]).map((row) => ({
+    id: row.id,
+    type: "feedback" as const,
+    locationId: row.location_id,
+    locationName: row.locations?.name ?? null,
+    rating: row.rating as number | null,
+    submittedAt: row.submitted_at,
+  }));
+
+  const merged = [...taps, ...feedback].sort(
+    (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
+  );
+
+  const hasMore = merged.length > limit;
+  const visible = merged.slice(0, limit);
+
+  return {
+    data: visible,
+    meta: {
+      hasMore,
+      nextCursor: hasMore ? visible[visible.length - 1]?.submittedAt ?? null : null,
+    },
+  };
+}
+
 /**
  * Team Praise, deliberately rating-blind.
  *
