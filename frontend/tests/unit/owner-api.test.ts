@@ -385,6 +385,96 @@ describe("stand token rotation", () => {
   });
 });
 
+describe("GET /api/v1/customer-responses/[responseId]", () => {
+  const VALID_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+
+  it("rejects without a bearer token", async () => {
+    const { GET } = await import(
+      "@/app/api/v1/customer-responses/[responseId]/route"
+    );
+    const response = await GET(
+      request("GET", `/api/v1/customer-responses/${VALID_UUID}`, { auth: false }),
+      { params: Promise.resolve({ responseId: VALID_UUID }) },
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it("returns the response for a valid UUID", async () => {
+    tableRows = [
+      {
+        id: VALID_UUID,
+        location_id: "loc-1",
+        rating: 4,
+        note_encrypted: null,
+        submitted_at: "2026-01-01T00:00:00Z",
+        read_at: "2026-01-02T00:00:00Z",
+        resolved_at: null,
+      },
+    ];
+
+    const { GET } = await import(
+      "@/app/api/v1/customer-responses/[responseId]/route"
+    );
+    const response = await GET(
+      request("GET", `/api/v1/customer-responses/${VALID_UUID}`),
+      { params: Promise.resolve({ responseId: VALID_UUID }) },
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { data: { responseId: string; isRead: boolean; isResolved: boolean } };
+    expect(body.data.responseId).toBe(VALID_UUID);
+    expect(body.data.isRead).toBe(true);
+    expect(body.data.isResolved).toBe(false);
+  });
+
+  it("rejects a non-UUID responseId before touching the database", async () => {
+    const { GET } = await import(
+      "@/app/api/v1/customer-responses/[responseId]/route"
+    );
+    const response = await GET(
+      request("GET", "/api/v1/customer-responses/not-a-uuid"),
+      { params: Promise.resolve({ responseId: "not-a-uuid" }) },
+    );
+
+    expect(response.status).toBe(400);
+    expect(
+      recorded.filter((entry) => entry.kind === "from" && entry.name !== "organization_members"),
+    ).toHaveLength(0);
+  });
+
+  it("returns 404 for a missing or cross-organization record", async () => {
+    tableRows = [];
+
+    const { GET } = await import(
+      "@/app/api/v1/customer-responses/[responseId]/route"
+    );
+    const response = await GET(
+      request("GET", `/api/v1/customer-responses/${VALID_UUID}`),
+      { params: Promise.resolve({ responseId: VALID_UUID }) },
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("queries customer_responses with the org_id filter", async () => {
+    tableRows = [];
+
+    const { GET } = await import(
+      "@/app/api/v1/customer-responses/[responseId]/route"
+    );
+    await GET(
+      request("GET", `/api/v1/customer-responses/${VALID_UUID}`),
+      { params: Promise.resolve({ responseId: VALID_UUID }) },
+    );
+
+    const query = recorded.find((entry) => entry.name === "customer_responses");
+    expect(query).toBeDefined();
+    expect(query?.columns).toContain("id");
+    expect(query?.columns).not.toContain("org_id");
+  });
+});
+
 describe("security headers on owner routes", () => {
   it("marks every owner response uncacheable", async () => {
     const { GET } = await import("@/app/api/v1/customer-responses/route");

@@ -1,8 +1,16 @@
-import { View, Text, ScrollView, StyleSheet } from "react-native";
+import { useEffect } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+  Pressable,
+} from "react-native";
 import { useLocalSearchParams, Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/data/auth-context";
-import { MOCK_FEEDBACK, MOCK_NOTES } from "@/data/mock";
+import { useFeedbackDetail } from "@/data/use-feedback-detail";
 import { Stars } from "@/components/stars";
 import { relativeTime } from "@/components/relative-time";
 import { colors, radii, fonts } from "@/theme";
@@ -10,16 +18,51 @@ import { colors, radii, fonts } from "@/theme";
 export default function FeedbackDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activeOrg } = useAuth();
-  const item = MOCK_FEEDBACK.find(
-    (f) => f.id === id && f.orgId === activeOrg?.orgId,
+  const orgId = activeOrg?.orgId;
+  const { item, loading, error, notFound, load } = useFeedbackDetail(
+    orgId,
+    id,
   );
-  const notes = MOCK_NOTES[id ?? ""] ?? [];
 
-  if (!item) {
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (notFound) {
     return (
       <SafeAreaView style={styles.container}>
         <Stack.Screen options={{ title: "Not found", headerShown: true }} />
         <Text style={styles.empty}>Feedback not found</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (loading || !item) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Stack.Screen
+          options={{
+            title: "Feedback",
+            headerShown: true,
+            headerStyle: { backgroundColor: colors.surface },
+            headerTitleStyle: { ...fonts.subheading, color: colors.ink },
+            headerTintColor: colors.brandText,
+          }}
+        />
+        {error ? (
+          <View style={styles.centered}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Pressable style={styles.retryButton} onPress={load}>
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <ActivityIndicator
+            style={styles.spinner}
+            size="large"
+            color={colors.brandText}
+          />
+        )}
       </SafeAreaView>
     );
   }
@@ -49,7 +92,9 @@ export default function FeedbackDetailScreen() {
           )}
           {item.isResolved && (
             <View style={[styles.badge, styles.badgeResolved]}>
-              <Text style={[styles.badgeText, styles.badgeResolvedText]}>Resolved</Text>
+              <Text style={[styles.badgeText, styles.badgeResolvedText]}>
+                Resolved
+              </Text>
             </View>
           )}
         </View>
@@ -58,23 +103,6 @@ export default function FeedbackDetailScreen() {
           <View style={styles.noteSection}>
             <Text style={styles.sectionTitle}>Customer note</Text>
             <Text style={styles.noteText}>{item.note}</Text>
-          </View>
-        )}
-
-        {notes.length > 0 && (
-          <View style={styles.notesSection}>
-            <Text style={styles.sectionTitle}>
-              Owner notes ({notes.length})
-            </Text>
-            {notes.map((note) => (
-              <View key={note.id} style={styles.ownerNote}>
-                <View style={styles.noteHeader}>
-                  <Text style={styles.noteAuthor}>{note.authorName}</Text>
-                  <Text style={styles.noteTime}>{relativeTime(note.createdAt)}</Text>
-                </View>
-                <Text style={styles.noteBody}>{note.body}</Text>
-              </View>
-            ))}
           </View>
         )}
       </ScrollView>
@@ -102,25 +130,32 @@ const styles = StyleSheet.create({
   badgeResolved: { backgroundColor: colors.successBg },
   badgeResolvedText: { color: colors.success },
   noteSection: { marginTop: 24 },
-  sectionTitle: { fontSize: 14, ...fonts.subheading, color: colors.inkMuted, marginBottom: 8 },
+  sectionTitle: {
+    fontSize: 14,
+    ...fonts.subheading,
+    color: colors.inkMuted,
+    marginBottom: 8,
+  },
   noteText: { fontSize: 16, color: colors.ink, lineHeight: 24 },
-  notesSection: { marginTop: 28 },
-  ownerNote: {
-    backgroundColor: colors.surfaceAlt,
+  empty: {
+    textAlign: "center",
+    color: colors.inkFaint,
+    marginTop: 40,
+    fontSize: 15,
+  },
+  spinner: { marginTop: 60 },
+  centered: { alignItems: "center", marginTop: 40, paddingHorizontal: 20 },
+  errorText: {
+    fontSize: 15,
+    color: colors.danger,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: colors.brandText,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
     borderRadius: radii.control,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  noteHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  noteAuthor: { fontSize: 13, ...fonts.subheading, color: colors.ink },
-  noteTime: { fontSize: 12, color: colors.inkFaint },
-  noteBody: { fontSize: 14, color: colors.ink, lineHeight: 20 },
-  empty: { textAlign: "center", color: colors.inkFaint, marginTop: 40, fontSize: 15 },
+  retryText: { color: "#fff", ...fonts.subheading, fontSize: 14 },
 });

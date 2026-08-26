@@ -21,7 +21,6 @@ export interface FeedbackItem {
   submittedAt: string;
   isRead: boolean;
   isResolved: boolean;
-  noteCount: number;
 }
 
 export interface LiveFeedEntry {

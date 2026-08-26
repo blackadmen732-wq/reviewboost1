@@ -1,8 +1,16 @@
-import { View, Text, FlatList, Pressable, StyleSheet } from "react-native";
+import { useEffect } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  Pressable,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/data/auth-context";
-import { MOCK_FEEDBACK } from "@/data/mock";
+import { useFeedback } from "@/data/use-feedback";
 import { Stars } from "@/components/stars";
 import { relativeTime } from "@/components/relative-time";
 import { colors, radii, fonts } from "@/theme";
@@ -34,19 +42,46 @@ function FeedbackRow({ item }: { item: FeedbackItem }) {
           {item.note}
         </Text>
       )}
-
-      {item.noteCount > 0 && (
-        <Text style={styles.noteCount}>
-          {item.noteCount} note{item.noteCount !== 1 ? "s" : ""}
-        </Text>
-      )}
     </Pressable>
   );
 }
 
 export default function FeedbackListScreen() {
   const { activeOrg } = useAuth();
-  const items = MOCK_FEEDBACK.filter((f) => f.orgId === activeOrg?.orgId);
+  const {
+    items,
+    loading,
+    refreshing,
+    error,
+    hasMore,
+    loadingMore,
+    load,
+    refresh,
+    loadMore,
+  } = useFeedback(activeOrg?.orgId);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (loading && items.length === 0) {
+    return (
+      <SafeAreaView style={styles.centered} edges={["bottom"]}>
+        <ActivityIndicator size="large" color={colors.brand} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error && items.length === 0) {
+    return (
+      <SafeAreaView style={styles.centered} edges={["bottom"]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Pressable style={styles.retryButton} onPress={load}>
+          <Text style={styles.retryText}>Retry</Text>
+        </Pressable>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
@@ -56,6 +91,19 @@ export default function FeedbackListScreen() {
         renderItem={({ item }) => <FeedbackRow item={item} />}
         contentContainerStyle={styles.list}
         ListEmptyComponent={<Text style={styles.empty}>No feedback yet</Text>}
+        refreshing={refreshing}
+        onRefresh={refresh}
+        onEndReached={hasMore ? loadMore : undefined}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={
+          loadingMore ? (
+            <ActivityIndicator
+              style={styles.footer}
+              size="small"
+              color={colors.brand}
+            />
+          ) : null
+        }
       />
     </SafeAreaView>
   );
@@ -63,6 +111,13 @@ export default function FeedbackListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
+  centered: {
+    flex: 1,
+    backgroundColor: colors.canvas,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
   list: { padding: 16, gap: 10 },
   card: {
     backgroundColor: colors.surface,
@@ -73,7 +128,11 @@ const styles = StyleSheet.create({
   },
   cardUnread: { borderColor: colors.brand, backgroundColor: "#f2faf6" },
   cardResolved: { opacity: 0.7 },
-  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   unreadDot: {
     width: 8,
@@ -84,6 +143,24 @@ const styles = StyleSheet.create({
   resolvedCheck: { fontSize: 14, color: colors.success, ...fonts.heading },
   time: { fontSize: 12, color: colors.inkFaint },
   note: { fontSize: 14, color: colors.ink, marginTop: 8, lineHeight: 20 },
-  noteCount: { fontSize: 12, color: colors.inkMuted, marginTop: 6 },
-  empty: { textAlign: "center", color: colors.inkFaint, marginTop: 40, fontSize: 15 },
+  empty: {
+    textAlign: "center",
+    color: colors.inkFaint,
+    marginTop: 40,
+    fontSize: 15,
+  },
+  errorText: {
+    fontSize: 15,
+    color: colors.danger,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: colors.brand,
+    borderRadius: radii.control,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  retryText: { color: colors.onBrand, fontSize: 15, ...fonts.subheading },
+  footer: { paddingVertical: 16 },
 });

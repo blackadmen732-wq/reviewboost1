@@ -362,6 +362,33 @@ export async function listCustomerResponses(
   };
 }
 
+export async function getCustomerResponse(
+  context: AuthenticatedContext,
+  responseId: string,
+  requestId: string,
+  orgId: string,
+) {
+  const { data, error } = await context.db
+    .from("customer_responses")
+    .select("id, location_id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .eq("org_id", orgId)
+    .eq("id", responseId)
+    .maybeSingle();
+
+  if (error) databaseFailure("get_response", error, requestId);
+  if (!data) return null;
+
+  return {
+    responseId: data.id as string,
+    locationId: data.location_id as string,
+    rating: data.rating as number,
+    note: tryDecrypt(data.note_encrypted as string | null),
+    submittedAt: data.submitted_at as string,
+    isRead: data.read_at !== null,
+    isResolved: data.resolved_at !== null,
+  };
+}
+
 /**
  * Team Praise, deliberately rating-blind.
  *
