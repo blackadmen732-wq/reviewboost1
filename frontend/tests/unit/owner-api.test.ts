@@ -684,6 +684,159 @@ describe("GET /api/v1/live-feed", () => {
     // Feedback cursor should carry forward from the input since no feedback appeared
     expect(decoded.f).toEqual({ s: "2026-08-20T11:00:00Z", i: "old-fb" });
   });
+
+  it("two-page walk: identical timestamps across both tables, no missing or duplicate IDs", async () => {
+    const ts = "2026-08-20T10:00:00Z";
+    const loc = { name: "HQ" };
+
+    // 6 events at the exact same timestamp: 3 taps, 3 feedback
+    // Deterministic order by id DESC: t-f, t-e, t-d, f-c, f-b, f-a
+    const allTaps = [
+      { id: "t-f", location_id: "loc-1", created_at: ts, locations: loc },
+      { id: "t-e", location_id: "loc-1", created_at: ts, locations: loc },
+      { id: "t-d", location_id: "loc-1", created_at: ts, locations: loc },
+    ];
+    const allFeedback = [
+      { id: "f-c", location_id: "loc-1", rating: 5, submitted_at: ts, locations: loc },
+      { id: "f-b", location_id: "loc-1", rating: 3, submitted_at: ts, locations: loc },
+      { id: "f-a", location_id: "loc-1", rating: 1, submitted_at: ts, locations: loc },
+    ];
+
+    perTableRows["public_review_sessions"] = allTaps;
+    perTableRows["customer_responses"] = allFeedback;
+
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+
+    // --- Page 1 (limit=3) ---
+    const page1 = (await (await GET(request("GET", "/api/v1/live-feed?limit=3"))).json()) as {
+      data: Array<{ id: string; type: string }>;
+      meta: { hasMore: boolean; nextCursor: string };
+    };
+
+    expect(page1.data).toHaveLength(3);
+    expect(page1.meta.hasMore).toBe(true);
+    const page1Ids = page1.data.map((e) => e.id);
+    // Top 3 by id DESC: t-f, t-e, t-d
+    expect(page1Ids).toEqual(["t-f", "t-e", "t-d"]);
+
+    // Decode the cursor to understand what the DB should filter next
+    const cursor = JSON.parse(
+      Buffer.from(page1.meta.nextCursor, "base64url").toString(),
+    ) as { v: number; t?: { s: string; i: string }; f?: { s: string; i: string } };
+
+    expect(cursor.v).toBe(1);
+    expect(cursor.t).toBeDefined();
+    // The last tap in page 1 was "t-d"
+    expect(cursor.t!.i).toBe("t-d");
+    expect(cursor.t!.s).toBe(ts);
+
+    // --- Simulate the DB applying cursor filters for page 2 ---
+    // Tap filter: (created_at < ts) OR (created_at = ts AND id < "t-d")
+    // At same ts, ids < "t-d" = none (t-d is the smallest tap id)
+    perTableRows["public_review_sessions"] = allTaps.filter(
+      (r) => r.created_at < ts || (r.created_at === ts && r.id < cursor.t!.i),
+    );
+    // Feedback filter: no feedback cursor was set (no feedback appeared on page 1),
+    // so the feedback cursor carries forward as undefined → no filter applied.
+    // If a feedback cursor was set, apply its filter:
+    if (cursor.f) {
+      perTableRows["customer_responses"] = allFeedback.filter(
+        (r) => r.submitted_at < ts || (r.submitted_at === ts && r.id < cursor.f!.i),
+      );
+    } else {
+      perTableRows["customer_responses"] = allFeedback;
+    }
+
+    // --- Page 2 ---
+    const page2 = (await (
+      await GET(request("GET", `/api/v1/live-feed?limit=3&cursor=${page1.meta.nextCursor}`))
+    ).json()) as {
+      data: Array<{ id: string; type: string }>;
+      meta: { hasMore: boolean; nextCursor: string | null };
+    };
+
+    expect(page2.data).toHaveLength(3);
+    expect(page2.meta.hasMore).toBe(false);
+    const page2Ids = page2.data.map((e) => e.id);
+    // Remaining 3 by id DESC: f-c, f-b, f-a
+    expect(page2Ids).toEqual(["f-c", "f-b", "f-a"]);
+
+    // --- Verify: all 6 IDs across both pages, no duplicates, no missing ---
+    const allIds = [...page1Ids, ...page2Ids];
+    const expectedIds = ["t-f", "t-e", "t-d", "f-c", "f-b", "f-a"];
+    expect(allIds).toEqual(expectedIds);
+    expect(new Set(allIds).size).toBe(6);
+  });
+
+  it("two-page walk: interleaved sources at the same timestamp", async () => {
+    const ts = "2026-08-20T10:00:00Z";
+    const loc = { name: "HQ" };
+
+    // 4 events: alternating types when sorted by id DESC
+    // id DESC order: d-tap, c-fb, b-tap, a-fb
+    const allTaps = [
+      { id: "d-tap", location_id: "loc-1", created_at: ts, locations: loc },
+      { id: "b-tap", location_id: "loc-1", created_at: ts, locations: loc },
+    ];
+    const allFeedback = [
+      { id: "c-fb", location_id: "loc-1", rating: 4, submitted_at: ts, locations: loc },
+      { id: "a-fb", location_id: "loc-1", rating: 2, submitted_at: ts, locations: loc },
+    ];
+
+    perTableRows["public_review_sessions"] = allTaps;
+    perTableRows["customer_responses"] = allFeedback;
+
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+
+    // --- Page 1 (limit=2) ---
+    const page1 = (await (await GET(request("GET", "/api/v1/live-feed?limit=2"))).json()) as {
+      data: Array<{ id: string; type: string }>;
+      meta: { hasMore: boolean; nextCursor: string };
+    };
+
+    expect(page1.data).toHaveLength(2);
+    expect(page1.meta.hasMore).toBe(true);
+    const page1Ids = page1.data.map((e) => e.id);
+    // Top 2 by id DESC: d-tap, c-fb
+    expect(page1Ids).toEqual(["d-tap", "c-fb"]);
+
+    const cursor = JSON.parse(
+      Buffer.from(page1.meta.nextCursor, "base64url").toString(),
+    ) as { v: number; t?: { s: string; i: string }; f?: { s: string; i: string } };
+
+    // Both sources appeared, so both have cursor positions
+    expect(cursor.t).toBeDefined();
+    expect(cursor.f).toBeDefined();
+    expect(cursor.t!.i).toBe("d-tap");
+    expect(cursor.f!.i).toBe("c-fb");
+
+    // --- Simulate DB cursor filters for page 2 ---
+    perTableRows["public_review_sessions"] = allTaps.filter(
+      (r) => r.created_at < ts || (r.created_at === ts && r.id < cursor.t!.i),
+    );
+    perTableRows["customer_responses"] = allFeedback.filter(
+      (r) => r.submitted_at < ts || (r.submitted_at === ts && r.id < cursor.f!.i),
+    );
+
+    // --- Page 2 ---
+    const page2 = (await (
+      await GET(request("GET", `/api/v1/live-feed?limit=2&cursor=${page1.meta.nextCursor}`))
+    ).json()) as {
+      data: Array<{ id: string; type: string }>;
+      meta: { hasMore: boolean; nextCursor: string | null };
+    };
+
+    expect(page2.data).toHaveLength(2);
+    expect(page2.meta.hasMore).toBe(false);
+    const page2Ids = page2.data.map((e) => e.id);
+    // Remaining 2 by id DESC: b-tap, a-fb
+    expect(page2Ids).toEqual(["b-tap", "a-fb"]);
+
+    // --- Verify completeness ---
+    const allIds = [...page1Ids, ...page2Ids];
+    expect(allIds).toEqual(["d-tap", "c-fb", "b-tap", "a-fb"]);
+    expect(new Set(allIds).size).toBe(4);
+  });
 });
 
 describe("security headers on owner routes", () => {
