@@ -44,7 +44,7 @@ function parseCompositeOr(
     /^(\w+)\.lt\.(.+?),and\(\1\.eq\.\2,id\.lt\.(.+)\)$/,
   );
   if (!m) return null;
-  return { tsField: m[1], tsValue: m[2], idValue: m[3] };
+  return { tsField: m[1]!, tsValue: m[2]!, idValue: m[3]! };
 }
 
 function queryBuilder(columns: string, rows?: unknown[]) {
