@@ -38,7 +38,7 @@ function queryBuilder(columns: string, rows?: unknown[]) {
   const builder: Record<string, unknown> = {};
   const chain = () => builder;
 
-  for (const method of ["eq", "lt", "order", "limit", "update", "select"]) {
+  for (const method of ["eq", "lt", "or", "order", "limit", "update", "select"]) {
     builder[method] = chain;
   }
   builder["maybeSingle"] = () =>
@@ -575,6 +575,114 @@ describe("GET /api/v1/live-feed", () => {
     const { GET } = await import("@/app/api/v1/live-feed/route");
     await GET(request("GET", "/api/v1/live-feed"));
     expect(serviceRoleUsed).toBe(false);
+  });
+
+  it("returns an opaque versioned cursor, not a bare timestamp", async () => {
+    const ts = "2026-08-20T10:00:00Z";
+    // 3 items at limit=2 → hasMore, cursor returned
+    perTableRows["public_review_sessions"] = [
+      { id: "tap-1", location_id: "loc-1", created_at: ts, locations: { name: "A" } },
+      { id: "tap-2", location_id: "loc-1", created_at: ts, locations: { name: "A" } },
+    ];
+    perTableRows["customer_responses"] = [
+      { id: "fb-1", location_id: "loc-1", rating: 3, submitted_at: ts, locations: { name: "A" } },
+    ];
+
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+    const body = (await (await GET(request("GET", "/api/v1/live-feed?limit=2"))).json()) as {
+      meta: { hasMore: boolean; nextCursor: string };
+    };
+
+    expect(body.meta.hasMore).toBe(true);
+
+    // Cursor must not be a bare timestamp — it is base64url JSON with version
+    expect(body.meta.nextCursor).not.toBe(ts);
+    const decoded = JSON.parse(
+      Buffer.from(body.meta.nextCursor, "base64url").toString(),
+    ) as { v: number; t?: { s: string; i: string }; f?: { s: string; i: string } };
+    expect(decoded.v).toBe(1);
+  });
+
+  it("cursor tracks per-source positions with timestamp and id", async () => {
+    const ts = "2026-08-20T10:00:00Z";
+    perTableRows["public_review_sessions"] = [
+      { id: "tap-a", location_id: "loc-1", created_at: ts, locations: { name: "A" } },
+    ];
+    perTableRows["customer_responses"] = [
+      { id: "fb-b", location_id: "loc-1", rating: 5, submitted_at: ts, locations: { name: "A" } },
+      { id: "fb-a", location_id: "loc-1", rating: 3, submitted_at: ts, locations: { name: "A" } },
+    ];
+
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+    const body = (await (await GET(request("GET", "/api/v1/live-feed?limit=2"))).json()) as {
+      data: Array<{ id: string; type: string }>;
+      meta: { hasMore: boolean; nextCursor: string };
+    };
+
+    expect(body.meta.hasMore).toBe(true);
+    const decoded = JSON.parse(
+      Buffer.from(body.meta.nextCursor, "base64url").toString(),
+    ) as { v: number; t?: { s: string; i: string }; f?: { s: string; i: string } };
+
+    // Both sources should have cursor positions since both appeared in the page
+    expect(decoded.t).toBeDefined();
+    expect(decoded.f).toBeDefined();
+    expect(decoded.t!.s).toBe(ts);
+    expect(decoded.t!.i).toBe("tap-a");
+    expect(decoded.f!.s).toBe(ts);
+    // The last feedback in the visible slice (sorted by id DESC at same ts)
+    expect(decoded.f!.i).toBeDefined();
+  });
+
+  it("orders deterministically when timestamps match across both tables", async () => {
+    const ts = "2026-08-20T10:00:00Z";
+    perTableRows["public_review_sessions"] = [
+      { id: "aaa", location_id: "loc-1", created_at: ts, locations: { name: "A" } },
+      { id: "bbb", location_id: "loc-1", created_at: ts, locations: { name: "A" } },
+    ];
+    perTableRows["customer_responses"] = [
+      { id: "ccc", location_id: "loc-1", rating: 4, submitted_at: ts, locations: { name: "A" } },
+      { id: "ddd", location_id: "loc-1", rating: 2, submitted_at: ts, locations: { name: "A" } },
+    ];
+
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+    const body = (await (await GET(request("GET", "/api/v1/live-feed"))).json()) as {
+      data: Array<{ id: string }>;
+    };
+
+    // With all identical timestamps, order should be by id DESC: ddd, ccc, bbb, aaa
+    const ids = body.data.map((e) => e.id);
+    expect(ids).toEqual(["ddd", "ccc", "bbb", "aaa"]);
+  });
+
+  it("preserves cursor source position when one source has no items on page", async () => {
+    const ts = "2026-08-20T10:00:00Z";
+    // Only taps, no feedback — feedback cursor should carry forward from input
+    perTableRows["public_review_sessions"] = [
+      { id: "tap-1", location_id: "loc-1", created_at: ts, locations: { name: "A" } },
+      { id: "tap-2", location_id: "loc-1", created_at: ts, locations: { name: "A" } },
+    ];
+    perTableRows["customer_responses"] = [];
+
+    const inputCursor = Buffer.from(
+      JSON.stringify({ v: 1, t: { s: "2026-08-20T12:00:00Z", i: "old-tap" }, f: { s: "2026-08-20T11:00:00Z", i: "old-fb" } }),
+    ).toString("base64url");
+
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+    const body = (await (await GET(request("GET", `/api/v1/live-feed?limit=1&cursor=${inputCursor}`))).json()) as {
+      meta: { hasMore: boolean; nextCursor: string };
+    };
+
+    expect(body.meta.hasMore).toBe(true);
+    const decoded = JSON.parse(
+      Buffer.from(body.meta.nextCursor, "base64url").toString(),
+    ) as { v: number; t?: { s: string; i: string }; f?: { s: string; i: string } };
+
+    // Tap cursor should be updated from the visible page
+    expect(decoded.t).toBeDefined();
+    expect(decoded.t!.s).toBe(ts);
+    // Feedback cursor should carry forward from the input since no feedback appeared
+    expect(decoded.f).toEqual({ s: "2026-08-20T11:00:00Z", i: "old-fb" });
   });
 });
 

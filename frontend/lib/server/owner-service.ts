@@ -399,10 +399,42 @@ export async function getCustomerResponse(
  * Supabase JS has no UNION, and adding a view would require a migration. Both
  * tables carry RLS on `org_id`, so the merge cannot leak across tenants.
  *
- * The cursor is an ISO timestamp that gates both queries. Because the two
- * tables use different column names for the event time (`created_at` vs
- * `submitted_at`), the cursor is applied to each independently.
+ * Cursor design (v1)
+ * ------------------
+ * A plain timestamp cursor loses events when multiple rows share the same
+ * timestamp: `lt(ts)` skips every row at that timestamp, even unseen ones.
+ *
+ * The cursor is an opaque base64url-encoded JSON object that tracks each
+ * source's last-seen (timestamp, id) independently:
+ *
+ *   { v:1, t?: { s: string, i: string }, f?: { s: string, i: string } }
+ *
+ * Each source is ordered by (timestamp DESC, id DESC) for deterministic
+ * ordering, and the resume query uses a composite condition:
+ *   (ts < cursor_ts) OR (ts = cursor_ts AND id < cursor_id)
+ * so no row at the boundary timestamp is lost.
  */
+
+interface LiveFeedCursorV1 {
+  v: 1;
+  t?: { s: string; i: string };
+  f?: { s: string; i: string };
+}
+
+function encodeCursor(c: LiveFeedCursorV1): string {
+  return Buffer.from(JSON.stringify(c)).toString("base64url");
+}
+
+function decodeCursor(raw: string): LiveFeedCursorV1 | null {
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString()) as LiveFeedCursorV1;
+    if (parsed.v !== 1) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export async function listLiveFeed(
   context: AuthenticatedContext,
   page: Page,
@@ -411,12 +443,14 @@ export async function listLiveFeed(
 ) {
   const limit = pageSize(page.limit);
   const fetchSize = limit + 1;
+  const cursor = page.cursor ? decodeCursor(page.cursor) : null;
 
   let tapQuery = context.db
     .from("public_review_sessions")
     .select("id, location_id, created_at, locations(name)")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(fetchSize);
 
   let feedbackQuery = context.db
@@ -424,11 +458,14 @@ export async function listLiveFeed(
     .select("id, location_id, rating, submitted_at, locations(name)")
     .eq("org_id", orgId)
     .order("submitted_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(fetchSize);
 
-  if (page.cursor) {
-    tapQuery = tapQuery.lt("created_at", page.cursor);
-    feedbackQuery = feedbackQuery.lt("submitted_at", page.cursor);
+  if (cursor?.t) {
+    tapQuery = tapQuery.or(`created_at.lt.${cursor.t.s},and(created_at.eq.${cursor.t.s},id.lt.${cursor.t.i})`);
+  }
+  if (cursor?.f) {
+    feedbackQuery = feedbackQuery.or(`submitted_at.lt.${cursor.f.s},and(submitted_at.eq.${cursor.f.s},id.lt.${cursor.f.i})`);
   }
 
   const [tapResult, feedbackResult] = await Promise.all([tapQuery, feedbackQuery]);
@@ -468,19 +505,30 @@ export async function listLiveFeed(
     submittedAt: row.submitted_at,
   }));
 
-  const merged = [...taps, ...feedback].sort(
-    (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
-  );
+  const merged = [...taps, ...feedback].sort((a, b) => {
+    const timeDiff = new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+    if (timeDiff !== 0) return timeDiff;
+    return b.id < a.id ? -1 : b.id > a.id ? 1 : 0;
+  });
 
   const hasMore = merged.length > limit;
   const visible = merged.slice(0, limit);
 
+  let nextCursor: string | null = null;
+  if (hasMore) {
+    const lastTap = [...visible].reverse().find((e) => e.type === "tap");
+    const lastFeedback = [...visible].reverse().find((e) => e.type === "feedback");
+    const next: LiveFeedCursorV1 = { v: 1 };
+    if (lastTap) next.t = { s: lastTap.submittedAt, i: lastTap.id };
+    else if (cursor?.t) next.t = cursor.t;
+    if (lastFeedback) next.f = { s: lastFeedback.submittedAt, i: lastFeedback.id };
+    else if (cursor?.f) next.f = cursor.f;
+    nextCursor = encodeCursor(next);
+  }
+
   return {
     data: visible,
-    meta: {
-      hasMore,
-      nextCursor: hasMore ? visible[visible.length - 1]?.submittedAt ?? null : null,
-    },
+    meta: { hasMore, nextCursor },
   };
 }
 
