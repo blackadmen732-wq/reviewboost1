@@ -20,7 +20,7 @@ export const MOCK_ORGANIZATIONS: Organization[] = [
     orgId: "org-2",
     name: "Sunrise Bakery",
     timezone: "America/Chicago",
-    role: "manager",
+    role: "admin",
   },
 ];
 

@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
-import type { Organization } from "./types";
+import { parseMemberRole, type Organization } from "./types";
 
 interface AuthState {
   isLoggedIn: boolean;
@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         orgId: row.org_id as string,
         name: org?.name ?? "",
         timezone: org?.timezone ?? "UTC",
-        role: row.role as "owner" | "manager" | "staff",
+        role: parseMemberRole(row.role),
       };
     });
 

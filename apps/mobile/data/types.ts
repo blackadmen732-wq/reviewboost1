@@ -1,8 +1,18 @@
+export const MEMBER_ROLES = ["owner", "admin", "member", "viewer"] as const;
+export type MemberRole = (typeof MEMBER_ROLES)[number];
+
+export function parseMemberRole(value: unknown): MemberRole {
+  if (typeof value === "string" && (MEMBER_ROLES as readonly string[]).includes(value)) {
+    return value as MemberRole;
+  }
+  throw new RangeError(`Unknown organization role: ${String(value)}`);
+}
+
 export interface Organization {
   orgId: string;
   name: string;
   timezone: string;
-  role: "owner" | "manager" | "staff";
+  role: MemberRole;
 }
 
 export interface Location {
