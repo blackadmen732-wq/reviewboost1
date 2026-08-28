@@ -1,7 +1,16 @@
-import { View, Text, FlatList, StyleSheet } from "react-native";
+import { useEffect } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
+  Pressable,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/data/auth-context";
-import { MOCK_LIVE_FEED } from "@/data/mock";
+import { useLiveFeed } from "@/data/use-live-feed";
 import { Stars } from "@/components/stars";
 import { relativeTime } from "@/components/relative-time";
 import { colors, radii, fonts } from "@/theme";
@@ -35,27 +44,73 @@ function FeedCard({ item }: { item: LiveFeedEntry }) {
         </View>
       )}
 
-      <Text style={styles.location}>{item.locationName}</Text>
+      <Text style={styles.location}>{item.locationName ?? "Unknown location"}</Text>
     </View>
   );
 }
 
 export default function FeedScreen() {
   const { activeOrg } = useAuth();
-  const feed = MOCK_LIVE_FEED.filter((e) => e.orgId === activeOrg?.orgId);
+  const orgId = activeOrg?.orgId;
+  const {
+    items,
+    loading,
+    refreshing,
+    error,
+    hasMore,
+    loadingMore,
+    load,
+    refresh,
+    loadMore,
+  } = useLiveFeed(orgId);
+
+  useEffect(() => {
+    if (orgId) void load();
+  }, [orgId, load]);
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <View style={styles.orgBar}>
         <Text style={styles.orgName}>{activeOrg?.name ?? "—"}</Text>
       </View>
-      <FlatList
-        data={feed}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <FeedCard item={item} />}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={<Text style={styles.empty}>No activity yet</Text>}
-      />
+      {error && items.length === 0 ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>Couldn’t load activity.</Text>
+          <Pressable onPress={() => void load()} style={styles.retryButton}>
+            <Text style={styles.retryText}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <FeedCard item={item} />}
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />
+          }
+          onEndReachedThreshold={0.4}
+          onEndReached={() => {
+            if (hasMore && !loadingMore) void loadMore();
+          }}
+          ListEmptyComponent={
+            loading ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator color={colors.brand} />
+              </View>
+            ) : (
+              <Text style={styles.empty}>No activity yet</Text>
+            )
+          }
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={styles.footerLoading}>
+                <ActivityIndicator color={colors.brand} />
+              </View>
+            ) : null
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -85,4 +140,21 @@ const styles = StyleSheet.create({
   ratingRow: { marginTop: 8 },
   location: { fontSize: 13, color: colors.inkMuted, marginTop: 6 },
   empty: { textAlign: "center", color: colors.inkFaint, marginTop: 40, fontSize: 15 },
+  loadingBox: { marginTop: 40, alignItems: "center" },
+  footerLoading: { paddingVertical: 16, alignItems: "center" },
+  errorBox: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    gap: 12,
+  },
+  errorText: { fontSize: 15, color: colors.ink, textAlign: "center" },
+  retryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: colors.brand,
+    borderRadius: radii.control,
+  },
+  retryText: { color: colors.onBrand, ...fonts.subheading, fontSize: 14 },
 });
