@@ -27,6 +27,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.resolve(HERE, "..", "seed-stand-remote.mjs");
 const B64_32 = Buffer.alloc(32, 7).toString("base64");
 const B64_31 = Buffer.alloc(31, 7).toString("base64");
+const B64_33 = Buffer.alloc(33, 7).toString("base64");
 const STAGING_REF = "abcdefghijklmnopqrst";
 const STAGING_URL = `https://${STAGING_REF}.supabase.co`;
 
@@ -132,7 +133,7 @@ test("wrong-project-ref mismatch refuses (would-be production credentials)", () 
         expectedProjectRef: "expectedstagingprojref",
         observedProjectRef: "productionprojectxxxx",
       }),
-    /positive-identity check/,
+    /expected-ref guard/,
   );
 });
 
@@ -188,12 +189,57 @@ test("missing CUSTOMER_NOTE_ENCRYPTION_KEY refuses", () => {
   expectRefusal(result, "CUSTOMER_NOTE_ENCRYPTION_KEY");
 });
 
-test("malformed encryption key refuses", () => {
+test("malformed encryption key refuses (31 bytes)", () => {
   assert.throws(() => parseBase64Key(B64_31, "CUSTOMER_NOTE_ENCRYPTION_KEY"), /32-byte key/);
 });
 
-test("malformed digest key refuses", () => {
+test("malformed digest key refuses (31 bytes)", () => {
   assert.throws(() => parseBase64Key(B64_31, "TOKEN_DIGEST_KEY"), /32-byte key/);
+});
+
+test("33-byte key refuses", () => {
+  assert.throws(() => parseBase64Key(B64_33, "CUSTOMER_NOTE_ENCRYPTION_KEY"), /32-byte key/);
+});
+
+test("valid 32-byte canonical base64 key passes", () => {
+  const key = parseBase64Key(B64_32, "CUSTOMER_NOTE_ENCRYPTION_KEY");
+  assert.equal(key.length, 32);
+  assert.equal(key.toString("base64"), B64_32);
+});
+
+test("base64 with injected `!!!!` refuses (decoder would ignore them silently)", () => {
+  // Node's decoder drops `!` — length becomes wrong so this fails on length,
+  // but the intent is that no non-alphabet junk survives strict validation.
+  const bad = B64_32.slice(0, 20) + "!!!!" + B64_32.slice(20);
+  assert.throws(() => parseBase64Key(bad, "CUSTOMER_NOTE_ENCRYPTION_KEY"), /canonical base64/);
+});
+
+test("base64 with internal spaces refuses", () => {
+  const bad = B64_32.slice(0, 10) + " " + B64_32.slice(10);
+  assert.throws(() => parseBase64Key(bad, "CUSTOMER_NOTE_ENCRYPTION_KEY"), /canonical base64/);
+});
+
+test("base64 with an internal newline refuses", () => {
+  const bad = B64_32.slice(0, 22) + "\n" + B64_32.slice(22);
+  assert.throws(() => parseBase64Key(bad, "CUSTOMER_NOTE_ENCRYPTION_KEY"), /canonical base64/);
+});
+
+test("base64 with misplaced `=` refuses", () => {
+  const bad = "=" + B64_32.slice(1);
+  assert.throws(() => parseBase64Key(bad, "CUSTOMER_NOTE_ENCRYPTION_KEY"), /canonical base64/);
+});
+
+test("base64 with too much padding refuses", () => {
+  const bad = B64_32.slice(0, 42) + "==";
+  assert.throws(() => parseBase64Key(bad, "CUSTOMER_NOTE_ENCRYPTION_KEY"), /canonical base64/);
+});
+
+test("base64url form of a 32-byte key refuses (this CLI requires standard base64)", () => {
+  // Base64url uses -/_ instead of +// and typically omits padding. It is a
+  // valid encoding of the same bytes, but the app documents standard base64
+  // for these secrets, so we refuse to accept both silently.
+  const url = Buffer.alloc(32, 250).toString("base64url");
+  assert.throws(() => parseBase64Key(url, "CUSTOMER_NOTE_ENCRYPTION_KEY"), /canonical base64/);
 });
 
 test("invalid digest key version refuses", () => {
@@ -288,10 +334,29 @@ test("CONTENT_KEY_VERSION mirrors the app's KEY_VERSION constant (1)", () => {
 
 // ------------------------------------------------------ error redaction
 
-test("sanitizeSupabaseError trims long bodies and does not echo secrets from headers", () => {
-  const message = sanitizeSupabaseError(500, "x".repeat(10000));
-  assert.ok(message.length < 500);
-  assert.match(message, /HTTP 500/);
+test("sanitizeSupabaseError exposes only the HTTP status — never the body", () => {
+  const status = 500;
+  const bodyFragments = [
+    "sensitive-service-role-key-fake",
+    "0123456789abcdef".repeat(4), // a 64-hex-char stand-in for a token digest
+    "v1:ivpartb64:tagpartb64:cipherpartb64", // ciphertext-shape stand-in
+    "PlaintextTokenShouldNeverEcho",
+    "customer note contents",
+  ];
+  const evilBody = JSON.stringify({
+    message: bodyFragments.join(" "),
+    details: bodyFragments.join("|"),
+    hint: bodyFragments.join(","),
+  });
+  // sanitizeSupabaseError deliberately ignores the body argument.
+  const message = sanitizeSupabaseError(status, evilBody);
+  assert.equal(message, "Supabase responded HTTP 500.");
+  for (const fragment of bodyFragments) {
+    assert.ok(
+      !message.includes(fragment),
+      `sanitized message must not echo body fragment: ${fragment}`,
+    );
+  }
 });
 
 test("normal output/error fixtures do not leak secrets", () => {
@@ -307,7 +372,7 @@ test("normal output/error fixtures do not leak secrets", () => {
     },
     ["--i-am-targeting-staging", "--location", "11111111-1111-1111-1111-111111111111"],
   );
-  expectRefusal(result, "positive-identity check");
+  expectRefusal(result, "expected-ref guard");
   const combined = `${result.stderr}${result.stdout}`;
   assert.doesNotMatch(combined, /sensitive-service-role-key-should-not-appear/);
   assert.doesNotMatch(combined, new RegExp(B64_32.replace(/[+/=]/g, "\\$&")));

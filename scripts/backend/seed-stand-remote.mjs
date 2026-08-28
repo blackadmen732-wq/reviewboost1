@@ -7,10 +7,15 @@
  *     SUPABASE_URL                        https://<project-ref>.supabase.co
  *     SUPABASE_SERVICE_ROLE_KEY           service-role JWT
  *     STAGING_SUPABASE_PROJECT_REF        must equal <project-ref> extracted
- *                                         from SUPABASE_URL — this is the
- *                                         positive proof that the target is
- *                                         the intended staging project, not
- *                                         production.
+ *                                         from SUPABASE_URL — an expected-ref
+ *                                         guard against pointing the CLI at
+ *                                         an unintended project. It is NOT
+ *                                         independent proof that the target
+ *                                         is non-production: both values are
+ *                                         operator-supplied. Real safety
+ *                                         requires this env var to be sourced
+ *                                         from a trusted secrets store and
+ *                                         to be the known staging ref.
  *     CUSTOMER_NOTE_ENCRYPTION_KEY        base64 32-byte AES-256 key, must
  *                                         match the deployed app so the stand
  *                                         is reprintable.
@@ -27,8 +32,7 @@
  *   Required flags:
  *     --location <uuid>                   the staging location under which to
  *                                         create the stand. No default.
- *     --i-am-targeting-staging            secondary human ack; the primary
- *                                         proof is the project-ref match.
+ *     --i-am-targeting-staging            human acknowledgement belt.
  *
  *   Optional flags:
  *     --label "Front Desk"                1..80 chars; default "Staging Stand".
@@ -36,7 +40,7 @@
  * This is a STAGING administration utility. It is NOT the production stand
  * creation path — production creates stands through the SECURITY-DEFINER
  * onboarding RPC. The utility uses the service-role key to insert the stand
- * directly, which is why the staging-target proof matters.
+ * directly, which is why the expected-ref guard matters.
  *
  * The plaintext token is emitted exactly once (embedded in the customer URL).
  * The row also carries an AES-256-GCM ciphertext of the token so the stand
@@ -163,18 +167,37 @@ export function parseFrontendUrl(raw) {
   return url.origin;
 }
 
+// Strict standard-base64 for 32-byte keys. 32 bytes encode to exactly 44
+// canonical characters (43 data + one "=" pad). Node's decoder silently drops
+// unknown characters, so we validate the alphabet and length ourselves BEFORE
+// decoding, then round-trip the decoded bytes back to canonical base64 and
+// require an exact string match. That refuses anything the decoder would have
+// "helpfully" ignored: internal whitespace or newlines, non-alphabet junk
+// like `!!!!`, and off-by-one padding.
+const CANONICAL_KEY_LENGTH = 44;
+const STRICT_BASE64_32_RE = /^[A-Za-z0-9+/]{43}=$/;
+
 export function parseBase64Key(raw, name) {
   if (typeof raw !== "string" || raw.trim() === "") {
     throw new ConfigError(`${name} is required.`);
   }
-  let key;
-  try {
-    key = Buffer.from(raw.trim(), "base64");
-  } catch {
-    throw new ConfigError(`${name} must be a base64-encoded 32-byte key.`);
+  const trimmed = raw.trim();
+  const requireStandard = `${name} must be a canonical base64-encoded 32-byte key (44 chars, trailing "=").`;
+
+  if (trimmed.length !== CANONICAL_KEY_LENGTH) {
+    throw new ConfigError(requireStandard);
   }
+  if (!STRICT_BASE64_32_RE.test(trimmed)) {
+    throw new ConfigError(requireStandard);
+  }
+  const key = Buffer.from(trimmed, "base64");
   if (key.length !== 32) {
-    throw new ConfigError(`${name} must be a base64-encoded 32-byte key.`);
+    throw new ConfigError(requireStandard);
+  }
+  // Canonical round-trip: if the decoder had to skip anything at all, the
+  // re-encoded form won't match the input byte-for-byte.
+  if (key.toString("base64") !== trimmed) {
+    throw new ConfigError(requireStandard);
   }
   return key;
 }
@@ -246,18 +269,23 @@ export function assertStagingTarget(config) {
     // Never echo the observed ref in case it points at a production project.
     throw new ConfigError(
       "Refused: SUPABASE_URL's project ref does not match STAGING_SUPABASE_PROJECT_REF. " +
-        "This positive-identity check is the primary staging safeguard.",
+        "This is an expected-ref guard, not independent proof of a staging target — " +
+        "STAGING_SUPABASE_PROJECT_REF must be sourced from a trusted secrets store " +
+        "and be the known staging project ref.",
     );
   }
 }
 
 // --------------------------------------------------- REST error redaction --
 
-// Trim large PostgREST bodies and strip anything that could carry an echo of
-// the caller's payload (which includes the digest and service-role Authorization).
-export function sanitizeSupabaseError(status, body) {
-  const trimmed = typeof body === "string" ? body.slice(0, 400) : "";
-  return `Supabase responded HTTP ${status}${trimmed ? `: ${trimmed}` : ""}`;
+// The response body is discarded on purpose. PostgREST may echo request
+// values inside `message` / `details` / `hint`, and the caller's payload
+// contains the token digest and the AES ciphertext. Truncation is not
+// sanitization: a short body can still contain a secret. The operator gets
+// only the HTTP status, which is enough to look up the run in Supabase logs
+// without any request value ever crossing back through the CLI's output.
+export function sanitizeSupabaseError(status /* body intentionally ignored */) {
+  return `Supabase responded HTTP ${status}.`;
 }
 
 // --------------------------------------------------- CLI-only entry point --
@@ -291,15 +319,16 @@ async function supabaseRest(origin, serviceRoleKey, path, { method = "GET", body
     throw err;
   }
 
+  if (!res.ok) {
+    // Body deliberately not read — see sanitizeSupabaseError above.
+    throw new Error(sanitizeSupabaseError(res.status));
+  }
+
   let text = "";
   try {
     text = await res.text();
   } catch {
     text = "";
-  }
-
-  if (!res.ok) {
-    throw new Error(sanitizeSupabaseError(res.status, text));
   }
 
   if (text === "") return null;

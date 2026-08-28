@@ -131,3 +131,18 @@ jobs:
             exit 1
           fi
           echo "No review-gating patterns found."
+
+  staging-script-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Syntax-check the staging seed script
+        run: node --check scripts/backend/seed-stand-remote.mjs
+
+      - name: Run staging seed script tests
+        run: node --test scripts/backend/__tests__/seed-stand-remote.test.mjs
