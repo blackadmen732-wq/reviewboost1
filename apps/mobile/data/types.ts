@@ -40,7 +40,9 @@ export interface LiveFeedEntry {
   type: "tap" | "feedback";
   rating: number | null;
   submittedAt: string;
-  locationName: string;
+  // The backend join may return null for locations the caller can see the
+  // event for but not the row for; the UI substitutes a fallback label.
+  locationName: string | null;
 }
 
 export interface OwnerNote {
