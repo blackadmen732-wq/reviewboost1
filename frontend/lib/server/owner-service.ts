@@ -301,14 +301,16 @@ export async function getStandTokenForReprint(
 
 export interface Page {
   cursor: string | undefined;
-  limit: number;
+  limit: number | undefined;
 }
 
 function pageSize(limit: number | undefined): number {
-  if (limit === undefined) return DEFAULT_PAGE_SIZE;
   // Bounded rather than trusted. An unbounded page is how a listing endpoint
-  // becomes a way to pull an entire table in one request.
-  return Math.min(Math.max(limit, 1), MAX_PAGE_SIZE);
+  // becomes a way to pull an entire table in one request. Non-finite (NaN,
+  // Infinity, missing) falls back to the default; fractional values are
+  // truncated so `.limit()` and `.slice()` always see an integer.
+  if (limit === undefined || !Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
+  return Math.min(Math.max(Math.trunc(limit), 1), MAX_PAGE_SIZE);
 }
 
 /**
@@ -386,6 +388,245 @@ export async function getCustomerResponse(
     submittedAt: data.submitted_at as string,
     isRead: data.read_at !== null,
     isResolved: data.resolved_at !== null,
+  };
+}
+
+// ---------------------------------------------------------------- live feed --
+
+/**
+ * The live feed: taps and feedback in one reverse-chronological stream.
+ *
+ * Two tables (`public_review_sessions` for taps, `customer_responses` for
+ * feedback) are queried separately and merge-sorted in application code.
+ * Supabase JS has no UNION, and adding a view would require a migration. Both
+ * tables carry RLS on `org_id`, so the merge cannot leak across tenants.
+ *
+ * Cursor design (v1)
+ * ------------------
+ * A plain timestamp cursor loses events when multiple rows share the same
+ * timestamp: `lt(ts)` skips every row at that timestamp, even unseen ones.
+ *
+ * The cursor is an opaque base64url-encoded JSON object that tracks each
+ * source's last-seen (timestamp, id) independently:
+ *
+ *   { v:1, t?: { s: string, i: string }, f?: { s: string, i: string } }
+ *
+ * Each source is ordered by (timestamp DESC, id DESC) for deterministic
+ * ordering, and the resume query uses a composite condition:
+ *   (ts < cursor_ts) OR (ts = cursor_ts AND id < cursor_id)
+ * so no row at the boundary timestamp is lost.
+ */
+
+interface LiveFeedCursorV1 {
+  v: 1;
+  t?: { s: string; i: string };
+  f?: { s: string; i: string };
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// Strict RFC3339 subset, matched against the syntax Postgres/PostgREST emits
+// for `timestamptz` columns via supabase-js:
+//   `YYYY-MM-DDTHH:MM:SS[.fractional](Z|±HH:MM)`
+// Deliberately narrow — `Date.parse()` alone would accept `Aug 20, 2026 10:00 GMT`
+// and other human-readable syntax we never want interpolated into the resume
+// `.or()` filter.
+const ISO_TIMESTAMP_RE =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+function isValidIsoTimestamp(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0) return false;
+  const m = ISO_TIMESTAMP_RE.exec(value);
+  if (!m) return false;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const hour = Number(m[4]);
+  const minute = Number(m[5]);
+  const second = Number(m[6]);
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  if (hour > 23 || minute > 59 || second > 59) return false;
+  const offset = m[8]!;
+  if (offset !== "Z") {
+    const oh = Number(offset.slice(1, 3));
+    const om = Number(offset.slice(4, 6));
+    if (oh > 23 || om > 59) return false;
+  }
+  // Round-trip in UTC to catch invalid calendar dates like Feb 30 that would
+  // otherwise silently roll over to March.
+  const utc = Date.UTC(year, month - 1, day, hour, minute, second);
+  if (!Number.isFinite(utc)) return false;
+  const dt = new Date(utc);
+  return (
+    dt.getUTCFullYear() === year &&
+    dt.getUTCMonth() === month - 1 &&
+    dt.getUTCDate() === day
+  );
+}
+
+function isValidUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_RE.test(value);
+}
+
+function isValidCursorPosition(value: unknown): value is { s: string; i: string } {
+  if (!isPlainObject(value)) return false;
+  const keys = Object.keys(value);
+  if (keys.length !== 2 || !keys.every((k) => k === "s" || k === "i")) return false;
+  return isValidIsoTimestamp(value.s) && isValidUuid(value.i);
+}
+
+function encodeCursor(c: LiveFeedCursorV1): string {
+  return Buffer.from(JSON.stringify(c)).toString("base64url");
+}
+
+/**
+ * Parse a client-supplied live-feed cursor. Because the parsed values are
+ * interpolated into a PostgREST `.or()` filter, this validates the *entire*
+ * shape and rejects unsupported versions or unexpected keys/types with a 400
+ * rather than silently starting from page 1 — a scrolling client that has
+ * corrupted its cursor should see the error, not the first page again with
+ * duplicate entries.
+ */
+function parseCursor(raw: string): LiveFeedCursorV1 {
+  const reject = (message: string): never => {
+    throw new ApiError(400, ERROR_CODE.validationFailed, "The request could not be accepted.", {
+      details: [{ field: "cursor", message }],
+    });
+  };
+
+  let decoded: string;
+  try {
+    decoded = Buffer.from(raw, "base64url").toString();
+  } catch {
+    return reject("Cursor is not valid base64url.");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(decoded);
+  } catch {
+    return reject("Cursor is not valid JSON.");
+  }
+
+  if (!isPlainObject(parsed)) return reject("Cursor must be an object.");
+  if (parsed.v !== 1) return reject("Unsupported cursor version.");
+
+  const allowedKeys = new Set(["v", "t", "f"]);
+  for (const key of Object.keys(parsed)) {
+    if (!allowedKeys.has(key)) return reject("Cursor has an unexpected field.");
+  }
+
+  const cursor: LiveFeedCursorV1 = { v: 1 };
+  if (parsed.t !== undefined) {
+    if (!isValidCursorPosition(parsed.t)) return reject("Cursor 't' is malformed.");
+    cursor.t = { s: parsed.t.s, i: parsed.t.i };
+  }
+  if (parsed.f !== undefined) {
+    if (!isValidCursorPosition(parsed.f)) return reject("Cursor 'f' is malformed.");
+    cursor.f = { s: parsed.f.s, i: parsed.f.i };
+  }
+  return cursor;
+}
+
+export async function listLiveFeed(
+  context: AuthenticatedContext,
+  page: Page,
+  requestId: string,
+  orgId: string,
+) {
+  const limit = pageSize(page.limit);
+  const fetchSize = limit + 1;
+  const cursor = page.cursor ? parseCursor(page.cursor) : null;
+
+  let tapQuery = context.db
+    .from("public_review_sessions")
+    .select("id, location_id, created_at, locations(name)")
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(fetchSize);
+
+  let feedbackQuery = context.db
+    .from("customer_responses")
+    .select("id, location_id, rating, submitted_at, locations(name)")
+    .eq("org_id", orgId)
+    .order("submitted_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(fetchSize);
+
+  if (cursor?.t) {
+    tapQuery = tapQuery.or(`created_at.lt.${cursor.t.s},and(created_at.eq.${cursor.t.s},id.lt.${cursor.t.i})`);
+  }
+  if (cursor?.f) {
+    feedbackQuery = feedbackQuery.or(`submitted_at.lt.${cursor.f.s},and(submitted_at.eq.${cursor.f.s},id.lt.${cursor.f.i})`);
+  }
+
+  const [tapResult, feedbackResult] = await Promise.all([tapQuery, feedbackQuery]);
+
+  if (tapResult.error) databaseFailure("live_feed_taps", tapResult.error, requestId);
+  if (feedbackResult.error) databaseFailure("live_feed_feedback", feedbackResult.error, requestId);
+
+  interface RawTap {
+    id: string;
+    location_id: string;
+    created_at: string;
+    locations: { name: string } | null;
+  }
+  interface RawFeedback {
+    id: string;
+    location_id: string;
+    rating: number;
+    submitted_at: string;
+    locations: { name: string } | null;
+  }
+
+  const taps = ((tapResult.data ?? []) as unknown as RawTap[]).map((row) => ({
+    id: row.id,
+    type: "tap" as const,
+    locationId: row.location_id,
+    locationName: row.locations?.name ?? null,
+    rating: null as number | null,
+    submittedAt: row.created_at,
+  }));
+
+  const feedback = ((feedbackResult.data ?? []) as unknown as RawFeedback[]).map((row) => ({
+    id: row.id,
+    type: "feedback" as const,
+    locationId: row.location_id,
+    locationName: row.locations?.name ?? null,
+    rating: row.rating as number | null,
+    submittedAt: row.submitted_at,
+  }));
+
+  const merged = [...taps, ...feedback].sort((a, b) => {
+    const timeDiff = new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+    if (timeDiff !== 0) return timeDiff;
+    return b.id < a.id ? -1 : b.id > a.id ? 1 : 0;
+  });
+
+  const hasMore = merged.length > limit;
+  const visible = merged.slice(0, limit);
+
+  let nextCursor: string | null = null;
+  if (hasMore) {
+    const lastTap = [...visible].reverse().find((e) => e.type === "tap");
+    const lastFeedback = [...visible].reverse().find((e) => e.type === "feedback");
+    const next: LiveFeedCursorV1 = { v: 1 };
+    if (lastTap) next.t = { s: lastTap.submittedAt, i: lastTap.id };
+    else if (cursor?.t) next.t = cursor.t;
+    if (lastFeedback) next.f = { s: lastFeedback.submittedAt, i: lastFeedback.id };
+    else if (cursor?.f) next.f = cursor.f;
+    nextCursor = encodeCursor(next);
+  }
+
+  return {
+    data: visible,
+    meta: { hasMore, nextCursor },
   };
 }
 
