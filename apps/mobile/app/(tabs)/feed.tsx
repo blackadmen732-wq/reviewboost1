@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "expo-router";
 import { useAuth } from "@/data/auth-context";
 import { useLiveFeed } from "@/data/use-live-feed";
 import { Stars } from "@/components/stars";
@@ -64,9 +65,18 @@ export default function FeedScreen() {
     loadMore,
   } = useLiveFeed(orgId);
 
-  useEffect(() => {
-    if (orgId) void load();
-  }, [orgId, load]);
+  // One intentional lifecycle: refetch page 1 every time the Feed tab gains
+  // focus, and every time the active organization changes while it is focused
+  // (the callback identity flips on orgId, so useFocusEffect re-runs). This
+  // replaces a mount-only useEffect, which never fires when the user returns
+  // to a still-mounted tab after activity elsewhere. The hook keeps the
+  // existing rows visible during the refetch and its generation guard drops
+  // any stale response from a superseded load.
+  useFocusEffect(
+    useCallback(() => {
+      if (orgId) void load();
+    }, [orgId, load]),
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
