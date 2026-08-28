@@ -301,14 +301,16 @@ export async function getStandTokenForReprint(
 
 export interface Page {
   cursor: string | undefined;
-  limit: number;
+  limit: number | undefined;
 }
 
 function pageSize(limit: number | undefined): number {
-  if (limit === undefined) return DEFAULT_PAGE_SIZE;
   // Bounded rather than trusted. An unbounded page is how a listing endpoint
-  // becomes a way to pull an entire table in one request.
-  return Math.min(Math.max(limit, 1), MAX_PAGE_SIZE);
+  // becomes a way to pull an entire table in one request. Non-finite (NaN,
+  // Infinity, missing) falls back to the default; fractional values are
+  // truncated so `.limit()` and `.slice()` always see an integer.
+  if (limit === undefined || !Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
+  return Math.min(Math.max(Math.trunc(limit), 1), MAX_PAGE_SIZE);
 }
 
 /**
@@ -421,18 +423,81 @@ interface LiveFeedCursorV1 {
   f?: { s: string; i: string };
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidIsoTimestamp(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0) return false;
+  // Reject anything Postgres cannot round-trip as a timestamptz.
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed);
+}
+
+function isValidUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_RE.test(value);
+}
+
+function isValidCursorPosition(value: unknown): value is { s: string; i: string } {
+  if (!isPlainObject(value)) return false;
+  const keys = Object.keys(value);
+  if (keys.length !== 2 || !keys.every((k) => k === "s" || k === "i")) return false;
+  return isValidIsoTimestamp(value.s) && isValidUuid(value.i);
+}
+
 function encodeCursor(c: LiveFeedCursorV1): string {
   return Buffer.from(JSON.stringify(c)).toString("base64url");
 }
 
-function decodeCursor(raw: string): LiveFeedCursorV1 | null {
+/**
+ * Parse a client-supplied live-feed cursor. Because the parsed values are
+ * interpolated into a PostgREST `.or()` filter, this validates the *entire*
+ * shape and rejects unsupported versions or unexpected keys/types with a 400
+ * rather than silently starting from page 1 — a scrolling client that has
+ * corrupted its cursor should see the error, not the first page again with
+ * duplicate entries.
+ */
+function parseCursor(raw: string): LiveFeedCursorV1 {
+  const reject = (message: string): never => {
+    throw new ApiError(400, ERROR_CODE.validationFailed, "The request could not be accepted.", {
+      details: [{ field: "cursor", message }],
+    });
+  };
+
+  let decoded: string;
   try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString()) as LiveFeedCursorV1;
-    if (parsed.v !== 1) return null;
-    return parsed;
+    decoded = Buffer.from(raw, "base64url").toString();
   } catch {
-    return null;
+    return reject("Cursor is not valid base64url.");
   }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(decoded);
+  } catch {
+    return reject("Cursor is not valid JSON.");
+  }
+
+  if (!isPlainObject(parsed)) return reject("Cursor must be an object.");
+  if (parsed.v !== 1) return reject("Unsupported cursor version.");
+
+  const allowedKeys = new Set(["v", "t", "f"]);
+  for (const key of Object.keys(parsed)) {
+    if (!allowedKeys.has(key)) return reject("Cursor has an unexpected field.");
+  }
+
+  const cursor: LiveFeedCursorV1 = { v: 1 };
+  if (parsed.t !== undefined) {
+    if (!isValidCursorPosition(parsed.t)) return reject("Cursor 't' is malformed.");
+    cursor.t = { s: parsed.t.s, i: parsed.t.i };
+  }
+  if (parsed.f !== undefined) {
+    if (!isValidCursorPosition(parsed.f)) return reject("Cursor 'f' is malformed.");
+    cursor.f = { s: parsed.f.s, i: parsed.f.i };
+  }
+  return cursor;
 }
 
 export async function listLiveFeed(
@@ -443,7 +508,7 @@ export async function listLiveFeed(
 ) {
   const limit = pageSize(page.limit);
   const fetchSize = limit + 1;
-  const cursor = page.cursor ? decodeCursor(page.cursor) : null;
+  const cursor = page.cursor ? parseCursor(page.cursor) : null;
 
   let tapQuery = context.db
     .from("public_review_sessions")

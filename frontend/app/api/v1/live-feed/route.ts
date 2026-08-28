@@ -20,10 +20,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     const page = await listLiveFeed(
       context,
-      {
-        cursor,
-        limit: Number.isFinite(parsedLimit) ? (parsedLimit as number) : 25,
-      },
+      { cursor, limit: parsedLimit },
       requestId,
       context.orgId,
     );
