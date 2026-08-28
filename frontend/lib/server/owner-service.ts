@@ -429,11 +429,44 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// Strict RFC3339 subset, matched against the syntax Postgres/PostgREST emits
+// for `timestamptz` columns via supabase-js:
+//   `YYYY-MM-DDTHH:MM:SS[.fractional](Z|±HH:MM)`
+// Deliberately narrow — `Date.parse()` alone would accept `Aug 20, 2026 10:00 GMT`
+// and other human-readable syntax we never want interpolated into the resume
+// `.or()` filter.
+const ISO_TIMESTAMP_RE =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
 function isValidIsoTimestamp(value: unknown): value is string {
   if (typeof value !== "string" || value.length === 0) return false;
-  // Reject anything Postgres cannot round-trip as a timestamptz.
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed);
+  const m = ISO_TIMESTAMP_RE.exec(value);
+  if (!m) return false;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const hour = Number(m[4]);
+  const minute = Number(m[5]);
+  const second = Number(m[6]);
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  if (hour > 23 || minute > 59 || second > 59) return false;
+  const offset = m[8]!;
+  if (offset !== "Z") {
+    const oh = Number(offset.slice(1, 3));
+    const om = Number(offset.slice(4, 6));
+    if (oh > 23 || om > 59) return false;
+  }
+  // Round-trip in UTC to catch invalid calendar dates like Feb 30 that would
+  // otherwise silently roll over to March.
+  const utc = Date.UTC(year, month - 1, day, hour, minute, second);
+  if (!Number.isFinite(utc)) return false;
+  const dt = new Date(utc);
+  return (
+    dt.getUTCFullYear() === year &&
+    dt.getUTCMonth() === month - 1 &&
+    dt.getUTCDate() === day
+  );
 }
 
 function isValidUuid(value: unknown): value is string {

@@ -1046,6 +1046,56 @@ describe("GET /api/v1/live-feed", () => {
     expect(body.data).toHaveLength(25);
   });
 
+  // ----------------------------------- strict cursor timestamp validation ---
+
+  it("rejects cursor timestamps Date.parse() accepts but are not RFC3339", async () => {
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+    // Every one of these is happily accepted by JS `Date.parse()` but is NOT
+    // the syntax Postgres/PostgREST emits for a timestamptz column, and must
+    // never reach the resume `.or()` filter.
+    const badTimestamps = [
+      "Aug 20, 2026 10:00:00 GMT",                       // human-readable
+      "2026-08-20 10:00:00Z",                            // space instead of T
+      "2026/08/20T10:00:00Z",                            // slashes
+      "2026-08-20T10:00:00",                             // no offset / Z
+      "August 20, 2026",                                 // month name + comma
+      "2026-02-30T10:00:00Z",                            // invalid calendar date
+      "2026-13-01T10:00:00Z",                            // invalid month
+      "2026-08-20T25:00:00Z",                            // invalid hour
+      "2026-08-20T10:00:00+25:00",                       // invalid offset hour
+      "2026-08-20T10:00:00Z, injection",                 // trailing comma
+      "'2026-08-20T10:00:00Z'",                          // quoted
+      "2026-08-20T10:00:00Z or 1=1",                     // SQL-shaped tail
+    ];
+    for (const s of badTimestamps) {
+      const bad = encCursor({ v: 1, t: { s, i: U.tapA } });
+      const response = await GET(request("GET", `/api/v1/live-feed?cursor=${bad}`));
+      expect(response.status, s).toBe(400);
+    }
+  });
+
+  it("accepts strictly-formed RFC3339 timestamps in a cursor", async () => {
+    perTableRows["public_review_sessions"] = [];
+    perTableRows["customer_responses"] = [];
+    const { GET } = await import("@/app/api/v1/live-feed/route");
+    // Every one of these is a shape Postgres/PostgREST actually emits for
+    // timestamptz via supabase-js.
+    const goodTimestamps = [
+      "2026-08-20T10:00:00Z",
+      "2026-08-20T10:00:00.123Z",
+      "2026-08-20T10:00:00.123456Z",
+      "2026-08-20T10:00:00+00:00",
+      "2026-08-20T10:00:00-05:00",
+      "2026-08-20T10:00:00.500+05:30",
+      "2024-02-29T00:00:00Z", // real leap day
+    ];
+    for (const s of goodTimestamps) {
+      const good = encCursor({ v: 1, t: { s, i: U.tapA } });
+      const response = await GET(request("GET", `/api/v1/live-feed?cursor=${good}`));
+      expect(response.status, s).toBe(200);
+    }
+  });
+
   it("missing limit falls back to the default of 25", async () => {
     const ts = "2026-08-20T10:00:00Z";
     perTableRows["public_review_sessions"] = Array.from({ length: 30 }, (_, k) => ({
