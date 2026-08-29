@@ -178,20 +178,27 @@ body {
   background: var(--rb-canvas);
   color: var(--rb-ink);
 }
-button,
-input,
-select,
-textarea {
-  color: inherit;
-  font: inherit;
-}
-button,
-a,
-select {
-  -webkit-tap-highlight-color: transparent;
-}
-a {
-  color: inherit;
+/* Reset lives in @layer base so Tailwind utilities (which sit in
+   @layer utilities and cascade after base) can win against `color: inherit`.
+   Without the layer, this un-layered rule beat every utility class — a
+   `bg-brand text-on-brand` primary button inherited body-text color in dark
+   mode instead of the on-brand dark ink, dropping contrast to 2.74:1. */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    color: inherit;
+    font: inherit;
+  }
+  button,
+  a,
+  select {
+    -webkit-tap-highlight-color: transparent;
+  }
+  a {
+    color: inherit;
+  }
 }
 ::selection {
   background: var(--rb-brand-soft);
