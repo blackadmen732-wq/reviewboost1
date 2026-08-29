@@ -25,7 +25,7 @@ jobs:
       - name: Verify Supabase CLI
         run: supabase --version
 
-      - name: Pre-flight — verify data counts are zero
+      - name: Pre-flight — verify all data tables are empty
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
@@ -34,29 +34,44 @@ jobs:
 
           count_rows() {
             local table="$1"
-            psql -h "$HOST" -p 5432 -U postgres -d postgres \
-              -t -A -c "SELECT count(*) FROM ${table};" 2>/dev/null \
-              || echo "0"
+            local result
+            result=$(psql -h "$HOST" -p 5432 -U postgres -d postgres \
+              -t -A -c "SELECT count(*) FROM ${table};")
+            if [ $? -ne 0 ] || ! [[ "$result" =~ ^[0-9]+$ ]]; then
+              echo "::error::Failed to query ${table} — aborting (fail-closed)."
+              exit 1
+            fi
+            echo "$result"
           }
 
-          auth_users=$(count_rows "auth.users")
-          orgs=$(count_rows "public.organizations")
-          locs=$(count_rows "public.locations")
-          stands=$(count_rows "public.review_stands")
-          responses=$(count_rows "public.customer_responses")
+          total=0
+          for tbl in \
+            auth.users \
+            public.organizations \
+            public.organization_members \
+            public.locations \
+            public.review_stands \
+            public.audit_events \
+            public.public_review_sessions \
+            public.customer_responses \
+            public.google_review_clicks \
+            public.team_praise_records \
+            public.idempotency_records \
+            public.rate_limit_buckets \
+            public.response_notes \
+            public.staff_members \
+            public.profiles
+          do
+            cnt=$(count_rows "$tbl")
+            echo "${tbl}: ${cnt}"
+            total=$(( total + cnt ))
+          done
 
-          echo "auth.users:          ${auth_users}"
-          echo "organizations:       ${orgs}"
-          echo "locations:           ${locs}"
-          echo "review_stands:       ${stands}"
-          echo "customer_responses:  ${responses}"
-
-          total=$(( auth_users + orgs + locs + stands + responses ))
           if [ "$total" -gt 0 ]; then
             echo "::error::Data exists in the hosted database (total=${total}). ABORTING to prevent data loss."
             exit 1
           fi
-          echo "All counts verified zero. Safe to proceed."
+          echo "All counts verified zero across all tables. Safe to proceed."
 
       - name: Link to Supabase project
         env:
@@ -84,13 +99,7 @@ jobs:
       - name: Post-reset — verify no pending migrations
         run: |
           set -euo pipefail
-          output=$(supabase db push --dry-run 2>&1) || true
-          echo "$output"
-          if echo "$output" | grep -qiE "would apply|pending"; then
-            echo "::error::Pending migrations found after reset."
-            exit 1
-          fi
-          echo "No pending migrations."
+          supabase db push --dry-run
 
       - name: Post-reset — verify schema health
         env:
@@ -134,8 +143,20 @@ jobs:
             echo "::error::Expected at least 5 public tables, found ${tables}"
             exit 1
           fi
+          if [ "$rpcs" -lt 1 ]; then
+            echo "::error::Expected at least 1 public RPC, found ${rpcs}"
+            exit 1
+          fi
+          if [ "$app_functions" -lt 1 ]; then
+            echo "::error::Expected at least 1 app-schema function, found ${app_functions}"
+            exit 1
+          fi
           if [ "$rls_count" -lt 1 ]; then
             echo "::error::No RLS policies found"
+            exit 1
+          fi
+          if [ "$rls_enabled" -lt 1 ]; then
+            echo "::error::No tables with RLS enabled"
             exit 1
           fi
           echo "Schema health verified."
