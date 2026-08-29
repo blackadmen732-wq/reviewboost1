@@ -1,3 +1,9 @@
+# checkov:skip=CKV_OPENAPI_5:Public customer API is intentionally anonymous;
+# authorization is capability-based via the high-entropy stand token in the
+# URL path (see /q/{token}), which OpenAPI's securityScheme cannot express.
+# Adding a fake header/query auth scheme would make this contract lie about
+# the real API. Any future authenticated OpenAPI document must NOT carry this
+# comment and will still be checked by CKV_OPENAPI_5.
 openapi: 3.1.0
 info:
   title: ReviewBoost public customer API

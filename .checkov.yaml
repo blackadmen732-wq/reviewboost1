@@ -1,6 +1,0 @@
-# The only OpenAPI document in this repository describes the intentionally
-# anonymous public customer flow. Access is capability-based via the high-entropy
-# stand token in the URL path; OpenAPI securityScheme cannot model path parameters.
-# Do not invent a header/query auth scheme just to satisfy CKV_OPENAPI_5.
-skip-check:
-  - CKV_OPENAPI_5
