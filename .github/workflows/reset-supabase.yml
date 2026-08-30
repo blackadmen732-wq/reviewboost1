@@ -1,0 +1,162 @@
+name: Reset hosted Supabase (one-time)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-reset
+  cancel-in-progress: false
+
+jobs:
+  reset-hosted-supabase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      EXPECTED_REF: zoyqikgqfqulwkihjbev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify Supabase CLI
+        run: supabase --version
+
+      - name: Pre-flight — verify all data tables are empty
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          HOST="db.${EXPECTED_REF}.supabase.co"
+
+          count_rows() {
+            local table="$1"
+            local result
+            result=$(psql -h "$HOST" -p 5432 -U postgres -d postgres \
+              -t -A -c "SELECT count(*) FROM ${table};")
+            if [ $? -ne 0 ] || ! [[ "$result" =~ ^[0-9]+$ ]]; then
+              echo "::error::Failed to query ${table} — aborting (fail-closed)."
+              exit 1
+            fi
+            echo "$result"
+          }
+
+          total=0
+          for tbl in \
+            auth.users \
+            public.organizations \
+            public.organization_members \
+            public.locations \
+            public.review_stands \
+            public.audit_events \
+            public.public_review_sessions \
+            public.customer_responses \
+            public.google_review_clicks \
+            public.team_praise_records \
+            public.idempotency_records \
+            public.rate_limit_buckets \
+            public.response_notes \
+            public.staff_members \
+            public.profiles
+          do
+            cnt=$(count_rows "$tbl")
+            echo "${tbl}: ${cnt}"
+            total=$(( total + cnt ))
+          done
+
+          if [ "$total" -gt 0 ]; then
+            echo "::error::Data exists in the hosted database (total=${total}). ABORTING to prevent data loss."
+            exit 1
+          fi
+          echo "All counts verified zero across all tables. Safe to proceed."
+
+      - name: Link to Supabase project
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "${SUPABASE_DB_PASSWORD}" | supabase link --project-ref "${EXPECTED_REF}"
+
+      - name: Verify linked project ref
+        run: |
+          set -euo pipefail
+          LINKED=$(cat supabase/.temp/project-ref)
+          if [ "$LINKED" != "$EXPECTED_REF" ]; then
+            echo "::error::Linked ref '${LINKED}' does not match expected '${EXPECTED_REF}'"
+            exit 1
+          fi
+          echo "Linked project ref verified: ${LINKED}"
+
+      - name: Reset hosted database from repo migrations (no seed)
+        run: supabase db reset --linked --no-seed
+
+      - name: Post-reset — migration list
+        run: supabase migration list
+
+      - name: Post-reset — verify no pending migrations
+        run: |
+          set -euo pipefail
+          supabase db push --dry-run
+
+      - name: Post-reset — verify schema health
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          HOST="db.${EXPECTED_REF}.supabase.co"
+
+          run_sql() { psql -h "$HOST" -p 5432 -U postgres -d postgres -t -A -c "$1"; }
+
+          tables=$(run_sql "
+            SELECT count(*) FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
+          ")
+          echo "Public tables: ${tables}"
+
+          rpcs=$(run_sql "
+            SELECT count(*) FROM information_schema.routines
+            WHERE routine_schema = 'public' AND routine_type = 'FUNCTION';
+          ")
+          echo "Public RPCs: ${rpcs}"
+
+          rls_count=$(run_sql "
+            SELECT count(*) FROM pg_policies WHERE schemaname = 'public';
+          ")
+          echo "RLS policies: ${rls_count}"
+
+          app_functions=$(run_sql "
+            SELECT count(*) FROM information_schema.routines
+            WHERE routine_schema = 'app' AND routine_type = 'FUNCTION';
+          ")
+          echo "app-schema functions: ${app_functions}"
+
+          rls_enabled=$(run_sql "
+            SELECT count(*) FROM pg_tables
+            WHERE schemaname = 'public' AND rowsecurity = true;
+          ")
+          echo "Tables with RLS enabled: ${rls_enabled}"
+
+          if [ "$tables" -lt 5 ]; then
+            echo "::error::Expected at least 5 public tables, found ${tables}"
+            exit 1
+          fi
+          if [ "$rpcs" -lt 1 ]; then
+            echo "::error::Expected at least 1 public RPC, found ${rpcs}"
+            exit 1
+          fi
+          if [ "$app_functions" -lt 1 ]; then
+            echo "::error::Expected at least 1 app-schema function, found ${app_functions}"
+            exit 1
+          fi
+          if [ "$rls_count" -lt 1 ]; then
+            echo "::error::No RLS policies found"
+            exit 1
+          fi
+          if [ "$rls_enabled" -lt 1 ]; then
+            echo "::error::No tables with RLS enabled"
+            exit 1
+          fi
+          echo "Schema health verified."
