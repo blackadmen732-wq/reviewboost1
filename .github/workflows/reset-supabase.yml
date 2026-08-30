@@ -29,8 +29,8 @@ jobs:
       - name: Guard — no direct db endpoint in this workflow
         run: |
           set -euo pipefail
-          if grep -Eq 'db\.[a-z]+\.supabase\.co' .github/workflows/reset-supabase.yml; then
-            echo "::error::Direct db.<ref>.supabase.co endpoint found — use the session pooler (POOLER_HOST) instead."
+          if grep -Eq 'db\.[a-z${].*\.supabase\.co' .github/workflows/reset-supabase.yml; then
+            echo "::error::Direct db.REF.supabase.co endpoint found — use the session pooler (POOLER_HOST) instead."
             exit 1
           fi
           echo "No direct db endpoint references found. OK."
