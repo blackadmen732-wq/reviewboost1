@@ -14,6 +14,7 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       EXPECTED_REF: zoyqikgqfqulwkihjbev
+      POOLER_HOST: aws-0-us-east-1.pooler.supabase.com
 
     steps:
       - uses: actions/checkout@v4
@@ -25,17 +26,27 @@ jobs:
       - name: Verify Supabase CLI
         run: supabase --version
 
+      - name: Guard — no direct db endpoint in this workflow
+        run: |
+          set -euo pipefail
+          if grep -Eq 'db\.[a-z]+\.supabase\.co' .github/workflows/reset-supabase.yml; then
+            echo "::error::Direct db.<ref>.supabase.co endpoint found — use the session pooler (POOLER_HOST) instead."
+            exit 1
+          fi
+          echo "No direct db endpoint references found. OK."
+
       - name: Pre-flight — verify all data tables are empty
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PGSSLMODE: require
         run: |
           set -euo pipefail
-          HOST="db.${EXPECTED_REF}.supabase.co"
 
           count_rows() {
             local table="$1"
             local result
-            result=$(psql -h "$HOST" -p 5432 -U postgres -d postgres \
+            result=$(psql -h "$POOLER_HOST" -p 5432 \
+              -U "postgres.${EXPECTED_REF}" -d postgres \
               -t -A -c "SELECT count(*) FROM ${table};")
             if [ $? -ne 0 ] || ! [[ "$result" =~ ^[0-9]+$ ]]; then
               echo "::error::Failed to query ${table} — aborting (fail-closed)."
@@ -104,11 +115,15 @@ jobs:
       - name: Post-reset — verify schema health
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PGSSLMODE: require
         run: |
           set -euo pipefail
-          HOST="db.${EXPECTED_REF}.supabase.co"
 
-          run_sql() { psql -h "$HOST" -p 5432 -U postgres -d postgres -t -A -c "$1"; }
+          run_sql() {
+            psql -h "$POOLER_HOST" -p 5432 \
+              -U "postgres.${EXPECTED_REF}" -d postgres \
+              -t -A -c "$1"
+          }
 
           tables=$(run_sql "
             SELECT count(*) FROM information_schema.tables
