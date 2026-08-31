@@ -50,18 +50,14 @@ export default function StandDetailScreen() {
       setLoading(true);
       setError(null);
       try {
-        const res = await apiFetch<{ data: { token: string; standUrl: string; label: string } }>(
-          `/api/v1/review-stands/${id}/qr`,
+        const res = await apiFetch<{ data: { standUrl: string; label: string } }>(
+          `/api/v1/review-stands/${id}/qr?format=json`,
           orgId,
-          { headers: { Accept: "application/json" } },
         );
         setStandUrl(res.data.standUrl);
         setStandLabel(res.data.label);
-      } catch (e) {
-        // QR endpoint returns SVG, not JSON with the URL.
-        // Instead, use the stands list to get info and construct the URL
-        // from the token endpoint. For v1 we just show a helpful message.
-        setError("Stand URL could not be loaded. Use the web dashboard for NFC provisioning.");
+      } catch {
+        setError("Could not load stand details. Please try again.");
       } finally {
         setLoading(false);
       }

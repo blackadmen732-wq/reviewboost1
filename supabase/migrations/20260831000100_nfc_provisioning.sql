@@ -82,17 +82,15 @@ begin
   end if;
 
   -- Audit event
-  insert into public.audit_events (org_id, actor_id, event_type, entity_type, entity_id, metadata)
+  insert into public.audit_events (org_id, actor_user_id, action, target_type, target_id, request_id, metadata)
   values (
     p_org_id,
     v_user_id,
     'nfc_provisioned',
     'review_stand',
-    p_stand_id,
-    jsonb_build_object(
-      'nfc_uid',    p_nfc_uid,
-      'request_id', p_request_id
-    )
+    p_stand_id::text,
+    p_request_id,
+    jsonb_build_object('nfc_uid', p_nfc_uid)
   );
 end;
 $$;

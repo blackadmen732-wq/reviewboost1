@@ -1,7 +1,7 @@
 "use client";
 
 import { Smartphone, AlertTriangle, CheckCircle } from "lucide-react";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 
 import { Button } from "@/components/ui/button";
 import { notify } from "@/components/ui/toast";
@@ -18,34 +18,36 @@ function isWebNfcAvailable(): boolean {
   return typeof window !== "undefined" && "NDEFReader" in window;
 }
 
+function normalizeNfcUid(serialNumber: string | null): string | null {
+  if (!serialNumber) return null;
+  return serialNumber.replace(/[:\-]/g, "").toUpperCase() || null;
+}
+
 export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
-  const [supported, setSupported] = useState<boolean | null>(null);
+  const [supported] = useState(() => isWebNfcAvailable());
   const [writeState, setWriteState] = useState<WriteState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [tagUid, setTagUid] = useState<string | null>(null);
 
-  useEffect(() => {
-    setSupported(isWebNfcAvailable());
-  }, []);
-
   const recordProvision = useCallback(
-    async (nfcUid: string | null) => {
+    async (nfcUid: string | null): Promise<boolean> => {
       const {
         data: { session },
       } = await supabaseBrowser().auth.getSession();
-      if (!session) return;
+      if (!session) return false;
 
       try {
-        await fetch(`/api/v1/review-stands/${standId}/nfc-provision`, {
+        const res = await fetch(`/api/v1/review-stands/${standId}/nfc-provision`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${session.access_token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ nfcUid }),
+          body: JSON.stringify({ nfcUid: normalizeNfcUid(nfcUid) }),
         });
+        return res.ok;
       } catch {
-        // Non-fatal
+        return false;
       }
     },
     [standId],
@@ -118,16 +120,18 @@ export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
       setTagUid(verifyResult.serialNumber);
 
       if (verifyResult.verified) {
-        await recordProvision(verifyResult.serialNumber);
-        setWriteState("success");
-        notify.success("NFC tag written", "The tag has been verified.");
-      } else {
-        // Write succeeded but verification was inconclusive
-        await recordProvision(verifyResult.serialNumber);
+        const recorded = await recordProvision(verifyResult.serialNumber);
         setWriteState("success");
         notify.success(
           "NFC tag written",
-          "Tap the tag with your phone to confirm it works.",
+          recorded
+            ? "The tag has been verified and recorded."
+            : "Tag verified, but the server record failed. Try again from the dashboard.",
+        );
+      } else {
+        setWriteState("error");
+        setErrorMessage(
+          "Tag was written but read-back verification failed. Tap the tag to check, then try again.",
         );
       }
     } catch (e) {
@@ -144,7 +148,6 @@ export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
     }
   }, [standUrl, recordProvision]);
 
-  if (supported === null) return null;
   if (!supported) return null;
 
   return (
