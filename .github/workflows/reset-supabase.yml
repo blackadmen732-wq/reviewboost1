@@ -113,8 +113,18 @@ jobs:
           fi
           echo "Linked project ref verified: ${LINKED}"
 
+      - name: Guard — reset command must be non-interactive
+        run: |
+          set -euo pipefail
+          if grep -Pq 'supabase\s+db\s+reset\b' .github/workflows/reset-supabase.yml \
+             && ! grep -Pq 'supabase\s+db\s+reset\b.*--yes' .github/workflows/reset-supabase.yml; then
+            echo "::error::Found supabase db reset without --yes flag — CI will hang on interactive prompt."
+            exit 1
+          fi
+          echo "All supabase db reset commands include --yes. OK."
+
       - name: Reset hosted database from repo migrations (no seed)
-        run: supabase db reset --linked --no-seed
+        run: supabase db reset --linked --no-seed --yes
 
       - name: Post-reset — migration list
         run: supabase migration list
