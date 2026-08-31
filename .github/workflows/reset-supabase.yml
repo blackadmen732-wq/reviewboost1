@@ -42,47 +42,59 @@ jobs:
         run: |
           set -euo pipefail
 
-          count_rows() {
-            local table="$1"
-            local result
-            result=$(psql -h "$POOLER_HOST" -p 5432 \
+          run_sql() {
+            local out
+            if ! out=$(psql -h "$POOLER_HOST" -p 5432 \
               -U "postgres.${EXPECTED_REF}" -d postgres \
-              -t -A -c "SELECT count(*) FROM ${table};")
-            if [ $? -ne 0 ] || ! [[ "$result" =~ ^[0-9]+$ ]]; then
-              echo "::error::Failed to query ${table} — aborting (fail-closed)."
+              -t -A -c "$1" 2>&1); then
+              echo "::error::psql failed: ${out}" >&2
               exit 1
             fi
-            echo "$result"
+            printf '%s' "$out"
           }
 
-          total=0
-          for tbl in \
-            auth.users \
-            public.organizations \
-            public.organization_members \
-            public.locations \
-            public.review_stands \
-            public.audit_events \
-            public.public_review_sessions \
-            public.customer_responses \
-            public.google_review_clicks \
-            public.team_praise_records \
-            public.idempotency_records \
-            public.rate_limit_buckets \
-            public.response_notes \
-            public.staff_members \
-            public.profiles
-          do
-            cnt=$(count_rows "$tbl")
-            echo "${tbl}: ${cnt}"
+          # --- auth.users (always expected to exist) ---
+          auth_count=$(run_sql "SELECT count(*) FROM auth.users;")
+          if ! [[ "$auth_count" =~ ^[0-9]+$ ]]; then
+            echo "::error::Non-numeric result from auth.users count: '${auth_count}'"
+            exit 1
+          fi
+          echo "auth.users: ${auth_count}"
+          total=$auth_count
+
+          # --- dynamically discover every public BASE TABLE ---
+          table_list=$(run_sql "
+            SELECT quote_ident(table_name)
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_type = 'BASE TABLE'
+            ORDER BY table_name;
+          ")
+          if [ -z "$table_list" ]; then
+            echo "::error::Table discovery returned no public tables — aborting (fail-closed)."
+            exit 1
+          fi
+
+          table_count=0
+          while IFS= read -r quoted_name; do
+            [ -z "$quoted_name" ] && continue
+            cnt=$(run_sql "SELECT count(*) FROM public.${quoted_name};")
+            if ! [[ "$cnt" =~ ^[0-9]+$ ]]; then
+              echo "::error::Non-numeric result from public.${quoted_name} count: '${cnt}'"
+              exit 1
+            fi
+            echo "public.${quoted_name}: ${cnt}"
             total=$(( total + cnt ))
-          done
+            table_count=$(( table_count + 1 ))
+          done <<< "$table_list"
+
+          echo "Discovered ${table_count} public tables."
 
           if [ "$total" -gt 0 ]; then
             echo "::error::Data exists in the hosted database (total=${total}). ABORTING to prevent data loss."
             exit 1
           fi
-          echo "All counts verified zero across all tables. Safe to proceed."
+          echo "All counts verified zero (auth.users + ${table_count} public tables). Safe to proceed."
 
       - name: Link to Supabase project
         env:
