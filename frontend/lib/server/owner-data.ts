@@ -617,9 +617,13 @@ export async function getStaffPraiseTally(orgId: string): Promise<StaffPraiseTal
 export interface Stand {
   standId: string;
   label: string;
+  standType: string;
   status: string;
   tokenPrefix: string;
   locationName: string | null;
+  tokenRotatedAt: string | null;
+  nfcUid: string | null;
+  nfcProvisionedAt: string | null;
 }
 
 /**
@@ -637,7 +641,7 @@ export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
   const [standsResult, location] = await Promise.all([
     supabase
       .from("review_stands")
-      .select("id, label, status, public_token_prefix")
+      .select("id, label, stand_type, status, public_token_prefix, token_rotated_at, nfc_uid, nfc_provisioned_at")
       .eq("org_id", orgId)
       .order("created_at", { ascending: true }),
     getPrimaryLocation(orgId),
@@ -648,9 +652,13 @@ export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
   return (data ?? []).map((row) => ({
     standId: row.id as string,
     label: (row.label as string) || "Front counter",
+    standType: (row.stand_type as string) || "printable_qr",
     status: row.status as string,
     tokenPrefix: (row.public_token_prefix as string | null) ?? "",
     locationName: location?.name ?? null,
+    tokenRotatedAt: (row.token_rotated_at as string | null) ?? null,
+    nfcUid: (row.nfc_uid as string | null) ?? null,
+    nfcProvisionedAt: (row.nfc_provisioned_at as string | null) ?? null,
   }));
 });
 

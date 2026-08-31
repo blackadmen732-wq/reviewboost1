@@ -6,6 +6,7 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   const icons: Record<string, string> = {
     Feed: "◉",
     Feedback: "✉",
+    Stands: "⬡",
   };
   return (
     <Text style={{ fontSize: 20, color: focused ? colors.brandText : colors.inkFaint }}>
@@ -37,6 +38,13 @@ export default function TabLayout() {
         options={{
           title: "Feedback",
           tabBarIcon: ({ focused }) => <TabIcon label="Feedback" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="stands"
+        options={{
+          title: "Stands",
+          tabBarIcon: ({ focused }) => <TabIcon label="Stands" focused={focused} />,
         }}
       />
     </Tabs>

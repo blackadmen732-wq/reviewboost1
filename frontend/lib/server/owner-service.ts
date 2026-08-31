@@ -202,7 +202,7 @@ export async function getOnboardingState(context: AuthenticatedContext, requestI
 export async function listStands(context: AuthenticatedContext, requestId: string, orgId: string) {
   const { data, error } = await context.db
     .from("review_stands")
-    .select("id, org_id, location_id, label, stand_type, status, public_token_prefix, created_at, last_opened_at")
+    .select("id, org_id, location_id, label, stand_type, status, public_token_prefix, created_at, last_opened_at, token_rotated_at, nfc_uid, nfc_provisioned_at, nfc_provisioned_by")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false })
     .limit(MAX_PAGE_SIZE);
@@ -215,11 +215,13 @@ export async function listStands(context: AuthenticatedContext, requestId: strin
     label: stand.label as string,
     standType: stand.stand_type as string,
     status: stand.status as string,
-    // The prefix is not the token and cannot be used to resolve the stand. It
-    // exists so an owner can tell two stands apart in a list.
     tokenPrefix: stand.public_token_prefix as string,
     createdAt: stand.created_at as string,
     lastOpenedAt: (stand.last_opened_at as string | null) ?? null,
+    tokenRotatedAt: (stand.token_rotated_at as string | null) ?? null,
+    nfcUid: (stand.nfc_uid as string | null) ?? null,
+    nfcProvisionedAt: (stand.nfc_provisioned_at as string | null) ?? null,
+    nfcProvisionedBy: (stand.nfc_provisioned_by as string | null) ?? null,
   }));
 }
 
@@ -295,6 +297,33 @@ export async function getStandTokenForReprint(
   if (token === null) return null;
 
   return { token, standUrl: standUrl(publicFrontendUrl(), token), label: data.label as string };
+}
+
+// ------------------------------------------------- NFC provisioning --
+
+export async function recordNfcProvision(
+  context: AuthenticatedContext,
+  standId: string,
+  orgId: string,
+  nfcUid: string | null,
+  requestId: string,
+): Promise<void> {
+  const { error } = await context.db.rpc("rpc_record_nfc_provision", {
+    p_stand_id: standId,
+    p_org_id: orgId,
+    p_nfc_uid: nfcUid,
+    p_request_id: requestId,
+  });
+
+  if (error) {
+    if (error.message?.includes("not_found_or_forbidden")) {
+      throw new ApiError(404, ERROR_CODE.reviewLinkInactive, "Not found.");
+    }
+    if (error.message?.includes("invalid_nfc_uid")) {
+      throw invalid("nfcUid", "Must be a hex string between 4 and 20 characters.");
+    }
+    databaseFailure("record_nfc_provision", error, requestId);
+  }
 }
 
 // ------------------------------------------------------ customer feedback --

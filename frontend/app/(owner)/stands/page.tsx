@@ -13,12 +13,6 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-/**
- * The codes an owner prints and puts on the counter.
- *
- * Called "Codes" everywhere a customer-facing word is needed. "Stand" is our
- * internal noun; the thing they are holding is a code.
- */
 export default async function StandsPage() {
   const { organization } = await requireOwner("/stands");
   const stands = await listStands(organization.orgId);
@@ -41,8 +35,12 @@ export default async function StandsPage() {
               key={stand.standId}
               standId={stand.standId}
               label={stand.label}
+              standType={stand.standType}
               status={stand.status}
               tokenPrefix={stand.tokenPrefix}
+              tokenRotatedAt={stand.tokenRotatedAt}
+              nfcUid={stand.nfcUid}
+              nfcProvisionedAt={stand.nfcProvisionedAt}
             />
           ))}
         </div>
