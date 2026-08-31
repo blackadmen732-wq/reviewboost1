@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -23,7 +23,7 @@ import {
   type NfcWriteResult,
 } from "@/lib/nfc";
 
-type WriteState = "idle" | "checking" | "ready" | "writing" | "verifying" | "success" | "error";
+type WriteState = "idle" | "checking" | "ready" | "writing" | "verifying" | "success" | "partial" | "error";
 
 export default function StandDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -43,6 +43,7 @@ export default function StandDetailScreen() {
   const [writeState, setWriteState] = useState<WriteState>("idle");
   const [writeResult, setWriteResult] = useState<NfcWriteResult | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
     if (!orgId || !id) return;
@@ -83,11 +84,13 @@ export default function StandDetailScreen() {
   const handleWriteNfc = useCallback(async () => {
     if (!standUrl || !canProvision) return;
 
+    cancelledRef.current = false;
     setWriteState("checking");
     setWriteError(null);
     setWriteResult(null);
 
     const supported = await isNfcSupported();
+    if (cancelledRef.current) return;
     if (!supported) {
       setWriteState("error");
       setWriteError("NFC is not supported on this device.");
@@ -95,6 +98,7 @@ export default function StandDetailScreen() {
     }
 
     const enabled = await isNfcEnabled();
+    if (cancelledRef.current) return;
     if (!enabled) {
       setWriteState("error");
       setWriteError("NFC is turned off. Enable it in Settings.");
@@ -104,6 +108,7 @@ export default function StandDetailScreen() {
     setWriteState("writing");
 
     const result = await writeNfcTag(standUrl);
+    if (cancelledRef.current) return;
     setWriteResult(result);
 
     if (!result.success) {
@@ -128,10 +133,13 @@ export default function StandDetailScreen() {
           body: JSON.stringify({ nfcUid: result.tagUid }),
         });
       } catch {
-        // Non-fatal: the tag is written, just the server record failed
+        if (cancelledRef.current) return;
+        setWriteState("partial");
+        return;
       }
     }
 
+    if (cancelledRef.current) return;
     setWriteState("success");
   }, [standUrl, canProvision, orgId, id]);
 
@@ -204,6 +212,20 @@ export default function StandDetailScreen() {
               </View>
             )}
 
+            {writeState === "partial" && writeResult && (
+              <View style={[styles.resultBanner, { backgroundColor: colors.infoBg }]}>
+                <Text style={[styles.resultText, { color: colors.info }]}>
+                  NFC tag written{writeResult.tagUid ? ` (UID: ${writeResult.tagUid})` : ""}, but the server record failed. The tag works, but provisioning status won&apos;t appear in the dashboard until you retry.
+                </Text>
+                <Pressable
+                  style={[styles.nfcButton, { marginTop: 12 }]}
+                  onPress={handleWriteNfc}
+                >
+                  <Text style={styles.nfcButtonText}>Retry</Text>
+                </Pressable>
+              </View>
+            )}
+
             {writeState === "error" && (
               <View style={[styles.resultBanner, { backgroundColor: colors.dangerBg }]}>
                 <Text style={[styles.resultText, { color: colors.danger }]}>
@@ -218,10 +240,11 @@ export default function StandDetailScreen() {
               </View>
             )}
 
-            {writeState !== "idle" && writeState !== "error" && writeState !== "success" && (
+            {writeState !== "idle" && writeState !== "error" && writeState !== "success" && writeState !== "partial" && (
               <Pressable
                 style={[styles.nfcButton, styles.cancelButton]}
                 onPress={() => {
+                  cancelledRef.current = true;
                   cancelNfcRequest();
                   setWriteState("idle");
                 }}

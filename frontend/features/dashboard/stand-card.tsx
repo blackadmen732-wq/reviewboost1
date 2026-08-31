@@ -46,9 +46,11 @@ export function StandCard({
   const qr = useAuthenticatedQr(standId);
   const { standUrl } = useStandUrl(standId);
 
+  const [rotatedLocally, setRotatedLocally] = useState(false);
   const hasNfc = nfcProvisionedAt !== null;
   const tokenWasRotatedAfterNfc =
-    hasNfc && tokenRotatedAt !== null && new Date(tokenRotatedAt) > new Date(nfcProvisionedAt!);
+    rotatedLocally ||
+    (hasNfc && tokenRotatedAt !== null && new Date(tokenRotatedAt) > new Date(nfcProvisionedAt!));
 
   async function rotate() {
     setBusy(true);
@@ -77,6 +79,7 @@ export function StandCard({
     }
 
     qr.reload();
+    if (hasNfc) setRotatedLocally(true);
     notify.success("New code ready", "Print it and replace the old one.");
   }
 
