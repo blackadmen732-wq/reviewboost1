@@ -113,8 +113,26 @@ jobs:
           fi
           echo "Linked project ref verified: ${LINKED}"
 
+      - name: Guard — reset command must be non-interactive
+        run: |
+          set -euo pipefail
+          # Extract lines that invoke the reset CLI (exclude grep/echo/comment lines)
+          matches=$(grep -Pn 'supabase\s+db\s+reset\b' .github/workflows/reset-supabase.yml \
+                    | grep -Pv '^\d+:\s*(#|echo|if |grep )' || true)
+          if [ -z "$matches" ]; then
+            echo "::error::No executable reset command found in workflow — expected at least one."
+            exit 1
+          fi
+          bad=$(echo "$matches" | grep -Pv -- '--yes' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Reset command missing --yes flag (non-interactive) on line(s):"
+            echo "$bad" >&2
+            exit 1
+          fi
+          echo "All executable reset commands include --yes. OK."
+
       - name: Reset hosted database from repo migrations (no seed)
-        run: supabase db reset --linked --no-seed
+        run: supabase db reset --linked --no-seed --yes
 
       - name: Post-reset — migration list
         run: supabase migration list
