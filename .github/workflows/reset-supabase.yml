@@ -47,7 +47,7 @@ jobs:
             if ! out=$(psql -h "$POOLER_HOST" -p 5432 \
               -U "postgres.${EXPECTED_REF}" -d postgres \
               -t -A -c "$1" 2>&1); then
-              echo "::error::psql failed: ${out}"
+              echo "::error::psql failed: ${out}" >&2
               exit 1
             fi
             printf '%s' "$out"
