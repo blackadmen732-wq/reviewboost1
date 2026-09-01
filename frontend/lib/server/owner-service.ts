@@ -202,7 +202,7 @@ export async function getOnboardingState(context: AuthenticatedContext, requestI
 export async function listStands(context: AuthenticatedContext, requestId: string, orgId: string) {
   const { data, error } = await context.db
     .from("review_stands")
-    .select("id, org_id, location_id, label, stand_type, status, public_token_prefix, created_at, last_opened_at, token_rotated_at, nfc_uid, nfc_provisioned_at, nfc_provisioned_by")
+    .select("id, org_id, location_id, label, stand_type, status, public_token_prefix, created_at, last_opened_at, token_rotated_at, nfc_provisioned_at")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false })
     .limit(MAX_PAGE_SIZE);
@@ -219,9 +219,7 @@ export async function listStands(context: AuthenticatedContext, requestId: strin
     createdAt: stand.created_at as string,
     lastOpenedAt: (stand.last_opened_at as string | null) ?? null,
     tokenRotatedAt: (stand.token_rotated_at as string | null) ?? null,
-    nfcUid: (stand.nfc_uid as string | null) ?? null,
     nfcProvisionedAt: (stand.nfc_provisioned_at as string | null) ?? null,
-    nfcProvisionedBy: (stand.nfc_provisioned_by as string | null) ?? null,
   }));
 }
 
@@ -305,13 +303,11 @@ export async function recordNfcProvision(
   context: AuthenticatedContext,
   standId: string,
   orgId: string,
-  nfcUid: string | null,
   requestId: string,
 ): Promise<void> {
   const { error } = await context.db.rpc("rpc_record_nfc_provision", {
     p_stand_id: standId,
     p_org_id: orgId,
-    p_nfc_uid: nfcUid,
     p_request_id: requestId,
   });
 
@@ -319,11 +315,57 @@ export async function recordNfcProvision(
     if (error.message?.includes("not_found_or_forbidden")) {
       throw new ApiError(404, ERROR_CODE.reviewLinkInactive, "Not found.");
     }
-    if (error.message?.includes("invalid_nfc_uid")) {
-      throw invalid("nfcUid", "Must be a hex string between 4 and 20 characters.");
-    }
     databaseFailure("record_nfc_provision", error, requestId);
   }
+}
+
+/**
+ * Create a new stand under an existing location.
+ *
+ * The token is generated here, same as createOrganization. The composite FK
+ * (location_id, org_id) in the database prevents cross-org linkage, and the
+ * RPC verifies owner/admin role.
+ */
+export async function createStand(
+  context: AuthenticatedContext,
+  orgId: string,
+  locationId: string,
+  label: string,
+  requestId: string,
+): Promise<{ standId: string; standUrl: string; standToken: string }> {
+  const token = generateToken();
+
+  const { data, error } = await context.db.rpc("rpc_create_stand", {
+    p_org_id: orgId,
+    p_location_id: locationId,
+    p_label: label || "Front Desk",
+    p_stand_token_hash: digestStandToken(token),
+    p_stand_token_prefix: tokenPrefix(token),
+    p_token_key_version: tokenDigestKeyVersion(),
+    p_request_id: requestId,
+  });
+
+  if (error) {
+    if (error.message?.includes("not_found_or_forbidden")) {
+      throw new ApiError(404, ERROR_CODE.reviewLinkInactive, "Location not found.");
+    }
+    databaseFailure("create_stand", error, requestId);
+  }
+
+  const standId = typeof data === "string" ? data : String(data);
+
+  // Store the encrypted token for reprinting
+  await context.db.rpc("rpc_set_stand_token_ciphertext", {
+    p_stand_id: standId,
+    p_ciphertext: encrypt(token),
+    p_key_version: KEY_VERSION,
+  });
+
+  return {
+    standId,
+    standUrl: standUrl(publicFrontendUrl(), token),
+    standToken: token,
+  };
 }
 
 // ------------------------------------------------------ customer feedback --

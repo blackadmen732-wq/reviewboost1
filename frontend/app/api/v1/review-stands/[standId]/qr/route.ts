@@ -15,7 +15,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const ALLOWED_FORMATS = new Set(["svg", "png", "json"]);
 const MIN_PNG_SIZE = 150;
-const MAX_PNG_SIZE = 2048;
+const MAX_PNG_SIZE = 4096;
 const DEFAULT_PNG_SIZE = 512;
 
 export async function GET(

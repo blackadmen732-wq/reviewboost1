@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { requireOrganizationContext, requireRole } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
-import { handle, noContent, preflight, readJsonBody } from "@/lib/server/http";
+import { handle, noContent, preflight } from "@/lib/server/http";
 import { recordNfcProvision } from "@/lib/server/owner-service";
 
 export const runtime = "nodejs";
@@ -27,20 +27,10 @@ export async function POST(
       });
     }
 
-    const body = await readJsonBody(request);
-    const nfcUid = (body as Record<string, unknown>)?.nfcUid;
-
-    if (nfcUid !== undefined && nfcUid !== null && typeof nfcUid !== "string") {
-      throw new ApiError(400, ERROR_CODE.validationFailed, "The request could not be accepted.", {
-        details: [{ field: "nfcUid", message: "Must be a string or null." }],
-      });
-    }
-
     await recordNfcProvision(
       context,
       standId,
       context.orgId,
-      typeof nfcUid === "string" ? nfcUid : null,
       requestId,
     );
 

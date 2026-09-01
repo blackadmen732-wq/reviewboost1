@@ -63,7 +63,5 @@ export interface StandItem {
   createdAt: string;
   lastOpenedAt: string | null;
   tokenRotatedAt: string | null;
-  nfcUid: string | null;
   nfcProvisionedAt: string | null;
-  nfcProvisionedBy: string | null;
 }

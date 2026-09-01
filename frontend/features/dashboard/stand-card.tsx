@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Printer, RefreshCw, Smartphone, Wifi } from "lucide-react";
+import { Check, Copy, Download, Printer, RefreshCw, Smartphone, Wifi } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,6 @@ import { notify } from "@/components/ui/toast";
 import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { WebNfcWriter } from "@/features/dashboard/web-nfc-writer";
-import { useStandUrl } from "@/lib/hooks/use-stand-url";
 
 interface StandCardProps {
   standId: string;
@@ -18,7 +17,6 @@ interface StandCardProps {
   status: string;
   tokenPrefix: string;
   tokenRotatedAt: string | null;
-  nfcUid: string | null;
   nfcProvisionedAt: string | null;
 }
 
@@ -29,6 +27,9 @@ const PNG_SIZES = [
   { label: "Print (2048px)", value: 2048 },
 ] as const;
 
+const MIN_CUSTOM_PNG = 150;
+const MAX_CUSTOM_PNG = 4096;
+
 export function StandCard({
   standId,
   label,
@@ -36,15 +37,16 @@ export function StandCard({
   status,
   tokenPrefix,
   tokenRotatedAt,
-  nfcUid,
   nfcProvisionedAt,
 }: StandCardProps) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pngSize, setPngSize] = useState(512);
+  const [customPngSize, setCustomPngSize] = useState("");
+  const [useCustomSize, setUseCustomSize] = useState(false);
   const [downloadingPng, setDownloadingPng] = useState(false);
+  const [copied, setCopied] = useState(false);
   const qr = useAuthenticatedQr(standId);
-  const { standUrl } = useStandUrl(standId);
 
   const [rotatedLocally, setRotatedLocally] = useState(false);
   const hasNfc = nfcProvisionedAt !== null;
@@ -83,7 +85,20 @@ export function StandCard({
     notify.success("New code ready", "Print it and replace the old one.");
   }
 
+  function getEffectivePngSize(): number | null {
+    if (!useCustomSize) return pngSize;
+    const parsed = Number(customPngSize);
+    if (!Number.isFinite(parsed) || parsed < MIN_CUSTOM_PNG || parsed > MAX_CUSTOM_PNG) return null;
+    return Math.round(parsed);
+  }
+
   async function downloadPng() {
+    const size = getEffectivePngSize();
+    if (!size) {
+      notify.error("Invalid size", `Enter a number between ${MIN_CUSTOM_PNG} and ${MAX_CUSTOM_PNG}.`);
+      return;
+    }
+
     setDownloadingPng(true);
 
     const {
@@ -98,7 +113,7 @@ export function StandCard({
 
     try {
       const res = await fetch(
-        `/api/v1/review-stands/${standId}/qr?format=png&size=${pngSize}`,
+        `/api/v1/review-stands/${standId}/qr?format=png&size=${size}`,
         {
           headers: { Authorization: `Bearer ${session.access_token}` },
           credentials: "omit",
@@ -110,13 +125,41 @@ export function StandCard({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `reviewboost-${tokenPrefix}-${pngSize}px.png`;
+      a.download = `reviewboost-${tokenPrefix}-${size}px.png`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
       notify.error("Could not download the code", "Please try again.");
     } finally {
       setDownloadingPng(false);
+    }
+  }
+
+  async function copyStandUrl() {
+    const {
+      data: { session },
+    } = await supabaseBrowser().auth.getSession();
+
+    if (!session) {
+      notify.error("Please sign in again", "Your session expired.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/v1/review-stands/${standId}/qr?format=json`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        credentials: "omit",
+      });
+      if (!res.ok) throw new Error("fetch_failed");
+      const json = await res.json();
+      const url = json.data?.standUrl;
+      if (!url) throw new Error("no_url");
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      notify.success("Link copied", "Paste it into NFC Tools or share it directly.");
+    } catch {
+      notify.error("Could not copy the link", "Please try again.");
     }
   }
 
@@ -148,7 +191,7 @@ export function StandCard({
               </p>
             ) : (
               <p>
-                NFC tag written{nfcUid ? ` (UID: ${nfcUid})` : ""} ·{" "}
+                NFC tag written ·{" "}
                 {new Date(nfcProvisionedAt!).toLocaleDateString()}
               </p>
             )}
@@ -199,23 +242,55 @@ export function StandCard({
           loading={qr.downloading}
         >
           <Download className="size-5" aria-hidden="true" />
-          Save SVG
+          Save SVG — best for printing
         </Button>
 
         {/* PNG download with size picker */}
         <div className="flex items-center gap-2">
-          <select
-            value={pngSize}
-            onChange={(e) => setPngSize(Number(e.target.value))}
-            className="h-11 flex-1 rounded-[var(--radius-control)] border border-border bg-surface px-3 text-sm text-ink"
-            aria-label="PNG size"
-          >
-            {PNG_SIZES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          {useCustomSize ? (
+            <div className="flex flex-1 items-center gap-2">
+              <input
+                type="number"
+                min={MIN_CUSTOM_PNG}
+                max={MAX_CUSTOM_PNG}
+                value={customPngSize}
+                onChange={(e) => setCustomPngSize(e.target.value)}
+                placeholder={`${MIN_CUSTOM_PNG}–${MAX_CUSTOM_PNG}`}
+                className="h-11 w-28 rounded-[var(--radius-control)] border border-border bg-surface px-3 text-sm text-ink"
+                aria-label="Custom PNG size in pixels"
+              />
+              <span className="text-sm text-muted">px</span>
+              <button
+                type="button"
+                onClick={() => setUseCustomSize(false)}
+                className="text-sm text-brand-text hover:underline"
+              >
+                Presets
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-1 items-center gap-2">
+              <select
+                value={pngSize}
+                onChange={(e) => setPngSize(Number(e.target.value))}
+                className="h-11 flex-1 rounded-[var(--radius-control)] border border-border bg-surface px-3 text-sm text-ink"
+                aria-label="PNG size"
+              >
+                {PNG_SIZES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setUseCustomSize(true)}
+                className="text-sm text-brand-text hover:underline"
+              >
+                Custom
+              </button>
+            </div>
+          )}
           <Button
             variant="secondary"
             onClick={() => void downloadPng()}
@@ -226,6 +301,19 @@ export function StandCard({
             Save PNG
           </Button>
         </div>
+
+        {/* Copy NFC Link */}
+        <Button
+          variant="secondary"
+          onClick={() => void copyStandUrl()}
+        >
+          {copied ? (
+            <Check className="size-5" aria-hidden="true" />
+          ) : (
+            <Copy className="size-5" aria-hidden="true" />
+          )}
+          {copied ? "Link copied" : "Copy NFC link"}
+        </Button>
       </div>
 
       {/* NFC write instructions */}
@@ -238,17 +326,16 @@ export function StandCard({
           </summary>
           <div className="mt-3 space-y-3 text-sm text-muted">
             <p>
-              Use the ReviewBoost mobile app (iPhone) or Chrome on Android to write
+              Use Android Chrome or the NFC Tools app on any phone to write
               this stand&apos;s URL to an NFC tag. The tag will contain the same link as
               the QR code.
             </p>
-            <WebNfcWriter standId={standId} standUrl={standUrl} />
+            <WebNfcWriter standId={standId} />
             <div className="rounded-[var(--radius-control)] border border-border p-3">
               <p className="mb-2 font-medium text-ink">Recommended NFC tags</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>NTAG213 (144 bytes) — sufficient for ReviewBoost URLs</li>
-                <li>NTAG215 (504 bytes) — more storage, widely compatible</li>
-                <li>NTAG216 (888 bytes) — maximum compatibility</li>
+                <li>NTAG213 — works with all phones</li>
+                <li>NTAG215 — more storage, widely compatible</li>
               </ul>
             </div>
             <div className="rounded-[var(--radius-control)] border border-border p-3">
@@ -257,7 +344,7 @@ export function StandCard({
                 <li>Install <strong>NFC Tools</strong> from App Store or Play Store</li>
                 <li>Open the app and tap <strong>Write</strong></li>
                 <li>Tap <strong>Add a record</strong> → <strong>URL / URI</strong></li>
-                <li>Paste the stand URL (shown when you rotate or create the code)</li>
+                <li>Use the <strong>Copy NFC link</strong> button above and paste it</li>
                 <li>Tap <strong>Write</strong> and hold your phone to the tag</li>
                 <li>Verify: tap the tag with your phone to confirm it opens the correct page</li>
               </ol>

@@ -1,7 +1,7 @@
 "use client";
 
-import { Smartphone, AlertTriangle, CheckCircle } from "lucide-react";
-import { useState, useCallback } from "react";
+import { Smartphone, AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { useState, useCallback, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { notify } from "@/components/ui/toast";
@@ -9,28 +9,41 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
 
 interface WebNfcWriterProps {
   standId: string;
-  standUrl: string | null;
 }
 
-type WriteState = "idle" | "checking" | "writing" | "verifying" | "success" | "error";
+type WriteState = "idle" | "checking" | "confirm-overwrite" | "writing" | "verifying" | "success" | "partial" | "error";
 
 function isWebNfcAvailable(): boolean {
   return typeof window !== "undefined" && "NDEFReader" in window;
 }
 
-function normalizeNfcUid(serialNumber: string | null): string | null {
-  if (!serialNumber) return null;
-  return serialNumber.replace(/[:\-]/g, "").toUpperCase() || null;
-}
-
-export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
+export function WebNfcWriter({ standId }: WebNfcWriterProps) {
   const [supported] = useState(() => isWebNfcAvailable());
   const [writeState, setWriteState] = useState<WriteState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [tagUid, setTagUid] = useState<string | null>(null);
+  const standUrlRef = useRef<string | null>(null);
+
+  const fetchStandUrl = useCallback(async (): Promise<string | null> => {
+    const {
+      data: { session },
+    } = await supabaseBrowser().auth.getSession();
+    if (!session) return null;
+
+    try {
+      const res = await fetch(`/api/v1/review-stands/${standId}/qr?format=json`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        credentials: "omit",
+      });
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json.data?.standUrl ?? null;
+    } catch {
+      return null;
+    }
+  }, [standId]);
 
   const recordProvision = useCallback(
-    async (nfcUid: string | null): Promise<boolean> => {
+    async (): Promise<boolean> => {
       const {
         data: { session },
       } = await supabaseBrowser().auth.getSession();
@@ -43,7 +56,7 @@ export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
             Authorization: `Bearer ${session.access_token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ nfcUid: normalizeNfcUid(nfcUid) }),
+          body: "{}",
         });
         return res.ok;
       } catch {
@@ -53,16 +66,20 @@ export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
     [standId],
   );
 
-  const handleWrite = useCallback(async () => {
-    if (!standUrl) {
-      setWriteState("error");
-      setErrorMessage("Stand URL is not available. Please reload the page.");
-      return;
+  const retryServerRecord = useCallback(async () => {
+    setWriteState("verifying");
+    const recorded = await recordProvision();
+    if (recorded) {
+      setWriteState("success");
+      notify.success("Status saved", "NFC provisioning status has been recorded.");
+    } else {
+      setWriteState("partial");
     }
+  }, [recordProvision]);
 
+  const handleWrite = useCallback(async (skipContentCheck = false) => {
     setWriteState("checking");
     setErrorMessage(null);
-    setTagUid(null);
 
     if (!isWebNfcAvailable()) {
       setWriteState("error");
@@ -70,28 +87,102 @@ export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
       return;
     }
 
-    try {
-      setWriteState("writing");
+    const url = await fetchStandUrl();
+    if (!url) {
+      setWriteState("error");
+      setErrorMessage("Could not load the stand URL. Please reload the page.");
+      return;
+    }
+    standUrlRef.current = url;
 
+    try {
       // @ts-expect-error Web NFC API types not in standard lib
       const ndef = new NDEFReader();
 
+      // Check existing content before writing
+      if (!skipContentCheck) {
+        const existingContent = await new Promise<{ hasContent: boolean; isSameUrl: boolean; description: string }>(
+          (resolve) => {
+            const timeout = setTimeout(() => {
+              resolve({ hasContent: false, isSameUrl: false, description: "" });
+            }, 8000);
+
+            ndef.addEventListener(
+              "reading",
+              ({ message }: { message: { records: Array<{ recordType: string; data?: unknown }> } }) => {
+                clearTimeout(timeout);
+                if (!message?.records || message.records.length === 0) {
+                  resolve({ hasContent: false, isSameUrl: false, description: "" });
+                  return;
+                }
+                const decoder = new TextDecoder();
+                let isSameUrl = false;
+                let description = "";
+                for (const record of message.records) {
+                  if (record.recordType === "url" && record.data) {
+                    const readUrl = decoder.decode(record.data as BufferSource);
+                    if (readUrl === url) {
+                      isSameUrl = true;
+                    }
+                    description = `URL: ${readUrl.slice(0, 60)}`;
+                  } else if (record.recordType === "text" && record.data) {
+                    description = `Text: ${decoder.decode(record.data as BufferSource).slice(0, 60)}`;
+                  } else {
+                    description = `${record.recordType} record`;
+                  }
+                }
+                resolve({ hasContent: true, isSameUrl, description });
+              },
+              { once: true },
+            );
+
+            ndef.scan().catch(() => {
+              clearTimeout(timeout);
+              resolve({ hasContent: false, isSameUrl: false, description: "" });
+            });
+          },
+        );
+
+        if (existingContent.isSameUrl) {
+          // Same URL already on tag — verify and record without rewriting
+          const recorded = await recordProvision();
+          setWriteState("success");
+          notify.success(
+            "NFC tag verified",
+            recorded
+              ? "The tag already has the correct link. Status recorded."
+              : "The tag has the correct link, but the server record failed.",
+          );
+          return;
+        }
+
+        if (existingContent.hasContent) {
+          setWriteState("confirm-overwrite");
+          setErrorMessage(
+            `This tag already has content (${existingContent.description}). Writing will replace it.`,
+          );
+          return;
+        }
+      }
+
+      // Write the URL
+      setWriteState("writing");
       await ndef.write({
-        records: [{ recordType: "url", data: standUrl }],
+        records: [{ recordType: "url", data: url }],
       });
 
       // Read back for verification
       setWriteState("verifying");
 
-      const verifyResult = await new Promise<{ verified: boolean; serialNumber: string | null }>(
+      const verifyResult = await new Promise<{ verified: boolean }>(
         (resolve) => {
           const timeout = setTimeout(() => {
-            resolve({ verified: false, serialNumber: null });
+            resolve({ verified: false });
           }, 5000);
 
           ndef.addEventListener(
             "reading",
-            ({ serialNumber, message }: { serialNumber: string; message: { records: Array<{ recordType: string; data?: unknown }> } }) => {
+            ({ message }: { message: { records: Array<{ recordType: string; data?: unknown }> } }) => {
               clearTimeout(timeout);
               let verified = false;
               if (message?.records) {
@@ -99,35 +190,32 @@ export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
                   if (record.recordType === "url") {
                     const decoder = new TextDecoder();
                     const readUrl = decoder.decode(record.data as BufferSource);
-                    if (readUrl === standUrl) {
+                    if (readUrl === url) {
                       verified = true;
                     }
                   }
                 }
               }
-              resolve({ verified, serialNumber: serialNumber || null });
+              resolve({ verified });
             },
             { once: true },
           );
 
           ndef.scan().catch(() => {
             clearTimeout(timeout);
-            resolve({ verified: false, serialNumber: null });
+            resolve({ verified: false });
           });
         },
       );
 
-      setTagUid(verifyResult.serialNumber);
-
       if (verifyResult.verified) {
-        const recorded = await recordProvision(verifyResult.serialNumber);
-        setWriteState("success");
-        notify.success(
-          "NFC tag written",
-          recorded
-            ? "The tag has been verified and recorded."
-            : "Tag verified, but the server record failed. Try again from the dashboard.",
-        );
+        const recorded = await recordProvision();
+        if (recorded) {
+          setWriteState("success");
+          notify.success("NFC tag written", "The tag has been verified and recorded.");
+        } else {
+          setWriteState("partial");
+        }
       } else {
         setWriteState("error");
         setErrorMessage(
@@ -146,7 +234,7 @@ export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
         );
       }
     }
-  }, [standUrl, recordProvision]);
+  }, [fetchStandUrl, recordProvision]);
 
   if (!supported) return null;
 
@@ -158,7 +246,7 @@ export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
       </div>
 
       {writeState === "idle" && (
-        <Button variant="secondary" onClick={handleWrite} disabled={!standUrl}>
+        <Button variant="secondary" onClick={() => void handleWrite()}>
           <Smartphone className="size-5" aria-hidden="true" />
           Write to NFC Tag
         </Button>
@@ -168,6 +256,23 @@ export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
         <div className="flex items-center gap-3 text-sm text-muted">
           <div className="size-5 animate-spin rounded-full border-2 border-border border-t-brand-text" />
           <p>Hold your phone to the NFC tag...</p>
+        </div>
+      )}
+
+      {writeState === "confirm-overwrite" && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 text-sm text-[color:var(--rb-warning,var(--rb-info))]">
+            <Info className="size-4 shrink-0" aria-hidden="true" />
+            <p>{errorMessage}</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => void handleWrite(true)}>
+              Overwrite tag
+            </Button>
+            <Button variant="secondary" onClick={() => setWriteState("idle")}>
+              Cancel
+            </Button>
+          </div>
         </div>
       )}
 
@@ -182,13 +287,24 @@ export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2 text-sm text-[color:var(--rb-success)]">
             <CheckCircle className="size-4" aria-hidden="true" />
+            <p>NFC tag written successfully</p>
+          </div>
+          <Button variant="secondary" onClick={() => void handleWrite()}>
+            Write Another Tag
+          </Button>
+        </div>
+      )}
+
+      {writeState === "partial" && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 text-sm text-[color:var(--rb-info,var(--rb-success))]">
+            <Info className="size-4 shrink-0" aria-hidden="true" />
             <p>
-              NFC tag written successfully
-              {tagUid ? ` (UID: ${tagUid})` : ""}
+              Your NFC tag works, but ReviewBoost couldn&apos;t save its setup status.
             </p>
           </div>
-          <Button variant="secondary" onClick={handleWrite}>
-            Write Another Tag
+          <Button variant="secondary" onClick={() => void retryServerRecord()}>
+            Retry saving status
           </Button>
         </div>
       )}
@@ -199,7 +315,7 @@ export function WebNfcWriter({ standId, standUrl }: WebNfcWriterProps) {
             <AlertTriangle className="size-4" aria-hidden="true" />
             <p>{errorMessage}</p>
           </div>
-          <Button variant="secondary" onClick={handleWrite}>
+          <Button variant="secondary" onClick={() => void handleWrite()}>
             Try Again
           </Button>
         </div>

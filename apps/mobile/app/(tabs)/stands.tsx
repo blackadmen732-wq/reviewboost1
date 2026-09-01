@@ -50,7 +50,7 @@ function NfcStatus({ stand }: { stand: StandItem }) {
       >
         {needsRewrite
           ? "NFC tag needs rewriting — code was changed"
-          : `NFC tag written${stand.nfcUid ? ` (${stand.nfcUid})` : ""}`}
+          : "NFC tag written"}
       </Text>
     </View>
   );

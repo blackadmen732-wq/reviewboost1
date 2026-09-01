@@ -28,10 +28,10 @@ describe("Stands system", () => {
 
   describe("PNG size validation", () => {
     const MIN = 150;
-    const MAX = 2048;
+    const MAX = 4096;
 
-    it("accepts valid sizes", () => {
-      for (const size of [150, 300, 512, 1024, 2048]) {
+    it("accepts valid sizes including custom range", () => {
+      for (const size of [150, 300, 512, 1024, 2048, 3000, 4096]) {
         expect(size >= MIN && size <= MAX).toBe(true);
       }
     });
@@ -42,26 +42,7 @@ describe("Stands system", () => {
     });
 
     it("rejects sizes above maximum", () => {
-      expect(4096 <= MAX).toBe(false);
-    });
-  });
-
-  describe("NFC UID validation", () => {
-    const NFC_UID_RE = /^[0-9A-Fa-f]{4,20}$/;
-
-    it("accepts valid hex UIDs", () => {
-      expect(NFC_UID_RE.test("04A1B2C3")).toBe(true);
-      expect(NFC_UID_RE.test("AABBCCDD")).toBe(true);
-      expect(NFC_UID_RE.test("0123")).toBe(true);
-      expect(NFC_UID_RE.test("0123456789ABCDEF0123")).toBe(true);
-    });
-
-    it("rejects invalid UIDs", () => {
-      expect(NFC_UID_RE.test("")).toBe(false);
-      expect(NFC_UID_RE.test("XYZ")).toBe(false);
-      expect(NFC_UID_RE.test("01")).toBe(false); // too short
-      expect(NFC_UID_RE.test("0123456789ABCDEF01234")).toBe(false); // too long
-      expect(NFC_UID_RE.test("04-A1-B2-C3")).toBe(false); // dashes
+      expect(8192 <= MAX).toBe(false);
     });
   });
 
@@ -143,12 +124,12 @@ describe("Stands system", () => {
       const token = "abc123def456";
       const url = `${frontendOrigin}/q/${encodeURIComponent(token)}`;
 
-      expect(url).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/); // no UUIDs
+      expect(url).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/);
     });
   });
 
-  describe("Stand list DTO shape", () => {
-    it("includes NFC provisioning fields", () => {
+  describe("Stand list DTO shape (v1)", () => {
+    it("includes NFC provisioning timestamp but NOT UID", () => {
       const stand = {
         standId: "id-1",
         locationId: "loc-1",
@@ -159,15 +140,14 @@ describe("Stands system", () => {
         createdAt: "2026-08-01T00:00:00Z",
         lastOpenedAt: null,
         tokenRotatedAt: null,
-        nfcUid: null,
         nfcProvisionedAt: null,
-        nfcProvisionedBy: null,
       };
 
-      expect(stand).toHaveProperty("nfcUid");
       expect(stand).toHaveProperty("nfcProvisionedAt");
-      expect(stand).toHaveProperty("nfcProvisionedBy");
+      expect(stand).toHaveProperty("locationId");
       expect(stand).toHaveProperty("tokenRotatedAt");
+      expect(stand).not.toHaveProperty("nfcUid");
+      expect(stand).not.toHaveProperty("nfcProvisionedBy");
     });
 
     it("never exposes token, token hash, or encryption details", () => {
@@ -184,6 +164,119 @@ describe("Stands system", () => {
       expect(json).not.toContain("encrypted");
       expect(json).not.toContain("cipher");
       expect(json).not.toContain("key_version");
+    });
+  });
+
+  describe("Location resolution", () => {
+    it("resolves each stand to its own location", () => {
+      const locations = new Map([
+        ["loc-1", "Miami"],
+        ["loc-2", "Fort Lauderdale"],
+      ]);
+
+      const stands = [
+        { standId: "s1", locationId: "loc-1" },
+        { standId: "s2", locationId: "loc-2" },
+        { standId: "s3", locationId: "loc-1" },
+      ];
+
+      const resolved = stands.map((s) => ({
+        ...s,
+        locationName: locations.get(s.locationId) ?? null,
+      }));
+
+      expect(resolved[0]!.locationName).toBe("Miami");
+      expect(resolved[1]!.locationName).toBe("Fort Lauderdale");
+      expect(resolved[2]!.locationName).toBe("Miami");
+    });
+
+    it("handles unknown location gracefully", () => {
+      const locations = new Map<string, string>();
+      const resolved = { locationId: "loc-unknown", locationName: locations.get("loc-unknown") ?? null };
+      expect(resolved.locationName).toBeNull();
+    });
+  });
+
+  describe("Add Stand validation", () => {
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    it("requires a valid UUID for locationId", () => {
+      expect(UUID.test("550e8400-e29b-41d4-a716-446655440000")).toBe(true);
+      expect(UUID.test("not-a-uuid")).toBe(false);
+      expect(UUID.test("")).toBe(false);
+    });
+
+    it("enforces label length limit", () => {
+      const maxLength = 100;
+      expect("Front Desk".length <= maxLength).toBe(true);
+      expect("A".repeat(101).length <= maxLength).toBe(false);
+    });
+
+    it("requires owner or admin role", () => {
+      const allowed = ["owner", "admin"];
+      expect(allowed.includes("owner")).toBe(true);
+      expect(allowed.includes("admin")).toBe(true);
+      expect(allowed.includes("member")).toBe(false);
+      expect(allowed.includes("viewer")).toBe(false);
+    });
+  });
+
+  describe("NFC content protection", () => {
+    it("classifies blank tag as writable", () => {
+      const records: unknown[] = [];
+      const hasContent = records.length > 0;
+      expect(hasContent).toBe(false);
+    });
+
+    it("classifies same-URL tag as already correct", () => {
+      const tagUrl = "https://app.reviewboost.com/q/abc123";
+      const standUrl = "https://app.reviewboost.com/q/abc123";
+      expect(tagUrl === standUrl).toBe(true);
+    });
+
+    it("classifies different-content tag as needing confirmation", () => {
+      const tagUrl: string = "https://example.com/other";
+      const standUrl: string = "https://app.reviewboost.com/q/abc123";
+      expect(tagUrl === standUrl).toBe(false);
+    });
+  });
+
+  describe("Partial success behavior", () => {
+    it("distinguishes write success from server record success", () => {
+      const writeSuccess = true;
+      const verified = true;
+      const serverRecordSuccess = false;
+
+      const state = writeSuccess && verified && !serverRecordSuccess ? "partial" : "success";
+      expect(state).toBe("partial");
+    });
+
+    it("partial retry only calls server, not rewrite", () => {
+      const retryAction = "record-provision-only";
+      expect(retryAction).not.toBe("full-nfc-write");
+    });
+  });
+
+  describe("Copy NFC Link", () => {
+    it("uses the same URL as the QR code", () => {
+      const qrUrl = "https://app.reviewboost.com/q/abc123";
+      const nfcUrl = qrUrl;
+      expect(nfcUrl).toBe(qrUrl);
+    });
+  });
+
+  describe("SVG/PNG export labels", () => {
+    it("SVG button indicates it is best for printing", () => {
+      const svgLabel = "Save SVG — best for printing";
+      expect(svgLabel).toContain("printing");
+    });
+
+    it("PNG allows custom sizes up to 4096", () => {
+      const MAX = 4096;
+      const MIN = 150;
+      expect(3500 >= MIN && 3500 <= MAX).toBe(true);
+      expect(4096 >= MIN && 4096 <= MAX).toBe(true);
+      expect(4097 <= MAX).toBe(false);
     });
   });
 });

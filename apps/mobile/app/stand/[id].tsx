@@ -5,25 +5,24 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Alert,
-  Platform,
   Pressable,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, useLocalSearchParams, router } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@/data/auth-context";
-import { apiFetch, ApiError } from "@/data/api";
+import { apiFetch } from "@/data/api";
 import { colors, radii, fonts } from "@/theme";
 import {
   isNfcSupported,
   isNfcEnabled,
   initNfc,
+  readExistingNfcContent,
   writeNfcTag,
   cancelNfcRequest,
-  type NfcWriteResult,
 } from "@/lib/nfc";
 
-type WriteState = "idle" | "checking" | "ready" | "writing" | "verifying" | "success" | "partial" | "error";
+type WriteState = "idle" | "checking" | "confirm-overwrite" | "writing" | "verifying" | "success" | "partial" | "error";
 
 export default function StandDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -39,10 +38,9 @@ export default function StandDetailScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const [nfcSupported, setNfcSupported] = useState<boolean | null>(null);
-  const [nfcEnabled, setNfcEnabled] = useState(false);
   const [writeState, setWriteState] = useState<WriteState>("idle");
-  const [writeResult, setWriteResult] = useState<NfcWriteResult | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
+  const [existingContentDesc, setExistingContentDesc] = useState<string | null>(null);
   const cancelledRef = useRef(false);
 
   useEffect(() => {
@@ -75,19 +73,33 @@ export default function StandDetailScreen() {
       setNfcSupported(supported);
       if (supported) {
         await initNfc();
-        const enabled = await isNfcEnabled();
-        setNfcEnabled(enabled);
       }
     })();
   }, []);
 
-  const handleWriteNfc = useCallback(async () => {
+  const retryServerRecord = useCallback(async () => {
+    if (!orgId || !id) return;
+    setWriteState("verifying");
+    try {
+      await apiFetch(`/api/v1/review-stands/${id}/nfc-provision`, orgId, {
+        method: "POST",
+        body: "{}",
+      });
+      if (cancelledRef.current) return;
+      setWriteState("success");
+    } catch {
+      if (cancelledRef.current) return;
+      setWriteState("partial");
+    }
+  }, [orgId, id]);
+
+  const handleWriteNfc = useCallback(async (skipContentCheck = false) => {
     if (!standUrl || !canProvision) return;
 
     cancelledRef.current = false;
     setWriteState("checking");
     setWriteError(null);
-    setWriteResult(null);
+    setExistingContentDesc(null);
 
     const supported = await isNfcSupported();
     if (cancelledRef.current) return;
@@ -105,11 +117,42 @@ export default function StandDetailScreen() {
       return;
     }
 
+    // Check existing content before writing
+    if (!skipContentCheck) {
+      try {
+        const existing = await readExistingNfcContent(standUrl);
+        if (cancelledRef.current) return;
+
+        if (existing.existingContent === "same-url") {
+          if (orgId) {
+            try {
+              await apiFetch(`/api/v1/review-stands/${id}/nfc-provision`, orgId, {
+                method: "POST",
+                body: "{}",
+              });
+            } catch {
+              // Non-fatal
+            }
+          }
+          if (cancelledRef.current) return;
+          setWriteState("success");
+          return;
+        }
+
+        if (existing.existingContent === "different") {
+          setExistingContentDesc(existing.description ?? "Unknown content");
+          setWriteState("confirm-overwrite");
+          return;
+        }
+      } catch {
+        // Could not read — proceed with write
+      }
+    }
+
     setWriteState("writing");
 
     const result = await writeNfcTag(standUrl);
     if (cancelledRef.current) return;
-    setWriteResult(result);
 
     if (!result.success) {
       setWriteState("error");
@@ -120,7 +163,7 @@ export default function StandDetailScreen() {
     if (!result.verified) {
       setWriteState("error");
       setWriteError(
-        "Tag was written but read-back verification failed. Please tap the tag with your phone to confirm it works.",
+        "Tag was written but verification could not confirm the contents. Please tap the tag with your phone to check it works, then try again.",
       );
       return;
     }
@@ -130,7 +173,7 @@ export default function StandDetailScreen() {
       try {
         await apiFetch(`/api/v1/review-stands/${id}/nfc-provision`, orgId, {
           method: "POST",
-          body: JSON.stringify({ nfcUid: result.tagUid }),
+          body: "{}",
         });
       } catch {
         if (cancelledRef.current) return;
@@ -174,13 +217,13 @@ export default function StandDetailScreen() {
             <Text style={styles.sectionTitle}>Write NFC Tag</Text>
             <Text style={styles.sectionDesc}>
               Hold an NFC tag to the back of your phone to write this stand&apos;s URL.
-              Use NTAG213, NTAG215, or NTAG216 tags.
+              Use NTAG213 or NTAG215 tags.
             </Text>
 
             {writeState === "idle" && (
               <Pressable
                 style={styles.nfcButton}
-                onPress={handleWriteNfc}
+                onPress={() => void handleWriteNfc()}
                 disabled={!standUrl}
               >
                 <Text style={styles.nfcButtonText}>Write to NFC Tag</Text>
@@ -190,7 +233,29 @@ export default function StandDetailScreen() {
             {writeState === "checking" && (
               <View style={styles.statusRow}>
                 <ActivityIndicator size="small" color={colors.brandText} />
-                <Text style={styles.statusText}>Checking NFC...</Text>
+                <Text style={styles.statusText}>Checking NFC and reading tag...</Text>
+              </View>
+            )}
+
+            {writeState === "confirm-overwrite" && (
+              <View style={[styles.resultBanner, { backgroundColor: colors.infoBg }]}>
+                <Text style={[styles.resultText, { color: colors.info }]}>
+                  This tag already has content ({existingContentDesc}). Writing will replace it.
+                </Text>
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+                  <Pressable
+                    style={[styles.nfcButton, { flex: 1 }]}
+                    onPress={() => void handleWriteNfc(true)}
+                  >
+                    <Text style={styles.nfcButtonText}>Overwrite</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.nfcButton, styles.cancelButton, { flex: 1 }]}
+                    onPress={() => setWriteState("idle")}
+                  >
+                    <Text style={[styles.nfcButtonText, { color: colors.danger }]}>Cancel</Text>
+                  </Pressable>
+                </View>
               </View>
             )}
 
@@ -203,25 +268,31 @@ export default function StandDetailScreen() {
               </View>
             )}
 
-            {writeState === "success" && writeResult && (
+            {writeState === "verifying" && (
+              <View style={styles.statusRow}>
+                <ActivityIndicator size="small" color={colors.brandText} />
+                <Text style={styles.statusText}>Verifying...</Text>
+              </View>
+            )}
+
+            {writeState === "success" && (
               <View style={[styles.resultBanner, { backgroundColor: colors.successBg }]}>
                 <Text style={[styles.resultText, { color: colors.success }]}>
                   NFC tag written and verified successfully
-                  {writeResult.tagUid ? ` (UID: ${writeResult.tagUid})` : ""}
                 </Text>
               </View>
             )}
 
-            {writeState === "partial" && writeResult && (
+            {writeState === "partial" && (
               <View style={[styles.resultBanner, { backgroundColor: colors.infoBg }]}>
                 <Text style={[styles.resultText, { color: colors.info }]}>
-                  NFC tag written{writeResult.tagUid ? ` (UID: ${writeResult.tagUid})` : ""}, but the server record failed. The tag works, but provisioning status won&apos;t appear in the dashboard until you retry.
+                  Your NFC tag works, but ReviewBoost couldn&apos;t save its setup status.
                 </Text>
                 <Pressable
                   style={[styles.nfcButton, { marginTop: 12 }]}
-                  onPress={handleWriteNfc}
+                  onPress={() => void retryServerRecord()}
                 >
-                  <Text style={styles.nfcButtonText}>Retry</Text>
+                  <Text style={styles.nfcButtonText}>Retry saving status</Text>
                 </Pressable>
               </View>
             )}
@@ -233,14 +304,14 @@ export default function StandDetailScreen() {
                 </Text>
                 <Pressable
                   style={[styles.nfcButton, { marginTop: 12 }]}
-                  onPress={handleWriteNfc}
+                  onPress={() => void handleWriteNfc()}
                 >
                   <Text style={styles.nfcButtonText}>Try Again</Text>
                 </Pressable>
               </View>
             )}
 
-            {writeState !== "idle" && writeState !== "error" && writeState !== "success" && writeState !== "partial" && (
+            {(writeState === "checking" || writeState === "writing") && (
               <Pressable
                 style={[styles.nfcButton, styles.cancelButton]}
                 onPress={() => {
@@ -285,7 +356,7 @@ export default function StandDetailScreen() {
             <Text style={styles.step}>1. Install NFC Tools from App Store or Play Store</Text>
             <Text style={styles.step}>2. Open the app → tap Write</Text>
             <Text style={styles.step}>3. Add a record → URL / URI</Text>
-            <Text style={styles.step}>4. Paste the stand URL from the web dashboard</Text>
+            <Text style={styles.step}>4. Copy the stand link from the web dashboard and paste it</Text>
             <Text style={styles.step}>5. Tap Write and hold your phone to the tag</Text>
             <Text style={styles.step}>6. Verify: tap the tag to confirm it opens the correct page</Text>
           </View>
