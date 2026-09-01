@@ -52,3 +52,16 @@ export interface OwnerNote {
   createdAt: string;
   authorName: string;
 }
+
+export interface StandItem {
+  standId: string;
+  locationId: string;
+  label: string;
+  standType: string;
+  status: string;
+  tokenPrefix: string;
+  createdAt: string;
+  lastOpenedAt: string | null;
+  tokenRotatedAt: string | null;
+  nfcProvisionedAt: string | null;
+}

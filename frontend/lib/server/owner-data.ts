@@ -617,40 +617,55 @@ export async function getStaffPraiseTally(orgId: string): Promise<StaffPraiseTal
 export interface Stand {
   standId: string;
   label: string;
+  standType: string;
   status: string;
   tokenPrefix: string;
+  locationId: string;
   locationName: string | null;
+  tokenRotatedAt: string | null;
+  nfcProvisionedAt: string | null;
 }
 
 /**
  * Every stand, oldest first, so the list order is stable across reloads.
  *
- * The location name comes from a separate lookup rather than an embed:
- * `review_stands` reaches `locations` through a composite key carrying `org_id`,
- * and PostgREST relationship inference over composite keys is exactly the thing
- * that works in development and errors in production. V1 has one location, so
- * this is a single cached read either way.
+ * Locations are fetched separately and joined in application code because
+ * PostgREST relationship inference over composite keys is unreliable.
+ * Each stand resolves its own location_id so multi-location businesses
+ * display correctly.
  */
 export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
   const supabase = await supabaseServer();
 
-  const [standsResult, location] = await Promise.all([
+  const [standsResult, locationsResult] = await Promise.all([
     supabase
       .from("review_stands")
-      .select("id, label, status, public_token_prefix")
+      .select("id, location_id, label, stand_type, status, public_token_prefix, token_rotated_at, nfc_provisioned_at")
       .eq("org_id", orgId)
       .order("created_at", { ascending: true }),
-    getPrimaryLocation(orgId),
+    supabase
+      .from("locations")
+      .select("id, name")
+      .eq("org_id", orgId),
   ]);
   if (standsResult.error) dataFailure("list_stands", standsResult.error);
-  const data = standsResult.data;
+  if (locationsResult.error) dataFailure("list_stands_locations", locationsResult.error);
 
-  return (data ?? []).map((row) => ({
+  const locationMap = new Map<string, string>();
+  for (const loc of locationsResult.data ?? []) {
+    locationMap.set(loc.id as string, loc.name as string);
+  }
+
+  return (standsResult.data ?? []).map((row) => ({
     standId: row.id as string,
     label: (row.label as string) || "Front counter",
+    standType: (row.stand_type as string) || "printable_qr",
     status: row.status as string,
     tokenPrefix: (row.public_token_prefix as string | null) ?? "",
-    locationName: location?.name ?? null,
+    locationId: row.location_id as string,
+    locationName: locationMap.get(row.location_id as string) ?? null,
+    tokenRotatedAt: (row.token_rotated_at as string | null) ?? null,
+    nfcProvisionedAt: (row.nfc_provisioned_at as string | null) ?? null,
   }));
 });
 
@@ -680,6 +695,24 @@ export const getPrimaryLocation = cache(async (orgId: string): Promise<OwnerLoca
     name: row.name as string,
     googleReviewUrl: (row.google_review_url as string | null) ?? null,
   };
+});
+
+export const listLocations = cache(async (orgId: string): Promise<OwnerLocation[]> => {
+  const supabase = await supabaseServer();
+
+  const { data, error } = await supabase
+    .from("locations")
+    .select("id, name, google_review_url")
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: true });
+
+  if (error) dataFailure("list_locations", error);
+
+  return (data ?? []).map((row) => ({
+    locationId: row.id as string,
+    name: row.name as string,
+    googleReviewUrl: (row.google_review_url as string | null) ?? null,
+  }));
 });
 
 // ------------------------------------------------------------- counters ----

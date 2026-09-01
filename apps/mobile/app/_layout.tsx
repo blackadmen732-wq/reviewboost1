@@ -16,6 +16,7 @@ function RootNavigator() {
       <Stack.Protected guard={isLoggedIn && !!activeOrg}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="feedback/[id]" />
+        <Stack.Screen name="stand/[id]" />
       </Stack.Protected>
     </Stack>
   );
