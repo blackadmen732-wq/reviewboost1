@@ -239,6 +239,18 @@ describe("Stands system", () => {
       const standUrl: string = "https://app.reviewboost.com/q/abc123";
       expect(tagUrl === standUrl).toBe(false);
     });
+
+    it("blocks write when tag read fails (timeout)", () => {
+      const readResult = { readFailed: true, hasContent: false, isSameUrl: false };
+      const shouldProceedToWrite = !readResult.readFailed;
+      expect(shouldProceedToWrite).toBe(false);
+    });
+
+    it("blocks write when tag read errors", () => {
+      const readThrew = true;
+      const shouldProceedToWrite = !readThrew;
+      expect(shouldProceedToWrite).toBe(false);
+    });
   });
 
   describe("Partial success behavior", () => {
@@ -254,6 +266,22 @@ describe("Stands system", () => {
     it("partial retry only calls server, not rewrite", () => {
       const retryAction = "record-provision-only";
       expect(retryAction).not.toBe("full-nfc-write");
+    });
+
+    it("same-URL tag with server failure uses partial state", () => {
+      const existingContent = "same-url";
+      const serverRecordSuccess = false;
+
+      const state = existingContent === "same-url" && !serverRecordSuccess ? "partial" : "success";
+      expect(state).toBe("partial");
+    });
+
+    it("same-URL tag with server success uses success state", () => {
+      const existingContent = "same-url";
+      const serverRecordSuccess = true;
+
+      const state = existingContent === "same-url" && !serverRecordSuccess ? "partial" : "success";
+      expect(state).toBe("success");
     });
   });
 

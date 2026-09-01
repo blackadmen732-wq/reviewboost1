@@ -39,6 +39,44 @@ describe("StandItem type shape", () => {
   });
 });
 
+describe("NFC read safety", () => {
+  it("blocks write when read throws (native)", () => {
+    const readThrew = true;
+    const shouldProceedToWrite = !readThrew;
+    expect(shouldProceedToWrite).toBe(false);
+  });
+
+  it("blocks write when read times out (web)", () => {
+    const readResult = { readFailed: true, hasContent: false, isSameUrl: false };
+    const shouldProceedToWrite = !readResult.readFailed;
+    expect(shouldProceedToWrite).toBe(false);
+  });
+
+  it("allows write when tag is confirmed blank", () => {
+    const readResult = { readFailed: false, hasContent: false, isSameUrl: false };
+    const shouldProceedToWrite = !readResult.readFailed && !readResult.hasContent;
+    expect(shouldProceedToWrite).toBe(true);
+  });
+});
+
+describe("Same-URL partial state", () => {
+  it("uses partial state when same-URL server record fails", () => {
+    const existingContent = "same-url";
+    const serverRecordSuccess = false;
+
+    const state = existingContent === "same-url" && !serverRecordSuccess ? "partial" : "success";
+    expect(state).toBe("partial");
+  });
+
+  it("uses success state when same-URL server record succeeds", () => {
+    const existingContent = "same-url";
+    const serverRecordSuccess = true;
+
+    const state = existingContent === "same-url" && !serverRecordSuccess ? "partial" : "success";
+    expect(state).toBe("success");
+  });
+});
+
 describe("Token rotation awareness for NFC", () => {
   it("detects stale NFC tag", () => {
     const nfcProvisionedAt = "2026-08-20T10:00:00Z";

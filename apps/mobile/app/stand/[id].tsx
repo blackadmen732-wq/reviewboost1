@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams } from "expo-router";
+import * as Linking from "expo-linking";
 import { useAuth } from "@/data/auth-context";
 import { apiFetch } from "@/data/api";
 import { colors, radii, fonts } from "@/theme";
@@ -131,7 +132,9 @@ export default function StandDetailScreen() {
                 body: "{}",
               });
             } catch {
-              // Non-fatal
+              if (cancelledRef.current) return;
+              setWriteState("partial");
+              return;
             }
           }
           if (cancelledRef.current) return;
@@ -145,7 +148,12 @@ export default function StandDetailScreen() {
           return;
         }
       } catch {
-        // Could not read — proceed with write
+        if (cancelledRef.current) return;
+        setWriteState("error");
+        setWriteError(
+          "ReviewBoost couldn't safely read this tag. Try again or use a blank NFC tag.",
+        );
+        return;
       }
     }
 
@@ -343,6 +351,22 @@ export default function StandDetailScreen() {
               Only owners and admins can write NFC tags. Ask your organization
               owner for access.
             </Text>
+          </View>
+        )}
+
+        {/* Test Stand */}
+        {standUrl && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Test Stand</Text>
+            <Text style={styles.sectionDesc}>
+              Open the live customer page for this stand to verify it works correctly.
+            </Text>
+            <Pressable
+              style={styles.nfcButton}
+              onPress={() => void Linking.openURL(standUrl)}
+            >
+              <Text style={styles.nfcButtonText}>Open Stand Page</Text>
+            </Pressable>
           </View>
         )}
 

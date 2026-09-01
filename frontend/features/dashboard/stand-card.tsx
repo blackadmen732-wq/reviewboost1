@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Download, Printer, RefreshCw, Smartphone, Wifi } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, Printer, RefreshCw, Smartphone, Wifi } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -119,7 +119,14 @@ export function StandCard({
           credentials: "omit",
         },
       );
-      if (!res.ok) throw new Error("download_failed");
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          notify.error("Please sign in again", "Your session expired.");
+          setDownloadingPng(false);
+          return;
+        }
+        throw new Error("download_failed");
+      }
 
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -160,6 +167,31 @@ export function StandCard({
       notify.success("Link copied", "Paste it into NFC Tools or share it directly.");
     } catch {
       notify.error("Could not copy the link", "Please try again.");
+    }
+  }
+
+  async function testStand() {
+    const {
+      data: { session },
+    } = await supabaseBrowser().auth.getSession();
+
+    if (!session) {
+      notify.error("Please sign in again", "Your session expired.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/v1/review-stands/${standId}/qr?format=json`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        credentials: "omit",
+      });
+      if (!res.ok) throw new Error("fetch_failed");
+      const json = await res.json();
+      const url = json.data?.standUrl;
+      if (!url) throw new Error("no_url");
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch {
+      notify.error("Could not open stand page", "Please try again.");
     }
   }
 
@@ -313,6 +345,15 @@ export function StandCard({
             <Copy className="size-5" aria-hidden="true" />
           )}
           {copied ? "Link copied" : "Copy NFC link"}
+        </Button>
+
+        {/* Test Stand */}
+        <Button
+          variant="secondary"
+          onClick={() => void testStand()}
+        >
+          <ExternalLink className="size-5" aria-hidden="true" />
+          Test Stand
         </Button>
       </div>
 

@@ -101,10 +101,10 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
 
       // Check existing content before writing
       if (!skipContentCheck) {
-        const existingContent = await new Promise<{ hasContent: boolean; isSameUrl: boolean; description: string }>(
+        const existingContent = await new Promise<{ hasContent: boolean; isSameUrl: boolean; description: string; readFailed: boolean }>(
           (resolve) => {
             const timeout = setTimeout(() => {
-              resolve({ hasContent: false, isSameUrl: false, description: "" });
+              resolve({ hasContent: false, isSameUrl: false, description: "", readFailed: true });
             }, 8000);
 
             ndef.addEventListener(
@@ -112,7 +112,7 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
               ({ message }: { message: { records: Array<{ recordType: string; data?: unknown }> } }) => {
                 clearTimeout(timeout);
                 if (!message?.records || message.records.length === 0) {
-                  resolve({ hasContent: false, isSameUrl: false, description: "" });
+                  resolve({ hasContent: false, isSameUrl: false, description: "", readFailed: false });
                   return;
                 }
                 const decoder = new TextDecoder();
@@ -131,28 +131,37 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
                     description = `${record.recordType} record`;
                   }
                 }
-                resolve({ hasContent: true, isSameUrl, description });
+                resolve({ hasContent: true, isSameUrl, description, readFailed: false });
               },
               { once: true },
             );
 
             ndef.scan().catch(() => {
               clearTimeout(timeout);
-              resolve({ hasContent: false, isSameUrl: false, description: "" });
+              resolve({ hasContent: false, isSameUrl: false, description: "", readFailed: true });
             });
           },
         );
 
-        if (existingContent.isSameUrl) {
-          // Same URL already on tag — verify and record without rewriting
-          const recorded = await recordProvision();
-          setWriteState("success");
-          notify.success(
-            "NFC tag verified",
-            recorded
-              ? "The tag already has the correct link. Status recorded."
-              : "The tag has the correct link, but the server record failed.",
+        if (existingContent.readFailed) {
+          setWriteState("error");
+          setErrorMessage(
+            "ReviewBoost couldn't safely read this tag. Try again or use a blank NFC tag.",
           );
+          return;
+        }
+
+        if (existingContent.isSameUrl) {
+          const recorded = await recordProvision();
+          if (recorded) {
+            setWriteState("success");
+            notify.success(
+              "NFC tag verified",
+              "The tag already has the correct link. Status recorded.",
+            );
+          } else {
+            setWriteState("partial");
+          }
           return;
         }
 
