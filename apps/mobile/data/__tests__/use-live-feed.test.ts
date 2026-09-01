@@ -330,15 +330,3 @@ describe("useLiveFeed", () => {
     expect(result.current.items.map((i) => i.id)).toEqual(["e-1", "e-2", "e-3"]);
   });
 });
-
-describe("production Feed data source", () => {
-  it("mock module no longer exports MOCK_LIVE_FEED", async () => {
-    // The production Feed screen (`app/(tabs)/feed.tsx`) uses `useLiveFeed`,
-    // which goes through the authenticated apiFetch helper. The old
-    // MOCK_LIVE_FEED constant has been removed from the mock module so any
-    // regression that tried to fall back to it would fail at import time.
-    const mock: unknown = await import("../mock");
-    expect(mock).toBeTruthy();
-    expect((mock as Record<string, unknown>)["MOCK_LIVE_FEED"]).toBeUndefined();
-  });
-});

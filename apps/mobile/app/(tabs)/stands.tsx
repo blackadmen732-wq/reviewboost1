@@ -1,8 +1,8 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   View,
   Text,
-  FlatList,
+  SectionList,
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
@@ -100,6 +100,25 @@ export default function StandsScreen() {
   const orgId = activeOrg?.orgId;
   const { stands, loading, refreshing, error, refresh } = useStands(orgId);
 
+  // One section per location, so writing a tag starts the way the owner
+  // thinks about it: pick the location, then pick the stand.
+  const sections = useMemo(() => {
+    const byLocation = new Map<string, { title: string; data: StandItem[] }>();
+    for (const stand of stands) {
+      const key = stand.locationId;
+      const existing = byLocation.get(key);
+      if (existing) {
+        existing.data.push(stand);
+      } else {
+        byLocation.set(key, {
+          title: stand.locationName ?? "Location",
+          data: [stand],
+        });
+      }
+    }
+    return [...byLocation.values()];
+  }, [stands]);
+
   useFocusEffect(
     useCallback(() => {
       if (orgId) void refresh();
@@ -124,10 +143,14 @@ export default function StandsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <FlatList
-        data={stands}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.standId}
         renderItem={({ item }) => <StandCard item={item} />}
+        renderSectionHeader={({ section }) => (
+          <Text style={styles.sectionHeader}>{section.title}</Text>
+        )}
+        stickySectionHeadersEnabled={false}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl
@@ -159,6 +182,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   list: { padding: 16, gap: 12 },
+  sectionHeader: {
+    fontSize: 14,
+    color: colors.inkMuted,
+    marginTop: 8,
+    marginBottom: 2,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    ...fonts.label,
+  },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.card,

@@ -202,7 +202,7 @@ export async function getOnboardingState(context: AuthenticatedContext, requestI
 export async function listStands(context: AuthenticatedContext, requestId: string, orgId: string) {
   const { data, error } = await context.db
     .from("review_stands")
-    .select("id, org_id, location_id, label, stand_type, status, public_token_prefix, created_at, last_opened_at, token_rotated_at, nfc_provisioned_at")
+    .select("id, org_id, location_id, label, stand_type, status, public_token_prefix, created_at, last_opened_at, token_rotated_at, nfc_provisioned_at, locations(name)")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false })
     .limit(MAX_PAGE_SIZE);
@@ -212,6 +212,13 @@ export async function listStands(context: AuthenticatedContext, requestId: strin
   return (data ?? []).map((stand) => ({
     standId: stand.id as string,
     locationId: stand.location_id as string,
+    // The embed is an object for this many-to-one join, but PostgREST types
+    // it loosely; null when RLS hides the location row.
+    locationName: (() => {
+      const embedded = stand.locations as { name?: string } | { name?: string }[] | null;
+      const row = Array.isArray(embedded) ? embedded[0] : embedded;
+      return row?.name ?? null;
+    })(),
     label: stand.label as string,
     standType: stand.stand_type as string,
     status: stand.status as string,

@@ -56,6 +56,9 @@ export interface OwnerNote {
 export interface StandItem {
   standId: string;
   locationId: string;
+  // Null when the caller cannot see the location row; the UI substitutes a
+  // fallback label.
+  locationName: string | null;
   label: string;
   standType: string;
   status: string;

@@ -6,6 +6,7 @@ interface ApiResponse {
   data: Array<{
     standId: string;
     locationId: string;
+    locationName: string | null;
     label: string;
     standType: string;
     status: string;
