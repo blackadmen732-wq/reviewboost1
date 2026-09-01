@@ -255,6 +255,16 @@ otp_expiry = 3600
 subject = "Your ReviewBoost sign-in code"
 content_path = "./supabase/templates/magic-link.html"
 
+# The first-time sign-up email. With enable_confirmations = false above, a new
+# user is auto-confirmed and receives the magic_link code email — so this is not
+# normally sent. It is customised anyway so that if email confirmations are ever
+# turned on, a first-time owner still gets the same six-digit code (leading with
+# {{ .Token }}) and the same subject, rather than the default "Confirm your email
+# address" link that does not match the sign-in screen.
+[auth.email.template.confirmation]
+subject = "Your ReviewBoost sign-in code"
+content_path = "./supabase/templates/confirmation.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
