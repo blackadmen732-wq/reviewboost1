@@ -382,11 +382,15 @@ export default function StandDetailScreen() {
             <Pressable
               style={styles.nfcButton}
               onPress={() => {
-                void Share.share(
+                Share.share(
                   Platform.OS === "ios"
                     ? { url: standUrl }
                     : { message: standUrl },
-                );
+                ).catch(() => {
+                  // react-native-web rejects when the browser has no Web
+                  // Share API, and users can dismiss the native sheet — a
+                  // no-op is the right outcome, not an unhandled rejection.
+                });
               }}
             >
               <Text style={styles.nfcButtonText}>Share Link</Text>

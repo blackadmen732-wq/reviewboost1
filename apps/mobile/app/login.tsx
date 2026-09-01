@@ -42,32 +42,41 @@ export default function LoginScreen() {
     setError(null);
     setSubmitting(true);
 
-    const err = await sendCode(address);
-
-    setSubmitting(false);
-    if (err) {
-      setError(err);
-      return;
+    try {
+      const err = await sendCode(address);
+      if (err) {
+        setError(err);
+        return;
+      }
+      setEmail(address);
+      setCode("");
+      setStep("code");
+      setSecondsLeft(RESEND_SECONDS);
+      setTimeout(() => codeField.current?.focus(), 100);
+    } catch {
+      setError("We could not send the code. Check the address and try again.");
+    } finally {
+      setSubmitting(false);
     }
-    setEmail(address);
-    setCode("");
-    setStep("code");
-    setSecondsLeft(RESEND_SECONDS);
-    setTimeout(() => codeField.current?.focus(), 100);
   };
 
   const handleResend = async () => {
     if (secondsLeft > 0 || submitting) return;
     setError(null);
     setSubmitting(true);
-    const err = await sendCode(email);
-    setSubmitting(false);
-    if (err) {
-      setError(err);
-      return;
+    try {
+      const err = await sendCode(email);
+      if (err) {
+        setError(err);
+        return;
+      }
+      setCode("");
+      setSecondsLeft(RESEND_SECONDS);
+    } catch {
+      setError("We could not send the code. Check the address and try again.");
+    } finally {
+      setSubmitting(false);
     }
-    setCode("");
-    setSecondsLeft(RESEND_SECONDS);
   };
 
   const handleVerify = async () => {
@@ -75,16 +84,22 @@ export default function LoginScreen() {
     setError(null);
     setSubmitting(true);
 
-    const err = await verifyCode(email, code);
-
-    setSubmitting(false);
-    if (err) {
-      setError(err);
+    try {
+      const err = await verifyCode(email, code);
+      if (err) {
+        setError(err);
+        setCode("");
+        codeField.current?.focus();
+        return;
+      }
+      router.replace("/select-org");
+    } catch {
+      setError("We could not verify the code. Please try again.");
       setCode("");
       codeField.current?.focus();
-      return;
+    } finally {
+      setSubmitting(false);
     }
-    router.replace("/select-org");
   };
 
   if (step === "code") {

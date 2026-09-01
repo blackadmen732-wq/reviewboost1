@@ -111,12 +111,23 @@ export default function StandsScreen() {
         existing.data.push(stand);
       } else {
         byLocation.set(key, {
-          title: stand.locationName ?? "Location",
+          title: stand.locationName ?? "",
           data: [stand],
         });
       }
     }
-    return [...byLocation.values()];
+    const result = [...byLocation.values()];
+    // A missing name would otherwise render every group as the same
+    // "Location" header. Number the unnamed ones so distinct locations
+    // stay distinguishable.
+    let unnamed = 0;
+    for (const section of result) {
+      if (!section.title) {
+        unnamed += 1;
+        section.title = result.length > 1 ? `Location ${unnamed}` : "Location";
+      }
+    }
+    return result;
   }, [stands]);
 
   useFocusEffect(
