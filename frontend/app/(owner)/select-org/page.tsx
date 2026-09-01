@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { OrgPicker } from "@/features/auth/org-picker";
 import { safeInternalPath } from "@/lib/security/safe-redirect";
+import { publicFrontendUrl } from "@/lib/server/env";
 import { listUserOrganizations } from "@/lib/server/owner-data";
 import { currentUser } from "@/lib/supabase/server";
 
@@ -27,8 +28,8 @@ export default async function SelectOrgPage({
   if (organizations.length === 1) redirect("/home");
 
   const { next } = await searchParams;
-  const origin = process.env.PUBLIC_FRONTEND_URL || "http://localhost:3000";
-  const destination = safeInternalPath(next, origin);
+  // Guarded accessor rather than a silent localhost fallback — see login/page.
+  const destination = safeInternalPath(next, publicFrontendUrl());
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">

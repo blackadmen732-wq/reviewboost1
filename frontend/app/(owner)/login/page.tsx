@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { SignInFlow } from "@/features/auth/sign-in-flow";
 import { safeInternalPath } from "@/lib/security/safe-redirect";
+import { publicFrontendUrl } from "@/lib/server/env";
 import { currentUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -21,8 +22,10 @@ export default async function LoginPage({
   const user = await currentUser();
   const { next } = await searchParams;
 
-  const origin = process.env.PUBLIC_FRONTEND_URL || "http://localhost:3000";
-  const destination = safeInternalPath(next, origin);
+  // The guarded accessor rather than a silent localhost fallback: in
+  // production it throws if PUBLIC_FRONTEND_URL is unset instead of validating
+  // redirects against a localhost origin. In development it returns localhost.
+  const destination = safeInternalPath(next, publicFrontendUrl());
 
   if (user) redirect(destination);
 
