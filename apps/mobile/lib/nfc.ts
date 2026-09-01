@@ -33,7 +33,7 @@ export async function initNfc(): Promise<boolean> {
   }
 }
 
-export async function readExistingNfcContent(url: string): Promise<NfcWriteResult["existingContent"] & { description: string | null }> {
+export async function readExistingNfcContent(url: string): Promise<{ existingContent: "blank" | "same-url" | "different"; description: string | null }> {
   try {
     await NfcManager.requestTechnology(NfcTech.Ndef);
     const tag = await NfcManager.getTag();

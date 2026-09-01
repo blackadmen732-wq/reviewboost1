@@ -13,13 +13,10 @@ describe("StandItem type shape", () => {
       createdAt: "2026-08-01T00:00:00Z",
       lastOpenedAt: null,
       tokenRotatedAt: null,
-      nfcUid: null,
       nfcProvisionedAt: null,
-      nfcProvisionedBy: null,
     };
 
     expect(stand.standId).toBe("stand-1");
-    expect(stand.nfcUid).toBeNull();
     expect(stand.nfcProvisionedAt).toBeNull();
   });
 
@@ -34,13 +31,10 @@ describe("StandItem type shape", () => {
       createdAt: "2026-08-01T00:00:00Z",
       lastOpenedAt: null,
       tokenRotatedAt: null,
-      nfcUid: "04A1B2C3D4",
       nfcProvisionedAt: "2026-08-15T10:00:00Z",
-      nfcProvisionedBy: "user-1",
     };
 
     expect(stand.standType).toBe("physical_nfc");
-    expect(stand.nfcUid).toBe("04A1B2C3D4");
     expect(stand.nfcProvisionedAt).not.toBeNull();
   });
 });
