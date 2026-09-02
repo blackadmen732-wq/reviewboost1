@@ -27,7 +27,10 @@ function authorized(request: Request): boolean {
   if (!secret) return false;
 
   const header = request.headers.get("authorization") ?? "";
-  const [scheme, token] = header.split(" ");
+  const parts = header.split(" ");
+  // Exactly "Bearer <token>" — reject trailing junk like "Bearer <token> x".
+  if (parts.length !== 2) return false;
+  const [scheme, token] = parts;
   if (scheme?.toLowerCase() !== "bearer" || !token) return false;
 
   const a = Buffer.from(token);

@@ -14,7 +14,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(49);
+select plan(55);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -39,6 +39,39 @@ begin
     perform set_config('role', 'postgres', true);
     perform set_config('request.jwt.claims', '', true);
 end $$;
+
+-- A fixed-offset IANA zone in which it is currently ~midday, so begin_dispatch's
+-- quiet-hours recheck ([09:00,20:00) local) always permits a send regardless of
+-- the wall-clock hour the suite runs at. Etc/GMT signs are inverted.
+create or replace function tests.noon_zone() returns text
+language sql stable as $$
+    select case
+        when (12 - extract(hour from now())::int) = 0 then 'UTC'
+        when (12 - extract(hour from now())::int) > 0
+            then 'Etc/GMT-' || (12 - extract(hour from now())::int)::text
+        else 'Etc/GMT+' || abs(12 - extract(hour from now())::int)::text
+    end;
+$$;
+
+-- A fixed-offset zone in which it is currently ~03:00, inside quiet hours, so
+-- begin_dispatch defers. The offset is kept within the representable Etc/GMT
+-- range [-12, +14] by shifting a full day when needed (local hour is unchanged).
+create or replace function tests.night_zone() returns text
+language sql stable as $$
+    with o as (
+        select case
+            when (3 - extract(hour from now())::int) < -12
+                then (3 - extract(hour from now())::int) + 24
+            else (3 - extract(hour from now())::int)
+        end as off
+    )
+    select case
+        when off = 0 then 'UTC'
+        when off > 0 then 'Etc/GMT-' || off::text
+        else 'Etc/GMT+' || abs(off)::text
+    end
+    from o;
+$$;
 
 grant usage on schema tests to public;
 grant execute on all functions in schema tests to public;
@@ -218,16 +251,16 @@ select ok(not app.sms_request_transition_allowed('cancelled', 'queued'), 'cancel
 
 -- ======================================================== quota ============
 
-select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000a', 10, 'alloc-1', null, null);
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000a', 10, 'alloc-001', null, null);
 select is(app.sms_quota_available('7c000000-0000-0000-0000-00000000000a'), 10::bigint, 'allocation increases available quota');
 
 select is(
-    (select reserved from app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000a', 3, 'resv-1', null)),
+    (select reserved from app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000a', 3, 'resv-0001', null)),
     true, 'a reservation within budget succeeds');
 select is(app.sms_quota_available('7c000000-0000-0000-0000-00000000000a'), 7::bigint, 'a reservation reduces available quota');
 
 -- Idempotent: same correlation key does not double-count.
-select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000a', 3, 'resv-1', null);
+select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000a', 3, 'resv-0001', null);
 select is(app.sms_quota_available('7c000000-0000-0000-0000-00000000000a'), 7::bigint, 'a repeated reservation key does not double-spend');
 
 -- Over-budget reservation is refused (no double-spend).
@@ -236,15 +269,25 @@ select is(
     false, 'a reservation beyond available quota is refused');
 select is(app.sms_quota_available('7c000000-0000-0000-0000-00000000000a'), 7::bigint, 'a refused reservation leaves quota untouched');
 
+-- Expired allocations are not spendable. Org B allocates a grant that has
+-- already lapsed; it must contribute nothing to available quota and a
+-- reservation against it must be refused.
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 5, 'alloc-exp1', now() - interval '1 hour', null);
+select is(app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'), 0::bigint,
+    'an already-expired allocation contributes no available quota');
+select is(
+    (select reserved from app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 1, 'resv-exp1', null)),
+    false, 'a reservation against only-expired quota is refused');
+
 -- ================================================= schedule pipeline =======
 
-select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000a', 100, 'alloc-2', null, null);
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000a', 100, 'alloc-002', null, null);
 
 select is(
     (select created from app.sms_schedule_request(
         '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
         repeat('2',64), 'v1:enc', 1::smallint, '2222', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
-        'UTC', now(), 'sched-dedupe-1', '7b000000-0000-0000-0000-000000000001', 'req-1')),
+        tests.noon_zone(), now(), 'sched-dedupe-1', '7b000000-0000-0000-0000-000000000001', 'req-1')),
     true, 'scheduling creates a request');
 
 select is(
@@ -314,6 +357,46 @@ select is(
     (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-supp'),
     'suppressed', 'the suppressed request is terminal');
 
+-- Quiet-hours defer: a due job whose recipient is currently inside quiet hours
+-- is deferred to the next window rather than sent, and no attempt is opened.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('5',64),
+    'v1:enc', 1::smallint, '5555', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('5',64), 'v1:enc', 1::smallint, '5555', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.night_zone(), now(), 'sched-dedupe-night', '7b000000-0000-0000-0000-000000000001', 'req-night');
+select is(
+    (select outcome from app.sms_begin_dispatch(
+        (select id from public.text_requests where dedupe_key = 'sched-dedupe-night'),
+        '7c000000-0000-0000-0000-00000000000a', 'fake')),
+    'deferred', 'a send in the recipient''s quiet hours is deferred, not sent');
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-night'),
+    'scheduled', 'a deferred request stays scheduled with no attempt opened');
+
+-- Stranded-'sending' recovery: a request whose worker died mid-send (status
+-- stuck at sending, attempt never settled) is parked as provider_unknown on the
+-- next claim, never re-sent and never left stuck forever.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('6',64),
+    'v1:enc', 1::smallint, '6666', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('6',64), 'v1:enc', 1::smallint, '6666', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-recover', '7b000000-0000-0000-0000-000000000001', 'req-recover');
+-- First claim opens the attempt and moves it to sending.
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-recover'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+-- A later claim (the prior worker never settled) recovers it.
+select is(
+    (select outcome from app.sms_begin_dispatch(
+        (select id from public.text_requests where dedupe_key = 'sched-dedupe-recover'),
+        '7c000000-0000-0000-0000-00000000000a', 'fake')),
+    'recovered_unknown', 'a stranded sending request is recovered, not lost');
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-recover'),
+    'provider_unknown', 'the recovered request becomes provider_unknown for reconciliation');
+
 -- ======================================================= outbox ============
 
 -- A fresh job to exercise the lease.
@@ -330,24 +413,27 @@ select is(
 -- =================================================== webhook inbox =========
 
 select is(
-    (select inserted from app.sms_webhook_receive('fake', 'evt-1', 'evt-1', 'status', true, '{}'::jsonb, 'v1:enc')),
+    (select inserted from app.sms_webhook_receive('fake', 'evt-0001', 'evt-0001', 'status', true, '{}'::jsonb, 'v1:enc')),
     true, 'a new webhook event is inserted');
 select is(
-    (select inserted from app.sms_webhook_receive('fake', 'evt-1', 'evt-1', 'status', true, '{}'::jsonb, 'v1:enc')),
+    (select inserted from app.sms_webhook_receive('fake', 'evt-0001', 'evt-0001', 'status', true, '{}'::jsonb, 'v1:enc')),
     false, 'a duplicate webhook event is a harmless no-op');
 select is(
-    (select count(*)::integer from public.sms_webhook_inbox where provider = 'fake' and dedupe_key = 'evt-1'),
+    (select count(*)::integer from public.sms_webhook_inbox where provider = 'fake' and dedupe_key = 'evt-0001'),
     1, 'a duplicate webhook does not create a second row');
 
 -- ============================================ single in-flight guard =======
 
--- Schedule a guard request and open one attempt on it (PH2 is opted in), then
--- prove a second concurrent in-flight attempt is refused by the partial unique
--- index — the duplicate-send guard.
+-- Schedule a guard request and open one attempt on it, then prove a second
+-- concurrent in-flight attempt is refused by the partial unique index — the
+-- duplicate-send guard. Uses a fresh recipient (PH4) that is opted in and has no
+-- recent_send suppression, so begin_dispatch actually opens an attempt.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('4',64),
+    'v1:enc', 1::smallint, '4444', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
 select app.sms_schedule_request(
     '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
-    repeat('2',64), 'v1:enc', 1::smallint, '2222', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
-    'UTC', now(), 'sched-dedupe-guard', '7b000000-0000-0000-0000-000000000001', 'req-guard');
+    repeat('4',64), 'v1:enc', 1::smallint, '4444', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-guard', '7b000000-0000-0000-0000-000000000001', 'req-guard');
 select app.sms_begin_dispatch(
     (select id from public.text_requests where dedupe_key = 'sched-dedupe-guard'),
     '7c000000-0000-0000-0000-00000000000a', 'fake');

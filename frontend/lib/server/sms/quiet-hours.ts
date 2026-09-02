@@ -80,24 +80,40 @@ function zoneOffsetMinutes(instant: Date, timeZone: string): number {
 /**
  * The UTC instant of a local wall-clock time in a zone.
  *
- * Two-pass: guess the offset at the naive UTC interpretation, apply it, then
- * re-read the offset at that candidate and correct once. This resolves the
- * ordinary DST cases; on the rare spring-forward gap it lands on the following
- * valid instant, which for a send time is the safe direction (never earlier).
+ * Compute the two candidate instants — one under the offset on each side of a
+ * possible transition — and pick the candidate whose zone wall-clock actually
+ * equals the requested time. In the ordinary case both agree; in an autumn fold
+ * the earliest valid instant is chosen. In a spring-forward gap the requested
+ * wall time does not exist, so neither candidate matches and we advance to the
+ * first valid instant *after* the gap (the later candidate) — never earlier,
+ * which for a send time is the safe direction (it would otherwise land back
+ * inside quiet hours).
  */
 function zonedWallClockToUtc(
   parts: { year: number; month: number; day: number; hour: number; minute: number },
   timeZone: string,
 ): Date {
   const naive = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, 0);
-  let offset = zoneOffsetMinutes(new Date(naive), timeZone);
-  let candidate = naive - offset * 60000;
-  const offset2 = zoneOffsetMinutes(new Date(candidate), timeZone);
-  if (offset2 !== offset) {
-    offset = offset2;
-    candidate = naive - offset * 60000;
+  const off1 = zoneOffsetMinutes(new Date(naive), timeZone);
+  const c1 = naive - off1 * 60000;
+  const off2 = zoneOffsetMinutes(new Date(c1), timeZone);
+  if (off2 === off1) return new Date(c1);
+
+  const c2 = naive - off2 * 60000;
+  for (const c of [c1, c2]) {
+    const p = partsInZone(new Date(c), timeZone);
+    if (
+      p.year === parts.year &&
+      p.month === parts.month &&
+      p.day === parts.day &&
+      p.hour === parts.hour &&
+      p.minute === parts.minute
+    ) {
+      return new Date(c);
+    }
   }
-  return new Date(candidate);
+  // Spring-forward gap: advance past it rather than resolving backward.
+  return new Date(Math.max(c1, c2));
 }
 
 function isValidTimeZone(timeZone: string): boolean {

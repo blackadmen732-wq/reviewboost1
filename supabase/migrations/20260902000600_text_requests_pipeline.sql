@@ -95,11 +95,21 @@ $$;
 
 -- ------------------------------------------- begin dispatch (definer) -----
 
--- The final pre-send gate, immediately before the provider call. Re-checks
--- consent + suppression; if blocked, moves the request to 'suppressed', releases
--- the reservation, and returns without creating an attempt. Otherwise moves the
--- request into 'sending' and opens exactly one attempt (the partial unique index
--- guarantees no concurrent second attempt).
+-- The final pre-send gate, immediately before the provider call. It:
+--   * recovers a request stranded in 'sending' (a worker crashed after an
+--     attempt was opened but before it settled, and the outbox lease expired):
+--     the open attempt and the request move to 'provider_unknown' — the durable
+--     "we do not know if it went out" state that reconciliation resolves — never
+--     a silent re-send and never a permanent 'sending';
+--   * re-checks consent + suppression; if blocked, moves the request to
+--     'suppressed', releases the reservation, opens no attempt;
+--   * re-checks quiet hours in the recipient's zone (a delayed worker run must
+--     not deliver a due job overnight): if now is outside the window it returns
+--     'deferred' with the next permitted instant, changing no state;
+--   * otherwise moves the request into 'sending' and opens exactly one attempt
+--     (the partial unique index guarantees no concurrent second attempt).
+--
+-- Quiet-hours window is [09:00, 20:00) local, matching DEFAULT_QUIET_HOURS.
 create or replace function app.sms_begin_dispatch(
     p_request_id uuid,
     p_org_id     uuid,
@@ -108,29 +118,65 @@ create or replace function app.sms_begin_dispatch(
 returns table (
     outcome text, attempt_id uuid, attempt_number integer,
     message_encrypted text, message_key_version smallint,
-    phone_encrypted text, phone_key_version smallint
+    phone_encrypted text, phone_key_version smallint,
+    defer_until timestamptz
 )
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
-    v_req      public.text_requests%rowtype;
-    v_gate     record;
-    v_next     integer;
-    v_attempt  uuid;
+    v_req        public.text_requests%rowtype;
+    v_gate       record;
+    v_next       integer;
+    v_attempt    uuid;
+    v_stranded   uuid;
+    v_tz         text;
+    v_local      timestamp;
+    v_hour       integer;
+    v_target     timestamp;
+    v_defer      timestamptz;
+    c_open_start constant integer := 9;
+    c_open_end   constant integer := 20;
 begin
     select * into v_req from public.text_requests tr
      where tr.id = p_request_id and tr.org_id = p_org_id for update;
 
     if v_req.id is null then
-        return query select 'not_found'::text, null::uuid, null::integer, null::text, null::smallint, null::text, null::smallint;
+        return query select 'not_found'::text, null::uuid, null::integer, null::text, null::smallint, null::text, null::smallint, null::timestamptz;
         return;
     end if;
 
-    -- Already terminal or in flight: idempotent no-op for a redelivered job.
+    -- Stranded in 'sending': the prior worker never settled and its lease
+    -- expired (else this job would not have been re-claimed). We cannot know
+    -- whether the provider was reached, so park it as provider_unknown for
+    -- reconciliation rather than re-sending or leaving it stuck forever.
+    if v_req.status = 'sending' then
+        update public.sms_delivery_attempts a
+           set status = 'provider_unknown',
+               error_class = coalesce(a.error_class, 'worker_lost'),
+               reconciliation_state = 'unresolved',
+               settled_at = coalesce(a.settled_at, now())
+         where a.org_id = p_org_id and a.request_id = p_request_id
+           and a.status in ('created', 'dispatched')
+        returning a.id into v_stranded;
+
+        update public.text_requests tr set status = 'provider_unknown'
+         where tr.id = p_request_id;
+
+        insert into public.audit_events
+            (org_id, actor_type, action, target_type, target_id, metadata)
+        values
+            (p_org_id, 'system', 'text_request.recovered_unknown', 'text_request', p_request_id::text,
+             jsonb_build_object('attempt_id', v_stranded));
+
+        return query select 'recovered_unknown'::text, null::uuid, null::integer, null::text, null::smallint, null::text, null::smallint, null::timestamptz;
+        return;
+    end if;
+
+    -- Any other non-startable status: idempotent no-op for a redelivered job.
     if v_req.status not in ('scheduled', 'queued') then
-        return query select ('already_' || v_req.status)::text, null::uuid, null::integer, null::text, null::smallint, null::text, null::smallint;
+        return query select ('already_' || v_req.status)::text, null::uuid, null::integer, null::text, null::smallint, null::text, null::smallint, null::timestamptz;
         return;
     end if;
 
@@ -151,7 +197,30 @@ begin
             (p_org_id, 'system', 'text_request.suppressed', 'text_request', p_request_id::text,
              jsonb_build_object('reason', v_gate.reason));
 
-        return query select 'suppressed'::text, null::uuid, null::integer, null::text, null::smallint, null::text, null::smallint;
+        return query select 'suppressed'::text, null::uuid, null::integer, null::text, null::smallint, null::text, null::smallint, null::timestamptz;
+        return;
+    end if;
+
+    -- Quiet-hours recheck in the recipient's zone. A bad zone falls back to UTC
+    -- rather than raising.
+    v_tz := coalesce(v_req.recipient_timezone, 'UTC');
+    begin
+        v_local := now() at time zone v_tz;
+    exception when others then
+        v_tz := 'UTC';
+        v_local := now() at time zone 'UTC';
+    end;
+    v_hour := extract(hour from v_local)::integer;
+
+    if v_hour < c_open_start or v_hour >= c_open_end then
+        if v_hour < c_open_start then
+            v_target := date_trunc('day', v_local) + make_interval(hours => c_open_start);
+        else
+            v_target := date_trunc('day', v_local) + interval '1 day' + make_interval(hours => c_open_start);
+        end if;
+        -- Interpret the target wall-clock in the recipient's zone (DST-correct).
+        v_defer := v_target at time zone v_tz;
+        return query select 'deferred'::text, null::uuid, null::integer, null::text, null::smallint, null::text, null::smallint, v_defer;
         return;
     end if;
 
@@ -174,7 +243,8 @@ begin
 
     return query select 'sending'::text, v_attempt, v_next,
                         v_req.message_encrypted, v_req.message_key_version,
-                        v_req.recipient_phone_encrypted, v_req.recipient_phone_key_version;
+                        v_req.recipient_phone_encrypted, v_req.recipient_phone_key_version,
+                        null::timestamptz;
 end;
 $$;
 
@@ -200,6 +270,7 @@ set search_path = ''
 as $$
 declare
     v_attempt public.sms_delivery_attempts%rowtype;
+    v_req     public.text_requests%rowtype;
     v_req_id  uuid;
     v_reserved integer;
 begin
@@ -208,9 +279,17 @@ begin
     if v_attempt.id is null then
         return 'not_found';
     end if;
-    v_req_id := v_attempt.request_id;
 
-    select tr.reserved_quota into v_reserved from public.text_requests tr where tr.id = v_req_id;
+    -- Idempotency: an attempt that has already reached a terminal provider
+    -- outcome must not be settled a second time (a redelivered settle call must
+    -- not re-consume or re-release quota).
+    if v_attempt.status not in ('created', 'dispatched') then
+        return 'already_settled';
+    end if;
+
+    v_req_id := v_attempt.request_id;
+    select * into v_req from public.text_requests tr where tr.id = v_req_id;
+    v_reserved := v_req.reserved_quota;
 
     if p_outcome = 'submitted' then
         update public.sms_delivery_attempts a
@@ -220,6 +299,16 @@ begin
          where a.id = p_attempt_id;
         update public.text_requests tr set status = 'submitted' where tr.id = v_req_id and tr.status = 'sending';
         perform app.sms_quota_consume(p_org_id, v_reserved::bigint, 'req:' || v_req_id::text, v_req_id);
+
+        -- A durable, rolling send guard: suppress further review-request texts to
+        -- this recipient for the dedupe window. This closes the fixed-UTC-bucket
+        -- boundary gap in the application dedupe key with a database-backed
+        -- window, and expresses "don't text the same person twice this window"
+        -- as data rather than application memory.
+        perform app.sms_add_suppression(
+            p_org_id, v_req.recipient_phone_hash, v_req.purpose, 'recent_send',
+            now() + interval '24 hours',
+            jsonb_build_object('request_id', v_req_id));
 
     elsif p_outcome = 'failed' then
         update public.sms_delivery_attempts a
@@ -450,12 +539,17 @@ $$;
 
 -- ------------------------------------------- owner rpc wrappers ------------
 
--- Authenticated owner/admin schedules a Text Request. All PII is hashed and
--- encrypted by the Node handler before it reaches here; this wrapper enforces
--- the role and delegates. Returns the request id and whether it was newly
--- created (dedupe returns the existing one).
+-- Schedule a Text Request on behalf of an owner/admin. This runs as the service
+-- role only: the segment count drives quota reservation and the actual message
+-- length, so it must come from the server's own computation over the plaintext
+-- body, never from a value an authenticated client could forge by invoking the
+-- RPC directly. The Node service authenticates the caller, computes segments
+-- from the true body, and passes the acting user as p_actor_user; this wrapper
+-- re-verifies that user's membership and role (defence in depth) and the stand's
+-- ownership before delegating. All PII is hashed and encrypted before it arrives.
 create or replace function public.rpc_schedule_text_request(
     p_org_id            uuid,
+    p_actor_user        uuid,
     p_location_id       uuid,
     p_stand_id          uuid,
     p_phone_hash        text,
@@ -480,16 +574,14 @@ security definer
 set search_path = ''
 as $$
 declare
-    v_user uuid;
     v_role text;
 begin
-    v_user := auth.uid();
-    if v_user is null then
+    if p_actor_user is null then
         raise exception 'not_authenticated' using errcode = 'P0001';
     end if;
 
     select om.role into v_role from public.organization_members om
-     where om.org_id = p_org_id and om.user_id = v_user and om.status = 'active';
+     where om.org_id = p_org_id and om.user_id = p_actor_user and om.status = 'active';
     if v_role is null or v_role not in ('owner', 'admin') then
         raise exception 'not_found_or_forbidden' using errcode = 'P0001';
     end if;
@@ -507,7 +599,7 @@ begin
         p_org_id, p_location_id, p_stand_id, p_phone_hash, p_phone_encrypted,
         p_phone_key_version, p_last_four, p_message_encrypted, p_message_key_version,
         p_encoding, p_unit_count, p_segments, p_cost_micros, p_cost_currency,
-        p_timezone, p_scheduled_for, p_dedupe_key, v_user, p_request_id);
+        p_timezone, p_scheduled_for, p_dedupe_key, p_actor_user, p_request_id);
 end;
 $$;
 
@@ -559,12 +651,16 @@ begin
     end loop;
 end $$;
 
+-- Service-role only: an authenticated client must not be able to invoke this
+-- directly with a forged segment count (which would under-reserve quota for a
+-- multi-segment send). The Node service calls it with the service-role key after
+-- authenticating the owner/admin and computing segments from the true body.
 revoke all on function public.rpc_schedule_text_request(
-    uuid, uuid, uuid, text, text, smallint, text, text, smallint, text, integer, integer, bigint, char, text, timestamptz, text, text
-) from public, anon;
+    uuid, uuid, uuid, uuid, text, text, smallint, text, text, smallint, text, integer, integer, bigint, char, text, timestamptz, text, text
+) from public, anon, authenticated;
 grant execute on function public.rpc_schedule_text_request(
-    uuid, uuid, uuid, text, text, smallint, text, text, smallint, text, integer, integer, bigint, char, text, timestamptz, text, text
-) to authenticated, service_role;
+    uuid, uuid, uuid, uuid, text, text, smallint, text, text, smallint, text, integer, integer, bigint, char, text, timestamptz, text, text
+) to service_role;
 
 revoke all on function public.rpc_cancel_text_request(uuid, uuid) from public, anon;
 grant execute on function public.rpc_cancel_text_request(uuid, uuid) to authenticated, service_role;

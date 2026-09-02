@@ -40,6 +40,15 @@ export function twilioConfigured(): boolean {
   return readConfig() !== null;
 }
 
+// The public URL Twilio should POST delivery-status callbacks to. Derived from
+// an explicitly configured public base URL; absent means "no callback" rather
+// than a guessed endpoint.
+function statusCallbackUrl(): string | null {
+  const base = process.env.SMS_PUBLIC_WEBHOOK_BASE_URL;
+  if (!base) return null;
+  return `${base.replace(/\/+$/, "")}/api/v1/webhooks/sms/twilio`;
+}
+
 // Twilio delivery/error codes → our normalised classes. Extend as needed; the
 // default keeps an unmapped code from masquerading as a known one.
 function classifyTwilioCode(code: number | undefined): SmsErrorClass {
@@ -78,6 +87,12 @@ export class TwilioSmsProvider implements SmsProvider {
     form.set("Body", params.body);
     if (config.from.startsWith("MG")) form.set("MessagingServiceSid", config.from);
     else form.set("From", config.from);
+
+    // Ask Twilio to POST delivery-status updates back to our webhook, so a
+    // direct-From send can still progress from submitted to delivered/failed.
+    // Only set when a public base URL is configured — no URL is invented.
+    const callback = statusCallbackUrl();
+    if (callback) form.set("StatusCallback", callback);
 
     const auth = Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64");
 
@@ -160,7 +175,25 @@ export class TwilioSmsProvider implements SmsProvider {
     const from = params.get("From");
     const body = params.get("Body");
 
-    // Delivery receipt: carries a status for a message we sent.
+    // Inbound message FIRST: an actual reply (a STOP, a START, or free text)
+    // carries a Body. Twilio tags inbound messages with SmsStatus=received and a
+    // MessageSid too, so classifying by status alone would misroute every STOP
+    // and START into the delivery-status branch and never process consent. The
+    // presence of an inbound Body is the reliable discriminator (status
+    // callbacks carry no Body).
+    if (from !== null && body !== null) {
+      return {
+        kind: "inbound_message",
+        providerEventId: messageSid || null,
+        dedupeKey: messageSid ? `in:${messageSid}` : `in:${from}:${hashShort(body)}`,
+        from,
+        body,
+        providerMessageId: messageSid || null,
+        raw: { kind: "inbound" },
+      };
+    }
+
+    // Delivery receipt: a status for a message we sent, with no inbound Body.
     if (status && messageSid) {
       const terminal =
         status === "delivered"
@@ -178,19 +211,6 @@ export class TwilioSmsProvider implements SmsProvider {
           ? { errorClass: classifyTwilioCode(numberOrUndefined(params.get("ErrorCode"))) }
           : {}),
         raw: { status },
-      };
-    }
-
-    // Inbound message: an actual reply (a STOP, a START, or free text).
-    if (from !== null && body !== null) {
-      return {
-        kind: "inbound_message",
-        providerEventId: messageSid || null,
-        dedupeKey: messageSid || `${from}:${hashShort(body)}`,
-        from,
-        body,
-        providerMessageId: messageSid || null,
-        raw: { kind: "inbound" },
       };
     }
 

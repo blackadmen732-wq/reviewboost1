@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 import type {
   ParsedWebhook,
@@ -70,9 +70,27 @@ export class FakeSmsProvider implements SmsProvider {
     return "unknown";
   }
 
-  // The fake trusts its own test-issued events; a real provider must not.
-  verifySignature(): boolean {
-    return true;
+  /**
+   * In development and tests the fake trusts its own events. In production —
+   * where SMS_PROVIDER=fake is an explicit, supported choice — it must NOT
+   * accept every request: an open webhook that changes consent for a guessed
+   * number is a real hole. There it requires a shared secret in the
+   * `x-fake-signature` header matching SMS_FAKE_WEBHOOK_SECRET, and rejects
+   * everything else (including when no secret is configured).
+   */
+  verifySignature(input: WebhookInput): boolean {
+    if (process.env.NODE_ENV !== "production") return true;
+
+    const secret = process.env.SMS_FAKE_WEBHOOK_SECRET;
+    if (!secret) return false;
+
+    const provided = input.headers["x-fake-signature"] ?? input.headers["X-Fake-Signature"];
+    if (!provided) return false;
+
+    const a = Buffer.from(provided);
+    const b = Buffer.from(secret);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
   }
 
   parseWebhook(input: WebhookInput): ParsedWebhook {

@@ -92,6 +92,54 @@ begin
 end;
 $$;
 
+-- Apply expirations for one org: for every allocation past its expires_at that
+-- has not already been expired, append an idempotent 'expiration' ledger entry
+-- and remove its amount from the balance projection. Keyed 'expire:<allocation
+-- id>' so it applies exactly once. The caller need not hold the lock — this
+-- takes it. Returns the number of allocations expired.
+create or replace function app.sms_quota_apply_expirations(p_org_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+    r        record;
+    v_total  bigint := 0;
+    v_count  integer := 0;
+begin
+    perform app.sms_quota_lock_balance(p_org_id);
+
+    for r in
+        select l.id, l.amount
+          from public.sms_quota_ledger l
+         where l.org_id = p_org_id
+           and l.kind = 'allocation'
+           and l.expires_at is not null
+           and l.expires_at <= now()
+           and not exists (
+               select 1 from public.sms_quota_ledger e
+                where e.org_id = p_org_id
+                  and e.kind = 'expiration'
+                  and e.correlation_key = 'expire:' || l.id::text)
+    loop
+        insert into public.sms_quota_ledger (org_id, kind, amount, correlation_key, request_id, note)
+        values (p_org_id, 'expiration', r.amount, 'expire:' || r.id::text, null, 'allocation expired')
+        on conflict (org_id, kind, correlation_key) do nothing;
+        v_total := v_total + r.amount;
+        v_count := v_count + 1;
+    end loop;
+
+    if v_total > 0 then
+        update public.sms_quota_balance b
+           set allocated = greatest(0, b.allocated - v_total), updated_at = now()
+         where b.org_id = p_org_id;
+    end if;
+
+    return v_count;
+end;
+$$;
+
 -- Allocate quota (a purchase, a plan grant). Idempotent on correlation_key.
 create or replace function app.sms_quota_allocate(
     p_org_id          uuid,
@@ -146,6 +194,11 @@ declare
     v_inserted  uuid;
 begin
     v_bal := app.sms_quota_lock_balance(p_org_id);
+
+    -- Expired allocations must not be spendable: sweep them under the lock so
+    -- the availability check below sees only currently-valid quota.
+    perform app.sms_quota_apply_expirations(p_org_id);
+    select * into v_bal from public.sms_quota_balance b where b.org_id = p_org_id;
 
     -- Already reserved under this key: idempotent success, no double count.
     if exists (
@@ -275,7 +328,10 @@ begin
 end;
 $$;
 
--- Available balance (projection read).
+-- Available balance (projection read). Honest about expiry without mutating:
+-- the projection's `allocated` may still include allocations that have lapsed
+-- but not yet been swept, so their amount is subtracted here. A reserve always
+-- sweeps first, so the two never disagree at the moment quota is actually spent.
 create or replace function app.sms_quota_available(p_org_id uuid)
 returns bigint
 language sql
@@ -286,7 +342,45 @@ as $$
     select coalesce(
         (select b.allocated - b.reserved - b.consumed
            from public.sms_quota_balance b where b.org_id = p_org_id),
+        0::bigint)
+      - coalesce(
+        (select sum(l.amount)
+           from public.sms_quota_ledger l
+          where l.org_id = p_org_id
+            and l.kind = 'allocation'
+            and l.expires_at is not null
+            and l.expires_at <= now()
+            and not exists (
+                select 1 from public.sms_quota_ledger e
+                 where e.org_id = p_org_id
+                   and e.kind = 'expiration'
+                   and e.correlation_key = 'expire:' || l.id::text)),
         0::bigint);
+$$;
+
+-- Maintenance sweep across every org with lapsed allocations (a cron target,
+-- mirroring sms_purge_suppressions). Idempotent; safe to run repeatedly.
+create or replace function app.sms_quota_expire()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+    r       record;
+    v_total integer := 0;
+begin
+    for r in
+        select distinct l.org_id
+          from public.sms_quota_ledger l
+         where l.kind = 'allocation'
+           and l.expires_at is not null
+           and l.expires_at <= now()
+    loop
+        v_total := v_total + app.sms_quota_apply_expirations(r.org_id);
+    end loop;
+    return v_total;
+end;
 $$;
 
 -- -------------------------------------------------------- grants ----------
@@ -297,6 +391,8 @@ declare
 begin
     foreach fn in array array[
         'app.sms_quota_lock_balance(uuid)',
+        'app.sms_quota_apply_expirations(uuid)',
+        'app.sms_quota_expire()',
         'app.sms_quota_allocate(uuid, bigint, text, timestamptz, text)',
         'app.sms_quota_reserve(uuid, bigint, text, uuid)',
         'app.sms_quota_consume(uuid, bigint, text, uuid)',

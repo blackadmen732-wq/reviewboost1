@@ -1,6 +1,6 @@
 import "server-only";
 
-import { encrypt } from "@/lib/server/crypto";
+import { encrypt, keyedDigest } from "@/lib/server/crypto";
 import { logger } from "@/lib/server/logger";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import { classifyKeyword } from "@/lib/server/sms/keywords";
@@ -56,22 +56,47 @@ export async function receiveWebhook(input: {
   const provider: SmsProvider = getSmsProvider();
 
   // The route [provider] must match the configured provider adapter; a mismatch
-  // means a misrouted or forged request.
+  // means a misrouted or forged request and never verifies.
   const providerName = input.provider.toLowerCase();
+  const webhookInput = { url: input.url, headers: input.headers, rawBody: input.rawBody };
   const signatureVerified =
-    provider.name === providerName ? provider.verifySignature({ url: input.url, headers: input.headers, rawBody: input.rawBody }) : false;
+    provider.name === providerName ? provider.verifySignature(webhookInput) : false;
 
-  const parsed = provider.name === providerName
-    ? provider.parseWebhook({ url: input.url, headers: input.headers, rawBody: input.rawBody })
-    : ({ kind: "unknown", dedupeKey: `mismatch:${Date.now()}`, raw: {} } as const);
+  // Verify BEFORE claiming the deduplicated inbox namespace. An unverified
+  // request must never occupy a real provider event's (provider, dedupe_key):
+  // if it did, the authentic retry would be seen as a duplicate and its STOP or
+  // delivery-status processing silently skipped. Unverified payloads are still
+  // captured for forensics, under a separate `unverified:` namespace, then
+  // rejected.
+  if (!signatureVerified) {
+    const dedupeKey = `unverified:${keyedDigest(input.rawBody, "sms_webhook_unverified").slice(0, 48)}`;
+    const { error: unvError } = await svc.rpc("rpc_sms_webhook_receive", {
+      p_provider: providerName,
+      p_provider_event_id: null,
+      p_dedupe_key: dedupeKey,
+      p_event_type: "unverified",
+      p_signature_verified: false,
+      p_headers: redactHeaders(input.headers),
+      p_raw_body_encrypted: encrypt(input.rawBody),
+    });
+    if (unvError) {
+      logger.error("sms.webhook_unverified_capture_failed", { error: unvError });
+    }
+    return { accepted: false, duplicate: false, action: "unverified" };
+  }
 
-  // Durable, deduplicated write BEFORE any business processing.
+  const parsed = provider.parseWebhook(webhookInput);
+
+  // Durable, deduplicated write BEFORE any business processing. `inserted` is
+  // true for a first receipt AND for a retry of an event that never reached a
+  // 'processed' outcome (so a transient failure can be repaired); it is false
+  // only for a genuine, already-processed duplicate.
   const { data: received, error: receiveError } = await svc.rpc("rpc_sms_webhook_receive", {
     p_provider: providerName,
     p_provider_event_id: "providerEventId" in parsed ? (parsed.providerEventId ?? null) : null,
     p_dedupe_key: parsed.dedupeKey,
     p_event_type: parsed.kind,
-    p_signature_verified: signatureVerified,
+    p_signature_verified: true,
     p_headers: redactHeaders(input.headers),
     p_raw_body_encrypted: encrypt(input.rawBody),
   });
@@ -87,11 +112,18 @@ export async function receiveWebhook(input: {
 
   const inboxId = row.inbox_id;
 
-  // An unverified event is captured but must not change state.
-  if (!signatureVerified) {
-    await svc.rpc("rpc_sms_webhook_settle", { p_id: inboxId, p_status: "failed", p_org_id: null, p_error: "signature_unverified" });
-    return { accepted: false, duplicate: false, action: "unverified" };
-  }
+  // Settle the inbox row as processed, and surface any failure: if the durable
+  // "processed" write is lost, the row stays reclaimable and a provider retry
+  // will reprocess it, rather than being acknowledged and skipped forever.
+  const settleProcessed = async () => {
+    const { error } = await svc.rpc("rpc_sms_webhook_settle", {
+      p_id: inboxId,
+      p_status: "processed",
+      p_org_id: null,
+      p_error: null,
+    });
+    if (error) throw error;
+  };
 
   try {
     if (parsed.kind === "delivery_status") {
@@ -104,7 +136,7 @@ export async function receiveWebhook(input: {
         });
         if (error) throw error;
       }
-      await svc.rpc("rpc_sms_webhook_settle", { p_id: inboxId, p_status: "processed", p_org_id: null, p_error: null });
+      await settleProcessed();
       return { accepted: true, duplicate: false, action: "delivery_status" };
     }
 
@@ -118,7 +150,7 @@ export async function receiveWebhook(input: {
         });
         if (error) throw error;
       }
-      await svc.rpc("rpc_sms_webhook_settle", { p_id: inboxId, p_status: "processed", p_org_id: null, p_error: null });
+      await settleProcessed();
       return {
         accepted: true,
         duplicate: false,
@@ -126,7 +158,7 @@ export async function receiveWebhook(input: {
       };
     }
 
-    await svc.rpc("rpc_sms_webhook_settle", { p_id: inboxId, p_status: "processed", p_org_id: null, p_error: null });
+    await settleProcessed();
     return { accepted: true, duplicate: false, action: "ignored" };
   } catch (error) {
     logger.error("sms.webhook_process_failed", { inboxId, error });

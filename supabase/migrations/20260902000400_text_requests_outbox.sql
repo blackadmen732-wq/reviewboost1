@@ -136,6 +136,16 @@ security definer
 set search_path = ''
 as $$
 begin
+    -- A job whose worker keeps crashing must not be retried forever: once an
+    -- expired-lease job has already used all its attempts, dead-letter it instead
+    -- of handing it out again. This is a durable "needs a human", never a drop.
+    update public.sms_outbox o
+       set status = 'dead_letter', leased_until = null, lease_owner = null, updated_at = now()
+     where o.status = 'leased'
+       and o.leased_until is not null
+       and o.leased_until <= now()
+       and o.attempts >= o.max_attempts;
+
     return query
     with claimable as (
         select o.id
@@ -143,7 +153,8 @@ begin
          where o.available_at <= now()
            and (
                  o.status = 'pending'
-              or (o.status = 'leased' and o.leased_until is not null and o.leased_until <= now())
+              or (o.status = 'leased' and o.leased_until is not null and o.leased_until <= now()
+                  and o.attempts < o.max_attempts)
                )
          order by o.available_at
          for update skip locked
@@ -161,8 +172,10 @@ begin
 end;
 $$;
 
--- Mark a claimed job done.
-create or replace function app.sms_outbox_complete(p_id uuid)
+-- Mark a claimed job done. Only the worker that currently holds the lease may
+-- complete it: a stale worker whose lease expired (and whose job was reclaimed
+-- by another) must not mark a now-active or already-finished job done.
+create or replace function app.sms_outbox_complete(p_id uuid, p_worker text)
 returns void
 language sql
 security definer
@@ -170,7 +183,9 @@ set search_path = ''
 as $$
     update public.sms_outbox o
        set status = 'done', leased_until = null, lease_owner = null, updated_at = now()
-     where o.id = p_id;
+     where o.id = p_id
+       and o.status = 'leased'
+       and o.lease_owner = p_worker;
 $$;
 
 -- Record a transient failure: back off and retry, or dead-letter once attempts
@@ -178,6 +193,7 @@ $$;
 -- drop.
 create or replace function app.sms_outbox_fail(
     p_id             uuid,
+    p_worker         text,
     p_error          text,
     p_backoff_seconds integer
 )
@@ -193,6 +209,12 @@ begin
     select * into v_row from public.sms_outbox o where o.id = p_id for update;
     if v_row.id is null then
         return null;
+    end if;
+
+    -- Only the current lease holder may record a failure: a stale worker must not
+    -- revert a job another worker has since reclaimed or finished.
+    if v_row.status is distinct from 'leased' or v_row.lease_owner is distinct from p_worker then
+        return v_row.status;
     end if;
 
     if v_row.attempts >= v_row.max_attempts then
@@ -218,11 +240,43 @@ begin
 end;
 $$;
 
+-- Defer a claimed job to a later time without spending an attempt: the request
+-- was due but fell outside the recipient's send window (a delayed worker run),
+-- so it returns to the pool with a future available_at rather than being sent
+-- during quiet hours. Lease-owner guarded, like complete and fail.
+create or replace function app.sms_outbox_defer(
+    p_id     uuid,
+    p_worker text,
+    p_until  timestamptz
+)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+    update public.sms_outbox o
+       set status = 'pending',
+           available_at = greatest(now(), p_until),
+           leased_until = null,
+           lease_owner = null,
+           updated_at = now()
+     where o.id = p_id
+       and o.status = 'leased'
+       and o.lease_owner = p_worker;
+$$;
+
 -- ------------------------------------------- webhook receive / claim ------
 
--- Write a provider event durably. On a duplicate (provider, dedupe_key) this is
--- a harmless no-op that returns the existing row's id — a retried webhook does
--- not create a second record and cannot double-apply.
+-- Write a provider event durably. On first receipt it inserts and returns
+-- inserted=true (the caller should process it). On a repeat of the same
+-- (provider, dedupe_key):
+--   * if the prior attempt already reached 'processed', it is a true duplicate
+--     and returns inserted=false — do not re-apply;
+--   * otherwise (still 'received'/'processing', or a prior 'failed') the event
+--     was never durably processed, so it is moved back to 'processing' and
+--     returns inserted=true — a provider retry legitimately repairs a transient
+--     processing failure. Business handlers are all idempotent, so reprocessing
+--     a partially-applied event is safe.
 create or replace function app.sms_webhook_receive(
     p_provider          text,
     p_provider_event_id text,
@@ -238,7 +292,8 @@ security definer
 set search_path = ''
 as $$
 declare
-    v_id uuid;
+    v_id     uuid;
+    v_status public.sms_webhook_status;
 begin
     insert into public.sms_webhook_inbox
         (provider, provider_event_id, dedupe_key, event_type,
@@ -254,11 +309,27 @@ begin
         return;
     end if;
 
-    select w.id into v_id
+    -- Existing row: lock it so a concurrent retry cannot both reclaim it.
+    select w.id, w.status into v_id, v_status
       from public.sms_webhook_inbox w
-     where w.provider = p_provider and w.dedupe_key = p_dedupe_key;
+     where w.provider = p_provider and w.dedupe_key = p_dedupe_key
+       for update;
 
-    return query select v_id, false;
+    if v_status = 'processed' then
+        return query select v_id, false; -- genuinely already handled
+        return;
+    end if;
+
+    -- Never processed to completion (or previously failed): reclaim for another
+    -- pass. Refresh signature verification in case the first copy was unverified
+    -- (a misconfigured URL) and the authentic retry now verifies.
+    update public.sms_webhook_inbox w
+       set status = 'processing',
+           signature_verified = w.signature_verified or coalesce(p_signature_verified, false),
+           updated_at = now()
+     where w.id = v_id;
+
+    return query select v_id, true;
 end;
 $$;
 
@@ -292,8 +363,9 @@ declare
 begin
     foreach fn in array array[
         'app.sms_outbox_claim(text, integer, integer)',
-        'app.sms_outbox_complete(uuid)',
-        'app.sms_outbox_fail(uuid, text, integer)',
+        'app.sms_outbox_complete(uuid, text)',
+        'app.sms_outbox_fail(uuid, text, text, integer)',
+        'app.sms_outbox_defer(uuid, text, timestamptz)',
         'app.sms_webhook_receive(text, text, text, text, boolean, jsonb, text)',
         'app.sms_webhook_settle(uuid, public.sms_webhook_status, uuid, text)'
     ]

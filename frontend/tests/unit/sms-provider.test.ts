@@ -52,6 +52,30 @@ describe("fake provider", () => {
     });
     expect(inbound).toMatchObject({ kind: "inbound_message", from: "+15551230000", body: "STOP" });
   });
+
+  it("verifies every signature outside production", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider();
+    expect(p.verifySignature({ url: "https://x", headers: {}, rawBody: "" })).toBe(true);
+  });
+
+  it("requires the shared secret for fake webhooks in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      const { FakeSmsProvider } = await loadFake();
+      const p = new FakeSmsProvider();
+      // No secret configured, or a wrong one → rejected.
+      vi.stubEnv("SMS_FAKE_WEBHOOK_SECRET", "");
+      expect(p.verifySignature({ url: "https://x", headers: {}, rawBody: "" })).toBe(false);
+      vi.stubEnv("SMS_FAKE_WEBHOOK_SECRET", "s3cret-value");
+      expect(p.verifySignature({ url: "https://x", headers: { "x-fake-signature": "nope" }, rawBody: "" })).toBe(false);
+      expect(
+        p.verifySignature({ url: "https://x", headers: { "x-fake-signature": "s3cret-value" }, rawBody: "" }),
+      ).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe("twilio provider", () => {
@@ -122,6 +146,19 @@ describe("twilio provider", () => {
       url: "https://x",
       headers: {},
       rawBody: "MessageSid=SM9&From=%2B15551230000&Body=STOP",
+    });
+    expect(r).toMatchObject({ kind: "inbound_message", from: "+15551230000", body: "STOP" });
+  });
+
+  it("classifies an inbound STOP as inbound even when it carries SmsStatus=received", async () => {
+    // Twilio tags inbound messages with SmsStatus=received AND a MessageSid, so
+    // classifying by status alone would misroute every STOP/START into the
+    // delivery-status branch. The inbound Body is the reliable discriminator.
+    const { TwilioSmsProvider } = await loadTwilio();
+    const r = new TwilioSmsProvider().parseWebhook({
+      url: "https://x",
+      headers: {},
+      rawBody: "MessageSid=SM9&SmsStatus=received&From=%2B15551230000&Body=STOP",
     });
     expect(r).toMatchObject({ kind: "inbound_message", from: "+15551230000", body: "STOP" });
   });

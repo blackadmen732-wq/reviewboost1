@@ -30,6 +30,7 @@ export interface DispatchSummary {
   suppressed: number;
   failed: number;
   unknown: number;
+  deferred: number;
   skipped: number;
 }
 
@@ -41,7 +42,9 @@ export async function dispatchOnce(options?: {
   const svc = serviceRoleClient();
   const provider = getSmsProvider();
   const worker = options?.worker ?? `dispatch-${randomUUID().slice(0, 8)}`;
-  const summary: DispatchSummary = { claimed: 0, submitted: 0, suppressed: 0, failed: 0, unknown: 0, skipped: 0 };
+  const summary: DispatchSummary = {
+    claimed: 0, submitted: 0, suppressed: 0, failed: 0, unknown: 0, deferred: 0, skipped: 0,
+  };
 
   const { data: jobs, error } = await svc.rpc("rpc_sms_claim_outbox", {
     p_worker: worker,
@@ -57,9 +60,11 @@ export async function dispatchOnce(options?: {
   summary.claimed = claimed.length;
 
   for (const job of claimed) {
+    const complete = () => svc.rpc("rpc_sms_complete_outbox", { p_id: job.id, p_worker: worker });
+
     try {
       if (!job.request_id) {
-        await svc.rpc("rpc_sms_complete_outbox", { p_id: job.id });
+        await complete();
         summary.skipped += 1;
         continue;
       }
@@ -76,53 +81,79 @@ export async function dispatchOnce(options?: {
         attempt_id: string | null;
         message_encrypted: string | null;
         phone_encrypted: string | null;
+        defer_until: string | null;
       };
 
+      if (b.outcome === "deferred") {
+        // Outside the recipient's send window (a delayed run): push the job to
+        // the next permitted instant instead of sending during quiet hours.
+        await svc.rpc("rpc_sms_defer_outbox", {
+          p_id: job.id,
+          p_worker: worker,
+          p_until: b.defer_until,
+        });
+        summary.deferred += 1;
+        continue;
+      }
       if (b.outcome === "suppressed") {
-        await svc.rpc("rpc_sms_complete_outbox", { p_id: job.id });
+        await complete();
         summary.suppressed += 1;
+        continue;
+      }
+      if (b.outcome === "recovered_unknown") {
+        // A prior worker died mid-send; the request is now parked as
+        // provider_unknown for reconciliation. This job's work is done.
+        await complete();
+        summary.unknown += 1;
         continue;
       }
       if (b.outcome !== "sending" || !b.attempt_id) {
         // not_found, or already_* — a redelivered job for a settled request.
-        await svc.rpc("rpc_sms_complete_outbox", { p_id: job.id });
+        await complete();
         summary.skipped += 1;
         continue;
       }
+
+      const attemptId = b.attempt_id;
 
       const to = decrypt(b.phone_encrypted);
       const body = decrypt(b.message_encrypted);
       if (!to || !body) {
         // Should never happen; treat as a hard failure, not a silent drop.
-        await svc.rpc("rpc_sms_settle_attempt", {
-          p_attempt_id: b.attempt_id,
+        const { error: settleError } = await svc.rpc("rpc_sms_settle_attempt", {
+          p_attempt_id: attemptId,
           p_org_id: job.org_id,
           p_outcome: "failed",
           p_provider_message_id: null,
           p_error_class: "provider_error",
           p_provider_response: { error: "decrypt_failed" },
         });
-        await svc.rpc("rpc_sms_complete_outbox", { p_id: job.id });
+        if (settleError) throw settleError;
+        await complete();
         summary.failed += 1;
         continue;
       }
 
       const result = await provider.send({ to, body, idempotencyKey: `req:${job.request_id}` });
 
-      await svc.rpc("rpc_sms_settle_attempt", {
-        p_attempt_id: b.attempt_id,
+      // The provider call already happened; if we cannot durably record its
+      // outcome, do NOT complete the job — leave it recoverable so the state is
+      // reconciled, never silently lost with the request stuck in 'sending'.
+      const { error: settleError } = await svc.rpc("rpc_sms_settle_attempt", {
+        p_attempt_id: attemptId,
         p_org_id: job.org_id,
         p_outcome: result.outcome,
         p_provider_message_id: result.providerMessageId ?? null,
         p_error_class: result.errorClass ?? null,
         p_provider_response: result.raw ?? {},
       });
+      if (settleError) throw settleError;
 
       if (result.outcome === "submitted") summary.submitted += 1;
       else if (result.outcome === "failed") summary.failed += 1;
       else summary.unknown += 1;
 
-      await svc.rpc("rpc_sms_complete_outbox", { p_id: job.id });
+      await complete();
     } catch (jobError) {
       // Transient infrastructure failure: back the job off. The outbox decides
       // whether this becomes a retry or a dead-letter based on attempts.
@@ -130,6 +161,7 @@ export async function dispatchOnce(options?: {
       await svc
         .rpc("rpc_sms_fail_outbox", {
           p_id: job.id,
+          p_worker: worker,
           p_error: jobError instanceof Error ? jobError.message : "unknown",
           p_backoff_seconds: BACKOFF_BASE_SECONDS * Math.pow(2, Math.min(job.attempts, 6)),
         })

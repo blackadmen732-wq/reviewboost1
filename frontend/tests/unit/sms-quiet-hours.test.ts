@@ -62,6 +62,19 @@ describe("quiet hours — next allowed time is DST-aware", () => {
     const { isWithinSendWindow } = await load();
     expect(isWithinSendWindow(new Date("2026-06-15T12:00:00Z"), "Not/AZone")).toBe(true);
   });
+
+  it("resolves a spring-forward gap forward, never backward into quiet hours", async () => {
+    const { nextAllowedSendTime } = await load();
+    // US DST begins 2026-03-08: 02:00 EST jumps to 03:00 EDT, so 02:00 local does
+    // not exist. With a window opening at 02:00, a time just before it must land
+    // on the first valid instant (03:00 EDT = 07:00Z), not resolve back to 01:00.
+    const next = nextAllowedSendTime(
+      new Date("2026-03-08T06:30:00Z"), // 01:30 EST
+      "America/New_York",
+      { startHour: 2, endHour: 20 },
+    );
+    expect(next.toISOString()).toBe("2026-03-08T07:00:00.000Z");
+  });
 });
 
 describe("quiet hours — window validation", () => {

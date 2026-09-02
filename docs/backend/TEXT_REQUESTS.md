@@ -98,29 +98,47 @@ its quota reserved until reconciliation resolves it.
 Each attempt records provider, provider message id, dispatch time, normalized
 error class, reconciliation state. A **partial unique index** allows at most one
 `created`/`dispatched` attempt per request — the duplicate-send guard.
+`app.sms_settle_attempt` is idempotent (a redelivered settle for an already-settled
+attempt is a no-op, so quota is never re-consumed). A request left in `sending` by
+a worker that died mid-send is **recovered** on the next claim: `begin_dispatch`
+parks it (and its open attempt) as `provider_unknown` for reconciliation rather
+than re-sending or leaving it stuck forever. pgTAP covers both.
 
 ## 8. Transactional outbox **[impl][test-ci]**
 
 `app.sms_schedule_request` commits the `text_requests` row, the quota
 reservation, and the `sms_outbox` job in one transaction. Workers claim with
 `app.sms_outbox_claim` (FOR UPDATE SKIP LOCKED + lease), so many workers are
-safe and a crashed worker's lease is reclaimable. Failures back off
-exponentially; `max_attempts` sends a job to `dead_letter` (a durable "needs a
-human"), never a silent drop.
+safe and a crashed worker's lease is reclaimable. `complete`/`fail`/`defer` are
+**lease-owner guarded**, so a stale worker cannot mutate a job another worker has
+reclaimed. Failures back off exponentially; `max_attempts` sends a job to
+`dead_letter` (a durable "needs a human"), never a silent drop — including an
+expired-lease job that has already used all its attempts.
 
 ## 9. Webhook inbox **[impl][test-ci]**
 
-Every provider event is written by `app.sms_webhook_receive` first, deduplicated
-by `(provider, dedupe_key)` — a retried webhook is a harmless no-op. Signature
-verification is recorded; an unverified event is captured but never drives state
-(HTTP 403). The raw body is stored encrypted (it can contain a phone number).
+Signature is **verified before** the deduplicated write, so an unverified request
+can never occupy a real event's `(provider, dedupe_key)` and suppress the
+authentic retry — unverified payloads are captured under a separate `unverified:`
+namespace and rejected (HTTP 403). A verified event is written by
+`app.sms_webhook_receive`; a genuine already-`processed` duplicate is a no-op,
+but a retry of an event that never reached `processed` (a transient failure) is
+**reclaimed for reprocessing** (all business handlers are idempotent). The
+`processed` settle is error-checked so a lost settle leaves the row reclaimable
+rather than acknowledged-and-skipped. The raw body is stored encrypted.
 
 ## 10. Provider boundary **[impl]** / Twilio **[needs-provider]**
 
 `SmsProvider` (`send`, `classifyError`, `verifySignature`, `parseWebhook`) is the
 only thing domain code depends on. `FakeSmsProvider` is deterministic and drives
-every test **[test-ci]**. `TwilioSmsProvider` maps Twilio's API, X-Twilio-Signature
-scheme, and status/inbound webhooks — **no credentials are committed, and it
+every test **[test-ci]**. In **production** the fake no longer trusts every
+webhook: it requires a shared secret (`SMS_FAKE_WEBHOOK_SECRET` in the
+`x-fake-signature` header), closing the forged-consent hole. `TwilioSmsProvider`
+maps Twilio's API, X-Twilio-Signature scheme, and status/inbound webhooks —
+inbound messages (which Twilio tags `SmsStatus=received`) are classified by their
+`Body`, so STOP/START are never misrouted into the delivery-status branch; a
+`StatusCallback` is set when `SMS_PUBLIC_WEBHOOK_BASE_URL` is configured so direct
+sends still reach a terminal state. **No credentials are committed, and it
 performs no send unless `TWILIO_*` are configured at runtime.**
 
 ## 11. Quiet hours **[impl][test-ci]**
@@ -129,16 +147,22 @@ performs no send unless `TWILIO_*` are configured at runtime.**
 window from the stand location's IANA zone using `Intl` — DST-correct, never a
 fixed UTC offset. The window is configurable (`DEFAULT_QUIET_HOURS = 09:00–20:00`).
 Tests assert the same wall-clock intent yields different UTC instants under EDT
-vs EST.
+vs EST, and that a non-existent spring-forward wall time resolves **forward** to
+the first valid instant, never backward into quiet hours. The window is also
+**re-checked at dispatch** (`app.sms_begin_dispatch`, DST-safe Postgres tz math):
+a job claimed late by a delayed worker is `deferred` to the next window via
+`app.sms_outbox_defer` rather than delivered overnight.
 
 ## 12. Dedupe **[impl][test-ci]**
 
 `text_requests` has a unique `(org_id, dedupe_key)`; `reviewRequestDedupeKey`
 derives a stable key from `(recipient, stand, time-bucket)` or honours an
 explicit client `Idempotency-Key`. The DB uniqueness — not app memory — collapses
-repeated clicks, API/worker/webhook retries, and concurrency. The
-`completed_flow` suppression window enforces "don't text someone who already
-completed the rating flow".
+repeated clicks, API/worker/webhook retries, and concurrency. Two durable
+suppression windows back the business rule "don't text someone twice in the
+window": `completed_flow` (set when the customer completes the rating flow) and
+`recent_send` (set when a message is actually submitted), the latter closing the
+UTC-bucket boundary gap in the derived key with a rolling DB-backed guard.
 
 ## 13. SMS segment engine **[impl][test-ci]**
 
@@ -161,7 +185,13 @@ consumption / release / refund / expiration / adjustment`, each idempotent on a
 unique `(org, kind, correlation_key)`. `sms_quota_balance` is a projection.
 `app.sms_quota_reserve` locks the balance row, so concurrent reservations cannot
 double-spend; pgTAP asserts an over-budget reservation is refused and a repeated
-key does not double-count.
+key does not double-count. **Expiry is enforced**: `app.sms_quota_apply_expirations`
+(swept under the lock before every reservation, and by the `app.sms_quota_expire`
+cron target) appends an idempotent `expiration` entry and removes lapsed
+allocations from the projection, and `app.sms_quota_available` discounts any
+not-yet-swept expired allocation — so an allocation past its `expires_at` is never
+spendable. pgTAP asserts an already-expired grant yields zero available and a
+reservation against it is refused.
 
 ## 16. API endpoints **[impl][test-ci for auth/isolation via pgTAP]**
 
@@ -183,24 +213,31 @@ errors, rate-limited where it matters:
   impossible by pgTAP (a member of one org sees none of another's requests).
 - No client role may write consent, suppression, requests, or attempts — only
   the `app.*` definer functions do, reached by the service role through
-  `public.rpc_sms_*` wrappers (service-role-only) or by owners through the
-  authenticated `rpc_schedule/cancel` wrappers (role-checked).
+  `public.rpc_sms_*` wrappers (service-role-only). **Scheduling is service-role
+  only**: the segment count drives quota and the real message length, so it must
+  be the server's own computation over the true body, never a value an
+  authenticated client could forge by calling the RPC directly; the Node service
+  authenticates the owner/admin and the wrapper re-verifies membership, role, and
+  stand ownership against the acting user it is passed. Cancel stays an
+  authenticated, role-checked wrapper.
 - Service-role key stays server-only (never `NEXT_PUBLIC_`).
 - Phone/PII encrypted at rest; webhook signature boundary; webhook replay
-  harmless; per-org rate limiting; idempotency at the DB.
+  harmless; per-org rate limiting (**fails closed** if its store is unreachable);
+  idempotency at the DB.
 - Logs carry hashes and safe metadata only — never a raw number, token, or
   provider credential.
 
 ## 18. Tests **[test-ci]**
 
-- **vitest** (`tests/unit/sms-*.test.ts`): 59 cases across segments, phone
-  normalization, keywords, quiet-hours/DST, cost, dedupe, and the provider
-  boundary (incl. Twilio signature verification).
-- **pgTAP** (`supabase/tests/text_requests_test.sql`): 49 assertions across RLS
+- **vitest** (`tests/unit/sms-*.test.ts`): 63 cases across segments, phone
+  normalization, keywords, quiet-hours/DST (incl. spring-forward gap), cost,
+  dedupe, and the provider boundary (Twilio signature verification, inbound-vs-
+  status classification, fake production signature).
+- **pgTAP** (`supabase/tests/text_requests_test.sql`): 55 assertions across RLS
   isolation, the consent ledger + projection, the suppression gate, STOP/START,
-  the state machine, quota (incl. double-spend refusal and idempotency), the
-  schedule→dispatch→settle lifecycle, outbox leasing, webhook dedupe, and the
-  single-in-flight guard.
+  the state machine, quota (incl. double-spend refusal, idempotency, and expiry),
+  the schedule→dispatch→settle lifecycle, quiet-hours defer, stranded-send
+  recovery, outbox leasing, webhook dedupe, and the single-in-flight guard.
 
 ## 19. CI
 

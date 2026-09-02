@@ -75,8 +75,12 @@ create table public.sms_consent_events (
     occurred_at        timestamptz not null default now(),
     created_at         timestamptz not null default now(),
 
+    -- Only location_id is nulled when the location is deleted; org_id is NOT
+    -- NULL, so the column-list form is required (a bare ON DELETE SET NULL would
+    -- try to null org_id too and the delete would fail).
     constraint sms_consent_events_location_fk
-        foreign key (location_id, org_id) references public.locations (id, org_id) on delete set null
+        foreign key (location_id, org_id) references public.locations (id, org_id)
+            on delete set null (location_id)
 );
 
 create index sms_consent_events_lookup_idx
@@ -139,8 +143,13 @@ grant select on public.sms_consent_state to authenticated;
 --
 -- Idempotent on (org, phone, purpose, source, status, occurred_at): re-running
 -- the same signal — a retried import row, a duplicate inbound webhook — does not
--- append a second identical event. A genuinely new signal (different status or
--- a later time) always appends.
+-- append a second identical event. A genuinely new signal (a different status,
+-- a different source, or a later time) always appends: the append-only history
+-- must not silently drop a later event that happens to repeat a status.
+--
+-- Concurrency: an advisory lock keyed on (org, phone, purpose) serialises
+-- concurrent signals for the same identity even when no projection row exists
+-- yet, so two first-time events cannot both append past the duplicate check.
 --
 -- Runs as the service role only. The number is hashed and encrypted by the
 -- application before it ever reaches this function.
@@ -163,11 +172,17 @@ security definer
 set search_path = ''
 as $$
 declare
-    v_event_id uuid;
-    v_current  public.sms_consent_state%rowtype;
+    v_event_id  uuid;
+    v_current   public.sms_consent_state%rowtype;
+    v_last      public.sms_consent_events%rowtype;
 begin
-    -- Lock the projection row for this identity so two concurrent signals for
-    -- the same number serialise rather than racing to write the state.
+    -- Serialise concurrent signals for this identity even before any projection
+    -- row exists (a plain SELECT ... FOR UPDATE cannot lock a row that is not
+    -- there yet). Transaction-scoped, released at commit/rollback.
+    perform pg_advisory_xact_lock(
+        hashtextextended(p_org_id::text || '|' || p_phone_hash || '|' || p_purpose::text, 0));
+
+    -- Lock the projection row for this identity when it exists.
     select * into v_current
       from public.sms_consent_state s
      where s.org_id = p_org_id
@@ -175,13 +190,23 @@ begin
        and s.purpose = p_purpose
        for update;
 
-    -- Exact-duplicate suppression: same status from the same source at the same
-    -- instant is a replay, not a new fact.
-    if v_current.org_id is not null
-       and v_current.status = p_status
-       and v_current.source = p_source then
-        return query select v_current.last_event_id, false;
-        return;
+    -- Exact-duplicate suppression: a replay is the same status AND source AND
+    -- occurred_at as the latest recorded event. A later event that merely
+    -- repeats a status is a new fact and must still be appended, so the
+    -- comparison reads the latest event's own occurred_at, not just the
+    -- projection's status/source.
+    if v_current.org_id is not null then
+        select * into v_last
+          from public.sms_consent_events e
+         where e.id = v_current.last_event_id;
+
+        if v_last.id is not null
+           and v_last.status = p_status
+           and v_last.source = p_source
+           and v_last.occurred_at = p_occurred_at then
+            return query select v_current.last_event_id, false;
+            return;
+        end if;
     end if;
 
     insert into public.sms_consent_events

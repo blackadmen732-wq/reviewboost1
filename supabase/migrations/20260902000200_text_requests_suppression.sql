@@ -92,7 +92,13 @@ begin
                 when s.expires_at is null or p_expires_at is null then null
                 else greatest(s.expires_at, p_expires_at)
             end,
-            evidence = coalesce(p_evidence, s.evidence),
+            -- Preserve existing audit evidence when the renewal carries none.
+            -- p_evidence defaults to '{}', so a bare renewal must not blank the
+            -- context recorded when the suppression was first raised.
+            evidence = case
+                when p_evidence is null or p_evidence = '{}'::jsonb then s.evidence
+                else p_evidence
+            end,
             updated_at = now()
     returning id into v_id;
 

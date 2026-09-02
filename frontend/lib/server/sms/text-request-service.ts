@@ -230,8 +230,14 @@ export async function scheduleTextRequest(
     explicitKey: input.idempotencyKey,
   });
 
-  const { data, error } = await context.db.rpc("rpc_schedule_text_request", {
+  // Scheduling runs as the service role, not the caller's RLS client: the
+  // segment count drives quota and the real message length, so it must be the
+  // server's own computation over the true body, never a value the client could
+  // forge by calling the RPC directly. Tenant/role are re-verified inside the
+  // RPC against the acting user we pass here.
+  const { data, error } = await serviceRoleClient().rpc("rpc_schedule_text_request", {
     p_org_id: context.orgId,
+    p_actor_user: context.userId,
     p_location_id: stand.locationId,
     p_stand_id: stand.standId,
     p_phone_hash: stored.phoneHash,

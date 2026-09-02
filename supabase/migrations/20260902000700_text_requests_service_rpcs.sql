@@ -17,13 +17,17 @@ returns setof public.sms_outbox
 language sql security definer set search_path = ''
 as $$ select * from app.sms_outbox_claim(p_worker, p_limit, p_lease_seconds); $$;
 
-create or replace function public.rpc_sms_complete_outbox(p_id uuid)
+create or replace function public.rpc_sms_complete_outbox(p_id uuid, p_worker text)
 returns void language sql security definer set search_path = ''
-as $$ select app.sms_outbox_complete(p_id); $$;
+as $$ select app.sms_outbox_complete(p_id, p_worker); $$;
 
-create or replace function public.rpc_sms_fail_outbox(p_id uuid, p_error text, p_backoff_seconds integer)
+create or replace function public.rpc_sms_fail_outbox(p_id uuid, p_worker text, p_error text, p_backoff_seconds integer)
 returns public.sms_outbox_status language sql security definer set search_path = ''
-as $$ select app.sms_outbox_fail(p_id, p_error, p_backoff_seconds); $$;
+as $$ select app.sms_outbox_fail(p_id, p_worker, p_error, p_backoff_seconds); $$;
+
+create or replace function public.rpc_sms_defer_outbox(p_id uuid, p_worker text, p_until timestamptz)
+returns void language sql security definer set search_path = ''
+as $$ select app.sms_outbox_defer(p_id, p_worker, p_until); $$;
 
 -- --------------------------------------------------- dispatch lifecycle -----
 
@@ -31,7 +35,8 @@ create or replace function public.rpc_sms_begin_dispatch(p_request_id uuid, p_or
 returns table (
     outcome text, attempt_id uuid, attempt_number integer,
     message_encrypted text, message_key_version smallint,
-    phone_encrypted text, phone_key_version smallint
+    phone_encrypted text, phone_key_version smallint,
+    defer_until timestamptz
 )
 language sql security definer set search_path = ''
 as $$ select * from app.sms_begin_dispatch(p_request_id, p_org_id, p_provider); $$;
@@ -120,6 +125,10 @@ create or replace function public.rpc_sms_quota_available(p_org_id uuid)
 returns bigint language sql security definer set search_path = ''
 as $$ select app.sms_quota_available(p_org_id); $$;
 
+create or replace function public.rpc_sms_quota_expire()
+returns integer language sql security definer set search_path = ''
+as $$ select app.sms_quota_expire(); $$;
+
 -- --------------------------------------------------- grants -----------------
 -- Every wrapper is service-role only. Revoke the default PUBLIC execute grant
 -- (which anon and authenticated inherit) and grant service_role explicitly.
@@ -130,8 +139,9 @@ declare
 begin
     foreach fn in array array[
         'public.rpc_sms_claim_outbox(text, integer, integer)',
-        'public.rpc_sms_complete_outbox(uuid)',
-        'public.rpc_sms_fail_outbox(uuid, text, integer)',
+        'public.rpc_sms_complete_outbox(uuid, text)',
+        'public.rpc_sms_fail_outbox(uuid, text, text, integer)',
+        'public.rpc_sms_defer_outbox(uuid, text, timestamptz)',
         'public.rpc_sms_begin_dispatch(uuid, uuid, text)',
         'public.rpc_sms_settle_attempt(uuid, uuid, text, text, text, jsonb)',
         'public.rpc_sms_apply_delivery_status(text, text, text, text)',
@@ -144,7 +154,8 @@ begin
         'public.rpc_sms_can_send(uuid, text, public.sms_consent_purpose)',
         'public.rpc_sms_mark_flow_completed(uuid, text, public.sms_consent_purpose, integer)',
         'public.rpc_sms_quota_allocate(uuid, bigint, text, timestamptz, text)',
-        'public.rpc_sms_quota_available(uuid)'
+        'public.rpc_sms_quota_available(uuid)',
+        'public.rpc_sms_quota_expire()'
     ]
     loop
         execute format('revoke all on function %s from public, anon, authenticated;', fn);

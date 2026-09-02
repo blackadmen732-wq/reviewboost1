@@ -31,7 +31,9 @@ export async function POST(
     }
 
     const rawBody = await request.text();
-    if (rawBody.length > MAX_BODY_BYTES) {
+    // Measure bytes, not UTF-16 code units: a multibyte payload can be far
+    // larger than its `.length` suggests.
+    if (Buffer.byteLength(rawBody, "utf8") > MAX_BODY_BYTES) {
       throw new ApiError(400, ERROR_CODE.validationFailed, "Request body is too large.");
     }
 
