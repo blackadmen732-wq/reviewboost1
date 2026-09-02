@@ -3,9 +3,9 @@
 -- Proves that public.rpc_create_organization is a SECURITY DEFINER wrapper over
 -- the PRIVATE app.create_organization_with_first_stand, so an authenticated
 -- caller can complete onboarding without any direct access to the app schema.
--- Guards the regression fixed by
--- 20260901213000_restore_rpc_create_organization_definer, where the wrapper had
--- been recreated as SECURITY INVOKER and onboarding failed with 42501.
+-- Guards the regression fixed by migration 20260901213000, where the public
+-- wrapper had been recreated as SECURITY INVOKER and onboarding failed with
+-- 42501 ("permission denied for function create_organization_with_first_stand").
 --
 --   supabase test db
 
