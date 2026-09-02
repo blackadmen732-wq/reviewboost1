@@ -57,6 +57,10 @@ create policy sms_suppressions_select_admin on public.sms_suppressions
     for select to authenticated
     using (app.has_org_role(org_id, array['owner', 'admin']::public.member_role[]));
 
+-- Table privilege (default privileges were revoked in 20260808000700). Read
+-- only; suppression is written exclusively through the definer functions.
+grant select on public.sms_suppressions to authenticated;
+
 -- --------------------------------------------- add / remove (definer) -----
 
 -- Upsert a suppression. For a permanent reason p_expires_at is null; for a

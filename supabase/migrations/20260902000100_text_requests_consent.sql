@@ -127,6 +127,12 @@ create policy sms_consent_state_select_admin on public.sms_consent_state
     for select to authenticated
     using (app.has_org_role(org_id, array['owner', 'admin']::public.member_role[]));
 
+-- Table privilege. Default privileges were revoked from authenticated in
+-- 20260808000700, so a policy without a matching grant is inert. Read only —
+-- consent is only ever written through the definer functions below.
+grant select on public.sms_consent_events to authenticated;
+grant select on public.sms_consent_state to authenticated;
+
 -- ------------------------------------------- record consent (definer) -----
 
 -- Append one consent event and refresh the projection atomically.

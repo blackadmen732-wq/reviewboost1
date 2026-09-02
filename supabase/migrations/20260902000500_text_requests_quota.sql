@@ -67,6 +67,12 @@ create policy sms_quota_balance_select_admin on public.sms_quota_balance
     for select to authenticated
     using (app.has_org_role(org_id, array['owner', 'admin']::public.member_role[]));
 
+-- Table privileges (default privileges were revoked in 20260808000700). Read
+-- only; the ledger and balance are written exclusively by the definer
+-- functions, so quota can never be minted from a client.
+grant select on public.sms_quota_ledger to authenticated;
+grant select on public.sms_quota_balance to authenticated;
+
 -- ------------------------------------------------ helpers (definer) -------
 
 -- Ensure a locked balance row exists for the org and return it. Internal.

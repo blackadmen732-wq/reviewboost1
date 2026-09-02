@@ -176,6 +176,12 @@ create policy sms_delivery_attempts_select_admin on public.sms_delivery_attempts
     for select to authenticated
     using (app.has_org_role(org_id, array['owner', 'admin']::public.member_role[]));
 
+-- Table privileges (default privileges were revoked in 20260808000700). Read
+-- only for every client role: scheduling and lifecycle happen only through the
+-- definer functions, so a member cannot fabricate or advance a request.
+grant select on public.text_requests to authenticated;
+grant select on public.sms_delivery_attempts to authenticated;
+
 -- ------------------------------------------- transition validity ----------
 
 -- The allowed edges of the state machine, in one place. A transition function

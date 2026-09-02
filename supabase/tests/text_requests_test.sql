@@ -85,10 +85,10 @@ values
      '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
      repeat('1', 64), 'v1:enc', 'gsm7', 40, 1, 'seed-dedupe-a');
 
-select tests.set_anonymous();
-select is(
-    (select count(*)::integer from public.text_requests),
-    0, 'anon sees no text_requests');
+-- anon holds no table privilege at all (defence in depth beneath RLS): the
+-- anonymous customer never touches these tables.
+select is(has_table_privilege('anon', 'public.text_requests', 'SELECT'), false,
+    'anon has no SELECT privilege on text_requests');
 
 select tests.set_actor('7b000000-0000-0000-0000-000000000003'); -- member of A
 select is(
