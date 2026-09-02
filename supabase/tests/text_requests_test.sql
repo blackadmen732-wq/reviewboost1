@@ -327,7 +327,7 @@ select is(
 -- Settle as submitted → request submitted, quota consumed.
 select is(
     app.sms_settle_attempt(
-        (select id from public.sms_delivery_attempts a
+        (select a.id from public.sms_delivery_attempts a
           join public.text_requests tr on tr.id = a.request_id where tr.dedupe_key = 'sched-dedupe-1' order by a.attempt_number desc limit 1),
         '7c000000-0000-0000-0000-00000000000a', 'submitted', 'fake_msg_1', null, '{}'::jsonb),
     'submitted', 'settling submitted returns submitted');
