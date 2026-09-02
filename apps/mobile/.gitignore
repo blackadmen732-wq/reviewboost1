@@ -18,6 +18,10 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Store-submission credentials (App Store Connect API key, Play service
+# account JSON). Referenced by eas.json submit profiles; never committed.
+credentials/
+
 # Metro
 .metro-health-check*
 
