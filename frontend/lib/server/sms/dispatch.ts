@@ -1,0 +1,143 @@
+import "server-only";
+
+import { randomUUID } from "node:crypto";
+
+import { decrypt } from "@/lib/server/crypto";
+import { logger } from "@/lib/server/logger";
+import { serviceRoleClient } from "@/lib/server/supabase";
+import { getSmsProvider } from "@/lib/server/sms/provider";
+
+/**
+ * The dispatch worker.
+ *
+ * A thin loop over the durable outbox: claim due jobs (the database's
+ * FOR UPDATE SKIP LOCKED lease makes this safe to run in many copies), and for
+ * each one run the final pre-send gate, hand the message to the provider, and
+ * record the outcome. All the hard state — leases, retries, dead-lettering,
+ * the single-in-flight-attempt guard — lives in SQL; this code only moves a job
+ * through it and never holds authoritative state in memory.
+ *
+ * Nothing here retries a `provider_unknown`: an unknown outcome means the
+ * message may already have gone out, so the request is parked for reconciliation
+ * rather than risking a duplicate send.
+ */
+
+const BACKOFF_BASE_SECONDS = 30;
+
+export interface DispatchSummary {
+  claimed: number;
+  submitted: number;
+  suppressed: number;
+  failed: number;
+  unknown: number;
+  skipped: number;
+}
+
+export async function dispatchOnce(options?: {
+  limit?: number;
+  leaseSeconds?: number;
+  worker?: string;
+}): Promise<DispatchSummary> {
+  const svc = serviceRoleClient();
+  const provider = getSmsProvider();
+  const worker = options?.worker ?? `dispatch-${randomUUID().slice(0, 8)}`;
+  const summary: DispatchSummary = { claimed: 0, submitted: 0, suppressed: 0, failed: 0, unknown: 0, skipped: 0 };
+
+  const { data: jobs, error } = await svc.rpc("rpc_sms_claim_outbox", {
+    p_worker: worker,
+    p_limit: options?.limit ?? 10,
+    p_lease_seconds: options?.leaseSeconds ?? 60,
+  });
+  if (error) {
+    logger.error("sms.dispatch_claim_failed", { error });
+    throw error;
+  }
+
+  const claimed = (jobs ?? []) as Array<{ id: string; org_id: string; request_id: string | null; attempts: number }>;
+  summary.claimed = claimed.length;
+
+  for (const job of claimed) {
+    try {
+      if (!job.request_id) {
+        await svc.rpc("rpc_sms_complete_outbox", { p_id: job.id });
+        summary.skipped += 1;
+        continue;
+      }
+
+      const { data: begun, error: beginError } = await svc.rpc("rpc_sms_begin_dispatch", {
+        p_request_id: job.request_id,
+        p_org_id: job.org_id,
+        p_provider: provider.name,
+      });
+      if (beginError) throw beginError;
+
+      const b = (Array.isArray(begun) ? begun[0] : begun) as {
+        outcome: string;
+        attempt_id: string | null;
+        message_encrypted: string | null;
+        phone_encrypted: string | null;
+      };
+
+      if (b.outcome === "suppressed") {
+        await svc.rpc("rpc_sms_complete_outbox", { p_id: job.id });
+        summary.suppressed += 1;
+        continue;
+      }
+      if (b.outcome !== "sending" || !b.attempt_id) {
+        // not_found, or already_* — a redelivered job for a settled request.
+        await svc.rpc("rpc_sms_complete_outbox", { p_id: job.id });
+        summary.skipped += 1;
+        continue;
+      }
+
+      const to = decrypt(b.phone_encrypted);
+      const body = decrypt(b.message_encrypted);
+      if (!to || !body) {
+        // Should never happen; treat as a hard failure, not a silent drop.
+        await svc.rpc("rpc_sms_settle_attempt", {
+          p_attempt_id: b.attempt_id,
+          p_org_id: job.org_id,
+          p_outcome: "failed",
+          p_provider_message_id: null,
+          p_error_class: "provider_error",
+          p_provider_response: { error: "decrypt_failed" },
+        });
+        await svc.rpc("rpc_sms_complete_outbox", { p_id: job.id });
+        summary.failed += 1;
+        continue;
+      }
+
+      const result = await provider.send({ to, body, idempotencyKey: `req:${job.request_id}` });
+
+      await svc.rpc("rpc_sms_settle_attempt", {
+        p_attempt_id: b.attempt_id,
+        p_org_id: job.org_id,
+        p_outcome: result.outcome,
+        p_provider_message_id: result.providerMessageId ?? null,
+        p_error_class: result.errorClass ?? null,
+        p_provider_response: result.raw ?? {},
+      });
+
+      if (result.outcome === "submitted") summary.submitted += 1;
+      else if (result.outcome === "failed") summary.failed += 1;
+      else summary.unknown += 1;
+
+      await svc.rpc("rpc_sms_complete_outbox", { p_id: job.id });
+    } catch (jobError) {
+      // Transient infrastructure failure: back the job off. The outbox decides
+      // whether this becomes a retry or a dead-letter based on attempts.
+      logger.error("sms.dispatch_job_failed", { jobId: job.id, error: jobError });
+      await svc
+        .rpc("rpc_sms_fail_outbox", {
+          p_id: job.id,
+          p_error: jobError instanceof Error ? jobError.message : "unknown",
+          p_backoff_seconds: BACKOFF_BASE_SECONDS * Math.pow(2, Math.min(job.attempts, 6)),
+        })
+        .then(({ error: failError }) => {
+          if (failError) logger.error("sms.dispatch_fail_record_failed", { jobId: job.id, error: failError });
+        });
+    }
+  }
+
+  return summary;
+}
