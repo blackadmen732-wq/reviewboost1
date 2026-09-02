@@ -69,7 +69,8 @@ is a projection maintained in the same transaction as the event it reflects.
 ## 4. Suppression & the pre-send gate **[impl][test-ci]**
 
 `app.sms_can_send(org, phone_hash, purpose)` is the single authoritative
-answer. It requires consent = `opted_in` **and** no active suppression. Reasons:
+answer. It blocks in this order: a **phone-level opt-out** (see §5) first, then
+consent = `opted_in`, then no active suppression. Suppression reasons:
 `opt_out`, `stop_keyword`, `compliance`, `hard_bounce`, `recent_send`,
 `completed_flow` (dedupe window), `manual`. Permanent reasons never expire;
 dedupe reasons carry an `expires_at`. **The gate runs again in
@@ -84,6 +85,25 @@ applies it idempotently to every org that has a consent relationship with the
 number: STOP → `opted_out` + `stop_keyword` suppression; START → `opted_in` +
 clears only the customer's own stop/opt-out (never a compliance hold); HELP →
 no consent change.
+
+**Phone-level opt-out (STOP before any consent).** A STOP is a fact about the
+number, not one org. `app.sms_apply_inbound_keyword` records the intent in
+`sms_phone_optout` (keyed by `phone_hash`, org-agnostic) *before* the per-org
+loop, so a STOP from a number no business has ever texted is still honoured; the
+gate checks it ahead of consent. A later owner import cannot override it — **only
+the customer's own START clears it**. pgTAP covers the full STOP-before-consent →
+owner-opt-in → START sequence and STOP idempotency on retry.
+
+**Ordering limitation (documented, not faked).** Twilio's inbound webhook payload
+carries **no trustworthy customer send-time** to order two keywords by, so no
+event timestamp is invented. Ordering therefore follows verified provider
+arrival/processing order: exact duplicate/retry processing is idempotent
+(`sms_record_consent` dedupes, suppression upserts are idempotent, the phone-level
+record is a single-row upsert), concurrent processing for one identity is
+serialised by an advisory lock in `sms_record_consent`, and a legitimate later
+START always reverses a prior STOP. Where a stronger provider ordering signal
+does not exist, last-verified-arrival wins — deliberately, and STOP is never made
+permanently sticky against a genuine later START.
 
 ## 6. Message state machine **[impl][test-ci]**
 
@@ -153,6 +173,13 @@ the first valid instant, never backward into quiet hours. The window is also
 a job claimed late by a delayed worker is `deferred` to the next window via
 `app.sms_outbox_defer` rather than delivered overnight.
 
+The recipient timezone is resolved from the stand's location and the lookup
+**fails closed**: `resolveStand` turns a database error into a 503 rather than
+silently substituting UTC (which could schedule into quiet hours). `resolveTimezone`
+applies the deliberate, documented fallback — a valid IANA zone is kept; a
+successfully-read missing/invalid zone falls back to `UTC`. Both paths are unit
+tested.
+
 ## 12. Dedupe **[impl][test-ci]**
 
 `text_requests` has a unique `(org_id, dedupe_key)`; `reviewRequestDedupeKey`
@@ -176,7 +203,13 @@ quotes, emoji (surrogate pairs), accented letters, exact boundaries, multi-segme
 `estimateMessageCost` / `previewCost` compute in integer **micro-units** (no
 floats, currency explicit). The per-segment rate is external config
 (`SMS_RATE_PER_SEGMENT_MICROS` / `SMS_RATE_CURRENCY`); **no production price is
-invented** — production throws if the rate is unset.
+invented** — production throws if the rate is unset. All arithmetic is
+**safe-integer-checked**: the rate must be a `Number.isSafeInteger` value (a
+merely-`isInteger` value above 2^53 loses precision), and every product and sum
+is proven to stay within `Number.MAX_SAFE_INTEGER` before it is returned —
+otherwise it throws rather than hand a rounded, wrong total to a Postgres bigint.
+`getProviderRate` applies the same safe-integer validation at config load. Tests
+cover the boundary and overflow cases.
 
 ## 15. Quota ledger **[impl][test-ci]**
 
@@ -229,15 +262,18 @@ errors, rate-limited where it matters:
 
 ## 18. Tests **[test-ci]**
 
-- **vitest** (`tests/unit/sms-*.test.ts`): 63 cases across segments, phone
-  normalization, keywords, quiet-hours/DST (incl. spring-forward gap), cost,
-  dedupe, and the provider boundary (Twilio signature verification, inbound-vs-
-  status classification, fake production signature).
-- **pgTAP** (`supabase/tests/text_requests_test.sql`): 55 assertions across RLS
+- **vitest** (`tests/unit/sms-*.test.ts`): 78 cases across segments, phone
+  normalization, keywords, quiet-hours/DST (incl. spring-forward gap), cost
+  (incl. safe-integer/overflow boundaries), dedupe, the provider boundary (Twilio
+  signature verification, inbound-vs-status classification, fake production
+  signature, message-id identity, rate safe-integer validation), and the
+  timezone fail-closed / fallback policy in `resolveStand`.
+- **pgTAP** (`supabase/tests/text_requests_test.sql`): 59 assertions across RLS
   isolation, the consent ledger + projection, the suppression gate, STOP/START,
-  the state machine, quota (incl. double-spend refusal, idempotency, and expiry),
-  the schedule→dispatch→settle lifecycle, quiet-hours defer, stranded-send
-  recovery, outbox leasing, webhook dedupe, and the single-in-flight guard.
+  phone-level opt-out (STOP-before-consent + retry idempotency), the state
+  machine, quota (incl. double-spend refusal, idempotency, and expiry), the
+  schedule→dispatch→settle lifecycle, quiet-hours defer, stranded-send recovery,
+  outbox leasing, webhook dedupe, and the single-in-flight guard.
 
 ## 19. CI
 

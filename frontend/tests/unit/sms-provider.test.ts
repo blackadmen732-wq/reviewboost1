@@ -9,6 +9,7 @@ beforeAll(() => {
 
 const loadFake = () => import("@/lib/server/sms/provider/fake-provider");
 const loadTwilio = () => import("@/lib/server/sms/provider/twilio");
+const loadProvider = () => import("@/lib/server/sms/provider");
 
 describe("fake provider", () => {
   it("submits by default with a stable message id", async () => {
@@ -19,6 +20,20 @@ describe("fake provider", () => {
     expect(r1.outcome).toBe("submitted");
     expect(r1.providerMessageId).toBe(r2.providerMessageId);
     expect(p.sent).toHaveLength(2);
+  });
+
+  it("derives the message id from the idempotency key (identity, not content)", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider();
+    // Same idempotency key (a retry of one logical request) → same provider id.
+    const a1 = await p.send({ to: "+15551230000", body: "hi", idempotencyKey: "req:abc" });
+    const a2 = await p.send({ to: "+15551230000", body: "hi", idempotencyKey: "req:abc" });
+    expect(a1.providerMessageId).toBe(a2.providerMessageId);
+
+    // Two distinct logical requests with identical recipient+body must NOT
+    // collide (this is the delivery-receipt correlation bug being guarded).
+    const b = await p.send({ to: "+15551230000", body: "hi", idempotencyKey: "req:def" });
+    expect(b.providerMessageId).not.toBe(a1.providerMessageId);
   });
 
   it("fails a programmed number with an error class", async () => {
@@ -161,5 +176,34 @@ describe("twilio provider", () => {
       rawBody: "MessageSid=SM9&SmsStatus=received&From=%2B15551230000&Body=STOP",
     });
     expect(r).toMatchObject({ kind: "inbound_message", from: "+15551230000", body: "STOP" });
+  });
+});
+
+describe("provider rate configuration", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("accepts a valid safe-integer rate", async () => {
+    vi.stubEnv("SMS_RATE_PER_SEGMENT_MICROS", "7500");
+    vi.stubEnv("SMS_RATE_CURRENCY", "USD");
+    const { getProviderRate } = await loadProvider();
+    expect(getProviderRate()).toEqual({ perSegmentMicros: 7500, currency: "USD" });
+  });
+
+  it("rejects a configured rate above the safe-integer range", async () => {
+    // 2^53 + 1 is an integer string that Number() rounds — must be rejected.
+    vi.stubEnv("SMS_RATE_PER_SEGMENT_MICROS", "9007199254740993");
+    const { getProviderRate } = await loadProvider();
+    expect(() => getProviderRate()).toThrow();
+  });
+
+  it("rejects a negative or non-numeric configured rate", async () => {
+    vi.stubEnv("SMS_RATE_PER_SEGMENT_MICROS", "-5");
+    const { getProviderRate } = await loadProvider();
+    expect(() => getProviderRate()).toThrow();
+    vi.stubEnv("SMS_RATE_PER_SEGMENT_MICROS", "abc");
+    const mod = await loadProvider();
+    expect(() => mod.getProviderRate()).toThrow();
   });
 });

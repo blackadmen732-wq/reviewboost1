@@ -56,8 +56,13 @@ export function getProviderRate(): ProviderRate {
   }
 
   const micros = Number(raw);
-  if (!Number.isInteger(micros) || micros < 0) {
-    throw new ConfigError("SMS_RATE_PER_SEGMENT_MICROS must be a non-negative integer (micro-units).");
+  // Safe integer, not merely integer: a configured value above 2^53 would lose
+  // precision the moment it is multiplied by a segment count or handed to a
+  // Postgres bigint, so reject it at configuration time rather than mischarge.
+  if (!Number.isSafeInteger(micros) || micros < 0) {
+    throw new ConfigError(
+      "SMS_RATE_PER_SEGMENT_MICROS must be a non-negative safe integer (micro-units).",
+    );
   }
   return { perSegmentMicros: micros, currency };
 }

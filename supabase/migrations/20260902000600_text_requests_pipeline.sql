@@ -509,6 +509,12 @@ begin
         return 0; -- HELP never alters consent.
     end if;
 
+    -- Record the phone-level opt-out state FIRST, independent of any existing
+    -- per-org consent. A STOP from a number we have never texted must still be
+    -- honoured: without this, the STOP would be lost (no org row to attach it to)
+    -- and a later owner opt-in could text them anyway. START clears it.
+    perform app.sms_record_phone_intent(p_phone_hash, p_intent, coalesce(p_evidence, '{}'::jsonb));
+
     for r in
         select distinct s.org_id, s.purpose, s.phone_encrypted, s.phone_key_version, s.phone_last_four
           from public.sms_consent_state s

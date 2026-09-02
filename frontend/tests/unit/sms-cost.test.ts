@@ -39,4 +39,35 @@ describe("cost preview — integer micro-units only", () => {
     expect(() => estimateMessageCost("hi", { perSegmentMicros: 1, currency: "usd" })).toThrow();
     expect(() => estimateMessageCost("hi", { perSegmentMicros: 1, currency: "US" })).toThrow();
   });
+
+  it("rejects a rate above the safe-integer range (would lose precision)", async () => {
+    const { estimateMessageCost } = await load();
+    // 2^53 is an integer but not a *safe* integer.
+    expect(() =>
+      estimateMessageCost("hi", { perSegmentMicros: Number.MAX_SAFE_INTEGER + 1, currency: "USD" }),
+    ).toThrow();
+  });
+
+  it("accepts the largest safe rate for a single segment", async () => {
+    const { estimateMessageCost } = await load();
+    const e = estimateMessageCost("hi", { perSegmentMicros: Number.MAX_SAFE_INTEGER, currency: "USD" });
+    expect(e.segments).toBe(1);
+    expect(e.totalMicros).toBe(Number.MAX_SAFE_INTEGER);
+    expect(Number.isSafeInteger(e.totalMicros)).toBe(true);
+  });
+
+  it("throws rather than silently overflowing when segments push the product past MAX_SAFE_INTEGER", async () => {
+    const { estimateMessageCost } = await load();
+    // A body that renders to 2 segments at a rate just over half the ceiling
+    // would multiply to an unsafe product — reject instead of mischarge.
+    const rate = { perSegmentMicros: Math.floor(Number.MAX_SAFE_INTEGER / 2) + 10, currency: "USD" as const };
+    expect(() => estimateMessageCost("a".repeat(200), rate)).toThrow(/safe integer/i);
+  });
+
+  it("throws when a preview aggregate would exceed the safe-integer range", async () => {
+    const { previewCost } = await load();
+    const rate = { perSegmentMicros: Math.floor(Number.MAX_SAFE_INTEGER / 3), currency: "USD" as const };
+    // Four single-segment messages sum past the ceiling.
+    expect(() => previewCost(["a", "b", "c", "d"], rate)).toThrow(/safe integer/i);
+  });
 });

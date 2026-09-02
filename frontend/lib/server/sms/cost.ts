@@ -29,12 +29,36 @@ export interface MessageCostEstimate {
 }
 
 function assertRate(rate: ProviderRate): void {
-  if (!Number.isInteger(rate.perSegmentMicros) || rate.perSegmentMicros < 0) {
-    throw new Error("perSegmentMicros must be a non-negative integer.");
+  // A safe integer, not merely an integer: values above 2^53 silently lose
+  // precision under JS multiplication, so a large-but-"integer" rate would
+  // produce a wrong charge. Reject them before any arithmetic.
+  if (!Number.isSafeInteger(rate.perSegmentMicros) || rate.perSegmentMicros < 0) {
+    throw new Error("perSegmentMicros must be a non-negative safe integer.");
   }
   if (!/^[A-Z]{3}$/.test(rate.currency)) {
     throw new Error("currency must be an uppercase ISO-4217 code.");
   }
+}
+
+// Money is integer micro-units in JS numbers, which are exact only up to
+// Number.MAX_SAFE_INTEGER (2^53 − 1). Prove every product and sum stays inside
+// that range rather than silently returning a rounded, wrong total. Callers
+// treat this as a hard failure — the value would otherwise be handed to a
+// Postgres bigint and misrepresent the charge.
+function safeMul(a: number, b: number): number {
+  const product = a * b;
+  if (!Number.isSafeInteger(product)) {
+    throw new Error("SMS cost exceeds the safe integer range (micro-units).");
+  }
+  return product;
+}
+
+function safeAdd(a: number, b: number): number {
+  const sum = a + b;
+  if (!Number.isSafeInteger(sum)) {
+    throw new Error("SMS cost exceeds the safe integer range (micro-units).");
+  }
+  return sum;
 }
 
 /** Estimate the cost of one message body at a given provider rate. */
@@ -46,7 +70,7 @@ export function estimateMessageCost(text: string, rate: ProviderRate): MessageCo
     unitCount: info.unitCount,
     segments: info.segments,
     perSegmentMicros: rate.perSegmentMicros,
-    totalMicros: info.segments * rate.perSegmentMicros,
+    totalMicros: safeMul(info.segments, rate.perSegmentMicros),
     currency: rate.currency,
   };
 }
@@ -69,8 +93,8 @@ export function previewCost(bodies: string[], rate: ProviderRate): CostPreview {
   const perRecipient = bodies.map((b) => estimateMessageCost(b, rate));
   return {
     recipients: perRecipient.length,
-    totalSegments: perRecipient.reduce((s, e) => s + e.segments, 0),
-    totalMicros: perRecipient.reduce((s, e) => s + e.totalMicros, 0),
+    totalSegments: perRecipient.reduce((s, e) => safeAdd(s, e.segments), 0),
+    totalMicros: perRecipient.reduce((s, e) => safeAdd(s, e.totalMicros), 0),
     currency: rate.currency,
     perRecipient,
   };

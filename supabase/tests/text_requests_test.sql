@@ -14,7 +14,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(55);
+select plan(59);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -242,6 +242,34 @@ select app.sms_apply_inbound_keyword(repeat('1',64), 'help', '{}'::jsonb);
 select is(
     app.sms_current_consent('7c000000-0000-0000-0000-00000000000a', repeat('1',64), 'review_request'),
     'opted_in'::public.sms_consent_status, 'inbound HELP leaves consent unchanged');
+
+-- STOP before any consent row (PH3): a number we have never texted still becomes
+-- opted out at the phone level, a later owner opt-in cannot override it, and only
+-- the customer's own START clears it. Retried STOP is idempotent.
+select app.sms_apply_inbound_keyword(repeat('3',64), 'stop', '{}'::jsonb);
+select is(
+    (select allowed from app.sms_can_send('7c000000-0000-0000-0000-00000000000a', repeat('3',64), 'review_request')),
+    false, 'a STOP before any consent row still blocks (phone-level opt-out)');
+
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('3',64),
+    'v1:enc', 1::smallint, '3333', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select is(
+    (select allowed from app.sms_can_send('7c000000-0000-0000-0000-00000000000a', repeat('3',64), 'review_request')),
+    false, 'a later owner opt-in does not override the customer''s earlier STOP');
+
+select app.sms_apply_inbound_keyword(repeat('3',64), 'start', '{}'::jsonb);
+select is(
+    (select allowed from app.sms_can_send('7c000000-0000-0000-0000-00000000000a', repeat('3',64), 'review_request')),
+    true, 'the customer''s own START reverses the STOP and restores sending');
+
+-- Retried/concurrent inbound STOP is idempotent: applying it twice leaves a
+-- single phone-level opt-out row (concurrent processing is serialized by the
+-- record path; a provider retry does not accumulate state).
+select app.sms_apply_inbound_keyword(repeat('3',64), 'stop', '{}'::jsonb);
+select app.sms_apply_inbound_keyword(repeat('3',64), 'stop', '{}'::jsonb);
+select is(
+    (select count(*)::integer from public.sms_phone_optout where phone_hash = repeat('3',64)),
+    1, 'a retried inbound STOP is idempotent (one phone-level opt-out row)');
 
 -- ================================================= state machine ==========
 

@@ -50,9 +50,15 @@ export class FakeSmsProvider implements SmsProvider {
       return { outcome: "failed", errorClass: failClass, raw: { simulated: failClass } };
     }
 
-    // A stable, unique-per-(to,body) message id so a re-send is visibly distinct
-    // and a webhook can be correlated in tests.
-    const id = createHash("sha256").update(`${params.to}|${params.body}`).digest("hex").slice(0, 24);
+    // The provider message id must identify the *logical request*, not just its
+    // content: two distinct requests to the same recipient with the same body
+    // are different messages and must get different ids, or a delivery receipt
+    // could resolve the wrong request. The dispatch idempotency key (`req:<id>`)
+    // is exactly that identity — unique per request and stable across an
+    // idempotent retry. When no key is supplied (ad-hoc/test sends) fall back to
+    // the content so behaviour stays deterministic.
+    const identity = params.idempotencyKey ?? `${params.to}|${params.body}`;
+    const id = createHash("sha256").update(identity).digest("hex").slice(0, 24);
     return { outcome: "submitted", providerMessageId: `fake_${id}`, raw: { simulated: "submitted" } };
   }
 

@@ -133,6 +133,73 @@ begin
 end;
 $$;
 
+-- ------------------------------------------ phone-level opt-out -----------
+--
+-- A STOP is a fact about a phone number, not about one organization. A customer
+-- who texts STOP to the platform number before any business has ever recorded
+-- consent for them still means "do not text me": without a phone-level record,
+-- that STOP would be lost (there is no org row to attach it to) and a later
+-- owner import could opt them in and text them anyway.
+--
+-- This table is the org-agnostic opt-out state. It is a hard gate checked ahead
+-- of per-org consent, and only the customer's own START clears it — a business
+-- asserting consent afterwards does not override the customer's explicit STOP.
+create table public.sms_phone_optout (
+    phone_hash  text primary key check (char_length(phone_hash) between 16 and 128),
+    opted_out   boolean not null default true,
+    last_intent text not null check (last_intent in ('stop', 'start')),
+    evidence    jsonb not null default '{}'::jsonb,
+    updated_at  timestamptz not null default now(),
+    created_at  timestamptz not null default now()
+);
+
+-- Infrastructure / compliance state, not tenant data (it is deliberately not
+-- org-scoped). RLS on with no policy denies every client role; it is reached
+-- only through the definer functions below.
+alter table public.sms_phone_optout enable row level security;
+
+-- Record an inbound STOP/START at the phone level. STOP sets opted_out; START
+-- clears it. Idempotent: re-applying the same intent just refreshes the row.
+create or replace function app.sms_record_phone_intent(
+    p_phone_hash text,
+    p_intent     text,           -- 'stop' | 'start'
+    p_evidence   jsonb default '{}'::jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+    if p_intent not in ('stop', 'start') then
+        return;
+    end if;
+    insert into public.sms_phone_optout as p (phone_hash, opted_out, last_intent, evidence, updated_at)
+    values (p_phone_hash, p_intent = 'stop', p_intent, coalesce(p_evidence, '{}'::jsonb), now())
+    on conflict (phone_hash) do update
+        set opted_out = (p_intent = 'stop'),
+            last_intent = p_intent,
+            evidence = case
+                when p_evidence is null or p_evidence = '{}'::jsonb then p.evidence
+                else p_evidence
+            end,
+            updated_at = now();
+end;
+$$;
+
+-- Whether this phone currently holds a phone-level opt-out.
+create or replace function app.sms_phone_opted_out(p_phone_hash text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+    select coalesce(
+        (select p.opted_out from public.sms_phone_optout p where p.phone_hash = p_phone_hash),
+        false);
+$$;
+
 -- ------------------------------------------------- the pre-send gate ------
 
 -- The single authoritative answer, evaluated immediately before dispatch.
@@ -156,6 +223,14 @@ declare
     v_consent public.sms_consent_status;
     v_reason  public.sms_suppression_reason;
 begin
+    -- Phone-level opt-out is a hard block ahead of per-org consent: a customer's
+    -- STOP applies even if this org has never recorded consent for them, and a
+    -- later owner opt-in does not override it (only the customer's START does).
+    if app.sms_phone_opted_out(p_phone_hash) then
+        return query select false, 'opt_out'::text;
+        return;
+    end if;
+
     v_consent := app.sms_current_consent(p_org_id, p_phone_hash, p_purpose);
     if v_consent is distinct from 'opted_in'::public.sms_consent_status then
         return query select false, 'no_consent'::text;
@@ -220,3 +295,9 @@ grant execute on function app.sms_can_send(uuid, text, public.sms_consent_purpos
 
 revoke all on function app.sms_purge_suppressions() from public, anon, authenticated;
 grant execute on function app.sms_purge_suppressions() to service_role;
+
+revoke all on function app.sms_record_phone_intent(text, text, jsonb) from public, anon, authenticated;
+grant execute on function app.sms_record_phone_intent(text, text, jsonb) to service_role;
+
+revoke all on function app.sms_phone_opted_out(text) from public, anon, authenticated;
+grant execute on function app.sms_phone_opted_out(text) to service_role;

@@ -111,6 +111,29 @@ interface ResolvedStand {
   timezone: string;
 }
 
+// The deliberate fallback timezone when a location has no zone configured (or an
+// unrecognised one). Quiet-hours math treats an invalid zone as UTC too, so this
+// is the documented, intentional default — NOT a substitute for a failed query,
+// which must fail closed instead (see resolveStand).
+export const DEFAULT_LOCATION_TIMEZONE = "UTC";
+
+/**
+ * Apply the timezone fallback policy: a valid IANA zone is used as-is; a missing,
+ * empty, or unrecognised value falls back to DEFAULT_LOCATION_TIMEZONE. This is a
+ * deliberate policy for *known* data, distinct from a database error (which the
+ * caller turns into a 503 rather than silently defaulting).
+ */
+export function resolveTimezone(raw: string | null | undefined): string {
+  if (typeof raw !== "string" || raw.trim() === "") return DEFAULT_LOCATION_TIMEZONE;
+  const tz = raw.trim();
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return tz;
+  } catch {
+    return DEFAULT_LOCATION_TIMEZONE;
+  }
+}
+
 /**
  * Verify the caller's stand token belongs to their organization and build the
  * link — without ever storing the raw token. The token is digested and matched
@@ -119,7 +142,7 @@ interface ResolvedStand {
  * quiet hours are computed in the stand's local time, the closest proxy we have
  * for the recipient's.
  */
-async function resolveStand(context: OrganizationContext, token: string): Promise<ResolvedStand> {
+export async function resolveStand(context: OrganizationContext, token: string): Promise<ResolvedStand> {
   const { data, error } = await context.db
     .from("review_stands")
     .select("id, location_id")
@@ -132,18 +155,23 @@ async function resolveStand(context: OrganizationContext, token: string): Promis
   if (!data) throw new ApiError(404, ERROR_CODE.notFound, "That review stand was not found.");
 
   const locationId = data.location_id as string;
-  const { data: loc } = await context.db
+  const { data: loc, error: locError } = await context.db
     .from("locations")
     .select("timezone")
     .eq("org_id", context.orgId)
     .eq("id", locationId)
     .maybeSingle();
 
+  // Fail CLOSED on a database error: a transient failure must not silently
+  // substitute UTC and risk scheduling a text into the recipient's quiet hours.
+  // Only a successfully-read missing/invalid zone takes the documented fallback.
+  if (locError) throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
+
   return {
     standId: data.id as string,
     locationId,
     link: standUrl(publicFrontendUrl(), token),
-    timezone: (loc?.timezone as string | undefined) ?? "UTC",
+    timezone: resolveTimezone(loc?.timezone as string | null | undefined),
   };
 }
 
