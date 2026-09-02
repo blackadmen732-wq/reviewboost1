@@ -183,9 +183,12 @@ Verified generated configuration (SDK 57 prebuild):
 
 ### Known dependency drift (ahead of SDK-57 pins)
 
-Four native modules sit slightly *ahead* of the versions Expo SDK 57 bundles.
-They were chosen in the mobile foundation, pass typecheck / tests / prebuild,
-and are reported by the CI audit as warnings (ahead, not behind):
+Four native modules sit *ahead* of the versions Expo SDK 57 bundles. They were
+chosen in the mobile foundation and pass typecheck / tests / prebuild. Because
+Expo only tests the bundled ranges, the CI audit (`scripts/check-native-deps.js`)
+**fails on any version outside the SDK-57 range in either direction** and
+accepts these four only via an explicit **vetted allowlist** (exact version +
+rationale), reporting each as a warning:
 
 | Package | Installed | SDK-57 bundled |
 | --- | --- | --- |
@@ -194,8 +197,9 @@ and are reported by the CI audit as warnings (ahead, not behind):
 | `react-native-screens` | `4.27.0` | `~4.26.0` |
 | `react-native-safe-area-context` | `5.9.0` | `~5.7.0` |
 
-Left as-is (forward bumps, not incompatibilities). Realign to the bundled
-versions only if a native build surfaces a concrete problem.
+Changing any of these versions (or adding a new out-of-range dependency)
+fails CI until its allowlist entry is updated and re-vetted — a new, untested
+forward bump does not pass silently.
 
 ---
 
@@ -249,9 +253,12 @@ Against the (now working) hosted Supabase Auth, on a real build
 - missing `EXPO_PUBLIC_*` variable names / drift between `.env.example` and `eas.json`
 - native dependency incompatibility (`scripts/check-native-deps.js`, an
   offline audit against SDK 57 bundled versions: fails on any dependency
-  *behind* the SDK-57 range, warns on ahead-of-pin bumps)
+  outside the SDK-57 range in either direction, except a vetted allowlist)
 - TypeScript failures (`tsc --noEmit`)
 - test failures (`vitest run`)
-- accidental server secrets under `apps/mobile` (service-role key, `sk_*`, encryption/token-digest keys)
+- accidental server secrets under `apps/mobile` — name-based scans plus
+  `scripts/check-no-service-secret.js`, which decodes committed JWT payloads
+  and rejects a privileged (e.g. service-role) key even under the innocuous
+  `EXPO_PUBLIC_SUPABASE_ANON_KEY` name
 - invalid bundle / package identifiers (must be `fit.reviewboost.app`)
 - `expo config` evaluation (config plugins resolve)

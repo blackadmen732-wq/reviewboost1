@@ -118,6 +118,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: No privileged Supabase JWT committed (decodes JWT payloads)
+        run: node apps/mobile/scripts/check-no-service-secret.js
       - name: No server secrets in the mobile app
         run: |
           found=0
@@ -139,11 +144,10 @@ jobs:
             found=1
           fi
 
-          # A service_role JWT embeds "role":"service_role"; the anon key does not.
-          if git grep -nIE '"role" *: *"service_role"' -- 'apps/mobile' ':!*.md'; then
-            echo "::error::A service_role JWT appears under apps/mobile."
-            found=1
-          fi
+          # Note: a service-role JWT pasted into the innocuously named
+          # EXPO_PUBLIC_SUPABASE_ANON_KEY would not match any name-based pattern
+          # above; that case is caught by check-no-service-secret.js, which
+          # decodes JWT payloads and rejects privileged roles.
 
           if [ "$found" -eq 1 ]; then exit 1; fi
           echo "No server secrets found under apps/mobile."
