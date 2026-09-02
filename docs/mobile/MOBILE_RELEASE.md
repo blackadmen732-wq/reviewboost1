@@ -154,8 +154,13 @@ inspect what the build will produce:
 
 ```bash
 cd apps/mobile
-npm run prebuild:check    # expo prebuild --no-install --clean --platform all
+npm run prebuild:check    # scripts/prebuild-check.sh
 ```
+
+`prebuild:check` runs `expo prebuild` but snapshots and restores `package.json`
+/ `package-lock.json` afterward (prebuild rewrites them in place), leaving the
+generated `./ios` and `./android` dirs (both gitignored) for inspection without
+dirtying the tracked tree.
 
 Verified generated configuration (SDK 57 prebuild):
 

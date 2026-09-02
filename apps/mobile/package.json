@@ -41,7 +41,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "prebuild:check": "expo prebuild --no-install --clean --platform all",
+    "prebuild:check": "bash scripts/prebuild-check.sh",
     "test": "vitest run"
   },
   "private": true
