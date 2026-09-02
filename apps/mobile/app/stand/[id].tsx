@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Pressable,
   Platform,
+  Share,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams } from "expo-router";
@@ -366,6 +367,33 @@ export default function StandDetailScreen() {
               onPress={() => void Linking.openURL(standUrl)}
             >
               <Text style={styles.nfcButtonText}>Open Stand Page</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Share the stand link — the same URL the QR and NFC tag carry */}
+        {standUrl && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Copy NFC Link</Text>
+            <Text style={styles.sectionDesc}>
+              Share or copy this stand&apos;s link. It is the same link the QR code
+              and NFC tag use.
+            </Text>
+            <Pressable
+              style={styles.nfcButton}
+              onPress={() => {
+                Share.share(
+                  Platform.OS === "ios"
+                    ? { url: standUrl }
+                    : { message: standUrl },
+                ).catch(() => {
+                  // react-native-web rejects when the browser has no Web
+                  // Share API, and users can dismiss the native sheet — a
+                  // no-op is the right outcome, not an unhandled rejection.
+                });
+              }}
+            >
+              <Text style={styles.nfcButtonText}>Share Link</Text>
             </Pressable>
           </View>
         )}

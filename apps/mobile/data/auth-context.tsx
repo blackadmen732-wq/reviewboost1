@@ -20,7 +20,8 @@ interface AuthState {
   name: string | null;
   organizations: Organization[];
   activeOrg: Organization | null;
-  login: (email: string, password: string) => Promise<string | null>;
+  sendCode: (email: string) => Promise<string | null>;
+  verifyCode: (email: string, code: string) => Promise<string | null>;
   logout: () => Promise<string | null>;
   selectOrg: (orgId: string) => void;
 }
@@ -106,13 +107,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOrgLoading(false);
   }
 
-  const login = useCallback(
-    async (email: string, password: string): Promise<string | null> => {
-      const { error } = await supabase.auth.signInWithPassword({
+  // ReviewBoost accounts have no passwords — sign-in is a six-digit code
+  // sent by email, identical to the web app.
+  const sendCode = useCallback(async (email: string): Promise<string | null> => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true },
+    });
+    if (error) return "We could not send the code. Check the address and try again.";
+    return null;
+  }, []);
+
+  const verifyCode = useCallback(
+    async (email: string, code: string): Promise<string | null> => {
+      const { error } = await supabase.auth.verifyOtp({
         email,
-        password,
+        token: code,
+        type: "email",
       });
-      if (error) return error.message;
+      if (error) return "That code is not right. Check it and type it again.";
       return null;
     },
     [],
@@ -148,7 +161,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: user?.user_metadata?.full_name ?? user?.email ?? null,
         organizations,
         activeOrg,
-        login,
+        sendCode,
+        verifyCode,
         logout,
         selectOrg,
       }}

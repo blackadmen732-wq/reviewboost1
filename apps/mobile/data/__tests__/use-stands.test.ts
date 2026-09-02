@@ -6,6 +6,7 @@ describe("StandItem type shape", () => {
     const stand: StandItem = {
       standId: "stand-1",
       locationId: "loc-1",
+      locationName: "Downtown",
       label: "Front Desk",
       standType: "printable_qr",
       status: "active",
@@ -24,6 +25,7 @@ describe("StandItem type shape", () => {
     const stand: StandItem = {
       standId: "stand-2",
       locationId: "loc-1",
+      locationName: null,
       label: "Table NFC",
       standType: "physical_nfc",
       status: "active",

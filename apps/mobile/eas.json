@@ -1,0 +1,34 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": { "simulator": true },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://zoyqikgqfqulwkihjbev.supabase.co",
+        "EXPO_PUBLIC_API_URL": "https://reviewboost.fit"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://zoyqikgqfqulwkihjbev.supabase.co",
+        "EXPO_PUBLIC_API_URL": "https://reviewboost.fit"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://zoyqikgqfqulwkihjbev.supabase.co",
+        "EXPO_PUBLIC_API_URL": "https://reviewboost.fit"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

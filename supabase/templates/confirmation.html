@@ -1,0 +1,42 @@
+<!--
+  The first-time sign-up email.
+
+  A brand-new email that signs in for the first time can, depending on
+  project settings, receive this "confirm sign up" mail instead of the
+  magic-link mail. Supabase's default for it is a "Confirm your email
+  address" link — a different experience from the six-digit code the
+  sign-in screen asks for, which confuses first-time owners.
+
+  So this mirrors the sign-in email exactly: it leads with {{ .Token }},
+  the same six-digit code, and keeps the link underneath as a fallback.
+  First sign-in and every later sign-in then look identical.
+
+  Deliberately plain, for the same reason as the sign-in mail: restaurant
+  owners read it on a phone, and a heavily designed email lands in spam
+  more often than a simple one.
+-->
+<h2 style="margin:0 0 8px;font:600 20px/1.3 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111">
+  Your sign-in code
+</h2>
+
+<p style="margin:0 0 24px;font:400 16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#555">
+  Enter this code to sign in to ReviewBoost.
+</p>
+
+<!-- Large, spaced, and monospace so 0 and O, 1 and l cannot be confused. -->
+<p style="margin:0 0 24px;font:700 40px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:10px;color:#111">
+  {{ .Token }}
+</p>
+
+<p style="margin:0 0 24px;font:400 14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#555">
+  This code expires in one hour and can only be used once.
+</p>
+
+<p style="margin:0 0 8px;font:400 14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#555">
+  Or <a href="{{ .ConfirmationURL }}" style="color:#059a52">tap here to sign in</a>.
+</p>
+
+<p style="margin:24px 0 0;font:400 13px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#888">
+  If you did not ask for this, you can ignore it. Nobody can sign in without the
+  code above.
+</p>
