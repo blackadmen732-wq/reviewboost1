@@ -412,12 +412,21 @@ select is(
 
 -- =================================================== webhook inbox =========
 
+-- First receipt inserts the event.
 select is(
     (select inserted from app.sms_webhook_receive('fake', 'evt-0001', 'evt-0001', 'status', true, '{}'::jsonb, 'v1:enc')),
     true, 'a new webhook event is inserted');
+
+-- Settle it as processed, then a retry of an ALREADY-PROCESSED event is a
+-- harmless no-op (inserted=false). A retry of an unprocessed/failed event, by
+-- contrast, is intentionally reclaimed for reprocessing — that is the durable
+-- webhook recovery path, so only a fully-processed event is a true duplicate.
+select app.sms_webhook_settle(
+    (select id from public.sms_webhook_inbox where provider = 'fake' and dedupe_key = 'evt-0001'),
+    'processed', null, null);
 select is(
     (select inserted from app.sms_webhook_receive('fake', 'evt-0001', 'evt-0001', 'status', true, '{}'::jsonb, 'v1:enc')),
-    false, 'a duplicate webhook event is a harmless no-op');
+    false, 'a retry of an already-processed webhook is a harmless no-op');
 select is(
     (select count(*)::integer from public.sms_webhook_inbox where provider = 'fake' and dedupe_key = 'evt-0001'),
     1, 'a duplicate webhook does not create a second row');
