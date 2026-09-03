@@ -1,0 +1,153 @@
+name: Mobile release validation
+
+# Catches release-blocking mobile problems on every PR without needing an
+# Expo account: malformed Expo/EAS config, missing or drifted environment
+# variable names, native dependency incompatibility, TypeScript/test
+# failures, accidental server secrets in the mobile app, and invalid
+# bundle/package identifiers.
+
+on:
+  push:
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/mobile-release-validation.yml"
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/mobile-release-validation.yml"
+
+concurrency:
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - run: npm ci
+
+      - name: Expo config evaluates (plugins resolve)
+        run: npx expo config --type public --json > /tmp/expo-config.json
+
+      - name: Identifiers are correct and consistent
+        run: |
+          node -e '
+            const c = require("/tmp/expo-config.json");
+            const errs = [];
+            if (c.ios?.bundleIdentifier !== "fit.reviewboost.app")
+              errs.push("ios.bundleIdentifier must be fit.reviewboost.app, got " + c.ios?.bundleIdentifier);
+            if (c.android?.package !== "fit.reviewboost.app")
+              errs.push("android.package must be fit.reviewboost.app, got " + c.android?.package);
+            if (c.scheme !== "reviewboost")
+              errs.push("scheme must be reviewboost, got " + c.scheme);
+            if (!c.ios?.infoPlist?.NFCReaderUsageDescription)
+              errs.push("ios.infoPlist.NFCReaderUsageDescription is missing");
+            if (!(c.plugins || []).includes("react-native-nfc-manager"))
+              errs.push("react-native-nfc-manager plugin missing");
+            if (!(c.plugins || []).includes("expo-secure-store"))
+              errs.push("expo-secure-store plugin missing");
+            if (errs.length) { console.error("::error::" + errs.join(" | ")); process.exit(1); }
+            console.log("Identifiers, NFC usage string, and plugins OK.");
+          '
+
+      - name: eas.json is valid and modern
+        run: |
+          node -e '
+            const e = require("./eas.json");
+            const errs = [];
+            const floor = e.cli?.version || "";
+            const m = floor.match(/(\d+)/);
+            if (!m || Number(m[1]) < 16)
+              errs.push("cli.version floor should be >= 16.0.0, got " + floor);
+            if (e.cli?.appVersionSource !== "remote")
+              errs.push("cli.appVersionSource must be remote");
+            if (e.build?.production?.autoIncrement !== true)
+              errs.push("production build must set autoIncrement:true");
+            for (const p of ["development", "preview", "production"]) {
+              if (!e.build?.[p]) { errs.push("missing build profile: " + p); continue; }
+              if (e.build[p].environment !== p)
+                errs.push(`build.${p}.environment should be "${p}"`);
+            }
+            if (e.build?.development?.developmentClient !== true)
+              errs.push("development profile must set developmentClient:true");
+            if (errs.length) { console.error("::error::" + errs.join(" | ")); process.exit(1); }
+            console.log("eas.json OK.");
+          '
+
+      - name: Required EXPO_PUBLIC_* env var names are present
+        run: |
+          node -e '
+            const fs = require("fs");
+            const eas = require("./eas.json");
+            const env = fs.readFileSync(".env.example", "utf8");
+            const required = ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_API_URL"];
+            const errs = [];
+            for (const name of required)
+              if (!env.includes(name)) errs.push(".env.example is missing " + name);
+            // URL and API_URL must be wired into every build profile inline.
+            for (const p of ["development", "preview", "production"]) {
+              const pe = eas.build?.[p]?.env || {};
+              for (const name of ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_API_URL"])
+                if (!pe[name]) errs.push(`eas.json build.${p}.env missing ${name}`);
+            }
+            if (errs.length) { console.error("::error::" + errs.join(" | ")); process.exit(1); }
+            console.log("Env var names present and wired.");
+          '
+
+      - name: Native dependency compatibility (Expo SDK 57)
+        run: node scripts/check-native-deps.js
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npm test
+
+  mobile-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: No privileged Supabase JWT committed (decodes JWT payloads)
+        run: node apps/mobile/scripts/check-no-service-secret.js
+      - name: No server secrets in the mobile app
+        run: |
+          found=0
+
+          # Server-only secret names must never be assigned a value under apps/mobile,
+          # and must never appear under an EXPO_PUBLIC_ name (they would ship to devices).
+          if git grep -nIE '(SUPABASE_SERVICE_ROLE_KEY|CUSTOMER_NOTE_ENCRYPTION_KEY|PII_ENCRYPTION_KEY|TOKEN_DIGEST_KEY|STRIPE_SECRET_KEY)=.+' -- 'apps/mobile' ':!*.example' ':!*.md'; then
+            echo "::error::A server-only secret assignment is committed under apps/mobile."
+            found=1
+          fi
+
+          if git grep -nIE 'EXPO_PUBLIC_[A-Z_]*(SERVICE_ROLE|SECRET|ENCRYPTION_KEY|DIGEST_KEY|STRIPE)' -- 'apps/mobile' ':!*.md'; then
+            echo "::error::A server-only secret is exposed under an EXPO_PUBLIC_ name."
+            found=1
+          fi
+
+          if git grep -nIE '(sk_live_[A-Za-z0-9]{20,}|sk_test_[A-Za-z0-9]{20,})' -- 'apps/mobile' ':!*.md'; then
+            echo "::error::A Stripe secret key appears under apps/mobile."
+            found=1
+          fi
+
+          # Note: a service-role JWT pasted into the innocuously named
+          # EXPO_PUBLIC_SUPABASE_ANON_KEY would not match any name-based pattern
+          # above; that case is caught by check-no-service-secret.js, which
+          # decodes JWT payloads and rejects privileged roles.
+
+          if [ "$found" -eq 1 ]; then exit 1; fi
+          echo "No server secrets found under apps/mobile."
