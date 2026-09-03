@@ -34,6 +34,9 @@ export const ERROR_CODE = {
   // work.
   forbidden: "forbidden",
   organizationSelectionRequired: "organization_selection_required",
+  // Text Requests: the organization has no send credit left. Client-actionable
+  // (buy more / wait), so distinct from a generic failure.
+  quotaExhausted: "quota_exhausted",
   requestTimeout: "request_timeout",
   internalError: "internal_error",
   serviceUnavailable: "service_unavailable",
