@@ -92,9 +92,19 @@ carries a label, brand colours, and an active flag, and renders as PNG or SVG at
 high error correction so it survives being scuffed or partially covered.
 
 The internal identifier never leaves the server, so stands cannot be enumerated.
-Owner and mobile UIs can create stands, export QR (SVG/PNG/JSON), copy the NFC
-link, and record NFC provisioning. Those surfaces have unit-test coverage in CI.
-They have not been live-verified on printed hardware in the field.
+
+Capability split (do not collapse these):
+
+- **Web owner dashboard:** create and manage stands, export QR (SVG / PNG /
+  JSON), Copy NFC Link, NFC Tools instructions, and Web NFC write on supported
+  Android Chrome.
+- **Mobile Stands tab:** list existing stands by location, open stand detail,
+  share or open the stand URL, and native NFC provisioning (owner/admin). Mobile
+  does **not** create stands or export QR SVG/PNG; the empty state tells the
+  owner to create a stand from the web dashboard.
+
+Those surfaces have unit-test coverage in CI. They have not been live-verified
+on printed hardware in the field.
 
 ### The tap flow — APPROVED
 
@@ -134,9 +144,15 @@ Software that exists:
 - Token-rotation awareness: a stand whose token moved after the last write
   should be treated as needing a rewrite.
 
-CI covers Expo NFC entitlements/config, stands unit tests, and mobile
-`use-stands` tests. There is no dedicated NFC pgTAP suite. The real-device
-checklist in `docs/testing/NFC_DEVICE_TEST_CHECKLIST.md` is **unchecked**.
+CI (`.github/workflows/mobile-release-validation.yml`) evaluates
+`expo config --type public` and asserts `NFCReaderUsageDescription`, the
+`react-native-nfc-manager` plugin name, identifiers, `eas.json`, env-var names,
+native-dep ranges, `tsc`, and unit tests. It does **not** run `expo prebuild`
+and does **not** inspect generated iOS entitlements. `npm run prebuild:check`
+exists for local/manual native-config inspection and is not invoked by CI.
+Frontend `stands-system` unit tests and mobile `use-stands` tests also run in
+CI. There is no dedicated NFC pgTAP suite. The real-device checklist in
+`docs/testing/NFC_DEVICE_TEST_CHECKLIST.md` is **unchecked**.
 GitHub issue #31 is the canonical NFC spec and remains open.
 
 ### Hardware ordering — PROPOSED / NOT BUILT
@@ -218,8 +234,13 @@ path. Detail: `docs/backend/TEXT_REQUESTS.md`.
   expiration / adjustment) with a projection. **Purchase of quota is not built.**
 - Authenticated APIs: schedule, list, preview, cancel; signed provider webhook;
   worker-secret dispatch trigger.
-- Twilio adapter in code. No credentials are committed. Production send is a
-  no-op unless `TWILIO_*` are configured at runtime.
+- Twilio adapter in code. No credentials are committed. In production,
+  `getSmsProvider` **fails closed**: a missing or invalid provider
+  configuration (`SMS_PROVIDER` unset/unknown, or `SMS_PROVIDER=twilio`
+  without credentials) throws `ConfigError` rather than sending or silently
+  skipping. An explicitly configured `SMS_PROVIDER=fake` returns simulated
+  `submitted` / `failed` / `provider_unknown` outcomes and can advance request
+  and outbox state for testing. Neither path is a real carrier send.
 
 **78** vitest cases and **59** pgTAP assertions cover this surface in CI.
 

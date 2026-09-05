@@ -76,11 +76,15 @@ Software for writing one ReviewBoost HTTPS URL (`/q/[token]`) to a tag exists:
 - QR as the universal fallback (same stand URL)
 - Provisioning recorded via `POST /api/v1/review-stands/[standId]/nfc-provision`
 
-CI covers Expo NFC config/entitlements, stands unit tests, and mobile `use-stands`
-tests. There is **no dedicated NFC pgTAP suite**. Real-device write/read-back
-is **not live-verified**. Issue #31 remains the canonical NFC spec and stays
-open until that live-device gate is done. Hardware catalogue, ordering,
-fulfilment, and shipping are **not built**.
+CI (`.github/workflows/mobile-release-validation.yml`) evaluates `expo config`,
+the NFC usage string, the `react-native-nfc-manager` plugin name, identifiers,
+`eas.json`, env-var names, native-dep ranges, `tsc`, and unit tests. It does
+**not** run `expo prebuild` or inspect generated iOS entitlements (that is a
+manual `prebuild:check`). Frontend `stands-system` tests and mobile
+`use-stands` tests also run in CI. There is **no dedicated NFC pgTAP suite**.
+Real-device write/read-back is **not live-verified**. Issue #31 remains the
+canonical NFC spec and stays open until that live-device gate is done. Hardware
+catalogue, ordering, fulfilment, and shipping are **not built**.
 
 ### Text Requests / SMS backend — implemented, CI-tested, not live-verified
 
@@ -93,7 +97,10 @@ truth. See `docs/backend/TEXT_REQUESTS.md`.
 - [x] Durable webhook inbox (signature verified before dedupe write)
 - [x] GSM-7 / UCS-2 segment engine and integer micro-unit cost preview
 - [x] Quota ledger (reserve/consume/release/refund/expiry); purchase/plan integration is **not built**
-- [x] Twilio adapter in code; **no credentials committed; no live send unless configured**
+- [x] Twilio adapter in code; no credentials committed. Production
+  `getSmsProvider` fails closed (`ConfigError`) if the provider is missing or
+  invalid. `SMS_PROVIDER=fake` can record simulated submissions. Neither is a
+  real carrier send
 
 CI-tested: 78 vitest cases (`frontend/tests/unit/sms-*.test.ts`) and 59 pgTAP
 assertions (`supabase/tests/text_requests_test.sql`).
