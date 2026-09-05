@@ -50,10 +50,11 @@ npm install
 npm start
 ```
 
-Both applications are implemented, but the full live flow has not been verified.
-The mobile application uses Supabase for authentication and organization
-loading; its Feed and Feedback screens still use organization-filtered mock data.
-It is not a production-complete mobile product.
+Both applications are implemented, but the full live flow has not been
+live-verified. The mobile application uses Supabase OTP authentication and
+organization loading. Its Live Feed, Feedback, and Stands screens call the
+authenticated APIs rather than mock data. Native NFC writing and store
+release are not live-verified. It is not a production-complete mobile product.
 
 ### Database
 
