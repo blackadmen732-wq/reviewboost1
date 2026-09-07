@@ -137,7 +137,7 @@ select tests.set_actor('aa100000-0000-0000-0000-000000000001');
 
 select throws_ok(
     $$insert into public.customer_page_profiles (org_id, scope, draft) values ('a1000000-0000-0000-0000-00000000000a', 'organization', '{}')$$,
-    '42501',
+    '42501', null,
     'direct INSERT blocked for authenticated on customer_page_profiles'
 );
 
@@ -145,7 +145,7 @@ select throws_ok(
 
 select throws_ok(
     $$update public.customer_page_profiles set draft = '{"templateId":"bold"}' where org_id = 'a1000000-0000-0000-0000-00000000000a'$$,
-    '42501',
+    '42501', null,
     'direct UPDATE blocked for authenticated on customer_page_profiles'
 );
 
@@ -153,7 +153,7 @@ select throws_ok(
 
 select throws_ok(
     $$delete from public.customer_page_profiles where org_id = 'a1000000-0000-0000-0000-00000000000a'$$,
-    '42501',
+    '42501', null,
     'direct DELETE blocked for authenticated on customer_page_profiles'
 );
 
@@ -210,7 +210,7 @@ select throws_ok(
         p_location_id => null,
         p_draft => '{"templateId":"bold"}'::jsonb
     )$$,
-    '42501',
+    '42501', null,
     'viewer cannot patch draft'
 );
 
@@ -224,7 +224,7 @@ select throws_ok(
         p_location_id => null,
         p_draft => '{"templateId":"minimal"}'::jsonb
     )$$,
-    '42501',
+    '42501', null,
     'org2 owner cannot patch org1 draft'
 );
 
@@ -238,7 +238,7 @@ select throws_ok(
         p_location_id => null,
         p_draft => '{"templateId":"neon_glow"}'::jsonb
     )$$,
-    '22023',
+    '22023', null,
     'invalid template rejected on patch'
 );
 
@@ -274,7 +274,7 @@ select throws_ok(
         p_location_id => 'c2000000-0000-0000-0000-00000000000a',
         p_draft => '{"templateId":"minimal"}'::jsonb
     )$$,
-    '42704',
+    '42704', null,
     'cross-org location blocked'
 );
 
@@ -288,7 +288,7 @@ select throws_ok(
     $$select * from public.rpc_customer_page_publish(
         p_org_id => 'a2000000-0000-0000-0000-00000000000a'
     )$$,
-    'P0002',
+    'P0002', null,
     'publish without draft raises error'
 );
 
@@ -479,7 +479,7 @@ select throws_ok(
         p_source_object_path => 'test.svg',
         p_source_content_type => 'image/svg+xml'
     )$$,
-    '22023',
+    '22023', null,
     'SVG content type rejected'
 );
 
@@ -495,7 +495,7 @@ select throws_ok(
         p_source_object_path => 'test.png',
         p_source_content_type => 'image/png'
     )$$,
-    '42501',
+    '42501', null,
     'viewer cannot create asset upload'
 );
 
@@ -520,7 +520,7 @@ select throws_ok(
     $$select * from public.rpc_customer_page_publish(
         p_org_id => 'a1000000-0000-0000-0000-00000000000a'
     )$$,
-    '22023',
+    '22023', null,
     'publish rejects non-ready hero asset'
 );
 
@@ -562,7 +562,7 @@ select throws_ok(
     $$select * from public.rpc_customer_page_publish(
         p_org_id => 'a1000000-0000-0000-0000-00000000000a'
     )$$,
-    '22023',
+    '22023', null,
     'publish rejects asset from another org'
 );
 
@@ -573,14 +573,14 @@ select tests.set_service();
 -- One org default only
 select throws_ok(
     $$insert into public.customer_page_profiles (org_id, scope, draft) values ('a1000000-0000-0000-0000-00000000000a', 'organization', '{}')$$,
-    '23505',
+    '23505', null,
     'cannot insert second org-level profile'
 );
 
 -- One per location only
 select throws_ok(
     $$insert into public.customer_page_profiles (org_id, scope, location_id, draft) values ('a1000000-0000-0000-0000-00000000000a', 'location', 'c1000000-0000-0000-0000-00000000000a', '{}')$$,
-    '23505',
+    '23505', null,
     'cannot insert second location-level profile'
 );
 
@@ -588,7 +588,7 @@ select throws_ok(
 
 select throws_ok(
     $$insert into public.customer_page_profiles (org_id, scope, location_id, draft) values ('a1000000-0000-0000-0000-00000000000a', 'organization', 'c1000000-0000-0000-0000-00000000000b', '{}')$$,
-    '23514',
+    '23514', null,
     'organization scope cannot have location_id'
 );
 
@@ -600,7 +600,7 @@ select throws_ok(
       values
         ('d3000000-0000-0000-0000-00000000000a', 'a2000000-0000-0000-0000-00000000000a', 'organization',
          '{}', 1, null, now())$$,
-    '23514',
+    '23514', null,
     'published_version > 0 without published snapshot violates constraint'
 );
 
