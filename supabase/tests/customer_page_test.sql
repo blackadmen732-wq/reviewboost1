@@ -81,10 +81,10 @@ values ('c2000000-0000-0000-0000-00000000000a', 'a2000000-0000-0000-0000-0000000
 
 select tests.set_anon();
 
-select is(
-    (select count(*) from public.customer_page_profiles),
-    0::bigint,
-    'anon sees zero profiles'
+select throws_ok(
+    $$ select 1 from public.customer_page_profiles $$,
+    '42501', null,
+    'anon cannot read customer_page_profiles'
 );
 
 -- =================== 2. RLS: outsider org2 cannot see org1 profiles ========
@@ -434,10 +434,10 @@ select is(
 
 -- anon cannot see assets
 select tests.set_anon();
-select is(
-    (select count(*) from public.customer_page_assets),
-    0::bigint,
-    'anon sees zero assets'
+select throws_ok(
+    $$ select 1 from public.customer_page_assets $$,
+    '42501', null,
+    'anon cannot read customer_page_assets'
 );
 
 -- org2 cannot see org1 assets
