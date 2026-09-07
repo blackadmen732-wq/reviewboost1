@@ -9,6 +9,11 @@ import type {
   TeamPraiseResponse,
 } from "@/lib/api/customer-flow-types";
 import {
+  resolvePublicCustomerPage,
+  type PublicCustomerPagePresentation,
+} from "@/lib/server/customer-page-service";
+import { customerFlowV2Enabled } from "@/lib/server/feature-flags";
+import {
   KEY_VERSION,
   clientFingerprint,
   decrypt,
@@ -228,6 +233,9 @@ async function guardWrite(tokenHash: string, meta: RequestMeta): Promise<void> {
 }
 
 interface ResolvedStand {
+  org_id: string;
+  location_id: string;
+  stand_id: string;
   business_name: string;
   location_name: string | null;
   google_review_url: string | null;
@@ -328,12 +336,22 @@ export async function getContext(token: string, meta: RequestMeta): Promise<Cust
       ? (locale as SupportedLocale)
       : DEFAULT_LOCALE;
 
+  let customerPage: PublicCustomerPagePresentation | null = null;
+  if (customerFlowV2Enabled()) {
+    customerPage = await resolvePublicCustomerPage(
+      stand.org_id,
+      stand.location_id,
+      meta.requestId,
+    );
+  }
+
   return {
     business: { name: stand.business_name, logoUrl: null },
     location: { name: stand.location_name },
     googleReviewUrl: stand.google_review_url,
     supportedLocales: [...SUPPORTED_LOCALES],
     defaultLocale,
+    ...(customerPage !== null ? { customerPage } : {}),
   };
 }
 

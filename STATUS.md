@@ -121,6 +121,39 @@ server-secret scanning.
 EAS build, TestFlight, or Google Play submission. Those require an Expo account
 and store credentials. See `docs/mobile/MOBILE_RELEASE.md`.
 
+### Customer Page V2 backend foundation — implemented, not live-verified
+
+Feature-flagged backend for the branded customer page experience. Two
+independent flags (`CUSTOMER_PAGE_EDITOR_ENABLED`, `CUSTOMER_FLOW_V2_ENABLED`)
+gate the owner editor API and the public V2 flow respectively. Both default off;
+the database schema is additive and safe with flags off.
+
+- [x] `customer_page_profiles` table: draft/publish model, 6 templates, org default + location override
+- [x] `customer_page_assets` table: upload reservation, state machine (pending → processing → ready → failed/quarantined)
+- [x] Owner RPCs: get, patch_draft, publish (atomic: validate → sanitize → verify assets → snapshot → audit)
+- [x] Asset RPCs: create_asset_upload (authenticated), finalize_asset (service-role only)
+- [x] Public resolver: location published → org published → built-in Minimal fallback
+- [x] Owner API routes: GET/PATCH `/api/v1/customer-page`, POST `.../publish`, POST `.../upload`
+- [x] Public `/q/{token}` context extended with optional `customerPage` field (backward-compatible)
+- [x] OpenAPI schema updated, TypeScript types regenerated
+- [x] Feature flags: `feature-flags.ts` reads on every access, no module-load caching
+- [x] 42 pgTAP assertions (`customer_page_test.sql`)
+- [x] 45 vitest assertions (`customer-page-v2.test.ts`)
+
+Migrations, RPCs, and API routes follow existing patterns: SECURITY DEFINER,
+RLS, column-level revokes, opaque content-hashed asset paths, audit events.
+Image binaries are stored in object storage, not Postgres. Draft data never
+leaks to the public flow. Resolver failure degrades gracefully (built-in
+Minimal, not a 500).
+
+**Not built:** pixel-perfect frontend editor, storage bucket / signed URL
+wiring, image processing pipeline, CDN configuration.
+
+**Downstream cleanup needed (does not block this PR):**
+- Remove Continue button, note field, Google-choice screen, Team Praise screen, and Finished screen from V2 public flow
+- Audit owner mobile app for V2 customer page settings
+- Wire `CUSTOMER_PAGE_PUBLIC_ASSET_BASE` to a real CDN
+
 ### Tests (pgTAP) — CI-tested
 
 - [x] column_security_test.sql (36 tests)
@@ -130,8 +163,9 @@ and store credentials. See `docs/mobile/MOBILE_RELEASE.md`.
 - [x] security_hardening_test.sql (85 tests)
 - [x] text_requests_test.sql (59 tests)
 - [x] token_rotation_test.sql (18 tests)
+- [x] customer_page_test.sql (42 tests)
 
-326 planned pgTAP assertions. Frontend Vitest/Playwright and mobile Vitest also
+368 planned pgTAP assertions. Frontend Vitest/Playwright and mobile Vitest also
 run in CI. See `TESTING.md`.
 
 ## Built but not live-verified
