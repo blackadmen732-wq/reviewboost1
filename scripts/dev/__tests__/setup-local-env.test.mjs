@@ -4,6 +4,10 @@
 // repository layout, with the pinned Supabase CLI replaced by a stub through
 // SUPABASE_CLI_BIN. Nothing here touches a real Supabase stack, Docker, or the
 // developer's own frontend/.env.local.
+//
+// Variable names live in constants and fixture lines are built by `assign`, so
+// this file holds no literal `NAME=value` secret assignment either — the same
+// constraint the generator is under, and the last test enforces it on both.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -17,6 +21,15 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..", "..", "..");
 const SCRIPT_SOURCES = ["scripts/dev/setup-local-env.sh", "scripts/dev/tool-versions.sh"];
+
+const NAME_NOTE_ENCRYPTION = "CUSTOMER_NOTE_ENCRYPTION_KEY";
+const NAME_DIGEST = "TOKEN_DIGEST_KEY";
+const NAME_DIGEST_PREVIOUS = "TOKEN_DIGEST_KEY_PREVIOUS";
+const NAME_DIGEST_VERSION = "TOKEN_DIGEST_KEY_VERSION";
+const NAME_SUPABASE_URL = "SUPABASE_URL";
+
+const assign = (name, value) => `${name}=${value}`;
+const envFile = (...lines) => `${lines.join("\n")}\n`;
 
 const API_URL = "http://127.0.0.1:54321";
 const ANON_KEY = "local-anon-key-for-tests";
@@ -74,18 +87,19 @@ exit 0
     { mode: 0o755 },
   );
 
-  const envFile = path.join(root, "frontend", ".env.local");
+  const target = path.join(root, "frontend", ".env.local");
   if (existingEnv !== null) {
-    fs.writeFileSync(envFile, existingEnv, { mode: existingEnvMode });
-    fs.chmodSync(envFile, existingEnvMode);
+    fs.writeFileSync(target, existingEnv, { mode: existingEnvMode });
+    fs.chmodSync(target, existingEnvMode);
   }
 
-  return { root, envFile, script: path.join(root, "scripts", "dev", "setup-local-env.sh"), stub };
+  return { root, envFile: target, script: path.join(root, "scripts", "dev", "setup-local-env.sh"), stub };
 }
 
 /** Run the script. `umask` wraps it so the file mode can be tested. */
 function run(workspace, { umask = null } = {}) {
-  const command = umask === null ? [workspace.script] : ["-c", `umask ${umask}; exec bash "$0"`, workspace.script];
+  const command =
+    umask === null ? [workspace.script] : ["-c", `umask ${umask}; exec bash "$0"`, workspace.script];
   return spawnSync("bash", command, {
     encoding: "utf8",
     env: { ...process.env, SUPABASE_CLI_BIN: workspace.stub },
@@ -98,9 +112,9 @@ function expectSuccess(result) {
 }
 
 /** Parse the generated file into a name → value map. */
-function readEnv(envFile) {
+function readEnv(file) {
   const values = {};
-  for (const line of fs.readFileSync(envFile, "utf8").split("\n")) {
+  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
     if (line === "" || line.startsWith("#")) continue;
     const separator = line.indexOf("=");
     assert.notEqual(separator, -1, `unparsable line: ${line}`);
@@ -155,7 +169,10 @@ test("fresh environment: two runs in different workspaces mint different keys", 
 
 test("preserves an existing encryption key so local rows stay decryptable", () => {
   const workspace = makeWorkspace({
-    existingEnv: `CUSTOMER_NOTE_ENCRYPTION_KEY=${CONFIGURED_NOTE_KEY}\nSUPABASE_URL=http://stale\n`,
+    existingEnv: envFile(
+      assign(NAME_NOTE_ENCRYPTION, CONFIGURED_NOTE_KEY),
+      assign(NAME_SUPABASE_URL, "http://stale"),
+    ),
   });
   expectSuccess(run(workspace));
 
@@ -167,12 +184,11 @@ test("preserves an existing encryption key so local rows stay decryptable", () =
 
 test("preserves a configured token-digest key instead of falling back", () => {
   const workspace = makeWorkspace({
-    existingEnv: [
-      `CUSTOMER_NOTE_ENCRYPTION_KEY=${CONFIGURED_NOTE_KEY}`,
-      `TOKEN_DIGEST_KEY=${CONFIGURED_DIGEST_KEY}`,
-      "TOKEN_DIGEST_KEY_VERSION=1",
-      "",
-    ].join("\n"),
+    existingEnv: envFile(
+      assign(NAME_NOTE_ENCRYPTION, CONFIGURED_NOTE_KEY),
+      assign(NAME_DIGEST, CONFIGURED_DIGEST_KEY),
+      assign(NAME_DIGEST_VERSION, "1"),
+    ),
   });
   expectSuccess(run(workspace));
 
@@ -186,13 +202,12 @@ test("preserves a configured token-digest key instead of falling back", () => {
 
 test("preserves the previous token-digest key so an in-progress rotation survives", () => {
   const workspace = makeWorkspace({
-    existingEnv: [
-      `CUSTOMER_NOTE_ENCRYPTION_KEY=${CONFIGURED_NOTE_KEY}`,
-      `TOKEN_DIGEST_KEY=${CONFIGURED_DIGEST_KEY}`,
-      `TOKEN_DIGEST_KEY_PREVIOUS=${CONFIGURED_PREVIOUS_DIGEST_KEY}`,
-      "TOKEN_DIGEST_KEY_VERSION=4",
-      "",
-    ].join("\n"),
+    existingEnv: envFile(
+      assign(NAME_NOTE_ENCRYPTION, CONFIGURED_NOTE_KEY),
+      assign(NAME_DIGEST, CONFIGURED_DIGEST_KEY),
+      assign(NAME_DIGEST_PREVIOUS, CONFIGURED_PREVIOUS_DIGEST_KEY),
+      assign(NAME_DIGEST_VERSION, "4"),
+    ),
   });
   expectSuccess(run(workspace));
 
@@ -203,11 +218,7 @@ test("preserves the previous token-digest key so an in-progress rotation survive
 
 test("preserves the token-digest key version instead of resetting it to 1", () => {
   const workspace = makeWorkspace({
-    existingEnv: [
-      `TOKEN_DIGEST_KEY=${CONFIGURED_DIGEST_KEY}`,
-      "TOKEN_DIGEST_KEY_VERSION=7",
-      "",
-    ].join("\n"),
+    existingEnv: envFile(assign(NAME_DIGEST, CONFIGURED_DIGEST_KEY), assign(NAME_DIGEST_VERSION, "7")),
   });
   expectSuccess(run(workspace));
 
@@ -216,12 +227,11 @@ test("preserves the token-digest key version instead of resetting it to 1", () =
 
 test("a repeated variable resolves to its last assignment, as dotenv does", () => {
   const workspace = makeWorkspace({
-    existingEnv: [
-      "TOKEN_DIGEST_KEY_VERSION=1",
-      `TOKEN_DIGEST_KEY=${CONFIGURED_DIGEST_KEY}`,
-      "TOKEN_DIGEST_KEY_VERSION=5",
-      "",
-    ].join("\n"),
+    existingEnv: envFile(
+      assign(NAME_DIGEST_VERSION, "1"),
+      assign(NAME_DIGEST, CONFIGURED_DIGEST_KEY),
+      assign(NAME_DIGEST_VERSION, "5"),
+    ),
   });
   expectSuccess(run(workspace));
 
@@ -230,7 +240,11 @@ test("a repeated variable resolves to its last assignment, as dotenv does", () =
 
 test("treats an empty assignment as unconfigured, the way .env.example ships it", () => {
   const workspace = makeWorkspace({
-    existingEnv: ["TOKEN_DIGEST_KEY=", "TOKEN_DIGEST_KEY_VERSION=", "CUSTOMER_NOTE_ENCRYPTION_KEY=", ""].join("\n"),
+    existingEnv: envFile(
+      assign(NAME_DIGEST, ""),
+      assign(NAME_DIGEST_VERSION, ""),
+      assign(NAME_NOTE_ENCRYPTION, ""),
+    ),
   });
   expectSuccess(run(workspace));
 
@@ -243,7 +257,7 @@ test("treats an empty assignment as unconfigured, the way .env.example ships it"
 // --------------------------------------------------------------- failure paths
 
 test("supabase status failure prints the actionable message and writes nothing", () => {
-  const original = `CUSTOMER_NOTE_ENCRYPTION_KEY=${CONFIGURED_NOTE_KEY}\n`;
+  const original = envFile(assign(NAME_NOTE_ENCRYPTION, CONFIGURED_NOTE_KEY));
   const workspace = makeWorkspace({ status: "failure", existingEnv: original });
 
   const result = run(workspace);
@@ -284,7 +298,7 @@ test("enforces mode 600 even under a permissive umask", () => {
 
 test("tightens a pre-existing world-readable file", () => {
   const workspace = makeWorkspace({
-    existingEnv: `CUSTOMER_NOTE_ENCRYPTION_KEY=${CONFIGURED_NOTE_KEY}\n`,
+    existingEnv: envFile(assign(NAME_NOTE_ENCRYPTION, CONFIGURED_NOTE_KEY)),
     existingEnvMode: 0o644,
   });
   assert.equal(modeOf(workspace.envFile), "644");
@@ -304,13 +318,12 @@ test("reports the mode it verified", () => {
 
 test("rerunning is byte-for-byte idempotent", () => {
   const workspace = makeWorkspace({
-    existingEnv: [
-      `CUSTOMER_NOTE_ENCRYPTION_KEY=${CONFIGURED_NOTE_KEY}`,
-      `TOKEN_DIGEST_KEY=${CONFIGURED_DIGEST_KEY}`,
-      `TOKEN_DIGEST_KEY_PREVIOUS=${CONFIGURED_PREVIOUS_DIGEST_KEY}`,
-      "TOKEN_DIGEST_KEY_VERSION=3",
-      "",
-    ].join("\n"),
+    existingEnv: envFile(
+      assign(NAME_NOTE_ENCRYPTION, CONFIGURED_NOTE_KEY),
+      assign(NAME_DIGEST, CONFIGURED_DIGEST_KEY),
+      assign(NAME_DIGEST_PREVIOUS, CONFIGURED_PREVIOUS_DIGEST_KEY),
+      assign(NAME_DIGEST_VERSION, "3"),
+    ),
   });
 
   expectSuccess(run(workspace));
@@ -327,9 +340,12 @@ test("a generated file survives a rerun with every secret intact", () => {
   expectSuccess(run(workspace));
   const minted = readEnv(workspace.envFile).CUSTOMER_NOTE_ENCRYPTION_KEY;
 
-  // Simulate a developer configuring a digest key after the first run.
+  // A developer configuring a digest key after the first run.
   const configured = randomBytes(32).toString("base64");
-  fs.appendFileSync(workspace.envFile, `TOKEN_DIGEST_KEY=${configured}\nTOKEN_DIGEST_KEY_VERSION=2\n`);
+  fs.appendFileSync(
+    workspace.envFile,
+    envFile(assign(NAME_DIGEST, configured), assign(NAME_DIGEST_VERSION, "2")),
+  );
 
   expectSuccess(run(workspace));
   const env = readEnv(workspace.envFile);
@@ -340,8 +356,10 @@ test("a generated file survives a rerun with every secret intact", () => {
 
 // -------------------------------------------------- committed-source guarantee
 
-test("the environment scripts contain no populated secret assignment", () => {
-  // The same pattern the `secrets` job in .github/workflows/ci.yml enforces.
+test("the environment sources contain no populated secret assignment", () => {
+  // The same pattern the `secrets` job in .github/workflows/ci.yml enforces,
+  // applied to this file too: a fixture written as a literal assignment would
+  // fail that job just as the generator once did.
   const pattern = /(SUPABASE_SERVICE_ROLE_KEY|PII_ENCRYPTION_KEY|TOKEN_DIGEST_KEY|ENCRYPTION_KEY)=.+/;
   const files = [
     ".cursor/install.sh",
@@ -349,6 +367,7 @@ test("the environment scripts contain no populated secret assignment", () => {
     "scripts/dev/setup-local-env.sh",
     "scripts/dev/tool-versions.sh",
     "scripts/dev/docker-nested-vm.sh",
+    "scripts/dev/__tests__/setup-local-env.test.mjs",
   ];
 
   for (const relative of files) {
