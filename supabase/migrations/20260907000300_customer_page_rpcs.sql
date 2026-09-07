@@ -347,12 +347,12 @@ begin
 
     v_new_ver := v_profile.published_version + 1;
 
-    update public.customer_page_profiles
+    update public.customer_page_profiles cp
        set published         = v_snapshot,
            published_version = v_new_ver,
            published_by      = v_actor,
            published_at      = now()
-     where id = v_profile.id;
+     where cp.id = v_profile.id;
 
     insert into public.audit_events
         (org_id, actor_user_id, actor_type, action, target_type, target_id, metadata)
