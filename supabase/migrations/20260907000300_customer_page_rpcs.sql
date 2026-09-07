@@ -238,13 +238,13 @@ begin
     end if;
 
     if v_id is null then
-        insert into public.customer_page_profiles
+        insert into public.customer_page_profiles as p
             (org_id, scope, location_id, composer_version,
              draft, draft_updated_by, draft_updated_at)
         values
             (p_org_id, v_scope, p_location_id, coalesce(p_composer_version, 1),
              p_draft, v_actor, now())
-        returning id, draft, draft_updated_at
+        returning p.id, p.draft, p.draft_updated_at
           into v_id, v_out_draft, v_out_at;
     end if;
 
