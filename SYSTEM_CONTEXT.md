@@ -155,6 +155,52 @@ CI. There is no dedicated NFC pgTAP suite. The real-device checklist in
 `docs/testing/NFC_DEVICE_TEST_CHECKLIST.md` is **unchecked**.
 GitHub issue #31 is the canonical NFC spec and remains open.
 
+### Customer Page V2 — IMPLEMENTED, CI-TESTED — not live-verified
+
+The branded customer page replaces the default rating screen with a
+business-customised landing page. The customer experience is:
+
+```
+NFC/QR/Text Request → branded customer page → tap 1-5 stars
+    → ReviewBoost rating saved → immediate Google handoff
+```
+
+No note field, no Continue button, no Google-choice screen, no Team Praise
+screen, no Finished screen in the V2 public flow. Every rating 1–5 follows the
+exact same Google path — no review gating under any circumstances.
+
+**Data model:** draft/publish. The owner edits a draft; publishing atomically
+snapshots it. The public flow only reads the published snapshot. Six templates:
+signature, modern, bold, editorial, classic, minimal. Location overrides
+cascade: location published → org published → built-in Minimal.
+
+**Feature flags:** `CUSTOMER_PAGE_EDITOR_ENABLED` gates owner API;
+`CUSTOMER_FLOW_V2_ENABLED` gates the public `customerPage` field in
+`/api/v1/public/q/{token}`. Both default off. Rollback is turning a flag off.
+
+**Assets:** image binaries live in object storage, never Postgres. Upload flow:
+reserve (returns opaque path) → client PUTs → finalize validates + promotes to
+`ready`. Public URLs are content-hashed; no org names, tokens, or bucket
+credentials appear in them.
+
+**Security:** all mutations are SECURITY DEFINER RPCs. RLS isolates tenants.
+Authenticated INSERT/UPDATE/DELETE revoked on both tables. Draft data never
+leaks to the public resolver. Resolver failure degrades to built-in Minimal
+(not a 500). The `customerPage` field in the public context contains no org,
+location, stand, or profile IDs.
+
+**Not built:** pixel-perfect frontend editor, storage bucket wiring, image
+processing pipeline, CDN configuration.
+
+**Downstream cleanup queue (V2 activation, does not block foundation PR):**
+- Remove Continue button, note field, Google-choice screen, Team Praise screen,
+  and Finished screen from V2 public flow frontend
+- Audit owner mobile app for customer page settings surface
+- Wire `CUSTOMER_PAGE_PUBLIC_ASSET_BASE` to a real CDN
+
+**CI-tested:** 42 pgTAP assertions (`customer_page_test.sql`) and 45 vitest
+assertions (`customer-page-v2.test.ts`).
+
 ### Hardware ordering — PROPOSED / NOT BUILT
 
 Not built, not costed, not agreed. Missing: tag catalogue, purchasing, ordering,
@@ -340,9 +386,9 @@ application uses Expo Router, OTP sign-in, and the authenticated APIs for Live
 Feed, Feedback, and Stands (mock data has been removed). Native NFC writing and
 EAS release config exist; neither is live-verified / live-released.
 
-Database migrations and **326** planned pgTAP assertions have run successfully
-in CI, including tenant-isolation, privilege checks, onboarding-security, and
-Text Requests. Deployments succeed through external Vercel configuration, but
+Database migrations and **368** planned pgTAP assertions have run successfully
+in CI, including tenant-isolation, privilege checks, onboarding-security,
+Text Requests, and Customer Page V2. Deployments succeed through external Vercel configuration, but
 the complete live product flow, including the Next.js and Expo applications
 against production infrastructure, remains unverified.
 

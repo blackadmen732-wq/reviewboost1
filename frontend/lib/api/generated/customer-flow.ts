@@ -118,6 +118,30 @@ export interface components {
     schemas: {
         /** @enum {string} */
         Locale: "en" | "es" | "ht";
+        /** @enum {string} */
+        CustomerPageTemplate: "signature" | "modern" | "bold" | "editorial" | "classic" | "minimal";
+        CustomerPageHeroVariant: {
+            width: number;
+            height: number;
+            url: string;
+        };
+        /** @description Published customer-page presentation. Contains only data safe for the anonymous customer page. No org id, location id, stand id, draft, source bucket paths, or composer internals. */
+        CustomerPagePresentation: {
+            publishedVersion: number;
+            templateId: components["schemas"]["CustomerPageTemplate"];
+            composerVersion: number;
+            hero?: {
+                focalX: number;
+                focalY: number;
+                zoom: number;
+                variants: components["schemas"]["CustomerPageHeroVariant"][];
+                width?: number | null;
+                height?: number | null;
+            } | null;
+            logo?: {
+                variants: components["schemas"]["CustomerPageHeroVariant"][];
+            } | null;
+        };
         /** @description Contains no organization id, location id, stand id, or subscription state. A caller who learned the tenant could write unlimited fabricated feedback into it. */
         CustomerReviewContext: {
             business: {
@@ -138,6 +162,8 @@ export interface components {
             googleReviewUrl: string;
             supportedLocales: components["schemas"]["Locale"][];
             defaultLocale: components["schemas"]["Locale"];
+            /** @description Published customer-page presentation. Null when the business has not published a page yet or when Customer Flow V2 is not enabled. Clients receiving null render the built-in Minimal look. */
+            customerPage?: components["schemas"]["CustomerPagePresentation"] | null;
         };
         CreateSessionRequest: {
             locale: components["schemas"]["Locale"];

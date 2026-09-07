@@ -373,6 +373,53 @@ components:
       type: string
       enum: [en, es, ht]
 
+    CustomerPageTemplate:
+      type: string
+      enum: [signature, modern, bold, editorial, classic, minimal]
+
+    CustomerPageHeroVariant:
+      type: object
+      additionalProperties: false
+      required: [width, height, url]
+      properties:
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        url: { type: string }
+
+    CustomerPagePresentation:
+      type: object
+      additionalProperties: false
+      required: [publishedVersion, templateId, composerVersion]
+      description: >-
+        Published customer-page presentation. Contains only data safe for
+        the anonymous customer page. No org id, location id, stand id,
+        draft, source bucket paths, or composer internals.
+      properties:
+        publishedVersion: { type: integer, minimum: 1 }
+        templateId: { $ref: "#/components/schemas/CustomerPageTemplate" }
+        composerVersion: { type: integer, minimum: 1 }
+        hero:
+          type: [object, "null"]
+          additionalProperties: false
+          required: [focalX, focalY, zoom, variants]
+          properties:
+            focalX: { type: number, minimum: 0, maximum: 1 }
+            focalY: { type: number, minimum: 0, maximum: 1 }
+            zoom: { type: number, minimum: 1, maximum: 1.5 }
+            variants:
+              type: array
+              items: { $ref: "#/components/schemas/CustomerPageHeroVariant" }
+            width: { type: [integer, "null"], minimum: 1 }
+            height: { type: [integer, "null"], minimum: 1 }
+        logo:
+          type: [object, "null"]
+          additionalProperties: false
+          required: [variants]
+          properties:
+            variants:
+              type: array
+              items: { $ref: "#/components/schemas/CustomerPageHeroVariant" }
+
     CustomerReviewContext:
       type: object
       additionalProperties: false
@@ -411,6 +458,15 @@ components:
           uniqueItems: true
           items: { $ref: "#/components/schemas/Locale" }
         defaultLocale: { $ref: "#/components/schemas/Locale" }
+        customerPage:
+          description: >-
+            Published customer-page presentation. Null when the business
+            has not published a page yet or when Customer Flow V2 is not
+            enabled. Clients receiving null render the built-in Minimal
+            look.
+          oneOf:
+            - { $ref: "#/components/schemas/CustomerPagePresentation" }
+            - { type: "null" }
 
     CreateSessionRequest:
       type: object
