@@ -3,37 +3,35 @@
 # Cloud Agent install phase — durable, idempotent setup baked into the
 # environment snapshot. Runs after the repository is checked out.
 #
-#   * Docker Engine (local Supabase runs in containers)
+#   * Docker Engine, at the versions pinned in scripts/dev/tool-versions.sh
+#   * fuse-overlayfs, the only storage driver that mounts in the nested VM
 #   * Node dependencies for the web app and the mobile foundation
 #   * Generated API types
-#   * Pre-pulled Supabase images so every boot starts quickly
+#   * Pre-pulled Supabase images, so every later boot starts quickly
+#
+# Every step is mandatory and every step fails closed. This phase publishes a
+# snapshot that later boots cannot repair, so an install that swallowed a failed
+# package operation would hand out an environment where Supabase never starts
+# while still reporting success.
 #
 # Per-boot work (starting dockerd, starting Supabase, the dev server) lives in
-# start.sh / the terminals, not here.
+# start.sh and the terminals, not here.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../scripts/dev/tool-versions.sh
+source "$REPO_ROOT/scripts/dev/tool-versions.sh"
+# shellcheck source=../scripts/dev/docker-nested-vm.sh
+source "$REPO_ROOT/scripts/dev/docker-nested-vm.sh"
 
-echo "== Docker Engine =="
-if ! command -v docker >/dev/null 2>&1; then
-  curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-  sudo sh /tmp/get-docker.sh
-fi
-
-# fuse-overlayfs is the storage driver that works inside the nested Cloud Agent
-# VM; the native overlayfs driver cannot mount there.
-sudo apt-get update -y || true
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  -o Dpkg::Options::=--force-confold fuse-overlayfs || true
-sudo mkdir -p /etc/docker
-printf '{\n  "storage-driver": "fuse-overlayfs"\n}\n' | sudo tee /etc/docker/daemon.json >/dev/null
-sudo usermod -aG docker "$(id -un)" || true
-sudo service docker restart || sudo service docker start || true
-
-# Same-bridge container-to-container traffic must bypass iptables in the nested
-# VM, otherwise packets between the Supabase containers are silently dropped.
-sudo sysctl -w net.bridge.bridge-nf-call-iptables=0 >/dev/null 2>&1 || true
-sudo sysctl -w net.bridge.bridge-nf-call-ip6tables=0 >/dev/null 2>&1 || true
+echo "== Docker Engine (pinned) =="
+docker_install_engine
+docker_install_storage_driver
+docker_write_daemon_config
+docker_grant_group_membership
+docker_restart_daemon
+docker_require_ready
+docker_apply_bridge_netfilter_bypass
 
 echo "== Web dependencies =="
 ( cd "$REPO_ROOT/frontend" && npm ci && npm run api:generate )
@@ -41,13 +39,12 @@ echo "== Web dependencies =="
 echo "== Mobile dependencies =="
 ( cd "$REPO_ROOT/apps/mobile" && npm ci )
 
-echo "== Pre-pull Supabase images =="
-# Start once to pull every image into the snapshot, then stop. `sg docker`
-# picks up the freshly added docker group without needing a new login.
-if sg docker -c "cd '$REPO_ROOT' && npx --yes supabase start"; then
-  sg docker -c "cd '$REPO_ROOT' && npx --yes supabase stop --no-backup" || true
-else
-  echo "WARNING: supabase start failed during install; boot will pull images." >&2
-fi
+echo "== Pre-pull Supabase images (CLI ${SUPABASE_CLI_VERSION}) =="
+# Start the stack once so every image lands in the snapshot, then stop it: no
+# process started here survives into a later boot. This doubles as the
+# end-to-end proof that the storage driver and bridge settings above work, so a
+# failure is fatal rather than a warning that boots inherit.
+docker_run_in_group "cd $(printf '%q' "$REPO_ROOT") && $(supabase_cli_command) start"
+docker_run_in_group "cd $(printf '%q' "$REPO_ROOT") && $(supabase_cli_command) stop --no-backup"
 
 echo "install.sh complete."

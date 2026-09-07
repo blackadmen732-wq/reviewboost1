@@ -1,29 +1,36 @@
 #!/usr/bin/env bash
 #
 # Cloud Agent start phase — per-boot reconciliation. Runs every time the
-# environment starts. Brings up Docker and the local Supabase stack, then
-# writes frontend/.env.local so the dev server (a terminal) can connect.
+# environment starts. Brings up Docker and the local Supabase stack, then writes
+# frontend/.env.local so the dev server (a terminal) can connect.
+#
+# Fails closed throughout: a boot that reported success without Docker would
+# hand the agent a web app that cannot reach a database.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../scripts/dev/tool-versions.sh
+source "$REPO_ROOT/scripts/dev/tool-versions.sh"
+# shellcheck source=../scripts/dev/docker-nested-vm.sh
+source "$REPO_ROOT/scripts/dev/docker-nested-vm.sh"
 
 echo "== Ensure Docker is running =="
-sudo service docker start || true
-for _ in $(seq 1 60); do
-  if sudo docker info >/dev/null 2>&1; then break; fi
-  sleep 1
-done
-sudo docker info >/dev/null 2>&1 || { echo "Docker daemon did not become ready." >&2; exit 1; }
+if ! docker_daemon_responds; then
+  # install.sh already wrote this, but a boot that lost /etc/docker would
+  # otherwise come up on a storage driver that cannot mount here.
+  docker_write_daemon_config
+  docker_start_daemon
+fi
+docker_require_ready
 
 # The bridge-netfilter bypass resets when br_netfilter is (re)loaded by the
 # daemon, so re-apply it on every boot before starting containers.
-sudo sysctl -w net.bridge.bridge-nf-call-iptables=0 >/dev/null 2>&1 || true
-sudo sysctl -w net.bridge.bridge-nf-call-ip6tables=0 >/dev/null 2>&1 || true
+docker_apply_bridge_netfilter_bypass
 
-echo "== Start local Supabase (idempotent) =="
-sg docker -c "cd '$REPO_ROOT' && npx --yes supabase start"
+echo "== Start local Supabase (idempotent, CLI ${SUPABASE_CLI_VERSION}) =="
+docker_run_in_group "cd $(printf '%q' "$REPO_ROOT") && $(supabase_cli_command) start"
 
 echo "== Write frontend/.env.local =="
-sg docker -c "bash '$REPO_ROOT/scripts/dev/setup-local-env.sh'"
+docker_run_in_group "bash $(printf '%q' "$REPO_ROOT/scripts/dev/setup-local-env.sh")"
 
 echo "start.sh complete. Supabase Studio: http://localhost:54323"
