@@ -18,6 +18,7 @@ supabase/
   config.toml      Supabase local config
 openapi/           OpenAPI spec (single source of truth for contracts)
 docs/backend/      Architecture and environment documentation
+docs/dev/          Cloud Agent development environment
 ```
 
 ## Getting started

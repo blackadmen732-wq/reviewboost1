@@ -146,3 +146,24 @@ jobs:
 
       - name: Run staging seed script tests
         run: node --test scripts/backend/__tests__/seed-stand-remote.test.mjs
+
+  dev-script-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Syntax-check the development environment scripts
+        run: |
+          for script in .cursor/install.sh .cursor/start.sh scripts/dev/*.sh; do
+            bash -n "$script"
+          done
+
+      - name: Lint the development environment scripts
+        run: shellcheck -x --source-path=SCRIPTDIR .cursor/install.sh .cursor/start.sh scripts/dev/*.sh
+
+      - name: Run local environment generator tests
+        run: node --test scripts/dev/__tests__/setup-local-env.test.mjs

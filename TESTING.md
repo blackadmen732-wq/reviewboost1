@@ -109,3 +109,23 @@ supabase test db
 | `scripts/backend/__tests__/seed-stand-remote.test.mjs` | Node test runner (`node --test`) |
 
 Run in CI by the `staging-script-tests` job in `.github/workflows/ci.yml`.
+
+## Development environment scripts
+
+The Cloud Agent environment scripts and the `frontend/.env.local` generator.
+Design notes: `docs/dev/CLOUD_AGENT_ENVIRONMENT.md`.
+
+| File | Kind |
+|---|---|
+| `scripts/dev/__tests__/setup-local-env.test.mjs` | Node test runner (`node --test`) |
+
+```bash
+# Syntax and lint
+for script in .cursor/install.sh .cursor/start.sh scripts/dev/*.sh; do bash -n "$script"; done
+shellcheck -x --source-path=SCRIPTDIR .cursor/install.sh .cursor/start.sh scripts/dev/*.sh
+
+# Generator behaviour: no Supabase stack or Docker needed, the CLI is stubbed
+node --test scripts/dev/__tests__/setup-local-env.test.mjs
+```
+
+Run in CI by the `dev-script-tests` job in `.github/workflows/ci.yml`.
