@@ -198,8 +198,8 @@ processing pipeline, CDN configuration.
 - Audit owner mobile app for customer page settings surface
 - Wire `CUSTOMER_PAGE_PUBLIC_ASSET_BASE` to a real CDN
 
-**CI-tested:** 42 pgTAP assertions (`customer_page_test.sql`) and 45 vitest
-assertions (`customer-page-v2.test.ts`).
+**CI-tested:** 66 pgTAP assertions (`customer_page_test.sql`) and 51 vitest
+cases (`customer-page-v2.test.ts`).
 
 ### Hardware ordering — PROPOSED / NOT BUILT
 

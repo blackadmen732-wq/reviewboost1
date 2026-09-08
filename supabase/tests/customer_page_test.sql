@@ -12,7 +12,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(44);
+select plan(66);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -49,7 +49,8 @@ values
     ('aa100000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'o1owner@test.com', '', now(), now()),
     ('aa100000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'o1admin@test.com', '', now(), now()),
     ('aa100000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'o2owner@test.com', '', now(), now()),
-    ('aa100000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'viewer@test.com', '', now(), now());
+    ('aa100000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'viewer@test.com', '', now(), now()),
+    ('aa100000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'member@test.com', '', now(), now());
 
 -- Org 1
 insert into public.organizations (id, name, slug)
@@ -59,7 +60,8 @@ insert into public.organization_members (id, org_id, user_id, role, status)
 values
     ('b1000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-00000000000a', 'aa100000-0000-0000-0000-000000000001', 'owner', 'active'),
     ('b1000000-0000-0000-0000-000000000002', 'a1000000-0000-0000-0000-00000000000a', 'aa100000-0000-0000-0000-000000000002', 'admin', 'active'),
-    ('b1000000-0000-0000-0000-000000000004', 'a1000000-0000-0000-0000-00000000000a', 'aa100000-0000-0000-0000-000000000004', 'viewer', 'active');
+    ('b1000000-0000-0000-0000-000000000004', 'a1000000-0000-0000-0000-00000000000a', 'aa100000-0000-0000-0000-000000000004', 'viewer', 'active'),
+    ('b1000000-0000-0000-0000-000000000005', 'a1000000-0000-0000-0000-00000000000a', 'aa100000-0000-0000-0000-000000000005', 'member', 'active');
 
 insert into public.locations (id, org_id, name, google_review_url)
 values
@@ -657,6 +659,271 @@ select * from public.rpc_customer_page_patch_draft('a2000000-0000-0000-0000-0000
 select is(
     (select count(*) from public.rpc_customer_page_publish('a2000000-0000-0000-0000-00000000000a')),
     1::bigint, 'template minimal publishes'
+);
+
+-- =================== 43. Member cannot patch ==============================
+
+select tests.set_actor('aa100000-0000-0000-0000-000000000005');
+
+select throws_ok(
+    $$select * from public.rpc_customer_page_patch_draft(
+        p_org_id => 'a1000000-0000-0000-0000-00000000000a',
+        p_location_id => null,
+        p_draft => '{"templateId":"bold"}'::jsonb
+    )$$,
+    '42501', null,
+    'member cannot patch draft'
+);
+
+-- =================== 44-45. Viewer/member cannot get or publish ===========
+
+select tests.set_actor('aa100000-0000-0000-0000-000000000004');
+
+select throws_ok(
+    $$select * from public.rpc_customer_page_get(
+        p_org_id => 'a1000000-0000-0000-0000-00000000000a'
+    )$$,
+    '42501', null,
+    'viewer cannot get customer page profile'
+);
+
+select throws_ok(
+    $$select * from public.rpc_customer_page_publish(
+        p_org_id => 'a1000000-0000-0000-0000-00000000000a'
+    )$$,
+    '42501', null,
+    'viewer cannot publish'
+);
+
+select tests.set_actor('aa100000-0000-0000-0000-000000000005');
+
+select throws_ok(
+    $$select * from public.rpc_customer_page_publish(
+        p_org_id => 'a1000000-0000-0000-0000-00000000000a'
+    )$$,
+    '42501', null,
+    'member cannot publish'
+);
+
+-- =================== 46-52. EXECUTE grants (fail-closed surface) ==========
+
+select ok(
+    not has_function_privilege(
+        'authenticated',
+        'public.rpc_customer_page_finalize_asset(uuid, uuid, integer, integer, bigint, text, jsonb)',
+        'EXECUTE'),
+    'authenticated cannot execute finalize_asset'
+);
+
+select ok(
+    not has_function_privilege(
+        'authenticated',
+        'public.rpc_customer_page_resolve_public(uuid, uuid)',
+        'EXECUTE'),
+    'authenticated cannot execute public resolver'
+);
+
+select ok(
+    not has_function_privilege(
+        'anon',
+        'public.rpc_customer_page_resolve_public(uuid, uuid)',
+        'EXECUTE'),
+    'anon cannot execute public resolver'
+);
+
+select ok(
+    has_function_privilege(
+        'service_role',
+        'public.rpc_customer_page_finalize_asset(uuid, uuid, integer, integer, bigint, text, jsonb)',
+        'EXECUTE'),
+    'service_role can execute finalize_asset'
+);
+
+select ok(
+    has_function_privilege(
+        'service_role',
+        'public.rpc_customer_page_resolve_public(uuid, uuid)',
+        'EXECUTE'),
+    'service_role can execute public resolver'
+);
+
+select ok(
+    has_function_privilege(
+        'authenticated',
+        'public.rpc_customer_page_get(uuid, uuid)',
+        'EXECUTE'),
+    'authenticated can execute rpc_customer_page_get'
+);
+
+select ok(
+    not has_function_privilege(
+        'authenticated',
+        'app.customer_page_require_editor(uuid)',
+        'EXECUTE'),
+    'authenticated cannot execute require_editor helper'
+);
+
+select ok(
+    not has_function_privilege(
+        'authenticated',
+        'app.customer_page_sanitize_draft(jsonb)',
+        'EXECUTE'),
+    'authenticated cannot execute sanitize helper'
+);
+
+-- =================== 53-54. Finalize is service-role, no user JWT =========
+
+select tests.set_service();
+
+insert into public.customer_page_assets
+    (id, org_id, kind, state, source_object_path, source_content_type)
+values
+    ('e1000000-0000-0000-0000-0000000000ff',
+     'a1000000-0000-0000-0000-00000000000a',
+     'logo', 'pending',
+     'customer-page/source/ff/finalize-me.png',
+     'image/png');
+
+select lives_ok(
+    $$select public.rpc_customer_page_finalize_asset(
+        'a1000000-0000-0000-0000-00000000000a',
+        'e1000000-0000-0000-0000-0000000000ff',
+        200, 200, 1234,
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        '[{"width":200,"height":200,"path":"customer-page/public/ff/logo.webp","contentType":"image/webp","bytes":1234}]'::jsonb
+    )$$,
+    'finalize succeeds without a user JWT'
+);
+
+select is(
+    (select state from public.customer_page_assets
+      where id = 'e1000000-0000-0000-0000-0000000000ff'),
+    'ready',
+    'finalize moves the asset to ready'
+);
+
+-- =================== 55. Finalize rejects already-ready ===================
+
+select throws_ok(
+    $$select public.rpc_customer_page_finalize_asset(
+        'a1000000-0000-0000-0000-00000000000a',
+        'e1000000-0000-0000-0000-0000000000ff',
+        200, 200, 1234,
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        '[{"width":200,"height":200,"path":"customer-page/public/ff/logo.webp","contentType":"image/webp","bytes":1234}]'::jsonb
+    )$$,
+    '42704', null,
+    'finalize rejects an already-ready asset'
+);
+
+-- =================== 56-57. Source path validation ========================
+
+select tests.set_actor('aa100000-0000-0000-0000-000000000001');
+
+select throws_ok(
+    $$select public.rpc_customer_page_create_asset_upload(
+        p_org_id => 'a1000000-0000-0000-0000-00000000000a',
+        p_location_id => null,
+        p_kind => 'hero',
+        p_source_object_path => '../etc/passwd',
+        p_source_content_type => 'image/jpeg'
+    )$$,
+    '22023', null,
+    'absolute/traversal source path rejected'
+);
+
+select throws_ok(
+    $$select public.rpc_customer_page_create_asset_upload(
+        p_org_id => 'a1000000-0000-0000-0000-00000000000a',
+        p_location_id => null,
+        p_kind => 'hero',
+        p_source_object_path => 'customer-page/source/ab/../../secret.jpg',
+        p_source_content_type => 'image/jpeg'
+    )$$,
+    '22023', null,
+    'source path with .. rejected'
+);
+
+-- =================== 58. Invalid asset UUID rejected on patch =============
+
+select throws_ok(
+    $$select * from public.rpc_customer_page_patch_draft(
+        p_org_id => 'a1000000-0000-0000-0000-00000000000a',
+        p_location_id => null,
+        p_draft => '{"templateId":"modern","hero":{"assetId":"not-a-uuid"}}'::jsonb
+    )$$,
+    '22023', null,
+    'invalid hero assetId rejected on patch'
+);
+
+-- =================== 59. Public resolver strips asset ids =================
+
+select tests.set_service();
+
+select is(
+    (select published -> 'hero' ? 'assetId' from
+        public.rpc_customer_page_resolve_public(
+            'a1000000-0000-0000-0000-00000000000a',
+            'c1000000-0000-0000-0000-00000000000b'
+        )
+    ),
+    false,
+    'public resolver published payload does not contain assetId'
+);
+
+-- =================== 60-61. Publish clamps focal/zoom =====================
+
+select tests.set_actor('aa100000-0000-0000-0000-000000000001');
+
+select * from public.rpc_customer_page_patch_draft(
+    p_org_id => 'a1000000-0000-0000-0000-00000000000a',
+    p_location_id => null,
+    p_draft => '{"templateId":"minimal","hero":{"focalX":9,"focalY":-3,"zoom":99}}'::jsonb
+);
+
+select * from public.rpc_customer_page_publish(
+    p_org_id => 'a1000000-0000-0000-0000-00000000000a'
+);
+
+select tests.set_service();
+
+select is(
+    (select (published #>> '{hero,focalX}')::numeric from public.customer_page_profiles
+      where org_id = 'a1000000-0000-0000-0000-00000000000a' and scope = 'organization'),
+    1.0,
+    'publish clamps focalX to 1'
+);
+
+select is(
+    (select (published #>> '{hero,zoom}')::numeric from public.customer_page_profiles
+      where org_id = 'a1000000-0000-0000-0000-00000000000a' and scope = 'organization'),
+    1.5,
+    'publish clamps zoom to 1.5'
+);
+
+-- =================== 62. Finalize rejects traversal variants ==============
+
+select tests.set_service();
+
+insert into public.customer_page_assets
+    (id, org_id, kind, state, source_object_path, source_content_type)
+values
+    ('e1000000-0000-0000-0000-0000000000ee',
+     'a1000000-0000-0000-0000-00000000000a',
+     'hero', 'pending',
+     'customer-page/source/ee/bad-variants.jpg',
+     'image/jpeg');
+
+select throws_ok(
+    $$select public.rpc_customer_page_finalize_asset(
+        'a1000000-0000-0000-0000-00000000000a',
+        'e1000000-0000-0000-0000-0000000000ee',
+        800, 600, 1000,
+        'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        '[{"width":800,"height":600,"path":"../secret.webp","contentType":"image/webp","bytes":1000}]'::jsonb
+    )$$,
+    '22023', null,
+    'finalize rejects variant paths outside customer-page/public/'
 );
 
 

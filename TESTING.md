@@ -2,7 +2,7 @@
 
 Commands and locations for every test suite in the repository.
 
-File counts below are the inventory on main as of 2026-09-05. Assertion counts
+File counts below are the inventory as of 2026-09-08. Assertion counts
 for pgTAP come from each file's `select plan(N)`.
 
 ## Frontend (Next.js)
@@ -11,7 +11,7 @@ Test files live under `frontend/tests/`, organised by kind:
 
 | Directory | Kind | Count |
 |---|---|---|
-| `tests/unit/` | Unit (Vitest) | 26 |
+| `tests/unit/` | Unit (Vitest) | 27 |
 | `tests/component/` | Component (Vitest + Testing Library) | 3 |
 | `tests/accessibility/` | Accessibility (Vitest + vitest-axe) | 1 |
 | `tests/e2e/` | End-to-end (Playwright) | 3 |
@@ -82,7 +82,7 @@ live-verify OTP sign-in, native NFC write, or a production API.
 ## Supabase (Database)
 
 Test files live under `supabase/tests/`. They are pgTAP tests executed
-against the local Supabase database. **326** planned assertions across 7 files.
+against the local Supabase database. **392** planned assertions across 8 files.
 
 | File | Plan |
 |---|---|
@@ -93,6 +93,7 @@ against the local Supabase database. **326** planned assertions across 7 files.
 | `security_hardening_test.sql` | 85 — security hardening measures |
 | `text_requests_test.sql` | 59 — Text Requests consent, suppression, outbox, quota |
 | `token_rotation_test.sql` | 18 — token rotation logic |
+| `customer_page_test.sql` | 66 — Customer Page V2 RLS, RPCs, resolver secrecy |
 
 There is no dedicated NFC pgTAP file. NFC schema is applied by migrations in
 the same CI job that runs this suite.

@@ -1,6 +1,6 @@
 # ReviewBoost Foundation Status
 
-Last updated: 2026-09-05 (main `7c3473f`)
+Last updated: 2026-09-08 (customer page V2 backend)
 
 State labels used here:
 
@@ -137,8 +137,8 @@ the database schema is additive and safe with flags off.
 - [x] Public `/q/{token}` context extended with optional `customerPage` field (backward-compatible)
 - [x] OpenAPI schema updated, TypeScript types regenerated
 - [x] Feature flags: `feature-flags.ts` reads on every access, no module-load caching
-- [x] 42 pgTAP assertions (`customer_page_test.sql`)
-- [x] 45 vitest assertions (`customer-page-v2.test.ts`)
+- [x] 66 pgTAP assertions (`customer_page_test.sql`)
+- [x] 51 vitest cases (`customer-page-v2.test.ts`)
 
 Migrations, RPCs, and API routes follow existing patterns: SECURITY DEFINER,
 RLS, column-level revokes, opaque content-hashed asset paths, audit events.
@@ -163,9 +163,9 @@ wiring, image processing pipeline, CDN configuration.
 - [x] security_hardening_test.sql (85 tests)
 - [x] text_requests_test.sql (59 tests)
 - [x] token_rotation_test.sql (18 tests)
-- [x] customer_page_test.sql (42 tests)
+- [x] customer_page_test.sql (66 tests)
 
-368 planned pgTAP assertions. Frontend Vitest/Playwright and mobile Vitest also
+392 planned pgTAP assertions. Frontend Vitest/Playwright and mobile Vitest also
 run in CI. See `TESTING.md`.
 
 ## Built but not live-verified

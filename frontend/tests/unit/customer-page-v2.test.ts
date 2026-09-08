@@ -54,16 +54,18 @@ const ACTIVE_STAND = {
   matched_key_version: 1,
 };
 
+let mockRole = "owner";
+
 vi.mock("@/lib/server/auth", () => ({
   requireOrganizationContext: () =>
     Promise.resolve({
       userId: "user-owner-1",
       orgId: ORG_ID,
-      role: "owner",
+      role: mockRole,
       db: mockAuthenticatedDb,
     }),
   requireUser: () => Promise.resolve({ userId: "user-owner-1" }),
-  requireMembership: () => Promise.resolve({ orgId: ORG_ID, role: "owner" }),
+  requireMembership: () => Promise.resolve({ orgId: ORG_ID, role: mockRole }),
 }));
 
 function allowed() {
@@ -152,6 +154,7 @@ beforeAll(() => {
 beforeEach(() => {
   calls.length = 0;
   rpcHandler = happyPath;
+  mockRole = "owner";
   vi.stubEnv("CUSTOMER_PAGE_EDITOR_ENABLED", "true");
   vi.stubEnv("CUSTOMER_FLOW_V2_ENABLED", "true");
 });
@@ -451,6 +454,28 @@ describe("owner API — customer page GET", () => {
 
     expect(response.status).toBe(400);
   });
+
+  it("forbids viewers from reading the editor", async () => {
+    vi.resetModules();
+    mockRole = "viewer";
+
+    const { GET } = await import("@/app/api/v1/customer-page/route");
+    const response = await GET(request("GET", "/api/v1/customer-page"));
+
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("forbidden");
+  });
+
+  it("forbids members from reading the editor", async () => {
+    vi.resetModules();
+    mockRole = "member";
+
+    const { GET } = await import("@/app/api/v1/customer-page/route");
+    const response = await GET(request("GET", "/api/v1/customer-page"));
+
+    expect(response.status).toBe(403);
+  });
 });
 
 describe("owner API — customer page PATCH", () => {
@@ -573,6 +598,48 @@ describe("owner API — customer page publish", () => {
     const response = await POST(request("POST", "/api/v1/customer-page/publish", { body: {} }));
 
     expect(response.status).toBe(400);
+  });
+
+  it("maps RPC forbidden to 403, not 503", async () => {
+    vi.resetModules();
+
+    rpcHandler = (fn) => {
+      if (fn === "rpc_customer_page_publish")
+        return { data: null, error: { message: "forbidden", code: "42501" } };
+      return happyPath(fn);
+    };
+
+    const { POST } = await import("@/app/api/v1/customer-page/publish/route");
+    const response = await POST(request("POST", "/api/v1/customer-page/publish", { body: {} }));
+
+    expect(response.status).toBe(403);
+  });
+
+  it("maps location-not-found to 404", async () => {
+    vi.resetModules();
+
+    rpcHandler = (fn) => {
+      if (fn === "rpc_customer_page_publish")
+        return { data: null, error: { message: "location not found", code: "42704" } };
+      return happyPath(fn);
+    };
+
+    const { POST } = await import("@/app/api/v1/customer-page/publish/route");
+    const response = await POST(
+      request("POST", "/api/v1/customer-page/publish", { body: { locationId: LOCATION_ID } }),
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("forbids viewers from publishing", async () => {
+    vi.resetModules();
+    mockRole = "viewer";
+
+    const { POST } = await import("@/app/api/v1/customer-page/publish/route");
+    const response = await POST(request("POST", "/api/v1/customer-page/publish", { body: {} }));
+
+    expect(response.status).toBe(403);
   });
 });
 
@@ -808,6 +875,42 @@ describe("customer page service", () => {
     const result = await resolvePublicCustomerPage(ORG_ID, LOCATION_ID, "req-raw");
 
     expect(result?.hero?.variants[0]?.url).toBe("customer-page/public/ab/hero-800.webp");
+  });
+
+  it("drops variant paths that escape the public prefix", async () => {
+    vi.resetModules();
+    vi.stubEnv("CUSTOMER_PAGE_PUBLIC_ASSET_BASE", "https://cdn.example.com/assets");
+
+    rpcHandler = (fn) => {
+      if (fn === "rpc_customer_page_resolve_public") {
+        return {
+          data: [
+            {
+              ...publicResolverRow(),
+              hero_variants: [
+                { width: 800, height: 600, path: "../secret.webp", contentType: "image/webp", bytes: 1 },
+                {
+                  width: 800,
+                  height: 600,
+                  path: "customer-page/public/ab/hero-800.webp",
+                  contentType: "image/webp",
+                  bytes: 1,
+                },
+              ],
+            },
+          ],
+          error: null,
+        };
+      }
+      return happyPath(fn);
+    };
+
+    const { resolvePublicCustomerPage } = await import("@/lib/server/customer-page-service");
+    const result = await resolvePublicCustomerPage(ORG_ID, LOCATION_ID, "req-path");
+
+    expect(result?.hero?.variants).toHaveLength(1);
+    expect(result?.hero?.variants[0]?.url).toContain("customer-page/public/");
+    expect(JSON.stringify(result)).not.toContain("../secret");
   });
 });
 
