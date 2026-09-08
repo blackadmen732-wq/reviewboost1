@@ -382,6 +382,31 @@ describe("twilio send outcome classification", () => {
     expect(url).toContain(encodeURIComponent("+15551230000"));
   });
 
+  it("lookup is unknown when a full page has no match (do not fail+release)", async () => {
+    configureEnv();
+    const messages = Array.from({ length: 50 }, (_, i) => ({
+      sid: `SM${String(i).padStart(4, "0")}`,
+      status: "delivered",
+      body: "other",
+      date_created: "2026-09-08T12:00:00Z",
+    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ messages }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(result.outcome).toBe("unknown");
+  });
+
   it("lookup returns not_found when the list is empty", async () => {
     configureEnv();
     vi.stubGlobal(

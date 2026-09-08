@@ -124,8 +124,7 @@ declare
     v_attempt public.sms_delivery_attempts%rowtype;
 begin
     select * into v_req from public.text_requests tr
-     where tr.id = p_request_id and tr.org_id = p_org_id
-       for update;
+     where tr.id = p_request_id and tr.org_id = p_org_id;
     if v_req.id is null then
         return query select 'not_found'::text, null::uuid, null::text, null::text, null::text, null::timestamptz;
         return;
@@ -136,6 +135,7 @@ begin
         return;
     end if;
 
+    -- Lock attempt then request — same order as settle / apply_delivery_status.
     select * into v_attempt from public.sms_delivery_attempts a
      where a.org_id = p_org_id
        and a.request_id = p_request_id
@@ -145,6 +145,16 @@ begin
        for update;
     if v_attempt.id is null then
         return query select 'no_attempt'::text, null::uuid, null::text, null::text, null::text, null::timestamptz;
+        return;
+    end if;
+
+    select * into v_req from public.text_requests tr
+     where tr.id = p_request_id and tr.org_id = p_org_id
+       for update;
+    if v_req.id is null or v_req.status is distinct from 'provider_unknown' then
+        return query select (
+            case when v_req.id is null then 'not_found' else 'already_' || v_req.status::text end
+        ), null::uuid, null::text, null::text, null::text, null::timestamptz;
         return;
     end if;
 
@@ -187,24 +197,18 @@ begin
         return 'invalid';
     end if;
 
-    select * into v_attempt from public.sms_delivery_attempts a
-     where a.id = p_attempt_id and a.org_id = p_org_id;
-    if v_attempt.id is null then
-        return 'not_found';
-    end if;
-
-    -- Lock request then attempt (same order as prepare) to avoid deadlocks.
-    select * into v_req from public.text_requests tr
-     where tr.id = v_attempt.request_id and tr.org_id = p_org_id
-       for update;
-    if v_req.id is null then
-        return 'not_found';
-    end if;
-
+    -- Lock attempt then request — same order as settle / apply_delivery_status.
     select * into v_attempt from public.sms_delivery_attempts a
      where a.id = p_attempt_id and a.org_id = p_org_id
        for update;
     if v_attempt.id is null then
+        return 'not_found';
+    end if;
+
+    select * into v_req from public.text_requests tr
+     where tr.id = v_attempt.request_id and tr.org_id = p_org_id
+       for update;
+    if v_req.id is null then
         return 'not_found';
     end if;
 

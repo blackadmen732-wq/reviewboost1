@@ -56,7 +56,13 @@ export async function reconcileOnce(options?: {
   summary.claimed = claimed.length;
 
   for (const job of claimed) {
-    const complete = () => svc.rpc("rpc_sms_complete_outbox", { p_id: job.id, p_worker: worker });
+    const complete = async () => {
+      const { error: completeError } = await svc.rpc("rpc_sms_complete_outbox", {
+        p_id: job.id,
+        p_worker: worker,
+      });
+      if (completeError) throw completeError;
+    };
     const deferUnknown = async (reason: string) => {
       const recorded = await failOutboxWithRetry({
         jobId: job.id,

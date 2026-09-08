@@ -216,6 +216,15 @@ export class TwilioSmsProvider implements SmsProvider {
       const matched = bodyMatches.length > 0 ? bodyMatches : candidates.length === 1 ? candidates : [];
 
       if (matched.length === 0) {
+        // A full page with no match is incomplete, not proof of absence.
+        // Fail-closed: keep reserved and retry rather than fail+release.
+        if (messages.length >= 50) {
+          return {
+            outcome: "unknown",
+            errorClass: "unknown",
+            raw: { error: "lookup_page_truncated", count: messages.length },
+          };
+        }
         return { outcome: "not_found", raw: { count: candidates.length } };
       }
       if (matched.length > 1) {

@@ -26,14 +26,15 @@ export async function failOutboxWithRetry(input: {
       p_error: input.error,
       p_backoff_seconds: input.backoffSeconds,
     });
-    if (!error) {
-      return { status: typeof data === "string" ? data : null, recorded: true };
+    // A missing row returns SQL NULL with no PostgREST error — that is not recorded.
+    if (!error && typeof data === "string") {
+      return { status: data, recorded: true };
     }
-    lastError = error;
+    lastError = error ?? { message: "fail_outbox_null_status" };
     logger.error("sms.outbox_fail_record_failed", {
       jobId: input.jobId,
       attempt,
-      error,
+      error: lastError,
     });
   }
 

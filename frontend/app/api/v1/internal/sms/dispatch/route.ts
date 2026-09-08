@@ -47,8 +47,17 @@ export async function POST(request: NextRequest): Promise<Response> {
       throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
     }
 
-    const dispatch = await dispatchOnce({ limit: 1, leaseSeconds: 90 });
+    let dispatchError: unknown = null;
+    let dispatch;
+    try {
+      dispatch = await dispatchOnce({ limit: 1, leaseSeconds: 90 });
+    } catch (error) {
+      dispatchError = error;
+    }
+    // Reconciliation must still run if dispatch claim/config throws — parked
+    // provider_unknown rows are independent of this batch's send loop.
     const reconcile = await reconcileOnce({ limit: 1, leaseSeconds: 90 });
+    if (dispatchError) throw dispatchError;
     return json(request, requestId, 200, { data: { ...dispatch, reconcile }, requestId });
   });
 }
