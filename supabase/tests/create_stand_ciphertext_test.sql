@@ -12,7 +12,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(12);
+select plan(13);
 
 create or replace function tests.set_actor(p_user_id uuid) returns void
 language plpgsql as $$
@@ -102,19 +102,25 @@ select ok(
 
 select tests.set_actor('61000000-0000-0000-0000-000000000001');
 
+select lives_ok(
+    $$ select public.rpc_create_stand(
+        '62000000-0000-0000-0000-00000000000a',
+        '63000000-0000-0000-0000-00000000000a',
+        'Reprint Desk',
+        'cipher-stand-hash-000000000000000000000000000001',
+        'ciphpfx1',
+        1::smallint,
+        'req-create-stand-ok',
+        'v1:enc-create-stand-ciphertext',
+        1::smallint) $$,
+    'owner can create a stand');
+
+-- Separate statement: a same-query SELECT cannot see the INSERT (statement
+-- snapshot). The ciphertext must already be on the row after the RPC returns.
 select results_eq(
     $$ select public_token_encrypted, token_encryption_key_version
          from public.review_stands
-        where id = public.rpc_create_stand(
-            '62000000-0000-0000-0000-00000000000a',
-            '63000000-0000-0000-0000-00000000000a',
-            'Reprint Desk',
-            'cipher-stand-hash-000000000000000000000000000001',
-            'ciphpfx1',
-            1::smallint,
-            'req-create-stand-ok',
-            'v1:enc-create-stand-ciphertext',
-            1::smallint) $$,
+        where public_token_hash = 'cipher-stand-hash-000000000000000000000000000001' $$,
     $$ values ('v1:enc-create-stand-ciphertext'::text, 1::smallint) $$,
     'owner create stores reprint ciphertext atomically');
 
