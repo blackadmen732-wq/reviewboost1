@@ -542,11 +542,19 @@ delete from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-000
 -- Test: allocate 100, consume 60, expire → available must be 0 (not -60).
 -- Then allocate 100 again → available must be 100 (not 40).
 select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 100, 'expiry-alloc-1',
-    now() - interval '1 second', null);
+    null, null);
 
 -- Simulate consumption of 60 credits. We need to reserve first, then consume.
 select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 60, 'expiry-resv-1', null);
 select app.sms_quota_consume('7c000000-0000-0000-0000-00000000000b', 60, 'expiry-cons-1', null);
+
+-- Mark the allocation as expired retroactively. We set expires_at after
+-- reserve/consume so that reserve's internal apply_expirations call doesn't
+-- fire before the usage entries exist.
+update public.sms_quota_ledger
+   set expires_at = now() - interval '1 second'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'expiry-alloc-1';
 
 -- Now expire. The fixed function should expire only the remaining 40, not 100.
 select is(
@@ -580,17 +588,40 @@ select is(
 delete from public.sms_quota_ledger where org_id = '7c000000-0000-0000-0000-00000000000b';
 delete from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b';
 
--- Grant A: 50 credits, expire in the past. Consume 20 against it.
+-- Grant A: 50 credits. Consume 20 against it.
 select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 50, 'overlap-alloc-a',
-    now() - interval '2 seconds', null);
+    null, null);
 select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 20, 'overlap-resv-a', null);
 select app.sms_quota_consume('7c000000-0000-0000-0000-00000000000b', 20, 'overlap-cons-a', null);
 
--- Grant B: 30 credits, also expire in the past. Consume 10 against it.
+-- Grant B: 30 credits. Consume 10 against it.
 select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 30, 'overlap-alloc-b',
-    now() - interval '1 second', null);
+    null, null);
 select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 10, 'overlap-resv-b', null);
 select app.sms_quota_consume('7c000000-0000-0000-0000-00000000000b', 10, 'overlap-cons-b', null);
+
+-- Space allocations into distinct effective_at windows so the expiry function
+-- can attribute each reservation to the correct grant, then mark both expired.
+update public.sms_quota_ledger set effective_at = now() - interval '10 seconds'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'overlap-alloc-a';
+update public.sms_quota_ledger set effective_at = now() - interval '8 seconds'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'reservation' and correlation_key = 'overlap-resv-a';
+update public.sms_quota_ledger set effective_at = now() - interval '5 seconds'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'overlap-alloc-b';
+update public.sms_quota_ledger set effective_at = now() - interval '3 seconds'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'reservation' and correlation_key = 'overlap-resv-b';
+update public.sms_quota_ledger
+   set expires_at = now() - interval '2 seconds'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'overlap-alloc-a';
+update public.sms_quota_ledger
+   set expires_at = now() - interval '1 second'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'overlap-alloc-b';
 
 -- Both expire: A expires 30 (50-20), B expires 20 (30-10).
 select is(
@@ -638,9 +669,15 @@ delete from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-000
 -- Allocate 50, consume 50, expire the grant, then refund 10. The refund restores
 -- consumed quota regardless of expiry status: a provider refund is real money back.
 select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 50, 'refund-alloc-1',
-    now() - interval '1 second', null);
+    null, null);
 select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 50, 'refund-resv-1', null);
 select app.sms_quota_consume('7c000000-0000-0000-0000-00000000000b', 50, 'refund-cons-1', null);
+
+-- Mark expired retroactively after consumption exists.
+update public.sms_quota_ledger
+   set expires_at = now() - interval '1 second'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'refund-alloc-1';
 
 -- Expire: all 50 consumed, so remaining is 0. A zero-amount marker is recorded.
 select app.sms_quota_apply_expirations('7c000000-0000-0000-0000-00000000000b');
@@ -670,7 +707,7 @@ select is(
       - coalesce(sum(case when kind = 'consumption' then amount else 0 end), 0)
       + coalesce(sum(case when kind = 'refund' then amount else 0 end), 0)
      from public.sms_quota_ledger
-     where org_id = '7c000000-0000-0000-0000-00000000000b'),
+     where org_id = '7c000000-0000-0000-0000-00000000000b')::bigint,
     'replayed ledger matches balance projection for Org B');
 
 -- ================================ receipt-before-SID lifecycle ============
