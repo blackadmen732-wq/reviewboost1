@@ -1012,6 +1012,10 @@ describe("owner API CORS", () => {
     );
 
     expect(response.status).toBe(204);
+    const allowed = response.headers.get("access-control-allow-methods") ?? "";
+    expect(allowed.toUpperCase()).toContain("PATCH");
+    expect(allowed.toUpperCase()).toContain("GET");
+    expect(allowed.toUpperCase()).toContain("OPTIONS");
   });
 
   it("publish route responds to OPTIONS", async () => {
