@@ -47,6 +47,11 @@ declare
     v_template text;
     v_hero     jsonb;
     v_logo     jsonb;
+    v_hero_id  text;
+    v_logo_id  text;
+    v_focal_x  numeric;
+    v_focal_y  numeric;
+    v_zoom     numeric;
 begin
     if not app.customer_page_draft_ok(p_draft) then
         raise exception 'invalid_draft' using errcode = '22023';
@@ -57,19 +62,53 @@ begin
         raise exception 'invalid_template' using errcode = '22023';
     end if;
 
-    v_hero := coalesce(p_draft -> 'hero', '{}'::jsonb);
-    v_logo := coalesce(p_draft -> 'logo', '{}'::jsonb);
+    v_hero := p_draft -> 'hero';
+    if v_hero is null or v_hero = 'null'::jsonb then
+        v_hero := '{}'::jsonb;
+    elsif jsonb_typeof(v_hero) is distinct from 'object' then
+        raise exception 'invalid_draft' using errcode = '22023';
+    end if;
+
+    v_logo := p_draft -> 'logo';
+    if v_logo is null or v_logo = 'null'::jsonb then
+        v_logo := '{}'::jsonb;
+    elsif jsonb_typeof(v_logo) is distinct from 'object' then
+        raise exception 'invalid_draft' using errcode = '22023';
+    end if;
+
+    v_hero_id := nullif(v_hero ->> 'assetId', '');
+    v_logo_id := nullif(v_logo ->> 'assetId', '');
+    if v_hero_id is not null
+       and v_hero_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+        raise exception 'invalid_draft' using errcode = '22023';
+    end if;
+    if v_logo_id is not null
+       and v_logo_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+        raise exception 'invalid_draft' using errcode = '22023';
+    end if;
+
+    begin
+        v_focal_x := coalesce((v_hero ->> 'focalX')::numeric, 0.5);
+        v_focal_y := coalesce((v_hero ->> 'focalY')::numeric, 0.5);
+        v_zoom    := coalesce((v_hero ->> 'zoom')::numeric, 1.0);
+    exception when invalid_text_representation then
+        raise exception 'invalid_draft' using errcode = '22023';
+    end;
+
+    v_focal_x := least(greatest(v_focal_x, 0), 1);
+    v_focal_y := least(greatest(v_focal_y, 0), 1);
+    v_zoom    := least(greatest(v_zoom, 1.0), 1.5);
 
     return jsonb_build_object(
         'templateId', v_template,
         'hero', jsonb_build_object(
-            'assetId', v_hero ->> 'assetId',
-            'focalX',  coalesce((v_hero ->> 'focalX')::numeric, 0.5),
-            'focalY',  coalesce((v_hero ->> 'focalY')::numeric, 0.5),
-            'zoom',    coalesce(least(greatest((v_hero ->> 'zoom')::numeric, 1.0), 1.5), 1.0)
+            'assetId', v_hero_id,
+            'focalX',  v_focal_x,
+            'focalY',  v_focal_y,
+            'zoom',    v_zoom
         ),
         'logo', jsonb_build_object(
-            'assetId', v_logo ->> 'assetId'
+            'assetId', v_logo_id
         )
     );
 end;
@@ -198,6 +237,23 @@ begin
         raise exception 'invalid_template' using errcode = '22023';
     end if;
 
+    -- Reject malformed nested objects and asset ids at save time so the
+    -- editor does not discover them only at publish.
+    if (p_draft ? 'hero' and jsonb_typeof(p_draft -> 'hero') is distinct from 'object')
+       or (p_draft ? 'logo' and jsonb_typeof(p_draft -> 'logo') is distinct from 'object') then
+        raise exception 'invalid_draft' using errcode = '22023';
+    end if;
+    if nullif(p_draft #>> '{hero,assetId}', '') is not null
+       and (p_draft #>> '{hero,assetId}')
+           !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+        raise exception 'invalid_draft' using errcode = '22023';
+    end if;
+    if nullif(p_draft #>> '{logo,assetId}', '') is not null
+       and (p_draft #>> '{logo,assetId}')
+           !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+        raise exception 'invalid_draft' using errcode = '22023';
+    end if;
+
     if p_location_id is not null then
         v_scope := 'location';
         perform 1
@@ -238,14 +294,41 @@ begin
     end if;
 
     if v_id is null then
-        insert into public.customer_page_profiles as p
-            (org_id, scope, location_id, composer_version,
-             draft, draft_updated_by, draft_updated_at)
-        values
-            (p_org_id, v_scope, p_location_id, coalesce(p_composer_version, 1),
-             p_draft, v_actor, now())
-        returning p.id, p.draft, p.draft_updated_at
-          into v_id, v_out_draft, v_out_at;
+        begin
+            insert into public.customer_page_profiles as p
+                (org_id, scope, location_id, composer_version,
+                 draft, draft_updated_by, draft_updated_at)
+            values
+                (p_org_id, v_scope, p_location_id, coalesce(p_composer_version, 1),
+                 p_draft, v_actor, now())
+            returning p.id, p.draft, p.draft_updated_at
+              into v_id, v_out_draft, v_out_at;
+        exception when unique_violation then
+            -- A concurrent first-insert won the partial unique index.
+            -- Lock and update that row so the second caller still saves.
+            if v_scope = 'organization' then
+                update public.customer_page_profiles p
+                   set draft            = p_draft,
+                       draft_updated_by = v_actor,
+                       draft_updated_at = now(),
+                       composer_version = greatest(p.composer_version, coalesce(p_composer_version, 1))
+                 where p.org_id = p_org_id
+                   and p.scope = 'organization'
+                returning p.id, p.draft, p.draft_updated_at
+                  into v_id, v_out_draft, v_out_at;
+            else
+                update public.customer_page_profiles p
+                   set draft            = p_draft,
+                       draft_updated_by = v_actor,
+                       draft_updated_at = now(),
+                       composer_version = greatest(p.composer_version, coalesce(p_composer_version, 1))
+                 where p.org_id = p_org_id
+                   and p.scope = 'location'
+                   and p.location_id = p_location_id
+                returning p.id, p.draft, p.draft_updated_at
+                  into v_id, v_out_draft, v_out_at;
+            end if;
+        end;
     end if;
 
     insert into public.audit_events
@@ -318,8 +401,12 @@ begin
     -- Verify referenced assets. `assetId` may be missing (unset) — that is
     -- valid; a page can publish without a hero, in which case the template
     -- falls back to a deterministic look.
-    v_hero_asset := nullif(v_snapshot #>> '{hero,assetId}', '')::uuid;
-    v_logo_asset := nullif(v_snapshot #>> '{logo,assetId}', '')::uuid;
+    begin
+        v_hero_asset := nullif(v_snapshot #>> '{hero,assetId}', '')::uuid;
+        v_logo_asset := nullif(v_snapshot #>> '{logo,assetId}', '')::uuid;
+    exception when invalid_text_representation then
+        raise exception 'invalid_draft' using errcode = '22023';
+    end;
 
     if v_hero_asset is not null then
         perform 1
@@ -409,6 +496,14 @@ begin
         raise exception 'unsupported_content_type' using errcode = '22023';
     end if;
 
+    -- Opaque, tenant-free path. Reject traversal, absolute paths, and
+    -- anything that is not the reserved prefix the application writes.
+    if p_source_object_path is null
+       or position('..' in p_source_object_path) > 0
+       or p_source_object_path !~ '^customer-page/source/[a-zA-Z0-9]{2}/[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$' then
+        raise exception 'invalid_source_path' using errcode = '22023';
+    end if;
+
     insert into public.customer_page_assets
         (org_id, location_id, kind, state,
          source_object_path, source_content_type, created_by)
@@ -447,18 +542,46 @@ security definer
 set search_path = ''
 as $$
 declare
-    v_actor uuid := app.customer_page_require_editor(p_org_id);
+    v_actor uuid := (select auth.uid());
     v_rows  integer;
 begin
+    -- EXECUTE is granted to service_role only. A user JWT must never
+    -- finalize: the numbers (dimensions, sha256, variants) are produced
+    -- by the application after decoding the image, and a browser cannot
+    -- attest them honestly. Fail closed if a user subject is present.
+    if v_actor is not null then
+        raise exception 'forbidden' using errcode = '42501';
+    end if;
+
     if jsonb_typeof(p_variants) is distinct from 'array'
        or jsonb_array_length(p_variants) = 0 then
         raise exception 'no_variants' using errcode = '22023';
+    end if;
+
+    if exists (
+        select 1
+          from jsonb_array_elements(p_variants) as elem
+         where jsonb_typeof(elem.value) is distinct from 'object'
+            or coalesce(elem.value ->> 'path', '') = ''
+            or position('..' in coalesce(elem.value ->> 'path', '')) > 0
+            or (elem.value ->> 'path') !~ '^customer-page/public/'
+    ) then
+        raise exception 'invalid_variants' using errcode = '22023';
     end if;
 
     if p_width is null or p_width < 1
        or p_height is null or p_height < 1
        or p_width > 20000 or p_height > 20000 then
         raise exception 'invalid_dimensions' using errcode = '22023';
+    end if;
+
+    if p_source_bytes is not null and p_source_bytes < 0 then
+        raise exception 'invalid_dimensions' using errcode = '22023';
+    end if;
+
+    if p_source_sha256 is not null
+       and p_source_sha256 !~* '^[0-9a-f]{64}$' then
+        raise exception 'invalid_source_hash' using errcode = '22023';
     end if;
 
     update public.customer_page_assets
@@ -468,7 +591,7 @@ begin
            source_bytes   = p_source_bytes,
            source_sha256  = p_source_sha256,
            variants       = p_variants,
-           finalized_by   = v_actor,
+           finalized_by   = null,
            finalized_at   = now()
      where id = p_asset_id
        and org_id = p_org_id
@@ -482,7 +605,7 @@ begin
     insert into public.audit_events
         (org_id, actor_user_id, actor_type, action, target_type, target_id, metadata)
     values
-        (p_org_id, v_actor, 'user', 'customer_page.asset_finalized',
+        (p_org_id, null, 'system', 'customer_page.asset_finalized',
          'customer_page_asset', p_asset_id::text,
          jsonb_build_object('width', p_width, 'height', p_height));
 end;
@@ -496,9 +619,9 @@ $$;
  * uses a built-in Minimal fallback in that case.
  *
  * Read-only, callable only through the service-role RPC surface. Never
- * touches drafts. Only returns keys that are allowed on a customer page:
- * templateId, focal, zoom, and asset id resolution is left to the caller
- * (which materialises URLs from `variants`).
+ * touches drafts. Returns the published presentation with asset ids
+ * stripped; variants are resolved server-side so the anonymous page
+ * never learns internal asset identifiers.
  */
 create or replace function app.resolve_public_customer_page(
     p_org_id      uuid,
@@ -549,8 +672,17 @@ begin
         return;
     end if;
 
-    v_hero_id := nullif(v_profile.published #>> '{hero,assetId}', '')::uuid;
-    v_logo_id := nullif(v_profile.published #>> '{logo,assetId}', '')::uuid;
+    -- Invalid stored ids must not crash the public flow; treat them as unset.
+    begin
+        v_hero_id := nullif(v_profile.published #>> '{hero,assetId}', '')::uuid;
+    exception when invalid_text_representation then
+        v_hero_id := null;
+    end;
+    begin
+        v_logo_id := nullif(v_profile.published #>> '{logo,assetId}', '')::uuid;
+    exception when invalid_text_representation then
+        v_logo_id := null;
+    end;
 
     if v_hero_id is not null then
         select a.variants, a.width, a.height
@@ -572,9 +704,19 @@ begin
            and a.state = 'ready';
     end if;
 
+    -- Strip asset ids from the payload the public flow sees. Resolution
+    -- already happened above; the anonymous page must not learn them.
     return query
     select v_profile.scope,
-           v_profile.published,
+           jsonb_set(
+               jsonb_set(
+                   v_profile.published,
+                   '{hero}',
+                   coalesce(v_profile.published -> 'hero', '{}'::jsonb) - 'assetId'
+               ),
+               '{logo}',
+               coalesce(v_profile.published -> 'logo', '{}'::jsonb) - 'assetId'
+           ),
            v_profile.published_version,
            coalesce(v_hero_variants, '[]'::jsonb),
            v_hero_width,
@@ -641,3 +783,31 @@ grant execute on function public.rpc_customer_page_finalize_asset(uuid, uuid, in
 
 revoke all on function public.rpc_customer_page_resolve_public(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.rpc_customer_page_resolve_public(uuid, uuid) to service_role;
+
+-- Verification: service-role-only functions must actually be executable by
+-- service_role. A missing grant here 503s finalize and the public resolver.
+do $$
+declare
+    missing text;
+begin
+    select string_agg(signature, ', ')
+      into missing
+      from (
+        values
+          ('app.resolve_public_customer_page(uuid, uuid)'),
+          ('public.rpc_customer_page_resolve_public(uuid, uuid)'),
+          ('public.rpc_customer_page_finalize_asset(uuid, uuid, integer, integer, bigint, text, jsonb)')
+      ) as required(signature)
+     where not has_function_privilege('service_role', signature, 'EXECUTE');
+
+    if missing is not null then
+        raise exception 'service_role cannot execute: %', missing;
+    end if;
+
+    if has_function_privilege('authenticated', 'public.rpc_customer_page_finalize_asset(uuid, uuid, integer, integer, bigint, text, jsonb)', 'EXECUTE')
+       or has_function_privilege('anon', 'public.rpc_customer_page_finalize_asset(uuid, uuid, integer, integer, bigint, text, jsonb)', 'EXECUTE')
+       or has_function_privilege('authenticated', 'public.rpc_customer_page_resolve_public(uuid, uuid)', 'EXECUTE')
+       or has_function_privilege('anon', 'public.rpc_customer_page_resolve_public(uuid, uuid)', 'EXECUTE') then
+        raise exception 'customer page service-role RPCs leaked to client roles';
+    end if;
+end $$;

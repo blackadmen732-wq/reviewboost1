@@ -107,6 +107,12 @@ create table public.customer_page_assets (
 create index customer_page_assets_org_kind_state_idx
     on public.customer_page_assets (org_id, kind, state, created_at desc);
 
+-- One reservation per source path so a replay cannot attach another
+-- logical asset to the same private object.
+create unique index customer_page_assets_source_path_key
+    on public.customer_page_assets (source_object_path)
+    where source_object_path is not null;
+
 create trigger customer_page_assets_touch
     before update on public.customer_page_assets
     for each row execute function app.touch_updated_at();

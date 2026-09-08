@@ -91,6 +91,43 @@ function fail(context: string, error: unknown, requestId: string): never {
   );
 }
 
+function rpcMessage(error: unknown): string {
+  return (error as { message?: string } | null)?.message ?? "";
+}
+
+function rpcCode(error: unknown): string {
+  return (error as { code?: string } | null)?.code ?? "";
+}
+
+function mapOwnerRpcError(context: string, error: unknown, requestId: string): never {
+  const message = rpcMessage(error);
+  const code = rpcCode(error);
+  if (code === "42501" || /forbidden|authentication required/i.test(message)) {
+    throw new ApiError(403, ERROR_CODE.forbidden, "You do not have permission to do that.");
+  }
+  if (code === "42704" || /location not found|asset_not_found/i.test(message)) {
+    throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
+  }
+  if (/hero_asset_not_ready|logo_asset_not_ready/.test(message)) {
+    throw new ApiError(
+      400,
+      ERROR_CODE.validationFailed,
+      "One of the images is not ready. Re-upload and try again.",
+    );
+  }
+  if (/no draft to publish/.test(message)) {
+    throw new ApiError(400, ERROR_CODE.validationFailed, "There is nothing to publish yet.");
+  }
+  if (
+    /invalid_template|invalid_draft|invalid_source_path|invalid_variants|unsupported_content_type|invalid_dimensions|invalid_source_hash|no_variants/.test(
+      message,
+    )
+  ) {
+    throw new ApiError(400, ERROR_CODE.validationFailed, "The draft is not valid.");
+  }
+  fail(context, error, requestId);
+}
+
 function coerceDraft(value: unknown): CustomerPageDraft {
   if (value === null || typeof value !== "object") return {};
   return value as CustomerPageDraft;
@@ -143,7 +180,7 @@ export async function getCustomerPageProfile(
     p_location_id: locationId,
   });
 
-  if (error) fail("get_profile", error, requestId);
+  if (error) mapOwnerRpcError("get_profile", error, requestId);
   const row = Array.isArray(data) ? (data[0] as RawProfileRow | undefined) : undefined;
   return projectProfile(row, locationId ? "location" : "organization", locationId);
 }
@@ -173,7 +210,7 @@ export async function patchCustomerPageDraft(
     p_composer_version: composerVersion,
   });
 
-  if (error) fail("patch_draft", error, requestId);
+  if (error) mapOwnerRpcError("patch_draft", error, requestId);
   return await getCustomerPageProfile(context, orgId, locationId, requestId);
 }
 
@@ -190,31 +227,7 @@ export async function publishCustomerPage(
     p_location_id: locationId,
   });
 
-  if (error) {
-    const message = (error as { message?: string }).message ?? "";
-    if (/hero_asset_not_ready|logo_asset_not_ready/.test(message)) {
-      throw new ApiError(
-        400,
-        ERROR_CODE.validationFailed,
-        "One of the images is not ready. Re-upload and try again.",
-      );
-    }
-    if (/no draft to publish/.test(message)) {
-      throw new ApiError(
-        400,
-        ERROR_CODE.validationFailed,
-        "There is nothing to publish yet.",
-      );
-    }
-    if (/invalid_template|invalid_draft/.test(message)) {
-      throw new ApiError(
-        400,
-        ERROR_CODE.validationFailed,
-        "The draft is not valid.",
-      );
-    }
-    fail("publish", error, requestId);
-  }
+  if (error) mapOwnerRpcError("publish", error, requestId);
 
   return await getCustomerPageProfile(context, orgId, locationId, requestId);
 }
@@ -268,7 +281,7 @@ export async function createCustomerPageAssetUpload(
     p_source_content_type: contentType,
   });
 
-  if (error) fail("create_asset_upload", error, requestId);
+  if (error) mapOwnerRpcError("create_asset_upload", error, requestId);
   const assetId = typeof data === "string" ? data : (Array.isArray(data) ? String(data[0]) : "");
   if (!assetId) fail("create_asset_upload", new Error("no asset id"), requestId);
 
@@ -315,7 +328,7 @@ export async function finalizeCustomerPageAsset(
     p_source_sha256: meta.sourceSha256,
     p_variants: meta.variants,
   });
-  if (error) fail("finalize_asset", error, requestId);
+  if (error) mapOwnerRpcError("finalize_asset", error, requestId);
 }
 
 // ---------------------------------------------- public presentation -------
@@ -385,10 +398,14 @@ export async function resolvePublicCustomerPage(
   if (!CUSTOMER_PAGE_TEMPLATES.includes(templateId)) return null;
 
   const heroVariants = Array.isArray(row.hero_variants)
-    ? row.hero_variants.map((v) => ({ width: v.width, height: v.height, url: publicAssetUrl(v.path) }))
+    ? row.hero_variants
+        .filter((v) => isSafePublicAssetPath(v.path))
+        .map((v) => ({ width: v.width, height: v.height, url: publicAssetUrl(v.path) }))
     : [];
   const logoVariants = Array.isArray(row.logo_variants)
-    ? row.logo_variants.map((v) => ({ width: v.width, height: v.height, url: publicAssetUrl(v.path) }))
+    ? row.logo_variants
+        .filter((v) => isSafePublicAssetPath(v.path))
+        .map((v) => ({ width: v.width, height: v.height, url: publicAssetUrl(v.path) }))
     : [];
 
   const heroSpec = row.published.hero ?? {};
@@ -429,6 +446,17 @@ function clamp(value: number, min: number, max: number): number {
  * otherwise the raw path is returned so a template render can degrade to
  * a placeholder rather than a broken URL.
  */
+function isSafePublicAssetPath(path: unknown): path is string {
+  return (
+    typeof path === "string" &&
+    path.length > 0 &&
+    !path.includes("..") &&
+    !path.includes("\\") &&
+    !path.includes(":") &&
+    /^customer-page\/public\/[a-zA-Z0-9._/-]+$/.test(path)
+  );
+}
+
 function publicAssetUrl(path: string): string {
   const base = process.env.CUSTOMER_PAGE_PUBLIC_ASSET_BASE?.trim();
   if (!base) return path;
