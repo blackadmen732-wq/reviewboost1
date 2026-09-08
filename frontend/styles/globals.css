@@ -189,12 +189,22 @@ body {
   background: var(--rb-canvas);
   color: var(--rb-ink);
 }
-button,
-input,
-select,
-textarea {
-  color: inherit;
-  font: inherit;
+/*
+ * Layered, and it matters. Tailwind's utilities live in `@layer utilities`, and
+ * unlayered CSS beats every layer — so as a plain rule this one quietly won
+ * against `text-white` and every other colour utility on a <button>, which is
+ * why a destructive button rendered ink on red. Normalising the inherited font
+ * and colour is base behaviour; it should lose to a utility that asks for
+ * something specific.
+ */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    color: inherit;
+    font: inherit;
+  }
 }
 button,
 a,

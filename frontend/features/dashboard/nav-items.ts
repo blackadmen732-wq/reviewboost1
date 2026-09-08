@@ -1,4 +1,12 @@
-import { Home, MessageSquare, QrCode, Sparkles, Star, Users } from "lucide-react";
+import {
+  Home,
+  MessageSquare,
+  QrCode,
+  Smartphone,
+  Sparkles,
+  Star,
+  Users,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 /**
@@ -44,6 +52,11 @@ export const REVIEWS: NavItem = { href: "/reviews", label: "Reviews", icon: Star
 export const CUSTOMERS: NavItem = { href: "/customers", label: "Customers", icon: Users };
 export const PRAISE: NavItem = { href: "/praise", label: "Praise", icon: Sparkles };
 export const STANDS: NavItem = { href: "/stands", label: "Codes", icon: QrCode };
+export const CUSTOMER_PAGE: NavItem = {
+  href: "/customer-page",
+  label: "Customer Page",
+  icon: Smartphone,
+};
 
 /** Phone. Exactly four, forever. */
 export const MOBILE_NAV: readonly NavItem[] = [HOME, FEEDBACK, REVIEWS, STANDS];
@@ -56,10 +69,11 @@ export const DESKTOP_NAV: readonly NavItem[] = [
   CUSTOMERS,
   PRAISE,
   STANDS,
+  CUSTOMER_PAGE,
 ];
 
 /** Reachable from Home on a phone, because they are not in the bar there. */
-export const HOME_SHORTCUTS: readonly NavItem[] = [PRAISE, CUSTOMERS];
+export const HOME_SHORTCUTS: readonly NavItem[] = [PRAISE, CUSTOMERS, CUSTOMER_PAGE];
 
 /** Whether a nav item should read as the current screen. */
 export function isActive(pathname: string, href: string): boolean {

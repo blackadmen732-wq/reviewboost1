@@ -7,6 +7,7 @@ import {
   type CustomerPageDesign,
   type CustomerPagePresentation,
 } from "@/lib/customer-page/design";
+import type { Locale } from "@/lib/i18n/config";
 
 /**
  * The seam between the public API and the page.
@@ -48,16 +49,19 @@ export function presentationFromContext(
   };
 }
 
+/** The owner's preview, which composes a design directly rather than fetching one. */
 export function presentationFromDesign(options: {
   businessName: string;
   locationName: string | null;
   design: CustomerPageDesign;
+  languages?: readonly Locale[];
 }): CustomerPagePresentation {
+  const languages = normalizeLanguages(options.languages);
   return {
     businessName: options.businessName,
     locationName: options.locationName,
     design: options.design,
-    languages: ["en"],
-    defaultLanguage: "en",
+    languages,
+    defaultLanguage: languages[0] ?? "en",
   };
 }

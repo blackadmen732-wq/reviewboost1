@@ -12,19 +12,28 @@ type FixtureOperation = "context" | "session" | "response" | "google-click" | "t
 
 declare global {
   interface Window {
-    __RB_FIXTURE_CALLS__?: Array<{ operation: FixtureOperation; idempotencyKey?: string }>;
+    __RB_FIXTURE_CALLS__?: Array<{
+      operation: FixtureOperation;
+      idempotencyKey?: string;
+      rating?: number;
+    }>;
   }
 }
 
 const idempotentResults = new Map<string, unknown>();
 const transientFailures = new Set<string>();
 
-function logCall(operation: FixtureOperation, idempotencyKey?: string) {
+function logCall(
+  operation: FixtureOperation,
+  idempotencyKey?: string,
+  rating?: number,
+) {
   if (typeof window === "undefined") return;
   window.__RB_FIXTURE_CALLS__ ??= [];
   window.__RB_FIXTURE_CALLS__.push({
     operation,
     ...(idempotencyKey ? { idempotencyKey } : {}),
+    ...(rating === undefined ? {} : { rating }),
   });
 }
 
@@ -159,8 +168,8 @@ export const developmentCustomerFlowApi: CustomerFlowApi = {
     }));
   },
 
-  async submitResponse(token, _body, options) {
-    logCall("response", options.idempotencyKey);
+  async submitResponse(token, body, options) {
+    logCall("response", options.idempotencyKey, body.rating);
     assertOnline();
     await delay(token);
     if (token === "fixture-response-error") {

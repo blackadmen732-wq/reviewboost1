@@ -1,0 +1,67 @@
+/* --------------------------------------------------------------------------
+   Customer Page Designer
+   --------------------------------------------------------------------------
+   Almost all of the owner side is Tailwind against the shared tokens. This file
+   exists for the one thing utilities cannot express: a phone preview that is
+   rendered at real device size — because the customer page's composition is
+   measured in container units and only tells the truth at 390px — and then
+   scaled to whatever room the screen has left.
+   -------------------------------------------------------------------------- */
+
+.cp-device {
+  /* The chrome around the screen, and the space the workspace header takes. */
+  --cp-device-bezel: 10px;
+  --cp-device-reserved: 190px;
+
+  /*
+   * Never larger than the real thing: scaling a 390px page up would show the
+   * owner type and spacing their customers will not get. Smaller is fine — it is
+   * the same composition at a smaller size, which is exactly what a preview is.
+   */
+  --cp-device-scale: min(
+    1,
+    (100dvh - var(--cp-device-reserved)) / var(--cp-device-height)
+  );
+
+  width: calc(
+    (var(--cp-device-width) + var(--cp-device-bezel) * 2) * var(--cp-device-scale)
+  );
+  /* The scaled element still occupies its unscaled box, so the height has to be
+     claimed here or the page scrolls past the bottom of a shrunken phone. */
+  height: calc(
+    (var(--cp-device-height) + var(--cp-device-bezel) * 2) * var(--cp-device-scale)
+  );
+}
+
+.cp-device__body {
+  width: calc(var(--cp-device-width) + var(--cp-device-bezel) * 2);
+  height: calc(var(--cp-device-height) + var(--cp-device-bezel) * 2);
+  border-radius: 44px;
+  padding: var(--cp-device-bezel);
+  background: #100c09;
+  box-shadow:
+    0 2px 4px rgb(38 32 24 / 6%),
+    0 50px 100px -60px rgb(38 32 24 / 70%);
+  transform: scale(var(--cp-device-scale));
+  transform-origin: top left;
+}
+
+.cp-device__screen {
+  width: var(--cp-device-width);
+  height: var(--cp-device-height);
+  overflow: hidden;
+  border-radius: 34px;
+}
+
+/* --------------------------------------------------------------------------
+   Look thumbnails
+   -------------------------------------------------------------------------- */
+
+/*
+ * A thumbnail is the real hero at a sixth of the size. The customer page sizes
+ * its type against the hero's own container, so this needs no scaling rules —
+ * only a box of the right shape to compose inside.
+ */
+.cp-look-thumb {
+  aspect-ratio: 3 / 4;
+}
