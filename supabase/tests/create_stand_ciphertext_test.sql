@@ -12,7 +12,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(13);
+select plan(25);
 
 create or replace function tests.set_actor(p_user_id uuid) returns void
 language plpgsql as $$
@@ -66,6 +66,18 @@ values
     ('63000000-0000-0000-0000-00000000000a', '62000000-0000-0000-0000-00000000000a', 'Cipher Location A'),
     ('63000000-0000-0000-0000-00000000000b', '62000000-0000-0000-0000-00000000000b', 'Cipher Location B');
 
+-- Shape encrypt() writes: v1:<b64>:<b64>:<b64>. SQL cannot decrypt; it
+-- can refuse anything that is not this shape. Used for happy-path and
+-- authz cases so those tests do not trip the format gate first.
+--
+-- 16 / 24 / 32 chars — IV / tag / ct floors the application actually emits.
+create function tests.reprint_ciphertext() returns text
+language sql immutable as $$
+    select 'v1:ABCDEFGHIJKLMNOP:QRSTUVWXYZabcdefghijklmn:opqrstuvwxyzABCDEFGHIJKLMNOPQR';
+$$;
+
+grant execute on function tests.reprint_ciphertext() to public;
+
 -- ============================================================
 -- 1. Signature: 9-param only; standalone setter stays gone
 -- ============================================================
@@ -111,7 +123,7 @@ select lives_ok(
         'ciphpfx1',
         1::smallint,
         'req-create-stand-ok',
-        'v1:enc-create-stand-ciphertext',
+        tests.reprint_ciphertext(),
         1::smallint) $$,
     'owner can create a stand');
 
@@ -121,7 +133,7 @@ select results_eq(
     $$ select public_token_encrypted, token_encryption_key_version
          from public.review_stands
         where public_token_hash = 'cipher-stand-hash-000000000000000000000000000001' $$,
-    $$ values ('v1:enc-create-stand-ciphertext'::text, 1::smallint) $$,
+    $$ values (tests.reprint_ciphertext(), 1::smallint) $$,
     'owner create stores reprint ciphertext atomically');
 
 -- ============================================================
@@ -148,6 +160,129 @@ select is_empty(
        where public_token_hash = 'cipher-stand-hash-000000000000000000000000000002' $$,
     'refusing empty ciphertext does not leave an orphan stand');
 
+-- ASCII space-only trim is not enough. Direct RPC with other whitespace
+-- (or garbage that tryDecrypt cannot read) must fail closed with no row.
+
+select throws_ok(
+    $$ select public.rpc_create_stand(
+        '62000000-0000-0000-0000-00000000000a',
+        '63000000-0000-0000-0000-00000000000a',
+        'Tab Desk',
+        'cipher-stand-hash-tab000000000000000000000000002',
+        'ciphtab1',
+        1::smallint,
+        'req-create-stand-tab',
+        E'\t',
+        1::smallint) $$,
+    'P0001',
+    'ciphertext_required',
+    'tab-only ciphertext is refused');
+
+select is_empty(
+    $$ select id from public.review_stands
+       where public_token_hash = 'cipher-stand-hash-tab000000000000000000000000002' $$,
+    'tab-only ciphertext leaves no orphan stand');
+
+select throws_ok(
+    $$ select public.rpc_create_stand(
+        '62000000-0000-0000-0000-00000000000a',
+        '63000000-0000-0000-0000-00000000000a',
+        'NL Desk',
+        'cipher-stand-hash-nl0000000000000000000000000002',
+        'ciphnl01',
+        1::smallint,
+        'req-create-stand-nl',
+        E'\n',
+        1::smallint) $$,
+    'P0001',
+    'ciphertext_required',
+    'newline-only ciphertext is refused');
+
+select is_empty(
+    $$ select id from public.review_stands
+       where public_token_hash = 'cipher-stand-hash-nl0000000000000000000000000002' $$,
+    'newline-only ciphertext leaves no orphan stand');
+
+select throws_ok(
+    $$ select public.rpc_create_stand(
+        '62000000-0000-0000-0000-00000000000a',
+        '63000000-0000-0000-0000-00000000000a',
+        'CRLF Desk',
+        'cipher-stand-hash-crlf00000000000000000000000002',
+        'ciphcrlf',
+        1::smallint,
+        'req-create-stand-crlf',
+        E'\r\n',
+        1::smallint) $$,
+    'P0001',
+    'ciphertext_required',
+    'CRLF-only ciphertext is refused');
+
+select is_empty(
+    $$ select id from public.review_stands
+       where public_token_hash = 'cipher-stand-hash-crlf00000000000000000000000002' $$,
+    'CRLF-only ciphertext leaves no orphan stand');
+
+select throws_ok(
+    $$ select public.rpc_create_stand(
+        '62000000-0000-0000-0000-00000000000a',
+        '63000000-0000-0000-0000-00000000000a',
+        'NBSP Desk',
+        'cipher-stand-hash-nbsp00000000000000000000000002',
+        'ciphnbsp',
+        1::smallint,
+        'req-create-stand-nbsp',
+        E'\u00A0',
+        1::smallint) $$,
+    'P0001',
+    'ciphertext_required',
+    'NBSP-only ciphertext is refused');
+
+select is_empty(
+    $$ select id from public.review_stands
+       where public_token_hash = 'cipher-stand-hash-nbsp00000000000000000000000002' $$,
+    'NBSP-only ciphertext leaves no orphan stand');
+
+select throws_ok(
+    $$ select public.rpc_create_stand(
+        '62000000-0000-0000-0000-00000000000a',
+        '63000000-0000-0000-0000-00000000000a',
+        'Garbage Desk',
+        'cipher-stand-hash-garbage00000000000000000000002',
+        'ciphgarb',
+        1::smallint,
+        'req-create-stand-garbage',
+        'not-a-ciphertext',
+        1::smallint) $$,
+    'P0001',
+    'ciphertext_required',
+    'non-decryptable garbage ciphertext is refused');
+
+select is_empty(
+    $$ select id from public.review_stands
+       where public_token_hash = 'cipher-stand-hash-garbage00000000000000000000002' $$,
+    'garbage ciphertext leaves no orphan stand');
+
+select throws_ok(
+    $$ select public.rpc_create_stand(
+        '62000000-0000-0000-0000-00000000000a',
+        '63000000-0000-0000-0000-00000000000a',
+        'Two-part Desk',
+        'cipher-stand-hash-twopart0000000000000000000002',
+        'ciphtwo1',
+        1::smallint,
+        'req-create-stand-twopart',
+        'v1:enc-not-enough-parts',
+        1::smallint) $$,
+    'P0001',
+    'ciphertext_required',
+    'v1: two-part payload is not reprintable and is refused');
+
+select is_empty(
+    $$ select id from public.review_stands
+       where public_token_hash = 'cipher-stand-hash-twopart0000000000000000000002' $$,
+    'malformed v1: payload leaves no orphan stand');
+
 -- ============================================================
 -- 4. Role / tenant attacks
 -- ============================================================
@@ -163,7 +298,7 @@ select throws_ok(
         'ciphpfx3',
         1::smallint,
         'req-create-stand-member',
-        'v1:enc-member',
+        tests.reprint_ciphertext(),
         1::smallint) $$,
     'P0001',
     'not_found_or_forbidden',
@@ -180,7 +315,7 @@ select throws_ok(
         'ciphpfx4',
         1::smallint,
         'req-create-stand-cross',
-        'v1:enc-cross',
+        tests.reprint_ciphertext(),
         1::smallint) $$,
     'P0001',
     'not_found_or_forbidden',
@@ -197,7 +332,7 @@ select throws_ok(
         'ciphpfx5',
         1::smallint,
         'req-create-stand-loc',
-        'v1:enc-cross-loc',
+        tests.reprint_ciphertext(),
         1::smallint) $$,
     'P0001',
     'not_found_or_forbidden',
@@ -214,7 +349,7 @@ select throws_ok(
         'ciphpfx6',
         1::smallint,
         'req-create-stand-anon',
-        'v1:enc-anon',
+        tests.reprint_ciphertext(),
         1::smallint) $$,
     '42501',
     null,
