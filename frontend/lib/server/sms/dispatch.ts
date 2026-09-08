@@ -4,8 +4,9 @@ import { randomUUID } from "node:crypto";
 
 import { decrypt } from "@/lib/server/crypto";
 import { logger } from "@/lib/server/logger";
-import { serviceRoleClient } from "@/lib/server/supabase";
+import { failOutboxWithRetry } from "@/lib/server/sms/outbox";
 import { getSmsProvider } from "@/lib/server/sms/provider";
+import { serviceRoleClient } from "@/lib/server/supabase";
 
 /**
  * The dispatch worker.
@@ -33,6 +34,7 @@ export interface DispatchSummary {
   unknown: number;
   deferred: number;
   skipped: number;
+  failRecordFailed: number;
 }
 
 export async function dispatchOnce(options?: {
@@ -45,12 +47,14 @@ export async function dispatchOnce(options?: {
   const worker = options?.worker ?? `dispatch-${randomUUID().slice(0, 8)}`;
   const summary: DispatchSummary = {
     claimed: 0, submitted: 0, suppressed: 0, failed: 0, retryable: 0, unknown: 0, deferred: 0, skipped: 0,
+    failRecordFailed: 0,
   };
 
   const { data: jobs, error } = await svc.rpc("rpc_sms_claim_outbox", {
     p_worker: worker,
     p_limit: options?.limit ?? 10,
     p_lease_seconds: options?.leaseSeconds ?? 60,
+    p_topic: "sms.dispatch",
   });
   if (error) {
     logger.error("sms.dispatch_claim_failed", { error });
@@ -151,16 +155,19 @@ export async function dispatchOnce(options?: {
           p_provider_response: result.raw ?? {},
         });
         if (settleError) throw settleError;
-        const { data: failStatus, error: failError } = await svc.rpc("rpc_sms_fail_outbox", {
-          p_id: job.id,
-          p_worker: worker,
-          p_error: `retryable: ${result.errorClass ?? "rate_limited"}`,
-          p_backoff_seconds: BACKOFF_BASE_SECONDS * Math.pow(2, Math.min(job.attempts, 6)),
+        const failRecord = await failOutboxWithRetry({
+          jobId: job.id,
+          worker,
+          error: `retryable: ${result.errorClass ?? "rate_limited"}`,
+          backoffSeconds: BACKOFF_BASE_SECONDS * Math.pow(2, Math.min(job.attempts, 6)),
         });
-        if (failError) logger.error("sms.dispatch_fail_record_failed", { jobId: job.id, error: failError });
+        if (!failRecord.recorded) {
+          summary.failRecordFailed += 1;
+          throw new Error("fail_outbox_unrecorded");
+        }
         // Terminal dead-letter fails the queued request and releases the
         // reservation in the same SQL transaction as the outbox write.
-        if (failStatus === "dead_letter") {
+        if (failRecord.status === "dead_letter") {
           summary.failed += 1;
         } else {
           summary.retryable += 1;
@@ -189,17 +196,18 @@ export async function dispatchOnce(options?: {
     } catch (jobError) {
       // Transient infrastructure failure: back the job off. The outbox decides
       // whether this becomes a retry or a dead-letter based on attempts.
+      // If fail_outbox itself cannot be recorded, the job stays leased until
+      // expiry — begin_dispatch then parks a still-sending request as
+      // provider_unknown rather than re-sending.
       logger.error("sms.dispatch_job_failed", { jobId: job.id, error: jobError });
-      await svc
-        .rpc("rpc_sms_fail_outbox", {
-          p_id: job.id,
-          p_worker: worker,
-          p_error: jobError instanceof Error ? jobError.message : "unknown",
-          p_backoff_seconds: BACKOFF_BASE_SECONDS * Math.pow(2, Math.min(job.attempts, 6)),
-        })
-        .then(({ error: failError }) => {
-          if (failError) logger.error("sms.dispatch_fail_record_failed", { jobId: job.id, error: failError });
-        });
+      const failRecord = await failOutboxWithRetry({
+        jobId: job.id,
+        worker,
+        error: jobError instanceof Error ? jobError.message : "unknown",
+        backoffSeconds: BACKOFF_BASE_SECONDS * Math.pow(2, Math.min(job.attempts, 6)),
+      });
+      if (!failRecord.recorded) summary.failRecordFailed += 1;
+      else if (failRecord.status === "dead_letter") summary.failed += 1;
     }
   }
 

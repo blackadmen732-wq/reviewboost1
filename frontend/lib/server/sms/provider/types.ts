@@ -42,6 +42,33 @@ export interface SendResult {
   raw: Record<string, unknown>;
 }
 
+export interface LookupParams {
+  /** Same key passed to send (`req:<request_id>`). */
+  idempotencyKey: string;
+  to: string;
+  body: string;
+  /** Lower bound for a provider list query; omit when the adapter does not need it. */
+  sentAfter?: Date;
+}
+
+/**
+ * Read-only recovery of a send whose HTTP response was lost.
+ *
+ * `found`      — the provider accepted a message; attach this SID.
+ * `not_found`  — the provider confirmed it has no matching message; fail+release.
+ * `unknown`    — lookup itself failed or was ambiguous; keep reserved and retry.
+ */
+export type LookupResult =
+  | {
+      outcome: "found";
+      providerMessageId: string;
+      terminal?: "delivered" | "failed" | null;
+      errorClass?: SmsErrorClass;
+      raw: Record<string, unknown>;
+    }
+  | { outcome: "not_found"; raw: Record<string, unknown> }
+  | { outcome: "unknown"; errorClass?: SmsErrorClass; raw: Record<string, unknown> };
+
 export interface WebhookInput {
   /** The absolute URL the provider POSTed to, needed for signature schemes. */
   url: string;
@@ -73,6 +100,11 @@ export type ParsedWebhook =
 export interface SmsProvider {
   readonly name: string;
   send(params: SendParams): Promise<SendResult>;
+  /**
+   * Read-only lookup of a previously attempted send. Must never send a new
+   * message — a POST that might create one is not a lookup.
+   */
+  lookup(params: LookupParams): Promise<LookupResult>;
   classifyError(raw: unknown): SmsErrorClass;
   /** True only when the provider signature verifies against configured secrets. */
   verifySignature(input: WebhookInput): boolean;

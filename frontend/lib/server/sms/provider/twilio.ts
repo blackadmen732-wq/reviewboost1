@@ -4,6 +4,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { ConfigError } from "@/lib/server/env";
 import type {
+  LookupParams,
+  LookupResult,
   ParsedWebhook,
   SendParams,
   SendResult,
@@ -143,6 +145,100 @@ export class TwilioSmsProvider implements SmsProvider {
       const timedOut = error instanceof Error && /timeout|abort/i.test(error.message);
       return {
         outcome: "provider_unknown",
+        errorClass: timedOut ? "timeout" : "provider_error",
+        raw: { error: timedOut ? "timeout" : "network_error" },
+      };
+    }
+  }
+
+  /**
+   * Read-only Messages list. Never POSTs — a re-POST with the idempotency
+   * token would send a new message if the original never reached Twilio.
+   * Unconfigured credentials are `unknown` (keep reserved), not `not_found`.
+   */
+  async lookup(params: LookupParams): Promise<LookupResult> {
+    const config = readConfig();
+    if (!config) {
+      return {
+        outcome: "unknown",
+        errorClass: "provider_error",
+        raw: { error: "twilio_not_configured" },
+      };
+    }
+
+    const url = new URL(`https://api.twilio.com/2010-04-01/Accounts/${config.accountSid}/Messages.json`);
+    url.searchParams.set("To", params.to);
+    url.searchParams.set("PageSize", "50");
+    if (params.sentAfter) {
+      url.searchParams.set("DateSent>", params.sentAfter.toISOString().slice(0, 10));
+    }
+
+    const auth = Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64");
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: { Authorization: `Basic ${auth}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        messages?: Array<Record<string, unknown>>;
+        code?: unknown;
+      };
+
+      if (!response.ok) {
+        if (response.status >= 500 || response.status === 429) {
+          return {
+            outcome: "unknown",
+            errorClass: response.status === 429 ? "rate_limited" : "provider_error",
+            raw: { status: response.status, code: payload.code },
+          };
+        }
+        return {
+          outcome: "unknown",
+          errorClass: "provider_error",
+          raw: { status: response.status, code: payload.code },
+        };
+      }
+
+      const messages = Array.isArray(payload.messages) ? payload.messages : [];
+      const sentAfterMs = params.sentAfter?.getTime();
+      const candidates = messages.filter((m) => {
+        if (typeof m.sid !== "string" || m.sid.length < 1) return false;
+        if (sentAfterMs !== undefined && typeof m.date_created === "string") {
+          const created = Date.parse(m.date_created);
+          if (Number.isFinite(created) && created < sentAfterMs - 60_000) return false;
+        }
+        return true;
+      });
+
+      const bodyMatches = candidates.filter((m) => m.body === params.body);
+      const matched = bodyMatches.length > 0 ? bodyMatches : candidates.length === 1 ? candidates : [];
+
+      if (matched.length === 0) {
+        return { outcome: "not_found", raw: { count: candidates.length } };
+      }
+      if (matched.length > 1) {
+        return { outcome: "unknown", errorClass: "unknown", raw: { error: "ambiguous_match", count: matched.length } };
+      }
+
+      const hit = matched[0]!;
+      const status = typeof hit.status === "string" ? hit.status : "";
+      const terminal =
+        status === "delivered" ? "delivered" : status === "failed" || status === "undelivered" ? "failed" : null;
+      return {
+        outcome: "found",
+        providerMessageId: String(hit.sid),
+        terminal,
+        ...(terminal === "failed"
+          ? { errorClass: classifyTwilioCode(numberOrUndefined(hit.error_code)) }
+          : {}),
+        raw: { status, lookup: "messages_list" },
+      };
+    } catch (error) {
+      const timedOut = error instanceof Error && /timeout|abort/i.test(error.message);
+      return {
+        outcome: "unknown",
         errorClass: timedOut ? "timeout" : "provider_error",
         raw: { error: timedOut ? "timeout" : "network_error" },
       };

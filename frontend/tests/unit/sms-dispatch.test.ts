@@ -98,5 +98,36 @@ describe("dispatchOnce — retryable outbox outcomes", () => {
       "rpc_sms_fail_outbox",
       expect.objectContaining({ p_id: "job-1" }),
     );
+    expect(rpc).toHaveBeenCalledWith(
+      "rpc_sms_claim_outbox",
+      expect.objectContaining({ p_topic: "sms.dispatch" }),
+    );
+  });
+
+  it("retries fail_outbox and throws into the catch path when it never records", async () => {
+    rpc.mockReset();
+    send.mockReset();
+    send.mockResolvedValue({
+      outcome: "retryable",
+      errorClass: "rate_limited",
+      raw: { simulated: "rate_limited" },
+    });
+    let failCalls = 0;
+    rpc.mockImplementation(async (name: string) => {
+      if (name === "rpc_sms_claim_outbox") return { data: [JOB], error: null };
+      if (name === "rpc_sms_begin_dispatch") return { data: beginSending(), error: null };
+      if (name === "rpc_sms_settle_attempt") return { data: "retryable", error: null };
+      if (name === "rpc_sms_fail_outbox") {
+        failCalls += 1;
+        return { data: null, error: { message: "unavailable" } };
+      }
+      return { data: null, error: { message: `unexpected rpc ${name}` } };
+    });
+
+    const { dispatchOnce } = await load();
+    const summary = await dispatchOnce({ worker: "w1", limit: 1 });
+    // Three retries on the retryable path, then throw, then three more in catch.
+    expect(failCalls).toBe(6);
+    expect(summary.failRecordFailed).toBe(1);
   });
 });

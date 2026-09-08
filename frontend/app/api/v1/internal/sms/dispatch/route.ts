@@ -5,6 +5,7 @@ import type { NextRequest } from "next/server";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json } from "@/lib/server/http";
 import { dispatchOnce } from "@/lib/server/sms/dispatch";
+import { reconcileOnce } from "@/lib/server/sms/reconcile";
 
 /**
  * Internal dispatch trigger.
@@ -46,7 +47,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
     }
 
-    const summary = await dispatchOnce({ limit: 1, leaseSeconds: 90 });
-    return json(request, requestId, 200, { data: summary, requestId });
+    const dispatch = await dispatchOnce({ limit: 1, leaseSeconds: 90 });
+    const reconcile = await reconcileOnce({ limit: 1, leaseSeconds: 90 });
+    return json(request, requestId, 200, { data: { ...dispatch, reconcile }, requestId });
   });
 }

@@ -3,6 +3,8 @@ import "server-only";
 import { createHash, timingSafeEqual } from "node:crypto";
 
 import type {
+  LookupParams,
+  LookupResult,
   ParsedWebhook,
   SendParams,
   SendResult,
@@ -24,8 +26,16 @@ export interface FakeProviderOptions {
   failNumbers?: Record<string, SmsErrorClass>;
   /** Numbers whose submit returns a retryable error (429). */
   retryableNumbers?: Set<string>;
-  /** Numbers whose submit "times out" — outcome provider_unknown. */
+  /** Numbers whose submit "times out" with no accept — outcome provider_unknown. */
   unknownNumbers?: Set<string>;
+  /**
+   * Timeout-after-accept: the provider accepted and minted a SID, but the
+   * HTTP response never came back. `send` returns provider_unknown; `lookup`
+   * finds the SID.
+   */
+  timeoutAfterAcceptNumbers?: Set<string>;
+  /** Numbers whose lookup is itself ambiguous (keep reserved, retry). */
+  lookupUnknownNumbers?: Set<string>;
 }
 
 export class FakeSmsProvider implements SmsProvider {
@@ -33,12 +43,18 @@ export class FakeSmsProvider implements SmsProvider {
   private readonly failNumbers: Record<string, SmsErrorClass>;
   private readonly retryableNumbers: Set<string>;
   private readonly unknownNumbers: Set<string>;
+  private readonly timeoutAfterAcceptNumbers: Set<string>;
+  private readonly lookupUnknownNumbers: Set<string>;
+  /** Accepted messages keyed by idempotency (or content fallback). */
+  public readonly accepted = new Map<string, { sid: string; terminal: "delivered" | "failed" | null }>();
   public readonly sent: SendParams[] = [];
 
   constructor(options: FakeProviderOptions = {}) {
     this.failNumbers = options.failNumbers ?? {};
     this.retryableNumbers = options.retryableNumbers ?? new Set();
     this.unknownNumbers = options.unknownNumbers ?? new Set();
+    this.timeoutAfterAcceptNumbers = options.timeoutAfterAcceptNumbers ?? new Set();
+    this.lookupUnknownNumbers = options.lookupUnknownNumbers ?? new Set();
   }
 
   async send(params: SendParams): Promise<SendResult> {
@@ -46,6 +62,16 @@ export class FakeSmsProvider implements SmsProvider {
 
     if (this.unknownNumbers.has(params.to)) {
       return { outcome: "provider_unknown", errorClass: "timeout", raw: { simulated: "timeout" } };
+    }
+
+    if (this.timeoutAfterAcceptNumbers.has(params.to)) {
+      const sid = fakeMessageId(params);
+      this.accepted.set(identityKey(params), { sid, terminal: null });
+      return {
+        outcome: "provider_unknown",
+        errorClass: "timeout",
+        raw: { simulated: "timeout_after_accept" },
+      };
     }
 
     if (this.retryableNumbers.has(params.to)) {
@@ -57,16 +83,29 @@ export class FakeSmsProvider implements SmsProvider {
       return { outcome: "failed", errorClass: failClass, raw: { simulated: failClass } };
     }
 
-    // The provider message id must identify the *logical request*, not just its
-    // content: two distinct requests to the same recipient with the same body
-    // are different messages and must get different ids, or a delivery receipt
-    // could resolve the wrong request. The dispatch idempotency key (`req:<id>`)
-    // is exactly that identity — unique per request and stable across an
-    // idempotent retry. When no key is supplied (ad-hoc/test sends) fall back to
-    // the content so behaviour stays deterministic.
-    const identity = params.idempotencyKey ?? `${params.to}|${params.body}`;
-    const id = createHash("sha256").update(identity).digest("hex").slice(0, 24);
-    return { outcome: "submitted", providerMessageId: `fake_${id}`, raw: { simulated: "submitted" } };
+    const sid = fakeMessageId(params);
+    this.accepted.set(identityKey(params), { sid, terminal: null });
+    return { outcome: "submitted", providerMessageId: sid, raw: { simulated: "submitted" } };
+  }
+
+  /**
+   * Read-only. Never mints a new SID — only returns one `send` already accepted.
+   * A true timeout (never accepted) is `not_found`; a lookup failure is `unknown`.
+   */
+  async lookup(params: LookupParams): Promise<LookupResult> {
+    if (this.lookupUnknownNumbers.has(params.to)) {
+      return { outcome: "unknown", errorClass: "timeout", raw: { simulated: "lookup_unknown" } };
+    }
+    const accepted = this.accepted.get(identityKey(params));
+    if (!accepted) {
+      return { outcome: "not_found", raw: { simulated: "not_accepted" } };
+    }
+    return {
+      outcome: "found",
+      providerMessageId: accepted.sid,
+      terminal: accepted.terminal,
+      raw: { simulated: "lookup_found" },
+    };
   }
 
   classifyError(raw: unknown): SmsErrorClass {
@@ -147,6 +186,21 @@ export class FakeSmsProvider implements SmsProvider {
 
     return { kind: "unknown", dedupeKey, raw: {} };
   }
+}
+
+function identityKey(params: { idempotencyKey?: string; to: string; body: string }): string {
+  return params.idempotencyKey ?? `${params.to}|${params.body}`;
+}
+
+function fakeMessageId(params: { idempotencyKey?: string; to: string; body: string }): string {
+  // The provider message id must identify the *logical request*, not just its
+  // content: two distinct requests to the same recipient with the same body
+  // are different messages and must get different ids, or a delivery receipt
+  // could resolve the wrong request. The dispatch idempotency key (`req:<id>`)
+  // is exactly that identity — unique per request and stable across an
+  // idempotent retry. When no key is supplied (ad-hoc/test sends) fall back to
+  // the content so behaviour stays deterministic.
+  return `fake_${createHash("sha256").update(identityKey(params)).digest("hex").slice(0, 24)}`;
 }
 
 function hashBody(body: string): string {

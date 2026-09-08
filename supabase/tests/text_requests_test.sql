@@ -8,13 +8,14 @@
 -- lifecycle, the outbox lease, webhook dedupe, and the single-in-flight guard.
 --
 --   supabase test db
+--   128 assertions in this file.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(109);
+select plan(128);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -1004,6 +1005,191 @@ select is(
       where kind = 'release'
         and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-dl-sending')::text),
     0, 'sending dead-letter keeps the reservation for reconciliation');
+
+select is(
+    (select count(*)::integer from public.sms_outbox
+      where topic = 'sms.reconcile'
+        and request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-dl-sending')),
+    1, 'sending dead-letter enqueues a reconcile job');
+
+-- ====================== provider_unknown / parked-SID reconcile ==========
+
+-- Timeout-after-accept: settle without a SID, park a terminal receipt by SID,
+-- then attach the looked-up SID. Replay runs in the same transaction.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('g',64),
+    'v1:enc', 1::smallint, '0707', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('g',64), 'v1:enc', 1::smallint, '0707', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-reconcile-sid', '7b000000-0000-0000-0000-000000000001', 'req-reconcile-sid');
+
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-reconcile-sid'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'provider_unknown', null, 'timeout', '{}'::jsonb);
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid'),
+    'provider_unknown', 'timeout settle parks the request as provider_unknown');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'release'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid')::text),
+    0, 'provider_unknown keeps the reservation until reconcile');
+
+select is(
+    (select count(*)::integer from public.sms_outbox
+      where topic = 'sms.reconcile'
+        and request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid')),
+    1, 'provider_unknown enqueues a durable reconcile job');
+
+update public.sms_outbox
+   set available_at = now() + interval '1 hour'
+ where topic = 'sms.dispatch' and status in ('pending', 'leased');
+
+select is(
+    (select count(*)::integer from app.sms_outbox_claim('worker-no-rec', 10, 60, 'sms.dispatch')),
+    0, 'dispatch claim does not pick sms.reconcile jobs');
+
+select is(
+    (select inserted from app.sms_webhook_receive(
+        'fake', 'evt-timeout-sid', 'evt-timeout-sid', 'status', true, '{}'::jsonb, 'v1:enc')),
+    true, 'timeout-after-accept webhook is inserted');
+
+select is(
+    app.sms_apply_or_park_delivery_status(
+        (select id from public.sms_webhook_inbox where provider = 'fake' and dedupe_key = 'evt-timeout-sid'),
+        'fake', 'fake_timeout_sid', 'delivered', null),
+    'no_matching_attempt', 'receipt parked by SID while attempt has no SID');
+
+select is(
+    app.sms_reconcile_attach_sid(
+        (select a.id from public.sms_delivery_attempts a
+          join public.text_requests tr on tr.id = a.request_id
+         where tr.dedupe_key = 'sched-dedupe-reconcile-sid'
+         order by a.attempt_number desc limit 1),
+        '7c000000-0000-0000-0000-00000000000a', 'fake_timeout_sid', null, null),
+    'delivered', 'attach SID replays the parked delivered receipt');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid'),
+    'delivered', 'timeout-after-accept request is delivered after SID attach');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'consumption'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid')::text),
+    1, 'attach SID consumes the reserved quota once');
+
+select is(
+    (select status::text from public.sms_webhook_inbox
+      where provider = 'fake' and dedupe_key = 'evt-timeout-sid'),
+    'processed', 'parked receipt is processed by reconcile attach');
+
+select is(
+    app.sms_reconcile_attach_sid(
+        (select a.id from public.sms_delivery_attempts a
+          join public.text_requests tr on tr.id = a.request_id
+         where tr.dedupe_key = 'sched-dedupe-reconcile-sid'
+         order by a.attempt_number desc limit 1),
+        '7c000000-0000-0000-0000-00000000000a', 'fake_timeout_sid', null, null),
+    'delivered', 'attach SID is idempotent after delivery');
+
+-- Confirmed not-sent: fail+release.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('h',64),
+    'v1:enc', 1::smallint, '0808', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('h',64), 'v1:enc', 1::smallint, '0808', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-reconcile-miss', '7b000000-0000-0000-0000-000000000001', 'req-reconcile-miss');
+
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-miss'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-reconcile-miss'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'provider_unknown', null, 'timeout', '{}'::jsonb);
+
+select is(
+    app.sms_reconcile_fail_release(
+        (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-miss'),
+        '7c000000-0000-0000-0000-00000000000a', 'provider_not_found'),
+    'failed', 'lookup not_found fails the request');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'release'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-miss')::text),
+    1, 'lookup not_found releases the reservation');
+
+select is(
+    (select outcome from app.sms_reconcile_prepare(
+        (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-miss'),
+        '7c000000-0000-0000-0000-00000000000a')),
+    'already_failed', 'prepare is a no-op after fail+release');
+
+-- Reconcile outbox budget exhausted: fail+release, never re-send.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('i',64),
+    'v1:enc', 1::smallint, '0909', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('i',64), 'v1:enc', 1::smallint, '0909', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-reconcile-dl', '7b000000-0000-0000-0000-000000000001', 'req-reconcile-dl');
+
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-reconcile-dl'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'provider_unknown', null, 'timeout', '{}'::jsonb);
+
+update public.sms_outbox
+   set max_attempts = 1
+ where topic = 'sms.reconcile'
+   and request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl');
+
+update public.sms_outbox
+   set available_at = now() + interval '1 hour'
+ where status in ('pending', 'leased')
+   and (topic is distinct from 'sms.reconcile'
+        or request_id is distinct from (
+            select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl'));
+
+select is(
+    (select count(*)::integer from app.sms_outbox_claim('worker-rec-dl', 10, 60, 'sms.reconcile')
+      where request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl')),
+    1, 'reconcile topic claims the provider_unknown job');
+
+select is(
+    app.sms_outbox_fail(
+        (select id from public.sms_outbox
+          where topic = 'sms.reconcile'
+            and request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl')),
+        'worker-rec-dl', 'lookup_unknown: timeout', 30)::text,
+    'dead_letter', 'exhausted reconcile job dead-letters');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl'),
+    'failed', 'reconcile dead-letter fails the unknown request');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'release'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl')::text),
+    1, 'reconcile dead-letter releases the reservation');
 
 -- ================================ webhook inbox replay ====================
 
