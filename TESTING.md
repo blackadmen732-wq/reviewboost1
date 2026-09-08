@@ -82,7 +82,7 @@ live-verify OTP sign-in, native NFC write, or a production API.
 ## Supabase (Database)
 
 Test files live under `supabase/tests/`. They are pgTAP tests executed
-against the local Supabase database. **392** planned assertions across 8 files.
+against the local Supabase database. **407** planned assertions across 8 files.
 
 | File | Plan |
 |---|---|
@@ -93,7 +93,7 @@ against the local Supabase database. **392** planned assertions across 8 files.
 | `security_hardening_test.sql` | 85 — security hardening measures |
 | `text_requests_test.sql` | 59 — Text Requests consent, suppression, outbox, quota |
 | `token_rotation_test.sql` | 18 — token rotation logic |
-| `customer_page_test.sql` | 66 — Customer Page V2 RLS, RPCs, resolver secrecy |
+| `customer_page_test.sql` | 81 — Customer Page V2 RLS, RPCs, resolver secrecy |
 
 There is no dedicated NFC pgTAP file. NFC schema is applied by migrations in
 the same CI job that runs this suite.

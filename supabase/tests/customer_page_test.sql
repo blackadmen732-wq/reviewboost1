@@ -12,7 +12,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(66);
+select plan(81);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -924,6 +924,264 @@ select throws_ok(
     )$$,
     '22023', null,
     'finalize rejects variant paths outside customer-page/public/'
+);
+
+-- =================== 63-65. RLS: drafts are owner/admin only ==============
+
+-- Unpublished draft column is on every profile row. A viewer or member
+-- denied by rpc_customer_page_get must also get zero rows from the Data API.
+select tests.set_actor('aa100000-0000-0000-0000-000000000004');
+
+select is(
+    (select count(*) from public.customer_page_profiles
+      where org_id = 'a1000000-0000-0000-0000-00000000000a'
+        and draft is not null),
+    0::bigint,
+    'viewer cannot SELECT unpublished drafts'
+);
+
+select tests.set_actor('aa100000-0000-0000-0000-000000000005');
+
+select is(
+    (select count(*) from public.customer_page_profiles
+      where org_id = 'a1000000-0000-0000-0000-00000000000a'
+        and draft is not null),
+    0::bigint,
+    'member cannot SELECT unpublished drafts'
+);
+
+-- Outsider (org2 owner) still sees none of org1, including drafts.
+select tests.set_actor('aa100000-0000-0000-0000-000000000003');
+
+select is(
+    (select count(*) from public.customer_page_profiles
+      where org_id = 'a1000000-0000-0000-0000-00000000000a'),
+    0::bigint,
+    'outsider cannot SELECT another org''s drafts'
+);
+
+select tests.set_actor('aa100000-0000-0000-0000-000000000001');
+
+select ok(
+    (select count(*) from public.customer_page_profiles
+      where org_id = 'a1000000-0000-0000-0000-00000000000a'
+        and draft is not null) > 0,
+    'owner can SELECT unpublished drafts'
+);
+
+select tests.set_actor('aa100000-0000-0000-0000-000000000002');
+
+select ok(
+    (select count(*) from public.customer_page_profiles
+      where org_id = 'a1000000-0000-0000-0000-00000000000a'
+        and draft is not null) > 0,
+    'admin can SELECT unpublished drafts'
+);
+
+-- =================== 66-70. Asset location scope on publish/resolve =======
+
+select tests.set_service();
+
+insert into public.customer_page_assets
+    (id, org_id, location_id, kind, state, width, height, variants)
+values
+    ('e1000000-0000-0000-0000-0000000000c1',
+     'a1000000-0000-0000-0000-00000000000a',
+     'c1000000-0000-0000-0000-00000000000a',
+     'hero', 'ready', 1200, 800,
+     '[{"width":1200,"height":800,"path":"customer-page/public/c1/hero.webp","contentType":"image/webp","bytes":50000}]'::jsonb),
+    ('e1000000-0000-0000-0000-0000000000c2',
+     'a1000000-0000-0000-0000-00000000000a',
+     'c1000000-0000-0000-0000-00000000000b',
+     'hero', 'ready', 1200, 800,
+     '[{"width":1200,"height":800,"path":"customer-page/public/c2/hero.webp","contentType":"image/webp","bytes":50000}]'::jsonb),
+    ('e1000000-0000-0000-0000-0000000000c3',
+     'a1000000-0000-0000-0000-00000000000a',
+     null,
+     'hero', 'ready', 1200, 800,
+     '[{"width":1200,"height":800,"path":"customer-page/public/c3/hero.webp","contentType":"image/webp","bytes":50000}]'::jsonb);
+
+-- Location-B profile so we can try attaching location-A's asset to it.
+select tests.set_actor('aa100000-0000-0000-0000-000000000001');
+
+select * from public.rpc_customer_page_patch_draft(
+    p_org_id => 'a1000000-0000-0000-0000-00000000000a',
+    p_location_id => 'c1000000-0000-0000-0000-00000000000b',
+    p_draft => '{"templateId":"modern","hero":{"assetId":"e1000000-0000-0000-0000-0000000000c1"}}'::jsonb
+);
+
+select throws_ok(
+    $$select * from public.rpc_customer_page_publish(
+        p_org_id => 'a1000000-0000-0000-0000-00000000000a',
+        p_location_id => 'c1000000-0000-0000-0000-00000000000b'
+    )$$,
+    '22023', null,
+    'publish rejects a location-A asset on a location-B profile'
+);
+
+select * from public.rpc_customer_page_patch_draft(
+    p_org_id => 'a1000000-0000-0000-0000-00000000000a',
+    p_location_id => null,
+    p_draft => '{"templateId":"minimal","hero":{"assetId":"e1000000-0000-0000-0000-0000000000c1"}}'::jsonb
+);
+
+select throws_ok(
+    $$select * from public.rpc_customer_page_publish(
+        p_org_id => 'a1000000-0000-0000-0000-00000000000a'
+    )$$,
+    '22023', null,
+    'publish rejects a location-scoped asset on an organization profile'
+);
+
+select * from public.rpc_customer_page_patch_draft(
+    p_org_id => 'a1000000-0000-0000-0000-00000000000a',
+    p_location_id => 'c1000000-0000-0000-0000-00000000000b',
+    p_draft => '{"templateId":"modern","hero":{"assetId":"e1000000-0000-0000-0000-0000000000c3"}}'::jsonb
+);
+
+select is(
+    (select count(*) from public.rpc_customer_page_publish(
+        p_org_id => 'a1000000-0000-0000-0000-00000000000a',
+        p_location_id => 'c1000000-0000-0000-0000-00000000000b'
+    )),
+    1::bigint,
+    'publish accepts an org-scoped asset on a location profile'
+);
+
+select * from public.rpc_customer_page_patch_draft(
+    p_org_id => 'a1000000-0000-0000-0000-00000000000a',
+    p_location_id => 'c1000000-0000-0000-0000-00000000000a',
+    p_draft => '{"templateId":"classic","hero":{"assetId":"e1000000-0000-0000-0000-0000000000c1"}}'::jsonb
+);
+
+select is(
+    (select count(*) from public.rpc_customer_page_publish(
+        p_org_id => 'a1000000-0000-0000-0000-00000000000a',
+        p_location_id => 'c1000000-0000-0000-0000-00000000000a'
+    )),
+    1::bigint,
+    'publish accepts a location-A asset on the matching location profile'
+);
+
+-- Defence in depth: a published snapshot that already points at the wrong
+-- location's asset must not leak that image on the public page.
+select tests.set_service();
+
+update public.customer_page_profiles
+   set published = jsonb_build_object(
+           'templateId', 'classic',
+           'hero', jsonb_build_object(
+               'assetId', 'e1000000-0000-0000-0000-0000000000c2',
+               'focalX', 0.5, 'focalY', 0.5, 'zoom', 1.0
+           ),
+           'logo', '{}'::jsonb
+       )
+ where org_id = 'a1000000-0000-0000-0000-00000000000a'
+   and scope = 'location'
+   and location_id = 'c1000000-0000-0000-0000-00000000000a';
+
+select is(
+    (select coalesce(jsonb_array_length(hero_variants), 0) from
+        public.rpc_customer_page_resolve_public(
+            'a1000000-0000-0000-0000-00000000000a',
+            'c1000000-0000-0000-0000-00000000000a'
+        )
+    ),
+    0,
+    'public resolver omits a location-B asset attached to a location-A snapshot'
+);
+
+-- =================== 71-75. Finalize requires complete variant metadata ===
+
+select tests.set_service();
+
+insert into public.customer_page_assets
+    (id, org_id, kind, state, source_object_path, source_content_type)
+values
+    ('e1000000-0000-0000-0000-0000000000d1',
+     'a1000000-0000-0000-0000-00000000000a',
+     'hero', 'pending',
+     'customer-page/source/d1/no-width.jpg',
+     'image/jpeg'),
+    ('e1000000-0000-0000-0000-0000000000d2',
+     'a1000000-0000-0000-0000-00000000000a',
+     'hero', 'pending',
+     'customer-page/source/d2/zero-height.jpg',
+     'image/jpeg'),
+    ('e1000000-0000-0000-0000-0000000000d3',
+     'a1000000-0000-0000-0000-00000000000a',
+     'hero', 'pending',
+     'customer-page/source/d3/bad-type.jpg',
+     'image/jpeg'),
+    ('e1000000-0000-0000-0000-0000000000d4',
+     'a1000000-0000-0000-0000-00000000000a',
+     'hero', 'pending',
+     'customer-page/source/d4/no-bytes.jpg',
+     'image/jpeg'),
+    ('e1000000-0000-0000-0000-0000000000d5',
+     'a1000000-0000-0000-0000-00000000000a',
+     'hero', 'pending',
+     'customer-page/source/d5/float-width.jpg',
+     'image/jpeg');
+
+select throws_ok(
+    $$select public.rpc_customer_page_finalize_asset(
+        'a1000000-0000-0000-0000-00000000000a',
+        'e1000000-0000-0000-0000-0000000000d1',
+        800, 600, 1000,
+        'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        '[{"height":600,"path":"customer-page/public/d1/hero.webp","contentType":"image/webp","bytes":1000}]'::jsonb
+    )$$,
+    '22023', null,
+    'finalize rejects a variant with missing width'
+);
+
+select throws_ok(
+    $$select public.rpc_customer_page_finalize_asset(
+        'a1000000-0000-0000-0000-00000000000a',
+        'e1000000-0000-0000-0000-0000000000d2',
+        800, 600, 1000,
+        'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        '[{"width":800,"height":0,"path":"customer-page/public/d2/hero.webp","contentType":"image/webp","bytes":1000}]'::jsonb
+    )$$,
+    '22023', null,
+    'finalize rejects a variant with non-positive height'
+);
+
+select throws_ok(
+    $$select public.rpc_customer_page_finalize_asset(
+        'a1000000-0000-0000-0000-00000000000a',
+        'e1000000-0000-0000-0000-0000000000d3',
+        800, 600, 1000,
+        'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        '[{"width":800,"height":600,"path":"customer-page/public/d3/hero.webp","contentType":"image/svg+xml","bytes":1000}]'::jsonb
+    )$$,
+    '22023', null,
+    'finalize rejects a variant with an unsupported content type'
+);
+
+select throws_ok(
+    $$select public.rpc_customer_page_finalize_asset(
+        'a1000000-0000-0000-0000-00000000000a',
+        'e1000000-0000-0000-0000-0000000000d4',
+        800, 600, 1000,
+        'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        '[{"width":800,"height":600,"path":"customer-page/public/d4/hero.webp","contentType":"image/webp"}]'::jsonb
+    )$$,
+    '22023', null,
+    'finalize rejects a variant with missing byte count'
+);
+
+select throws_ok(
+    $$select public.rpc_customer_page_finalize_asset(
+        'a1000000-0000-0000-0000-00000000000a',
+        'e1000000-0000-0000-0000-0000000000d5',
+        800, 600, 1000,
+        'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        '[{"width":800.5,"height":600,"path":"customer-page/public/d5/hero.webp","contentType":"image/webp","bytes":1000}]'::jsonb
+    )$$,
+    '22023', null,
+    'finalize rejects a variant with a non-integer width'
 );
 
 
