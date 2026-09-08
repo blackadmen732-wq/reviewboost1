@@ -438,7 +438,11 @@ $$;
 
 -- Oldest allocation (effective_at, id) absorbs net outstanding reservations
 -- first. Equal timestamps are deterministic via id. Consumption is ignored
--- (it reclassifies an existing reservation).
+-- (it reclassifies an existing reservation). prior_capacity is remaining
+-- capacity only: each earlier grant contributes amount minus any swept
+-- expiration. Counting the original amount after a full expire makes a
+-- later grant look unused, expires it in full, and leaves reserved
+-- credits against allocated=0 (negative availability).
 create or replace function app.sms_quota_fifo_used(p_org_id uuid, p_allocation_id uuid)
 returns bigint
 language sql
@@ -457,19 +461,31 @@ as $$
     ),
     allocs as (
         select l.id,
-               l.amount,
-               coalesce(sum(l.amount) over (
-                   order by l.effective_at, l.id
-                   rows between unbounded preceding and 1 preceding
-               ), 0) as prior_capacity
+               l.effective_at,
+               greatest(0, l.amount - coalesce((
+                   select e.amount
+                     from public.sms_quota_ledger e
+                    where e.org_id = p_org_id
+                      and e.kind = 'expiration'
+                      and e.correlation_key = 'expire:' || l.id::text
+               ), 0)) as remaining
           from public.sms_quota_ledger l
          where l.org_id = p_org_id
            and l.kind = 'allocation'
+    ),
+    ranked as (
+        select a.id,
+               a.remaining,
+               coalesce(sum(a.remaining) over (
+                   order by a.effective_at, a.id
+                   rows between unbounded preceding and 1 preceding
+               ), 0) as prior_capacity
+          from allocs a
     )
-    select least(a.amount, greatest(0, n.used - a.prior_capacity))
-      from allocs a
+    select least(r.remaining, greatest(0, n.used - r.prior_capacity))
+      from ranked r
       cross join net n
-     where a.id = p_allocation_id;
+     where r.id = p_allocation_id;
 $$;
 
 create or replace function app.sms_quota_apply_expirations(p_org_id uuid)
