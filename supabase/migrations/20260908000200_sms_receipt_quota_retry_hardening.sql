@@ -436,11 +436,12 @@ $$;
 
 -- ======== 6. FIFO grant attribution =====================================
 
--- Oldest still-active allocation (effective_at, id) absorbs net outstanding
--- reservations first. Equal timestamps are deterministic via id. Consumption
--- is ignored (it reclassifies an existing reservation). Swept expirations
--- must not remain as prior_capacity: an unused expired grant would otherwise
--- make a later grant look unused, expire it in full, and leave reserved
+-- Oldest allocation (effective_at, id) absorbs net outstanding reservations
+-- first. Equal timestamps are deterministic via id. Consumption is ignored
+-- (it reclassifies an existing reservation). prior_capacity is remaining
+-- capacity only: each earlier grant contributes amount minus any swept
+-- expiration. Counting the original amount after a full expire makes a
+-- later grant look unused, expires it in full, and leaves reserved
 -- credits against allocated=0 (negative availability).
 create or replace function app.sms_quota_fifo_used(p_org_id uuid, p_allocation_id uuid)
 returns bigint
@@ -460,24 +461,31 @@ as $$
     ),
     allocs as (
         select l.id,
-               l.amount,
-               coalesce(sum(l.amount) over (
-                   order by l.effective_at, l.id
-                   rows between unbounded preceding and 1 preceding
-               ), 0) as prior_capacity
+               l.effective_at,
+               greatest(0, l.amount - coalesce((
+                   select e.amount
+                     from public.sms_quota_ledger e
+                    where e.org_id = p_org_id
+                      and e.kind = 'expiration'
+                      and e.correlation_key = 'expire:' || l.id::text
+               ), 0)) as remaining
           from public.sms_quota_ledger l
          where l.org_id = p_org_id
            and l.kind = 'allocation'
-           and not exists (
-               select 1 from public.sms_quota_ledger e
-                where e.org_id = p_org_id
-                  and e.kind = 'expiration'
-                  and e.correlation_key = 'expire:' || l.id::text)
+    ),
+    ranked as (
+        select a.id,
+               a.remaining,
+               coalesce(sum(a.remaining) over (
+                   order by a.effective_at, a.id
+                   rows between unbounded preceding and 1 preceding
+               ), 0) as prior_capacity
+          from allocs a
     )
-    select least(a.amount, greatest(0, n.used - a.prior_capacity))
-      from allocs a
+    select least(r.remaining, greatest(0, n.used - r.prior_capacity))
+      from ranked r
       cross join net n
-     where a.id = p_allocation_id;
+     where r.id = p_allocation_id;
 $$;
 
 create or replace function app.sms_quota_apply_expirations(p_org_id uuid)
@@ -492,16 +500,9 @@ declare
     v_remaining bigint;
     v_total     bigint := 0;
     v_count     integer := 0;
-    v_ids       uuid[] := '{}';
-    v_amounts   bigint[] := '{}';
-    v_useds     bigint[] := '{}';
-    i           integer;
 begin
     perform app.sms_quota_lock_balance(p_org_id);
 
-    -- Snapshot FIFO attribution before writing any expiration row. A grant
-    -- swept in this pass must still count as prior_capacity for later
-    -- siblings in the same batch; subsequent calls exclude it via fifo_used.
     for r in
         select l.id, l.amount
           from public.sms_quota_ledger l
@@ -516,24 +517,17 @@ begin
                   and e.correlation_key = 'expire:' || l.id::text)
          order by l.effective_at, l.id
     loop
-        v_ids := array_append(v_ids, r.id);
-        v_amounts := array_append(v_amounts, r.amount);
-        v_useds := array_append(v_useds, coalesce(app.sms_quota_fifo_used(p_org_id, r.id), 0));
-    end loop;
-
-    for i in 1 .. coalesce(array_length(v_ids, 1), 0)
-    loop
-        v_used := v_useds[i];
-        v_remaining := greatest(0, v_amounts[i] - v_used);
+        v_used := coalesce(app.sms_quota_fifo_used(p_org_id, r.id), 0);
+        v_remaining := greatest(0, r.amount - v_used);
 
         if v_remaining > 0 then
             insert into public.sms_quota_ledger (org_id, kind, amount, correlation_key, request_id, note)
-            values (p_org_id, 'expiration', v_remaining, 'expire:' || v_ids[i]::text, null, 'allocation expired')
+            values (p_org_id, 'expiration', v_remaining, 'expire:' || r.id::text, null, 'allocation expired')
             on conflict (org_id, kind, correlation_key) do nothing;
             v_total := v_total + v_remaining;
         else
             insert into public.sms_quota_ledger (org_id, kind, amount, correlation_key, request_id, note)
-            values (p_org_id, 'expiration', 0, 'expire:' || v_ids[i]::text, null, 'fully consumed before expiry')
+            values (p_org_id, 'expiration', 0, 'expire:' || r.id::text, null, 'fully consumed before expiry')
             on conflict (org_id, kind, correlation_key) do nothing;
         end if;
         v_count := v_count + 1;
