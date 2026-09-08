@@ -329,9 +329,11 @@ export async function recordNfcProvision(
 /**
  * Create a new stand under an existing location.
  *
- * The token is generated here, same as createOrganization. The composite FK
- * (location_id, org_id) in the database prevents cross-org linkage, and the
- * RPC verifies owner/admin role.
+ * The token is generated here, same as createOrganization. Ciphertext is
+ * stored in the same RPC as the digest — the standalone setter was dropped
+ * in foundation hardening, and a second call that ignores errors leaves a
+ * stand the owner cannot reprint. The composite FK (location_id, org_id)
+ * prevents cross-org linkage, and the RPC verifies owner/admin role.
  */
 export async function createStand(
   context: AuthenticatedContext,
@@ -350,6 +352,8 @@ export async function createStand(
     p_stand_token_prefix: tokenPrefix(token),
     p_token_key_version: tokenDigestKeyVersion(),
     p_request_id: requestId,
+    p_token_ciphertext: encrypt(token),
+    p_cipher_key_version: KEY_VERSION,
   });
 
   if (error) {
@@ -359,14 +363,13 @@ export async function createStand(
     databaseFailure("create_stand", error, requestId);
   }
 
-  const standId = typeof data === "string" ? data : String(data);
+  // Same empty-result guard as createOrganization. A missing stand id after
+  // a "successful" RPC is not a reprintable stand — fail closed.
+  if (data === null || data === undefined || data === false) {
+    databaseFailure("create_stand", new Error("empty result"), requestId);
+  }
 
-  // Store the encrypted token for reprinting
-  await context.db.rpc("rpc_set_stand_token_ciphertext", {
-    p_stand_id: standId,
-    p_ciphertext: encrypt(token),
-    p_key_version: KEY_VERSION,
-  });
+  const standId = typeof data === "string" ? data : String(data);
 
   return {
     standId,

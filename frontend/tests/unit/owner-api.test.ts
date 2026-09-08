@@ -421,6 +421,46 @@ describe("stand token rotation", () => {
   });
 });
 
+describe("POST /api/v1/review-stands ciphertext", () => {
+  const locationId = "33333333-3333-3333-3333-333333333333";
+  const standId = "11111111-1111-1111-1111-111111111111";
+
+  it("creates a stand in one RPC that includes reprint ciphertext", async () => {
+    rpcResult = { data: standId, error: null };
+    const { POST } = await import("@/app/api/v1/review-stands/route");
+    const response = await POST(
+      request("POST", "/api/v1/review-stands", { body: { locationId, label: "Front Desk" } }),
+    );
+
+    expect(response.status).toBe(201);
+    const creates = recorded.filter((entry) => entry.kind === "rpc" && entry.name === "rpc_create_stand");
+    expect(creates).toHaveLength(1);
+    expect(creates[0]?.args?.["p_token_ciphertext"]).toEqual(expect.any(String));
+    expect(String(creates[0]?.args?.["p_token_ciphertext"]).length).toBeGreaterThan(0);
+    expect(creates[0]?.args?.["p_cipher_key_version"]).toBe(1);
+    expect(recorded.some((entry) => entry.name === "rpc_set_stand_token_ciphertext")).toBe(false);
+  });
+
+  it("does not report success when the create RPC errors", async () => {
+    rpcResult = {
+      data: null,
+      error: {
+        code: "42883",
+        message: "function rpc_set_stand_token_ciphertext(uuid, text, smallint) does not exist",
+      },
+    };
+    const { POST } = await import("@/app/api/v1/review-stands/route");
+    const response = await POST(
+      request("POST", "/api/v1/review-stands", { body: { locationId, label: "Till 2" } }),
+    );
+    const body = JSON.stringify(await response.json());
+
+    expect(response.status).toBe(503);
+    expect(body).not.toContain("rpc_set_stand_token_ciphertext");
+    expect(body).not.toContain("42883");
+  });
+});
+
 describe("GET /api/v1/customer-responses/[responseId]", () => {
   const VALID_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 
