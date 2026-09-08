@@ -34,7 +34,7 @@ function contextWithRpc(
         return Promise.resolve(rpc(name, args));
       },
     },
-  } as AuthenticatedContext;
+  } as unknown as AuthenticatedContext;
   return { context, calls };
 }
 
