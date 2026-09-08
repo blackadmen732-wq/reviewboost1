@@ -111,8 +111,9 @@ export class TwilioSmsProvider implements SmsProvider {
       const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
 
       if (!response.ok) {
+        const retryable = response.status === 429 || response.status >= 500;
         return {
-          outcome: "failed",
+          outcome: retryable ? "retryable" : "failed",
           errorClass: classifyTwilioCode(numberOrUndefined(payload.code)),
           raw: { status: response.status, code: payload.code },
         };

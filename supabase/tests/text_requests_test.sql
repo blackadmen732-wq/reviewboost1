@@ -14,7 +14,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(59);
+select plan(64);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -482,6 +482,36 @@ select throws_ok(
               99, 'fake', 'created' $$,
     '23505', NULL,
     'a second in-flight attempt for one request is rejected by the unique guard');
+
+-- =============================== Phase 1 settle fixes ====================
+
+-- Transition table: sending→queued allowed (retryable path).
+select is(
+    app.sms_request_transition_allowed('sending', 'queued'),
+    true,
+    'sending→queued is allowed (retryable provider error path)');
+
+-- Transition table: provider_unknown→queued closed (duplicate-send footgun).
+select is(
+    app.sms_request_transition_allowed('provider_unknown', 'queued'),
+    false,
+    'provider_unknown→queued is blocked (closes duplicate-send footgun)');
+
+-- Transition table: failed→queued closed (duplicate-send footgun).
+select is(
+    app.sms_request_transition_allowed('failed', 'queued'),
+    false,
+    'failed→queued is blocked (closes duplicate-send footgun)');
+
+-- Compliance index: sms_consent_state(phone_hash) exists.
+select has_index(
+    'public', 'sms_consent_state', 'sms_consent_state_phone_hash_idx',
+    'sms_consent_state has a phone_hash index for STOP lookups');
+
+-- Compliance index: sms_outbox(request_id) exists.
+select has_index(
+    'public', 'sms_outbox', 'sms_outbox_request_id_idx',
+    'sms_outbox has a request_id index for per-request lookups');
 
 select * from finish();
 rollback;

@@ -46,7 +46,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
     }
 
-    const summary = await dispatchOnce({ limit: 25, leaseSeconds: 90 });
+    const summary = await dispatchOnce({ limit: 1, leaseSeconds: 90 });
     return json(request, requestId, 200, { data: summary, requestId });
   });
 }

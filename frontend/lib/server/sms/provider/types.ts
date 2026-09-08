@@ -9,7 +9,7 @@ import "server-only";
  * idempotency test runs without a network or an account.
  */
 
-export type SendOutcome = "submitted" | "failed" | "provider_unknown";
+export type SendOutcome = "submitted" | "failed" | "retryable" | "provider_unknown";
 
 /**
  * Normalised, vendor-independent error classes. A handler and the quota logic

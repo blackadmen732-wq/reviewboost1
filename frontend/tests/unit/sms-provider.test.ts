@@ -43,6 +43,13 @@ describe("fake provider", () => {
     expect(r).toMatchObject({ outcome: "failed", errorClass: "invalid_number" });
   });
 
+  it("reports retryable for a programmed retryable number", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider({ retryableNumbers: new Set(["+15550000002"]) });
+    const r = await p.send({ to: "+15550000002", body: "hi" });
+    expect(r).toMatchObject({ outcome: "retryable", errorClass: "rate_limited" });
+  });
+
   it("reports provider_unknown for a programmed timeout", async () => {
     const { FakeSmsProvider } = await loadFake();
     const p = new FakeSmsProvider({ unknownNumbers: new Set(["+15550000001"]) });
@@ -163,6 +170,63 @@ describe("twilio provider", () => {
       rawBody: "MessageSid=SM9&From=%2B15551230000&Body=STOP",
     });
     expect(r).toMatchObject({ kind: "inbound_message", from: "+15551230000", body: "STOP" });
+  });
+
+  it("returns retryable for a 429 response", async () => {
+    process.env.TWILIO_ACCOUNT_SID = "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    process.env.TWILIO_AUTH_TOKEN = "test_auth_token";
+    process.env.TWILIO_FROM_NUMBER = "+15550001111";
+    const { TwilioSmsProvider } = await loadTwilio();
+    const provider = new TwilioSmsProvider();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        json: () => Promise.resolve({ code: 20429 }),
+      }),
+    );
+    const r = await provider.send({ to: "+15551230000", body: "hi" });
+    expect(r).toMatchObject({ outcome: "retryable", errorClass: "rate_limited" });
+    vi.unstubAllGlobals();
+  });
+
+  it("returns retryable for a 500 response", async () => {
+    process.env.TWILIO_ACCOUNT_SID = "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    process.env.TWILIO_AUTH_TOKEN = "test_auth_token";
+    process.env.TWILIO_FROM_NUMBER = "+15550001111";
+    const { TwilioSmsProvider } = await loadTwilio();
+    const provider = new TwilioSmsProvider();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({}),
+      }),
+    );
+    const r = await provider.send({ to: "+15551230000", body: "hi" });
+    expect(r.outcome).toBe("retryable");
+    vi.unstubAllGlobals();
+  });
+
+  it("returns failed for a 400 response", async () => {
+    process.env.TWILIO_ACCOUNT_SID = "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    process.env.TWILIO_AUTH_TOKEN = "test_auth_token";
+    process.env.TWILIO_FROM_NUMBER = "+15550001111";
+    const { TwilioSmsProvider } = await loadTwilio();
+    const provider = new TwilioSmsProvider();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ code: 21211 }),
+      }),
+    );
+    const r = await provider.send({ to: "+15551230000", body: "hi" });
+    expect(r).toMatchObject({ outcome: "failed", errorClass: "invalid_number" });
+    vi.unstubAllGlobals();
   });
 
   it("classifies an inbound STOP as inbound even when it carries SmsStatus=received", async () => {
