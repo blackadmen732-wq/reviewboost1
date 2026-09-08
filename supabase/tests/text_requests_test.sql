@@ -704,7 +704,6 @@ select is(
       - coalesce(sum(case when kind = 'expiration' then amount else 0 end), 0)
       - coalesce(sum(case when kind = 'reservation' then amount else 0 end), 0)
       + coalesce(sum(case when kind = 'release' then amount else 0 end), 0)
-      - coalesce(sum(case when kind = 'consumption' then amount else 0 end), 0)
       + coalesce(sum(case when kind = 'refund' then amount else 0 end), 0)
      from public.sms_quota_ledger
      where org_id = '7c000000-0000-0000-0000-00000000000b')::bigint,
