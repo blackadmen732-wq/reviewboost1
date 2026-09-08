@@ -12,6 +12,11 @@ const loadTwilio = () => import("@/lib/server/sms/provider/twilio");
 const loadProvider = () => import("@/lib/server/sms/provider");
 
 describe("fake provider", () => {
+  afterEach(async () => {
+    const { resetFakeAccepted } = await loadFake();
+    resetFakeAccepted();
+  });
+
   it("submits by default with a stable message id", async () => {
     const { FakeSmsProvider } = await loadFake();
     const p = new FakeSmsProvider();
@@ -54,6 +59,20 @@ describe("fake provider", () => {
       body: "hi",
     });
     expect(looked.outcome).toBe("not_found");
+  });
+
+  it("shares timeout-after-accept SIDs across FakeSmsProvider instances", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const sender = new FakeSmsProvider({ timeoutAfterAcceptNumbers: new Set(["+15550000002"]) });
+    const sent = await sender.send({ to: "+15550000002", body: "hi", idempotencyKey: "req:shared" });
+    expect(sent.outcome).toBe("provider_unknown");
+    const lookuper = new FakeSmsProvider();
+    const looked = await lookuper.lookup({
+      idempotencyKey: "req:shared",
+      to: "+15550000002",
+      body: "hi",
+    });
+    expect(looked.outcome).toBe("found");
   });
 
   it("timeout-after-accept hides the SID on send and returns it from lookup", async () => {
@@ -380,6 +399,28 @@ describe("twilio send outcome classification", () => {
     expect(init.method).toBe("GET");
     expect(url).toContain("/Messages.json");
     expect(url).toContain(encodeURIComponent("+15551230000"));
+  });
+
+  it("lookup is unknown for a lone candidate whose body does not match", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            messages: [{ sid: "SMother", status: "delivered", body: "different", date_created: "2026-09-08T12:00:00Z" }],
+          }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(result.outcome).toBe("unknown");
   });
 
   it("lookup is unknown when a full page has no match (do not fail+release)", async () => {

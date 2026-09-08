@@ -38,6 +38,13 @@ export interface FakeProviderOptions {
   lookupUnknownNumbers?: Set<string>;
 }
 
+/** Process-wide accepts so dispatch and reconcile share timeout-after-accept SIDs. */
+const sharedAccepted = new Map<string, { sid: string; terminal: "delivered" | "failed" | null }>();
+
+export function resetFakeAccepted(): void {
+  sharedAccepted.clear();
+}
+
 export class FakeSmsProvider implements SmsProvider {
   readonly name = "fake";
   private readonly failNumbers: Record<string, SmsErrorClass>;
@@ -66,7 +73,9 @@ export class FakeSmsProvider implements SmsProvider {
 
     if (this.timeoutAfterAcceptNumbers.has(params.to)) {
       const sid = fakeMessageId(params);
-      this.accepted.set(identityKey(params), { sid, terminal: null });
+      const record = { sid, terminal: null as "delivered" | "failed" | null };
+      this.accepted.set(identityKey(params), record);
+      sharedAccepted.set(identityKey(params), record);
       return {
         outcome: "provider_unknown",
         errorClass: "timeout",
@@ -84,7 +93,9 @@ export class FakeSmsProvider implements SmsProvider {
     }
 
     const sid = fakeMessageId(params);
-    this.accepted.set(identityKey(params), { sid, terminal: null });
+    const record = { sid, terminal: null as "delivered" | "failed" | null };
+    this.accepted.set(identityKey(params), record);
+    sharedAccepted.set(identityKey(params), record);
     return { outcome: "submitted", providerMessageId: sid, raw: { simulated: "submitted" } };
   }
 
@@ -96,7 +107,7 @@ export class FakeSmsProvider implements SmsProvider {
     if (this.lookupUnknownNumbers.has(params.to)) {
       return { outcome: "unknown", errorClass: "timeout", raw: { simulated: "lookup_unknown" } };
     }
-    const accepted = this.accepted.get(identityKey(params));
+    const accepted = this.accepted.get(identityKey(params)) ?? sharedAccepted.get(identityKey(params));
     if (!accepted) {
       return { outcome: "not_found", raw: { simulated: "not_accepted" } };
     }

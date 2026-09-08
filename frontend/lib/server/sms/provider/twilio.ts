@@ -213,37 +213,38 @@ export class TwilioSmsProvider implements SmsProvider {
       });
 
       const bodyMatches = candidates.filter((m) => m.body === params.body);
-      const matched = bodyMatches.length > 0 ? bodyMatches : candidates.length === 1 ? candidates : [];
 
-      if (matched.length === 0) {
-        // A full page with no match is incomplete, not proof of absence.
-        // Fail-closed: keep reserved and retry rather than fail+release.
-        if (messages.length >= 50) {
-          return {
-            outcome: "unknown",
-            errorClass: "unknown",
-            raw: { error: "lookup_page_truncated", count: messages.length },
-          };
-        }
-        return { outcome: "not_found", raw: { count: candidates.length } };
+      if (bodyMatches.length === 1) {
+        const hit = bodyMatches[0]!;
+        const status = typeof hit.status === "string" ? hit.status : "";
+        const terminal =
+          status === "delivered" ? "delivered" : status === "failed" || status === "undelivered" ? "failed" : null;
+        return {
+          outcome: "found",
+          providerMessageId: String(hit.sid),
+          terminal,
+          ...(terminal === "failed"
+            ? { errorClass: classifyTwilioCode(numberOrUndefined(hit.error_code)) }
+            : {}),
+          raw: { status, lookup: "messages_list" },
+        };
       }
-      if (matched.length > 1) {
-        return { outcome: "unknown", errorClass: "unknown", raw: { error: "ambiguous_match", count: matched.length } };
+      if (bodyMatches.length > 1) {
+        return { outcome: "unknown", errorClass: "unknown", raw: { error: "ambiguous_match", count: bodyMatches.length } };
       }
-
-      const hit = matched[0]!;
-      const status = typeof hit.status === "string" ? hit.status : "";
-      const terminal =
-        status === "delivered" ? "delivered" : status === "failed" || status === "undelivered" ? "failed" : null;
-      return {
-        outcome: "found",
-        providerMessageId: String(hit.sid),
-        terminal,
-        ...(terminal === "failed"
-          ? { errorClass: classifyTwilioCode(numberOrUndefined(hit.error_code)) }
-          : {}),
-        raw: { status, lookup: "messages_list" },
-      };
+      // A full page, or other messages with a different body, is not proof this
+      // send never happened (encoding drift / newer traffic). Keep reserved.
+      if (messages.length >= 50 || candidates.length > 0) {
+        return {
+          outcome: "unknown",
+          errorClass: "unknown",
+          raw: {
+            error: messages.length >= 50 ? "lookup_page_truncated" : "no_body_match",
+            count: messages.length,
+          },
+        };
+      }
+      return { outcome: "not_found", raw: { count: 0 } };
     } catch (error) {
       const timedOut = error instanceof Error && /timeout|abort/i.test(error.message);
       return {
