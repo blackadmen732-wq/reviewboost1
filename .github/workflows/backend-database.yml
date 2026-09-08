@@ -39,9 +39,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pin the CLI. `version: latest` resolves the release via the GitHub API
+      # and flakes this job under unauthenticated rate limits. The version is
+      # the same pin as the Cloud Agent environment
+      # (scripts/dev/tool-versions.sh). GITHUB_TOKEN keeps any remaining
+      # release lookup authenticated.
+      - name: Read pinned Supabase CLI version
+        id: supabase_cli
+        run: |
+          . scripts/dev/tool-versions.sh
+          echo "version=${SUPABASE_CLI_VERSION}" >> "$GITHUB_OUTPUT"
+
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: ${{ steps.supabase_cli.outputs.version }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Start Supabase
         run: supabase start --exclude studio,imgproxy,edge-runtime,logflare,vector,pooler
