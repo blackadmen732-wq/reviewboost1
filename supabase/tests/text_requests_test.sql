@@ -503,10 +503,10 @@ select ok(not app.sms_request_transition_allowed('failed', 'queued'),
 -- should be failed, the request should be back at queued, and quota stays
 -- reserved (not released).
 select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('a',64),
-    'v1:enc', 1::smallint, 'aaaa', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+    'v1:enc', 1::smallint, '0101', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
 select app.sms_schedule_request(
     '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
-    repeat('a',64), 'v1:enc', 1::smallint, 'aaaa', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    repeat('a',64), 'v1:enc', 1::smallint, '0101', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
     tests.noon_zone(), now(), 'sched-dedupe-retryable', '7b000000-0000-0000-0000-000000000001', 'req-retryable');
 
 select app.sms_begin_dispatch(
@@ -685,10 +685,10 @@ select is(
 
 -- 2. Now create the request and settle the attempt with that SID.
 select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('b',64),
-    'v1:enc', 1::smallint, 'bbbb', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+    'v1:enc', 1::smallint, '0202', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
 select app.sms_schedule_request(
     '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
-    repeat('b',64), 'v1:enc', 1::smallint, 'bbbb', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    repeat('b',64), 'v1:enc', 1::smallint, '0202', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
     tests.noon_zone(), now(), 'sched-dedupe-early-rcpt', '7b000000-0000-0000-0000-000000000001', 'req-early-rcpt');
 
 select app.sms_begin_dispatch(
