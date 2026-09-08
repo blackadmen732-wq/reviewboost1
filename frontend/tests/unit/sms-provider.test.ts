@@ -424,7 +424,7 @@ describe("twilio send outcome classification", () => {
   });
 
   it("lookup is unknown for a lone candidate whose body does not match", async () => {
-    // SENTINEL lock: a recipient/date singleton must not attach when the body differs.
+    // SENTINEL lock: same To + date window, different body → never attach that SID.
     configureEnv();
     vi.stubGlobal(
       "fetch",
@@ -442,10 +442,38 @@ describe("twilio send outcome classification", () => {
       idempotencyKey: "req:x",
       to: "+15551230000",
       body: "hi",
+      sentAfter: new Date("2026-09-08T11:00:00Z"),
     });
     expect(result.outcome).toBe("unknown");
     expect(result).not.toHaveProperty("providerMessageId");
     expect(result.raw).toMatchObject({ error: "no_body_match" });
+  });
+
+  it("lookup is unknown when two messages share the exact body (ambiguous)", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            messages: [
+              { sid: "SMone", status: "delivered", body: "hi", date_created: "2026-09-08T12:00:00Z" },
+              { sid: "SMtwo", status: "delivered", body: "hi", date_created: "2026-09-08T12:05:00Z" },
+            ],
+          }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(result.outcome).toBe("unknown");
+    expect(result).not.toHaveProperty("providerMessageId");
+    expect(result.raw).toMatchObject({ error: "ambiguous_match", count: 2 });
   });
 
   it("lookup is unknown when a full page has no match (do not fail+release)", async () => {
@@ -471,6 +499,9 @@ describe("twilio send outcome classification", () => {
       body: "hi",
     });
     expect(result.outcome).toBe("unknown");
+    expect(result.outcome).not.toBe("not_found");
+    expect(result).not.toHaveProperty("providerMessageId");
+    expect(result.raw).toMatchObject({ error: "lookup_page_truncated", count: 50 });
   });
 
   it("lookup returns not_found when the list is empty", async () => {
