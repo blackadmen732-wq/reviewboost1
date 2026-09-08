@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server";
 
 import { requireOrganizationContext, requireRole } from "@/lib/server/auth";
-import { ApiError, ERROR_CODE, rateLimited } from "@/lib/server/errors";
+import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
-import { serviceRoleClient } from "@/lib/server/supabase";
+import { consumeRateLimit } from "@/lib/server/rate-limit";
 import { parseOrThrow } from "@/lib/server/validation";
 import {
   listTextRequests,
@@ -32,23 +32,13 @@ export async function POST(request: NextRequest): Promise<Response> {
     const context = await requireOrganizationContext(request);
     requireRole(context.role, ["owner", "admin"]);
 
-    // Per-org rate limit, shared across instances via the database. A limiter
-    // that cannot reach its store must fail closed, never open: if the RPC
-    // errors we cannot prove the request is under budget, so refuse rather than
-    // wave it through.
-    const { data: rl, error: rlError } = await serviceRoleClient().rpc("rpc_consume_rate_limit", {
-      p_bucket: "sms_schedule",
-      p_bucket_key: context.orgId,
-      p_limit: SCHEDULE_LIMIT_PER_MINUTE,
-      p_window_seconds: 60,
-    });
-    if (rlError) {
-      throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
-    }
-    const decision = Array.isArray(rl) ? rl[0] : rl;
-    if (decision && decision.allowed === false) {
-      throw rateLimited((decision.retry_after_seconds as number) ?? 60);
-    }
+    // Per-org rate limit, shared across instances via the database. Store
+    // errors and empty decisions fail closed (503) — never an empty allow.
+    await consumeRateLimit(
+      { bucket: "sms_schedule", limit: SCHEDULE_LIMIT_PER_MINUTE, windowSeconds: 60 },
+      context.orgId,
+      requestId,
+    );
 
     const body = parseOrThrow(scheduleSchema, await readJsonBody(request));
     const result = await scheduleTextRequest(context, body, requestId);

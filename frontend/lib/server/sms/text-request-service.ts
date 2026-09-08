@@ -111,17 +111,18 @@ interface ResolvedStand {
   timezone: string;
 }
 
-// The deliberate fallback timezone when a location has no zone configured (or an
-// unrecognised one). Quiet-hours math treats an invalid zone as UTC too, so this
-// is the documented, intentional default — NOT a substitute for a failed query,
-// which must fail closed instead (see resolveStand).
+// The deliberate fallback timezone when a location has no zone configured.
+// An unrecognised IANA name is a closed failure (503), not a silent UTC
+// substitute — see resolveTimezone / resolveStand.
 export const DEFAULT_LOCATION_TIMEZONE = "UTC";
 
 /**
- * Apply the timezone fallback policy: a valid IANA zone is used as-is; a missing,
- * empty, or unrecognised value falls back to DEFAULT_LOCATION_TIMEZONE. This is a
- * deliberate policy for *known* data, distinct from a database error (which the
- * caller turns into a 503 rather than silently defaulting).
+ * Apply the timezone policy used when scheduling a text:
+ *   * a valid IANA zone is used as-is;
+ *   * a successfully-read missing/empty zone falls back to DEFAULT_LOCATION_TIMEZONE
+ *     (locations.timezone is NOT NULL DEFAULT 'UTC');
+ *   * an unrecognised zone fails closed — silent UTC would compute quiet hours
+ *     in the wrong place and can schedule into the recipient's night.
  */
 export function resolveTimezone(raw: string | null | undefined): string {
   if (typeof raw !== "string" || raw.trim() === "") return DEFAULT_LOCATION_TIMEZONE;
@@ -130,7 +131,7 @@ export function resolveTimezone(raw: string | null | undefined): string {
     new Intl.DateTimeFormat("en-US", { timeZone: tz });
     return tz;
   } catch {
-    return DEFAULT_LOCATION_TIMEZONE;
+    throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
   }
 }
 
@@ -162,16 +163,18 @@ export async function resolveStand(context: OrganizationContext, token: string):
     .eq("id", locationId)
     .maybeSingle();
 
-  // Fail CLOSED on a database error: a transient failure must not silently
-  // substitute UTC and risk scheduling a text into the recipient's quiet hours.
-  // Only a successfully-read missing/invalid zone takes the documented fallback.
+  // Fail CLOSED on a database error or a missing location row: a transient
+  // failure or broken FK must not silently substitute UTC and risk scheduling
+  // a text into the recipient's quiet hours. Only a successfully-read
+  // missing/empty zone takes the documented UTC fallback.
   if (locError) throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
+  if (!loc) throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
 
   return {
     standId: data.id as string,
     locationId,
     link: standUrl(publicFrontendUrl(), token),
-    timezone: resolveTimezone(loc?.timezone as string | null | undefined),
+    timezone: resolveTimezone(loc.timezone as string | null | undefined),
   };
 }
 

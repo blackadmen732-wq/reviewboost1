@@ -179,6 +179,55 @@ describe("twilio provider", () => {
   });
 });
 
+describe("getSmsProvider — production fail-closed", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("throws ConfigError in production when SMS_PROVIDER is missing", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SMS_PROVIDER", "");
+    delete process.env.TWILIO_ACCOUNT_SID;
+    const { getSmsProvider } = await loadProvider();
+    const { ConfigError } = await import("@/lib/server/env");
+    expect(() => getSmsProvider()).toThrow(ConfigError);
+  });
+
+  it("throws ConfigError in production when SMS_PROVIDER is unknown", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SMS_PROVIDER", "telnyx");
+    const { getSmsProvider } = await loadProvider();
+    const { ConfigError } = await import("@/lib/server/env");
+    expect(() => getSmsProvider()).toThrow(ConfigError);
+  });
+
+  it("throws ConfigError in production when SMS_PROVIDER=twilio without credentials", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SMS_PROVIDER", "twilio");
+    delete process.env.TWILIO_ACCOUNT_SID;
+    delete process.env.TWILIO_AUTH_TOKEN;
+    delete process.env.TWILIO_FROM_NUMBER;
+    delete process.env.TWILIO_MESSAGING_SERVICE_SID;
+    const { getSmsProvider } = await loadProvider();
+    const { ConfigError } = await import("@/lib/server/env");
+    expect(() => getSmsProvider()).toThrow(ConfigError);
+  });
+
+  it("returns the fake provider in production only when SMS_PROVIDER=fake is explicit", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SMS_PROVIDER", "fake");
+    const { getSmsProvider } = await loadProvider();
+    expect(getSmsProvider().name).toBe("fake");
+  });
+
+  it("returns the fake provider outside production when nothing is configured", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("SMS_PROVIDER", "");
+    const { getSmsProvider } = await loadProvider();
+    expect(getSmsProvider().name).toBe("fake");
+  });
+});
+
 describe("provider rate configuration", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -205,5 +254,13 @@ describe("provider rate configuration", () => {
     vi.stubEnv("SMS_RATE_PER_SEGMENT_MICROS", "abc");
     const mod = await loadProvider();
     expect(() => mod.getProviderRate()).toThrow();
+  });
+
+  it("throws ConfigError in production when the rate is unset", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SMS_RATE_PER_SEGMENT_MICROS", "");
+    const { getProviderRate } = await loadProvider();
+    const { ConfigError } = await import("@/lib/server/env");
+    expect(() => getProviderRate()).toThrow(ConfigError);
   });
 });

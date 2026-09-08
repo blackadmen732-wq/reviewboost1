@@ -46,13 +46,20 @@ describe("resolveTimezone — documented fallback policy", () => {
     expect(resolveTimezone("  Europe/London  ")).toBe("Europe/London");
   });
 
-  it("falls back to UTC for missing, empty, or invalid zones", async () => {
+  it("falls back to UTC for missing or empty zones", async () => {
     const { resolveTimezone, DEFAULT_LOCATION_TIMEZONE } = await load();
     expect(DEFAULT_LOCATION_TIMEZONE).toBe("UTC");
     expect(resolveTimezone(undefined)).toBe("UTC");
     expect(resolveTimezone(null)).toBe("UTC");
     expect(resolveTimezone("")).toBe("UTC");
-    expect(resolveTimezone("Not/AZone")).toBe("UTC");
+    expect(resolveTimezone("   ")).toBe("UTC");
+  });
+
+  it("fails closed (503) for an unrecognised IANA zone — never silent UTC", async () => {
+    const { resolveTimezone } = await load();
+    expect(() => resolveTimezone("Not/AZone")).toThrow(
+      expect.objectContaining({ status: 503, name: "ApiError" }),
+    );
   });
 });
 
@@ -84,6 +91,18 @@ describe("resolveStand — fail closed on the timezone lookup", () => {
     const ctx = makeContext(okStand, { data: { timezone: null }, error: null });
     const r = await resolveStand(ctx, "tokentokentoken");
     expect(r.timezone).toBe("UTC");
+  });
+
+  it("fails closed (503) when the location row is missing — never silently UTC", async () => {
+    const { resolveStand } = await load();
+    const ctx = makeContext(okStand, { data: null, error: null });
+    await expect(resolveStand(ctx, "tokentokentoken")).rejects.toMatchObject({ status: 503 });
+  });
+
+  it("fails closed (503) when the location zone is not a real IANA name", async () => {
+    const { resolveStand } = await load();
+    const ctx = makeContext(okStand, { data: { timezone: "Mars/Olympus" }, error: null });
+    await expect(resolveStand(ctx, "tokentokentoken")).rejects.toMatchObject({ status: 503 });
   });
 
   it("still 404s when the stand is not found", async () => {

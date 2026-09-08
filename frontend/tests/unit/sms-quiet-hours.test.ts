@@ -58,9 +58,14 @@ describe("quiet hours — next allowed time is DST-aware", () => {
     expect(next.toISOString()).toBe("2026-07-01T09:00:00.000Z");
   });
 
-  it("falls back to UTC for an unknown timezone rather than throwing", async () => {
-    const { isWithinSendWindow } = await load();
-    expect(isWithinSendWindow(new Date("2026-06-15T12:00:00Z"), "Not/AZone")).toBe(true);
+  it("fails closed on an unknown timezone rather than silently using UTC", async () => {
+    const { isWithinSendWindow, nextAllowedSendTime } = await load();
+    expect(() => isWithinSendWindow(new Date("2026-06-15T12:00:00Z"), "Not/AZone")).toThrow(
+      /valid IANA zone/i,
+    );
+    expect(() => nextAllowedSendTime(new Date("2026-06-15T12:00:00Z"), "Not/AZone")).toThrow(
+      /valid IANA zone/i,
+    );
   });
 
   it("resolves a spring-forward gap forward, never backward into quiet hours", async () => {

@@ -620,16 +620,27 @@ describe("rate limiting", () => {
     expect(response.headers.get("retry-after")).toBe("42");
   });
 
-  it("fails open when the limiter itself is unavailable", async () => {
-    // A customer at a counter must not be turned away because a limiter is
-    // down. The abuse this bounds is a nuisance, not a breach.
+  it("fails closed (503) when the limiter itself is unavailable", async () => {
+    // An unreachable store must not become an empty allow on the public write path.
     rpcHandler = (fn) =>
       fn === "rpc_consume_rate_limit"
         ? { data: null, error: { message: "connection refused" } }
         : happyPath(fn);
 
     const response = await postResponse({ sessionId: SESSION_ID, rating: 3 });
-    expect(response.status).toBe(201);
+    const body = (await response.json()) as { error: { code: string } };
+    expect(response.status).toBe(503);
+    expect(body.error.code).toBe("service_unavailable");
+  });
+
+  it("fails closed (503) when the limiter returns an empty decision", async () => {
+    rpcHandler = (fn) =>
+      fn === "rpc_consume_rate_limit" ? { data: [], error: null } : happyPath(fn);
+
+    const response = await postResponse({ sessionId: SESSION_ID, rating: 3 });
+    const body = (await response.json()) as { error: { code: string } };
+    expect(response.status).toBe(503);
+    expect(body.error.code).toBe("service_unavailable");
   });
 });
 

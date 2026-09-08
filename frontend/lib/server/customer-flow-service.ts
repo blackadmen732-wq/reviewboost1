@@ -24,9 +24,10 @@ import {
   generateToken,
 } from "@/lib/server/crypto";
 import { tokenDigestKeyVersion } from "@/lib/server/env";
-import { ApiError, ERROR_CODE, rateLimited, reviewLinkInactive } from "@/lib/server/errors";
+import { ApiError, ERROR_CODE, reviewLinkInactive } from "@/lib/server/errors";
 import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
 import { logger } from "@/lib/server/logger";
+import { consumeRateLimit, type RateLimitBudget } from "@/lib/server/rate-limit";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import {
   DEFAULT_LOCALE,
@@ -177,12 +178,6 @@ function decodeBody<T>(encrypted: string | null): T {
 
 // -------------------------------------------------------- rate limiting ---
 
-interface Budget {
-  bucket: string;
-  limit: number;
-  windowSeconds: number;
-}
-
 /**
  * Layered, because neither layer works alone.
  *
@@ -190,41 +185,21 @@ interface Budget {
  * one NAT address, so an address-keyed limit alone would block real customers
  * at exactly the busiest moment. Per client fingerprint stops one device
  * filling a business's feedback while everyone else at that stand carries on.
+ *
+ * Store failures fail closed (503). An unreachable limiter on this
+ * unauthenticated surface must not become an empty allow.
  */
-const CONTEXT_BUDGET: Budget = { bucket: "public-context", limit: 240, windowSeconds: 60 };
-const STAND_WRITE_BUDGET: Budget = { bucket: "public-write-stand", limit: 60, windowSeconds: 60 };
-const CLIENT_WRITE_BUDGET: Budget = { bucket: "public-write-client", limit: 30, windowSeconds: 300 };
-
-async function consume(budget: Budget, key: string, requestId: string): Promise<void> {
-  const { data, error } = await serviceRoleClient().rpc("rpc_consume_rate_limit", {
-    p_bucket: budget.bucket,
-    p_bucket_key: key,
-    p_limit: budget.limit,
-    p_window_seconds: budget.windowSeconds,
-  });
-
-  if (error) {
-    // Fails open. A customer standing at a counter must not be turned away
-    // because a limiter is unavailable; the abuse this bounds is a nuisance,
-    // not a breach. Authentication would fail closed — this is not that.
-    logger.warn("public.rate_limit_unavailable", { bucket: budget.bucket, requestId, error });
-    return;
-  }
-
-  const row = Array.isArray(data) ? (data[0] as { allowed: boolean; retry_after_seconds: number } | undefined) : undefined;
-  if (row && !row.allowed) {
-    logger.warn("public.rate_limited", { bucket: budget.bucket, requestId });
-    throw rateLimited(row.retry_after_seconds);
-  }
-}
+const CONTEXT_BUDGET: RateLimitBudget = { bucket: "public-context", limit: 240, windowSeconds: 60 };
+const STAND_WRITE_BUDGET: RateLimitBudget = { bucket: "public-write-stand", limit: 60, windowSeconds: 60 };
+const CLIENT_WRITE_BUDGET: RateLimitBudget = { bucket: "public-write-client", limit: 30, windowSeconds: 300 };
 
 async function guardRead(tokenHash: string, meta: RequestMeta): Promise<void> {
-  await consume(CONTEXT_BUDGET, tokenHash, meta.requestId);
+  await consumeRateLimit(CONTEXT_BUDGET, tokenHash, meta.requestId);
 }
 
 async function guardWrite(tokenHash: string, meta: RequestMeta): Promise<void> {
-  await consume(STAND_WRITE_BUDGET, tokenHash, meta.requestId);
-  await consume(CLIENT_WRITE_BUDGET, clientFingerprint(meta.address, meta.userAgent), meta.requestId);
+  await consumeRateLimit(STAND_WRITE_BUDGET, tokenHash, meta.requestId);
+  await consumeRateLimit(CLIENT_WRITE_BUDGET, clientFingerprint(meta.address, meta.userAgent), meta.requestId);
 }
 
 interface ResolvedStand {

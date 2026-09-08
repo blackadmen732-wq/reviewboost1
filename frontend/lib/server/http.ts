@@ -2,9 +2,9 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
+import { ConfigError, publicFrontendUrl } from "@/lib/server/env";
 import { ApiError, ERROR_CODE, type FieldError } from "@/lib/server/errors";
 import { logger } from "@/lib/server/logger";
-import { publicFrontendUrl } from "@/lib/server/env";
 
 /**
  * HTTP plumbing shared by every public route handler.
@@ -193,6 +193,24 @@ export async function handle(
         requestId,
       });
       return errorResponse(request, requestId, error);
+    }
+
+    // Missing/invalid runtime config (SMS provider, pricing, public origin) is
+    // a closed failure, not an unhandled bug. Opaque 503 — never the ConfigError
+    // text, which can name env vars.
+    if (error instanceof ConfigError) {
+      logger.error("public.config_unavailable", {
+        route,
+        method: request.method,
+        durationMs: Date.now() - startedAt,
+        requestId,
+        error,
+      });
+      return errorResponse(
+        request,
+        requestId,
+        new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly."),
+      );
     }
 
     logger.error("public.request_failed", {

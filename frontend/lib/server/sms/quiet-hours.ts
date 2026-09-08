@@ -1,5 +1,7 @@
 import "server-only";
 
+import { ConfigError } from "@/lib/server/env";
+
 /**
  * Quiet-hours scheduling.
  *
@@ -125,6 +127,14 @@ function isValidTimeZone(timeZone: string): boolean {
   }
 }
 
+function requireTimeZone(timeZone: string): string {
+  if (!isValidTimeZone(timeZone)) {
+    // Fail closed: silent UTC would compute the window in the wrong place.
+    throw new ConfigError("Quiet-hours timezone is not a valid IANA zone.");
+  }
+  return timeZone;
+}
+
 /** Whether sending is permitted right now in the recipient's zone. */
 export function isWithinSendWindow(
   now: Date,
@@ -132,7 +142,7 @@ export function isWithinSendWindow(
   window: QuietHoursWindow = DEFAULT_QUIET_HOURS,
 ): boolean {
   assertValidWindow(window);
-  const zone = isValidTimeZone(timeZone) ? timeZone : "UTC";
+  const zone = requireTimeZone(timeZone);
   const hour = partsInZone(now, zone).hour;
   return hour >= window.startHour && hour < window.endHour;
 }
@@ -151,7 +161,7 @@ export function nextAllowedSendTime(
   window: QuietHoursWindow = DEFAULT_QUIET_HOURS,
 ): Date {
   assertValidWindow(window);
-  const zone = isValidTimeZone(timeZone) ? timeZone : "UTC";
+  const zone = requireTimeZone(timeZone);
 
   if (isWithinSendWindow(now, zone, window)) return now;
 
