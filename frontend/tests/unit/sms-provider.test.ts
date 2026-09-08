@@ -179,6 +179,136 @@ describe("twilio provider", () => {
   });
 });
 
+describe("twilio send outcome classification", () => {
+  const OLD = { ...process.env };
+  afterEach(() => {
+    process.env = { ...OLD };
+    vi.restoreAllMocks();
+  });
+
+  function configureEnv() {
+    process.env.TWILIO_ACCOUNT_SID = "ACtest00000000000000000000000000";
+    process.env.TWILIO_AUTH_TOKEN = "test_auth_token";
+    process.env.TWILIO_FROM_NUMBER = "+15550001111";
+  }
+
+  it("returns retryable on HTTP 429", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        json: () => Promise.resolve({ code: 20429 }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("retryable");
+    expect(result.errorClass).toBe("rate_limited");
+  });
+
+  it("returns provider_unknown on HTTP 500 (ambiguous, do NOT retry)", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ code: 20500 }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("provider_unknown");
+    expect(result.errorClass).toBe("provider_error");
+  });
+
+  it("returns provider_unknown on HTTP 503", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: () => Promise.resolve({}),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("provider_unknown");
+  });
+
+  it("returns failed on HTTP 400 (clear rejection)", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ code: 21211 }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("failed");
+    expect(result.errorClass).toBe("invalid_number");
+  });
+
+  it("returns failed on HTTP 401 (auth error = clear rejection)", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({}),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("failed");
+  });
+
+  it("returns provider_unknown on network timeout (not retryable)", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("The operation was aborted due to timeout")),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("provider_unknown");
+    expect(result.errorClass).toBe("timeout");
+  });
+
+  it("returns submitted on HTTP 201 with SID", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ sid: "SM123abc", status: "queued" }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("submitted");
+    expect(result.providerMessageId).toBe("SM123abc");
+  });
+});
+
+describe("fake provider retryable outcome", () => {
+  it("returns retryable for a programmed retryable number", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider({ retryableNumbers: new Set(["+15559990000"]) });
+    const r = await p.send({ to: "+15559990000", body: "hi" });
+    expect(r.outcome).toBe("retryable");
+    expect(r.errorClass).toBe("rate_limited");
+  });
+});
+
 describe("provider rate configuration", () => {
   afterEach(() => {
     vi.unstubAllEnvs();

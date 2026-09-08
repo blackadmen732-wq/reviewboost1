@@ -29,6 +29,7 @@ export interface DispatchSummary {
   submitted: number;
   suppressed: number;
   failed: number;
+  retryable: number;
   unknown: number;
   deferred: number;
   skipped: number;
@@ -43,7 +44,7 @@ export async function dispatchOnce(options?: {
   const provider = getSmsProvider();
   const worker = options?.worker ?? `dispatch-${randomUUID().slice(0, 8)}`;
   const summary: DispatchSummary = {
-    claimed: 0, submitted: 0, suppressed: 0, failed: 0, unknown: 0, deferred: 0, skipped: 0,
+    claimed: 0, submitted: 0, suppressed: 0, failed: 0, retryable: 0, unknown: 0, deferred: 0, skipped: 0,
   };
 
   const { data: jobs, error } = await svc.rpc("rpc_sms_claim_outbox", {
@@ -135,6 +136,30 @@ export async function dispatchOnce(options?: {
       }
 
       const result = await provider.send({ to, body, idempotencyKey: `req:${job.request_id}` });
+
+      if (result.outcome === "retryable") {
+        // Provider returned 429: definitively not accepted, safe to retry.
+        // Settle the attempt as retryable — the SQL moves the request back
+        // to 'queued' (keeping quota reserved) so the next dispatch creates
+        // a fresh attempt after outbox backoff.
+        const { error: settleError } = await svc.rpc("rpc_sms_settle_attempt", {
+          p_attempt_id: attemptId,
+          p_org_id: job.org_id,
+          p_outcome: "retryable",
+          p_provider_message_id: null,
+          p_error_class: result.errorClass ?? "rate_limited",
+          p_provider_response: result.raw ?? {},
+        });
+        if (settleError) throw settleError;
+        await svc.rpc("rpc_sms_fail_outbox", {
+          p_id: job.id,
+          p_worker: worker,
+          p_error: `retryable: ${result.errorClass ?? "rate_limited"}`,
+          p_backoff_seconds: BACKOFF_BASE_SECONDS * Math.pow(2, Math.min(job.attempts, 6)),
+        });
+        summary.retryable += 1;
+        continue;
+      }
 
       // The provider call already happened; if we cannot durably record its
       // outcome, do NOT complete the job — leave it recoverable so the state is

@@ -22,6 +22,8 @@ import type {
 export interface FakeProviderOptions {
   /** Numbers that should return a failed submit, with their error class. */
   failNumbers?: Record<string, SmsErrorClass>;
+  /** Numbers whose submit returns a retryable error (429). */
+  retryableNumbers?: Set<string>;
   /** Numbers whose submit "times out" — outcome provider_unknown. */
   unknownNumbers?: Set<string>;
 }
@@ -29,11 +31,13 @@ export interface FakeProviderOptions {
 export class FakeSmsProvider implements SmsProvider {
   readonly name = "fake";
   private readonly failNumbers: Record<string, SmsErrorClass>;
+  private readonly retryableNumbers: Set<string>;
   private readonly unknownNumbers: Set<string>;
   public readonly sent: SendParams[] = [];
 
   constructor(options: FakeProviderOptions = {}) {
     this.failNumbers = options.failNumbers ?? {};
+    this.retryableNumbers = options.retryableNumbers ?? new Set();
     this.unknownNumbers = options.unknownNumbers ?? new Set();
   }
 
@@ -41,8 +45,11 @@ export class FakeSmsProvider implements SmsProvider {
     this.sent.push(params);
 
     if (this.unknownNumbers.has(params.to)) {
-      // Submitted to the network, but we never learned the outcome.
       return { outcome: "provider_unknown", errorClass: "timeout", raw: { simulated: "timeout" } };
+    }
+
+    if (this.retryableNumbers.has(params.to)) {
+      return { outcome: "retryable", errorClass: "rate_limited", raw: { simulated: "rate_limited" } };
     }
 
     const failClass = this.failNumbers[params.to];
