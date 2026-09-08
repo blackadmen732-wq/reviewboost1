@@ -231,12 +231,17 @@ begin
                   and e.kind = 'expiration'
                   and e.correlation_key = 'expire:' || l.id::text)
     loop
-        -- Credits consumed or still reserved against this grant cannot be
-        -- expired again — only the unused remainder should be clawed back.
-        select coalesce(sum(u.amount), 0) into v_used
+        -- Net credits still claimed (reserved minus returned) against this
+        -- grant window. Consumption is a reclassification of already-reserved
+        -- credits, so counting it too would double-count.
+        select coalesce(sum(
+            case when u.kind = 'reservation' then u.amount
+                 when u.kind in ('release', 'refund') then -u.amount
+                 else 0 end
+        ), 0) into v_used
           from public.sms_quota_ledger u
          where u.org_id = p_org_id
-           and u.kind in ('consumption', 'reservation')
+           and u.kind in ('reservation', 'release', 'refund')
            and u.effective_at >= (select al.effective_at from public.sms_quota_ledger al where al.id = r.id)
            and u.effective_at <= coalesce(
                (select min(al2.effective_at)

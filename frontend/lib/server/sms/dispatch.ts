@@ -151,12 +151,13 @@ export async function dispatchOnce(options?: {
           p_provider_response: result.raw ?? {},
         });
         if (settleError) throw settleError;
-        await svc.rpc("rpc_sms_fail_outbox", {
+        const { error: failError } = await svc.rpc("rpc_sms_fail_outbox", {
           p_id: job.id,
           p_worker: worker,
           p_error: `retryable: ${result.errorClass ?? "rate_limited"}`,
           p_backoff_seconds: BACKOFF_BASE_SECONDS * Math.pow(2, Math.min(job.attempts, 6)),
         });
+        if (failError) logger.error("sms.dispatch_fail_record_failed", { jobId: job.id, error: failError });
         summary.retryable += 1;
         continue;
       }
