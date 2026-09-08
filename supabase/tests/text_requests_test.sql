@@ -796,7 +796,7 @@ select is(
     2, 'equal-timestamp grants: both allocations expired');
 
 select is(
-    (select coalesce(sum(amount), 0) from public.sms_quota_ledger
+    (select coalesce(sum(amount), 0)::bigint from public.sms_quota_ledger
       where org_id = '7c000000-0000-0000-0000-00000000000b' and kind = 'expiration'),
     70::bigint, 'equal-timestamp grants: expire 70 (100-30), not 40 from double-attribution');
 

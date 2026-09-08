@@ -387,11 +387,12 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+    r record;
 begin
     -- Expired-lease jobs that have used all attempts: dead-letter and settle
     -- the request in the same transaction (queued → failed + release).
-    perform app.sms_finalize_dead_lettered_request(d.request_id, d.org_id, 'outbox_lease_exhausted')
-      from (
+    for r in
         update public.sms_outbox o
            set status = 'dead_letter', leased_until = null, lease_owner = null, updated_at = now()
          where o.status = 'leased'
@@ -399,8 +400,12 @@ begin
            and o.leased_until <= now()
            and o.attempts >= o.max_attempts
         returning o.request_id, o.org_id
-      ) d
-     where d.request_id is not null;
+    loop
+        if r.request_id is not null then
+            perform app.sms_finalize_dead_lettered_request(
+                r.request_id, r.org_id, 'outbox_lease_exhausted');
+        end if;
+    end loop;
 
     return query
     with claimable as (
