@@ -2,17 +2,17 @@
 
 import { useState } from "react";
 
-import { CustomerBlockingState } from "@/features/customer-flow/customer-blocking-state";
+import { CustomerPageFallback } from "@/features/customer-page/customer-page-fallback";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 import type { Locale } from "@/lib/i18n/config";
 
 export default function CustomerReviewError({ reset }: { reset: () => void }) {
   const [locale, setLocale] = useState<Locale>("en");
   return (
-    <CustomerBlockingState
+    <CustomerPageFallback
       kind="error"
-      locale={locale}
       messages={customerMessages[locale]}
+      locale={locale}
       onLocaleChange={setLocale}
       onRetry={reset}
     />

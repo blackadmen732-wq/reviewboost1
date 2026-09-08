@@ -19,7 +19,8 @@
   --color-star: var(--rb-star);
   --color-danger: var(--rb-danger);
   --color-info: var(--rb-info);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-hanken);
+  --font-display: var(--font-bricolage);
 }
 
 :root {
@@ -28,7 +29,8 @@
   --rb-surface: #ffffff;
   --rb-quiet: #f2efe9;
   --rb-ink: #1a1712;
-  --rb-muted: #5c5349;
+  /* 5.5:1 on cream, so secondary copy clears AA at body size. */
+  --rb-muted: #6b635b;
   --rb-border: #e8e1d7;
   --rb-border-strong: #cfc5b6;
   --rb-brand: #00a86b;
@@ -48,6 +50,11 @@
      unmistakably gold. Unfilled stars stay outline-only, so filled versus
      unfilled is a shape difference and never colour alone. */
   --rb-star: #bf7d00;
+  /* An unfilled star is a control, so it needs 3:1 against the sheet it sits
+     on — not the near-invisible hairline grey these usually get drawn in. This
+     is 3.6:1 on white and warm enough not to read as a disabled state. Theme
+     independent: the customer page is always light. */
+  --rb-star-empty: #8f8579;
   --rb-warning: #9a6417;
   --rb-danger: #b33a3a;
   --rb-danger-soft: #faeaea;
@@ -99,10 +106,14 @@
 :root[data-theme="light"] {
   color-scheme: light;
   --rb-canvas: #f8f5f0;
-  --rb-surface: #fff;
+  --rb-surface: #ffffff;
   --rb-quiet: #f2efe9;
-  --rb-ink: #111;
-  --rb-muted: #555;
+  /* Same values as the default light theme above. They drifted apart once —
+     #111/#555 here against #1a1712/#6b635b there — which meant an explicitly
+     light document rendered a slightly cooler grey than an implicitly light
+     one, and the customer page has to look the same either way. */
+  --rb-ink: #1a1712;
+  --rb-muted: #6b635b;
   --rb-border: #e8e1d7;
   --rb-border-strong: #cfc5b6;
   --rb-brand: #00a86b;
@@ -159,7 +170,7 @@ html {
   min-width: 320px;
   background: var(--rb-canvas);
   font-family:
-    var(--font-geist-sans),
+    var(--font-hanken),
     ui-sans-serif,
     system-ui,
     -apple-system,

@@ -1,0 +1,693 @@
+/* --------------------------------------------------------------------------
+   The customer page
+   --------------------------------------------------------------------------
+   Two parts, in a fixed relationship: a business's photograph and identity
+   filling roughly the top two thirds, and ReviewBoost's white rating sheet
+   anchored to the bottom third with rounded upper corners overlapping the photo.
+
+   The proportions and rhythm here are measured from the design reference rather
+   than invented, then expressed in container-query units so the same composition
+   holds at 320px, at 390px, inside the owner's phone preview, and in the
+   centred column on a desktop monitor. If you are changing a number in this
+   file, you are changing the page architecture — that is the part businesses do
+   not get to restyle and customers get to recognise.
+   -------------------------------------------------------------------------- */
+
+.cp {
+  /*
+   * The customer page opts out of dark mode, deliberately.
+   *
+   * The sheet is white and the canvas is warm cream at every business, in every
+   * theme, because half of this page's value is that a customer who used one at
+   * a different business last month recognises it instantly. Inverting it for a
+   * phone that happens to be in dark mode would be a redesign triggered by a
+   * system setting. The hero is a photograph, so it has no light or dark
+   * variant to respect either.
+   */
+  color-scheme: light;
+  --rb-canvas: #f8f5f0;
+  --rb-surface: #ffffff;
+  --rb-ink: #1a1712;
+  --rb-muted: #6b635b;
+  --rb-border: #e8e1d7;
+  --rb-star: #bf7d00;
+  --rb-star-empty: #8f8579;
+  --rb-danger: #b33a3a;
+
+  /* Warm and dark, never grey. A business with no photograph yet should look
+     like a considered choice rather than a missing asset. */
+  --cp-hero-neutral: linear-gradient(166deg, #3b3128 0%, #251d17 48%, #16110d 100%);
+  --cp-sheet-radius: clamp(20px, 7cqw, 34px);
+
+  /* The page itself is the query container the frame asks about. A viewport
+     query would be wrong: the owner's 390px-wide preview sits on a desktop
+     monitor and must still get the phone composition. */
+  container-type: inline-size;
+  display: grid;
+  place-items: center;
+  min-height: var(--cp-height, 100dvh);
+  background: var(--rb-canvas);
+  color: var(--rb-ink);
+}
+
+.cp__frame {
+  container-type: inline-size;
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: var(--cp-height, 100dvh);
+  flex-direction: column;
+  overflow: hidden;
+  /* Behind the photograph, so a slow image never shows as a white flash. */
+  background: #100c09;
+}
+
+/* --------------------------------------------------------------------------
+   Business hero
+   -------------------------------------------------------------------------- */
+
+.cp-hero {
+  container-type: inline-size;
+  position: relative;
+  display: flex;
+  min-height: 42cqw;
+  /* Takes whatever the sheet does not need, which is how the roughly 68/32
+     split holds without pinning either half to a viewport percentage. */
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--cp-hero-neutral);
+  color: #fff;
+}
+
+.cp-hero__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cp-hero__scrim {
+  position: absolute;
+  inset: 0;
+  /* Only as much as the identity needs to stay legible on a bright photo. The
+     lower two thirds of the frame are left alone so the photograph reads as a
+     photograph rather than as a darkened background image. */
+  background: linear-gradient(
+    to bottom,
+    rgb(14 10 8 / 62%) 0%,
+    rgb(14 10 8 / 40%) 24%,
+    rgb(14 10 8 / 14%) 44%,
+    rgb(14 10 8 / 0%) 62%
+  );
+}
+
+.cp-hero[data-media="neutral"] .cp-hero__scrim {
+  background: none;
+}
+
+.cp-hero__top {
+  position: relative;
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: max(10px, env(safe-area-inset-top)) clamp(12px, 3.6cqw, 20px) 0;
+}
+
+.cp-hero__identity {
+  position: relative;
+  /* Percentage margins resolve against the container's width, so the identity
+     sits at a consistent fraction of the frame rather than drifting up and down
+     with the height of the phone. Matches the reference, where the name begins
+     at about a fifth of the way down the hero. */
+  margin-block-start: clamp(24px, 12cqw, 72px);
+  padding-inline: clamp(18px, 6cqw, 40px);
+  text-align: center;
+  text-shadow:
+    0 1px 2px rgb(0 0 0 / 42%),
+    0 2px 22px rgb(0 0 0 / 46%);
+}
+
+.cp-hero__identity[hidden] {
+  display: none;
+}
+
+.cp-hero__logo {
+  width: auto;
+  max-width: 68cqw;
+  max-height: 26cqw;
+  margin-inline: auto;
+  object-fit: contain;
+}
+
+.cp-hero__tagline {
+  margin: clamp(10px, 4.4cqw, 22px) 0 0;
+  color: rgb(255 255 255 / 88%);
+  font-size: clamp(8px, 2.6cqw, 13px);
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.cp-hero__fallback-mark {
+  color: #fff;
+}
+
+/* --------------------------------------------------------------------------
+   Business wordmark
+   --------------------------------------------------------------------------
+   One structure — a lead line, an optional hairline, an optional tracked
+   descriptor — composed six different ways. The Look changes the faces and the
+   proportions and nothing else, which is what keeps six options from becoming a
+   font menu.
+   -------------------------------------------------------------------------- */
+
+.cp-wordmark {
+  --cp-scale: 1;
+  display: block;
+  margin: 0;
+  color: #fff;
+}
+
+/* A name too long to be set large steps down instead of being clipped. */
+.cp-wordmark[data-scale="long"] {
+  --cp-scale: 0.72;
+}
+
+.cp-wordmark[data-scale="extended"] {
+  --cp-scale: 0.5;
+}
+
+.cp-wordmark__lead {
+  display: block;
+  font-size: calc(var(--cp-lead) * var(--cp-scale));
+  text-wrap: balance;
+}
+
+.cp-wordmark__rule {
+  display: none;
+  width: clamp(28px, 12cqw, 58px);
+  height: 2px;
+  margin: clamp(6px, 2.2cqw, 12px) auto;
+  background: rgb(255 255 255 / 72%);
+}
+
+.cp-wordmark__descriptor {
+  display: block;
+  font-family: var(--font-hanken), sans-serif;
+  font-size: calc(var(--cp-descriptor) * max(var(--cp-scale), 0.8));
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.44em;
+  /* Uppercased in CSS, never in the data, so a screen reader still announces
+     the business's name the way the owner typed it. */
+  text-transform: uppercase;
+  /* Tracking is added on the right of the last letter too, which visually
+     shifts a centred line left by half of it. */
+  text-indent: 0.44em;
+}
+
+.cp-wordmark[data-look="signature"] {
+  --cp-lead: clamp(34px, 15cqw, 76px);
+  --cp-descriptor: clamp(9px, 3.1cqw, 15px);
+}
+.cp-wordmark[data-look="signature"] .cp-wordmark__lead {
+  font-family: var(--font-look-signature), cursive;
+  font-weight: 400;
+  line-height: 1;
+}
+.cp-wordmark[data-look="signature"] .cp-wordmark__rule {
+  display: block;
+}
+
+.cp-wordmark[data-look="modern"] {
+  --cp-lead: clamp(26px, 11.4cqw, 56px);
+  --cp-descriptor: clamp(9px, 2.9cqw, 14px);
+}
+.cp-wordmark[data-look="modern"] .cp-wordmark__lead {
+  font-family: var(--font-hanken), sans-serif;
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+.cp-wordmark[data-look="modern"] .cp-wordmark__descriptor {
+  margin-block-start: clamp(8px, 3cqw, 16px);
+  letter-spacing: 0.36em;
+  text-indent: 0.36em;
+  opacity: 0.9;
+}
+
+.cp-wordmark[data-look="bold"] {
+  --cp-lead: clamp(30px, 15.5cqw, 78px);
+  --cp-descriptor: clamp(9px, 3.3cqw, 16px);
+}
+.cp-wordmark[data-look="bold"] .cp-wordmark__lead {
+  font-family: var(--font-look-bold), sans-serif;
+  font-weight: 400;
+  line-height: 0.9;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+}
+.cp-wordmark[data-look="bold"] .cp-wordmark__descriptor {
+  margin-block-start: clamp(6px, 2.4cqw, 13px);
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+}
+
+.cp-wordmark[data-look="editorial"] {
+  --cp-lead: clamp(30px, 13.4cqw, 66px);
+  --cp-descriptor: clamp(8px, 2.8cqw, 14px);
+}
+.cp-wordmark[data-look="editorial"] .cp-wordmark__lead {
+  font-family: var(--font-look-editorial), serif;
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+}
+.cp-wordmark[data-look="editorial"] .cp-wordmark__descriptor {
+  margin-block-start: clamp(8px, 3.2cqw, 17px);
+  font-weight: 500;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em;
+}
+
+.cp-wordmark[data-look="classic"] {
+  --cp-lead: clamp(28px, 13cqw, 64px);
+  --cp-descriptor: clamp(8px, 2.7cqw, 14px);
+}
+.cp-wordmark[data-look="classic"] .cp-wordmark__lead {
+  font-family: var(--font-look-classic), serif;
+  font-weight: 600;
+  line-height: 1.06;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.cp-wordmark[data-look="classic"] .cp-wordmark__rule {
+  display: block;
+}
+.cp-wordmark[data-look="classic"] .cp-wordmark__descriptor {
+  font-weight: 500;
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
+}
+
+.cp-wordmark[data-look="minimal"] {
+  --cp-lead: clamp(15px, 5.4cqw, 26px);
+  --cp-descriptor: clamp(8px, 2.6cqw, 13px);
+}
+.cp-wordmark[data-look="minimal"] .cp-wordmark__lead {
+  font-family: var(--font-hanken), sans-serif;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  text-indent: 0.26em;
+}
+
+/* --------------------------------------------------------------------------
+   Language control
+   -------------------------------------------------------------------------- */
+
+.cp-language {
+  position: relative;
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+  border: 1px solid rgb(255 255 255 / 26%);
+  border-radius: 999px;
+  padding-inline: 12px;
+  background: rgb(16 12 9 / 42%);
+  color: #fff;
+  backdrop-filter: blur(8px);
+}
+
+.cp-language__icon {
+  width: 15px;
+  height: 15px;
+}
+
+.cp-language__code {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.cp-language__select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: transparent;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.cp-language:has(.cp-language__select:focus-visible) {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+.cp-preview-badge {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  border-radius: 999px;
+  padding-inline: 10px;
+  background: rgb(16 12 9 / 62%);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+
+/* --------------------------------------------------------------------------
+   Rating sheet
+   --------------------------------------------------------------------------
+   ReviewBoost's half. Locked: a business cannot restyle any of it.
+
+   The vertical rhythm is taken from the reference and capped at the top end, so
+   a wide desktop column does not inflate the sheet into a poster.
+   -------------------------------------------------------------------------- */
+
+.cp-sheet {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  /* Content-sized, and it overlaps the hero by its own corner radius so the
+     photograph shows through beside the rounded corners — no card, no border,
+     no seam. */
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  margin-block-start: calc(var(--cp-sheet-radius) * -1);
+  border-start-start-radius: var(--cp-sheet-radius);
+  border-start-end-radius: var(--cp-sheet-radius);
+  padding:
+    clamp(22px, 8.2cqw, 38px) clamp(16px, 5cqw, 30px)
+    calc(clamp(16px, 5.4cqw, 26px) + env(safe-area-inset-bottom));
+  background: var(--rb-surface);
+  box-shadow: 0 -20px 44px -34px rgb(14 10 8 / 45%);
+  text-align: center;
+}
+
+.cp-sheet__question {
+  margin: 0;
+  color: var(--rb-ink);
+  font-size: clamp(25px, 9.2cqw, 40px);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.cp-sheet__instruction {
+  min-height: 1.4em;
+  margin: clamp(7px, 2.6cqw, 13px) 0 0;
+  color: var(--rb-muted);
+  font-size: clamp(9.5px, 2.95cqw, 13px);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-indent: 0.16em;
+  text-wrap: balance;
+}
+
+.cp-sheet__alert {
+  display: grid;
+  min-height: 1.4em;
+  gap: 2px;
+  margin: clamp(7px, 2.6cqw, 13px) 0 0;
+  color: var(--rb-danger);
+  font-size: clamp(12px, 3.5cqw, 15px);
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+.cp-sheet__alert-heading {
+  font-weight: 700;
+}
+
+.cp-sheet__retry {
+  min-height: 48px;
+  margin-block-start: clamp(14px, 4.5cqw, 22px);
+  border: 1px solid var(--rb-ink);
+  border-radius: 14px;
+  padding-inline: 26px;
+  /* Ink on white, white label. The customer page never spends brand green on a
+     recovery button. */
+  background: var(--rb-ink);
+  color: #fff;
+  font-size: clamp(14px, 4cqw, 16px);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.cp-sheet__retry:focus-visible {
+  outline: 3px solid var(--rb-ink);
+  outline-offset: 3px;
+}
+
+.cp-sheet__footer {
+  display: grid;
+  gap: clamp(5px, 2.2cqw, 10px);
+  margin-block-start: clamp(20px, 7.4cqw, 34px);
+}
+
+.cp-sheet__powered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin: 0;
+  color: var(--rb-muted);
+  font-size: clamp(11px, 3.4cqw, 14px);
+  line-height: 1.3;
+}
+
+.cp-sheet__bolt {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+}
+
+.cp-sheet__mark {
+  font-size: inherit;
+  color: var(--rb-ink);
+}
+
+.cp-sheet__brandline {
+  margin: 0;
+  /* Kept extremely secondary: this is a brand line, not a message the customer
+     needs. It must never compete with the stars. */
+  color: color-mix(in srgb, var(--rb-muted) 62%, var(--rb-surface));
+  font-size: clamp(7px, 2.2cqw, 9.5px);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  text-indent: 0.11em;
+}
+
+/* --------------------------------------------------------------------------
+   Stars
+   -------------------------------------------------------------------------- */
+
+.cp-stars {
+  min-width: 0;
+  width: 100%;
+  margin: clamp(20px, 7cqw, 32px) 0 0;
+  border: 0;
+  padding: 0;
+}
+
+.cp-stars__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(2px, 1.6cqw, 9px);
+}
+
+.cp-star {
+  position: relative;
+  display: block;
+}
+
+/*
+ * The real radio, stretched over its own star and made invisible.
+ *
+ * This is the rule whose absence once left five native radio circles drawn on
+ * top of the stars on the live page: the sibling selectors below existed, the
+ * base rule did not. Keep it.
+ *
+ * Full-size rather than one pixel in a corner, so the input *is* the tap target
+ * and the generous hit area is the same shape as the thing being aimed at.
+ */
+.cp-star__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  appearance: none;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.cp-star__label {
+  display: grid;
+  width: clamp(48px, 15.4cqw, 68px);
+  height: clamp(48px, 15.4cqw, 68px);
+  place-items: center;
+  border-radius: 18px;
+  cursor: pointer;
+}
+
+.cp-star__glyph {
+  width: 100%;
+  height: 100%;
+  /* The glyph is decoration sitting under a full-size radio. Leaving it in the
+     hit test lets a touch land on the drawing instead of the control — which
+     mobile Chromium's touch adjustment will happily do, since it snaps to
+     whatever looks tappable nearby. */
+  pointer-events: none;
+  color: var(--rb-star-empty);
+  fill: none;
+  transition:
+    color 120ms ease,
+    fill 120ms ease,
+    transform 130ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Filled is a shape change as well as a colour change, so the rating is never
+   carried by colour alone. */
+.cp-star__glyph[data-filled] {
+  color: var(--rb-star);
+  fill: var(--rb-star);
+}
+
+.cp-star__input:focus-visible + .cp-star__label {
+  outline: 3px solid var(--rb-ink);
+  outline-offset: -1px;
+}
+
+.cp-star__input:active + .cp-star__label .cp-star__glyph {
+  transform: scale(0.93);
+}
+
+@media (hover: hover) {
+  .cp-star__label:hover .cp-star__glyph {
+    color: color-mix(in srgb, var(--rb-star) 62%, var(--rb-star-empty));
+  }
+}
+
+/* The stars are not ready to accept a tap yet, and say so rather than swallowing
+   one. */
+.cp-sheet[data-status="loading"] .cp-stars {
+  opacity: 0.42;
+}
+
+/* --------------------------------------------------------------------------
+   Message states
+   -------------------------------------------------------------------------- */
+
+/* Without stars the sheet is short, which would leave an unexplained expanse of
+   dark above it. The hero centres its mark and the sheet takes more room, so the
+   page still reads as composed rather than broken. */
+.cp-hero--message .cp-hero__identity {
+  margin-block: auto;
+  padding-block-end: 10%;
+}
+
+.cp-sheet--message {
+  padding-block: clamp(30px, 11cqw, 52px)
+    calc(clamp(26px, 9cqw, 44px) + env(safe-area-inset-bottom));
+}
+
+.cp-sheet--message .cp-sheet__question {
+  font-size: clamp(22px, 7.6cqw, 34px);
+  letter-spacing: -0.03em;
+}
+
+.cp-sheet--message .cp-sheet__instruction {
+  font-size: clamp(13px, 4cqw, 17px);
+  font-weight: 500;
+  letter-spacing: normal;
+  text-indent: 0;
+  text-transform: none;
+}
+
+/* --------------------------------------------------------------------------
+   Desktop
+   --------------------------------------------------------------------------
+   The customer experience, centred on the ReviewBoost canvas at phone width —
+   not a business photograph stretched to 1600px. The container query rather
+   than a viewport query is what lets the owner's phone preview keep the mobile
+   composition while sitting on a wide screen.
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 620px) {
+  .cp:not([data-mode="preview"]) {
+    padding: 28px 24px;
+  }
+}
+
+@container (min-width: 620px) {
+  .cp__frame {
+    width: min(100%, 496px);
+    min-height: 0;
+    height: min(calc(100dvh - 56px), 860px);
+    border-radius: 34px;
+    box-shadow:
+      0 1px 2px rgb(38 32 24 / 6%),
+      0 40px 90px -50px rgb(38 32 24 / 55%);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Narrow phones, reduced motion, forced colours
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-star__glyph {
+    transition-property: color, fill;
+  }
+
+  .cp-star__input:active + .cp-star__label .cp-star__glyph {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .cp-star__glyph[data-filled] {
+    color: Highlight;
+    fill: Highlight;
+  }
+
+  .cp-sheet {
+    border: 1px solid CanvasText;
+  }
+
+  .cp-language,
+  .cp-preview-badge {
+    border: 1px solid CanvasText;
+  }
+}
