@@ -275,10 +275,11 @@ export async function rotateStandToken(
 /**
  * Recover a stand's token so it can be reprinted.
  *
- * Reads the encrypted copy rather than the digest, which is the only direction
- * that works — a digest cannot be reversed. Returns null for a stand created
- * before reprinting existed, so the caller can tell the owner to rotate instead
- * of showing them a broken QR code.
+ * Reads the encrypted copy through a DEFINER RPC rather than the digest —
+ * a digest cannot be reversed, and the ciphertext column is not granted to
+ * authenticated (Data API callers must not dump every stand token). Returns
+ * null for a stand created before reprinting existed, so the caller can tell
+ * the owner to rotate instead of showing them a broken QR code.
  */
 export async function getStandTokenForReprint(
   context: AuthenticatedContext,
@@ -286,22 +287,31 @@ export async function getStandTokenForReprint(
   orgId: string,
   requestId: string,
 ): Promise<{ token: string; standUrl: string; label: string } | null> {
-  const { data, error } = await context.db
-    .from("review_stands")
-    .select("id, label, public_token_encrypted")
-    .eq("id", standId)
-    .eq("org_id", orgId)
-    .maybeSingle();
+  const { data, error } = await context.db.rpc("rpc_get_stand_token_ciphertext", {
+    p_stand_id: standId,
+    p_org_id: orgId,
+  });
 
-  if (error) databaseFailure("stand_reprint", error, requestId);
-  // Invisible under RLS when it belongs to another tenant, so a cross-tenant
-  // attempt looks exactly like a typo.
-  if (!data) throw new ApiError(404, ERROR_CODE.reviewLinkInactive, "Not found.");
+  if (error) {
+    if (error.message?.includes("not_found_or_forbidden")) {
+      throw new ApiError(404, ERROR_CODE.reviewLinkInactive, "Not found.");
+    }
+    databaseFailure("stand_reprint", error, requestId);
+  }
 
-  const token = tryDecrypt(data.public_token_encrypted as string | null);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new ApiError(404, ERROR_CODE.reviewLinkInactive, "Not found.");
+
+  const token = tryDecrypt(
+    ((row as { token_ciphertext?: string | null }).token_ciphertext as string | null) ?? null,
+  );
   if (token === null) return null;
 
-  return { token, standUrl: standUrl(publicFrontendUrl(), token), label: data.label as string };
+  return {
+    token,
+    standUrl: standUrl(publicFrontendUrl(), token),
+    label: (row as { label?: string }).label as string,
+  };
 }
 
 // ------------------------------------------------- NFC provisioning --
