@@ -519,11 +519,13 @@ security definer
 set search_path = ''
 as $$
 declare
-    v_profile   record;
-    v_hero_id   uuid;
-    v_logo_id   uuid;
-    v_hero      record;
-    v_logo      record;
+    v_profile        record;
+    v_hero_id        uuid;
+    v_logo_id        uuid;
+    v_hero_variants  jsonb    := '[]'::jsonb;
+    v_hero_width     integer;
+    v_hero_height    integer;
+    v_logo_variants  jsonb    := '[]'::jsonb;
 begin
     -- Prefer the location override if it has ever been published.
     select p.* into v_profile
@@ -552,7 +554,7 @@ begin
 
     if v_hero_id is not null then
         select a.variants, a.width, a.height
-          into v_hero
+          into v_hero_variants, v_hero_width, v_hero_height
           from public.customer_page_assets a
          where a.id = v_hero_id
            and a.org_id = p_org_id
@@ -562,7 +564,7 @@ begin
 
     if v_logo_id is not null then
         select a.variants
-          into v_logo
+          into v_logo_variants
           from public.customer_page_assets a
          where a.id = v_logo_id
            and a.org_id = p_org_id
@@ -574,10 +576,10 @@ begin
     select v_profile.scope,
            v_profile.published,
            v_profile.published_version,
-           coalesce(v_hero.variants, '[]'::jsonb),
-           v_hero.width,
-           v_hero.height,
-           coalesce(v_logo.variants, '[]'::jsonb);
+           coalesce(v_hero_variants, '[]'::jsonb),
+           v_hero_width,
+           v_hero_height,
+           coalesce(v_logo_variants, '[]'::jsonb);
 end;
 $$;
 
