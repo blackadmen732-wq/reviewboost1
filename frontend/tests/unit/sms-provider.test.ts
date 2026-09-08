@@ -401,7 +401,30 @@ describe("twilio send outcome classification", () => {
     expect(url).toContain(encodeURIComponent("+15551230000"));
   });
 
+  it("lookup finds a singleton only when the body matches exactly", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            messages: [{ sid: "SMexact", status: "queued", body: "hi", date_created: "2026-09-08T12:00:00Z" }],
+          }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(result).toMatchObject({ outcome: "found", providerMessageId: "SMexact" });
+  });
+
   it("lookup is unknown for a lone candidate whose body does not match", async () => {
+    // SENTINEL lock: a recipient/date singleton must not attach when the body differs.
     configureEnv();
     vi.stubGlobal(
       "fetch",
@@ -421,6 +444,8 @@ describe("twilio send outcome classification", () => {
       body: "hi",
     });
     expect(result.outcome).toBe("unknown");
+    expect(result).not.toHaveProperty("providerMessageId");
+    expect(result.raw).toMatchObject({ error: "no_body_match" });
   });
 
   it("lookup is unknown when a full page has no match (do not fail+release)", async () => {

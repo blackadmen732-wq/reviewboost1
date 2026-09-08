@@ -8,14 +8,14 @@
 -- lifecycle, the outbox lease, webhook dedupe, and the single-in-flight guard.
 --
 --   supabase test db
---   129 assertions in this file.
+--   138 assertions in this file.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(129);
+select plan(138);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -808,6 +808,79 @@ select is(
 select is(
     (select allocated from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b'),
     30::bigint, 'equal-timestamp grants: allocated projection is the reserved remainder');
+
+-- ===================== expired grant must not be FIFO prior capacity =====
+
+-- Unused grant A expires fully, then grant B takes a reservation and expires.
+-- prior_capacity must not still count A: that makes B look unused, expires B
+-- in full, and leaves reserved credits against allocated=0 (negative available).
+delete from public.sms_quota_ledger where org_id = '7c000000-0000-0000-0000-00000000000b';
+delete from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b';
+
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 100, 'ghost-fifo-a',
+    null, null);
+-- A must be strictly older than B. Equal now() plus UUID order can hide the
+-- ghost-capacity case when B sorts first.
+update public.sms_quota_ledger
+   set expires_at = now() - interval '1 second',
+       effective_at = now() - interval '10 seconds'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'ghost-fifo-a';
+select app.sms_quota_apply_expirations('7c000000-0000-0000-0000-00000000000b');
+
+select is(
+    (select allocated from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b'),
+    0::bigint, 'unused expired grant A leaves allocated at 0');
+
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 50, 'ghost-fifo-b',
+    null, null);
+select is(
+    (select reserved from app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 30, 'ghost-fifo-resv-b', null)),
+    true, 'reservation against grant B succeeds after unused A expired');
+
+select is(
+    app.sms_quota_fifo_used(
+        '7c000000-0000-0000-0000-00000000000b',
+        (select id from public.sms_quota_ledger
+          where org_id = '7c000000-0000-0000-0000-00000000000b'
+            and kind = 'allocation' and correlation_key = 'ghost-fifo-b')),
+    30::bigint,
+    'expired grant A is not prior_capacity: B is charged the 30 reserved');
+
+update public.sms_quota_ledger
+   set expires_at = now() - interval '1 second'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'ghost-fifo-b';
+
+select ok(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b') >= 0,
+    'available cannot go negative while B is expired but unswept');
+
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    0::bigint, 'unswept B expires only its unused 20; reserved 30 stay covered');
+
+select is(
+    app.sms_quota_apply_expirations('7c000000-0000-0000-0000-00000000000b'),
+    1, 'grant B is swept once');
+
+select is(
+    (select amount from public.sms_quota_ledger
+      where org_id = '7c000000-0000-0000-0000-00000000000b'
+        and kind = 'expiration'
+        and correlation_key = 'expire:' || (
+            select id::text from public.sms_quota_ledger
+             where org_id = '7c000000-0000-0000-0000-00000000000b'
+               and kind = 'allocation' and correlation_key = 'ghost-fifo-b')),
+    20::bigint, 'grant B expires unused 20, not the full 50');
+
+select is(
+    (select allocated from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b'),
+    30::bigint, 'after B expires, allocated covers the outstanding reservation');
+
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    0::bigint, 'after B expires, available is 0 not negative');
 
 -- ================================ atomic receipt replay after settle ======
 
