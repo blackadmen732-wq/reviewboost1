@@ -128,27 +128,27 @@ export async function receiveWebhook(input: {
   try {
     if (parsed.kind === "delivery_status") {
       if (parsed.terminal) {
-        const { data, error } = await svc.rpc("rpc_sms_apply_delivery_status", {
+        // Park the SID + terminal on the inbox first, then apply. If the
+        // attempt is not settled yet this returns no_matching_attempt and
+        // leaves the row findable; sms_settle_attempt replays it in the same
+        // transaction that writes the provider message id. HTTP 200 is safe
+        // because replay does not depend on a provider retry.
+        const { data, error } = await svc.rpc("rpc_sms_apply_or_park_delivery_status", {
+          p_inbox_id: inboxId,
           p_provider: providerName,
           p_provider_message_id: parsed.providerMessageId,
           p_terminal: parsed.terminal,
           p_error_class: parsed.errorClass ?? null,
         });
         if (error) throw error;
-        // Receipt arrived before the attempt was settled (race). Keep the
-        // inbox row in 'received' so a provider retry can reprocess it once
-        // the attempt exists — do NOT mark it processed.
         const result = typeof data === "string" ? data : Array.isArray(data) ? data[0] : data;
         if (result === "no_matching_attempt") {
-          const { error: settleErr } = await svc.rpc("rpc_sms_webhook_settle", {
-            p_id: inboxId,
-            p_status: "received",
-            p_org_id: null,
-            p_error: "unmatched_receipt",
-          });
-          if (settleErr) throw settleErr;
           return { accepted: true, duplicate: false, action: "delivery_status" };
         }
+        if (result === "invalid") {
+          throw new Error("invalid_parked_receipt");
+        }
+        return { accepted: true, duplicate: false, action: "delivery_status" };
       }
       await settleProcessed();
       return { accepted: true, duplicate: false, action: "delivery_status" };

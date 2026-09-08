@@ -133,7 +133,11 @@ safe and a crashed worker's lease is reclaimable. `complete`/`fail`/`defer` are
 **lease-owner guarded**, so a stale worker cannot mutate a job another worker has
 reclaimed. Failures back off exponentially; `max_attempts` sends a job to
 `dead_letter` (a durable "needs a human"), never a silent drop — including an
-expired-lease job that has already used all its attempts.
+expired-lease job that has already used all its attempts. A dead-lettered job
+whose request is still `queued` (retryable 429 path) **fails the request and
+releases its reservation in the same transaction**. A dead-letter while the
+request is `sending` parks it as `provider_unknown` and keeps the reservation
+(the provider may already have accepted the message).
 
 ## 9. Webhook inbox **[impl][test-ci]**
 
@@ -145,7 +149,11 @@ namespace and rejected (HTTP 403). A verified event is written by
 but a retry of an event that never reached `processed` (a transient failure) is
 **reclaimed for reprocessing** (all business handlers are idempotent). The
 `processed` settle is error-checked so a lost settle leaves the row reclaimable
-rather than acknowledged-and-skipped. The raw body is stored encrypted.
+rather than acknowledged-and-skipped. A terminal delivery receipt that arrives
+before the attempt records its provider message id is **parked by SID**
+(`pending_terminal`) and acknowledged with HTTP 200; `app.sms_settle_attempt`
+**replays it in the same transaction** that persists the SID — recovery does
+not depend on an unsolicited provider retry. The raw body is stored encrypted.
 
 ## 10. Provider boundary **[impl]** / Twilio **[needs-provider]**
 
@@ -223,8 +231,11 @@ key does not double-count. **Expiry is enforced**: `app.sms_quota_apply_expirati
 cron target) appends an idempotent `expiration` entry and removes lapsed
 allocations from the projection, and `app.sms_quota_available` discounts any
 not-yet-swept expired allocation — so an allocation past its `expires_at` is never
-spendable. pgTAP asserts an already-expired grant yields zero available and a
-reservation against it is refused.
+spendable. Unused remainder is attributed with **locked FIFO** (`effective_at`,
+then `id`) so equal-timestamp grants cannot claim the same ledger movement.
+pgTAP asserts an already-expired grant yields zero available, a reservation
+against it is refused, and equal-timestamp overlapping grants expire
+`sum(grants) - net_reserved` (not a double-attributed remainder).
 
 ## 16. API endpoints **[impl][test-ci for auth/isolation via pgTAP]**
 
@@ -262,18 +273,17 @@ errors, rate-limited where it matters:
 
 ## 18. Tests **[test-ci]**
 
-- **vitest** (`tests/unit/sms-*.test.ts`): 78 cases across segments, phone
-  normalization, keywords, quiet-hours/DST (incl. spring-forward gap), cost
-  (incl. safe-integer/overflow boundaries), dedupe, the provider boundary (Twilio
-  signature verification, inbound-vs-status classification, fake production
-  signature, message-id identity, rate safe-integer validation), and the
-  timezone fail-closed / fallback policy in `resolveStand`.
-- **pgTAP** (`supabase/tests/text_requests_test.sql`): 59 assertions across RLS
+- **vitest** (`tests/unit/sms-*.test.ts`): provider, webhook, and dispatch
+  coverage including 429/5xx classification, parked unmatched receipts, and
+  dead-letter vs retryable outbox outcomes, plus segments, phone normalization,
+  keywords, quiet-hours/DST, cost, dedupe, and the timezone fail-closed policy.
+- **pgTAP** (`supabase/tests/text_requests_test.sql`): 109 assertions across RLS
   isolation, the consent ledger + projection, the suppression gate, STOP/START,
-  phone-level opt-out (STOP-before-consent + retry idempotency), the state
-  machine, quota (incl. double-spend refusal, idempotency, and expiry), the
+  phone-level opt-out, the state machine, quota (double-spend, idempotency,
+  partial expiry, FIFO equal-timestamp attribution), the
   schedule→dispatch→settle lifecycle, quiet-hours defer, stranded-send recovery,
-  outbox leasing, webhook dedupe, and the single-in-flight guard.
+  outbox leasing, dead-letter fail+release, webhook dedupe, receipt-before-SID
+  park + atomic settle replay, and the single-in-flight guard.
 
 ## 19. CI
 
