@@ -69,4 +69,13 @@ describe("consumeRateLimit — fail closed", () => {
       code: "service_unavailable",
     });
   });
+
+  it("fails closed (503) on a bare object — table RPCs must return an array", async () => {
+    rpc.mockResolvedValue({ data: { allowed: true, retry_after_seconds: 1 }, error: null });
+    const { consumeRateLimit } = await load();
+    await expect(consumeRateLimit(BUDGET, "org-1", "req-1")).rejects.toMatchObject({
+      status: 503,
+      code: "service_unavailable",
+    });
+  });
 });

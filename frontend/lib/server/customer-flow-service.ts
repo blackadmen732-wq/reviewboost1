@@ -198,8 +198,10 @@ async function guardRead(tokenHash: string, meta: RequestMeta): Promise<void> {
 }
 
 async function guardWrite(tokenHash: string, meta: RequestMeta): Promise<void> {
-  await consumeRateLimit(STAND_WRITE_BUDGET, tokenHash, meta.requestId);
+  // Per-device first: a rejected or unavailable client check must not spend
+  // the shared stand budget and lock out unrelated customers on retry.
   await consumeRateLimit(CLIENT_WRITE_BUDGET, clientFingerprint(meta.address, meta.userAgent), meta.requestId);
+  await consumeRateLimit(STAND_WRITE_BUDGET, tokenHash, meta.requestId);
 }
 
 interface ResolvedStand {

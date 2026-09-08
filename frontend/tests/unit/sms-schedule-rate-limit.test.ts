@@ -94,4 +94,11 @@ describe("POST /api/v1/text-requests — schedule rate-limit fail-closed", () =>
     const response = await POST(request(VALID));
     expect(response.status).toBe(503);
   });
+
+  it("rejects an invalid body without charging the schedule limiter", async () => {
+    const { POST } = await import("@/app/api/v1/text-requests/route");
+    const response = await POST(request({ phone: "x" }));
+    expect(response.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
 });

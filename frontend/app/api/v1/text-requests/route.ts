@@ -32,6 +32,10 @@ export async function POST(request: NextRequest): Promise<Response> {
     const context = await requireOrganizationContext(request);
     requireRole(context.role, ["owner", "admin"]);
 
+    // Validate before charging the per-org budget so a malformed body cannot
+    // spend quota and block a later valid schedule.
+    const body = parseOrThrow(scheduleSchema, await readJsonBody(request));
+
     // Per-org rate limit, shared across instances via the database. Store
     // errors and empty decisions fail closed (503) — never an empty allow.
     await consumeRateLimit(
@@ -40,7 +44,6 @@ export async function POST(request: NextRequest): Promise<Response> {
       requestId,
     );
 
-    const body = parseOrThrow(scheduleSchema, await readJsonBody(request));
     const result = await scheduleTextRequest(context, body, requestId);
 
     return json(request, requestId, result.created ? 201 : 200, { data: result, requestId });

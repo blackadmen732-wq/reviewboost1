@@ -25,7 +25,10 @@ interface RateLimitDecision {
 }
 
 function decisionOf(data: unknown): RateLimitDecision | null {
-  const row = Array.isArray(data) ? data[0] : data;
+  // Table-returning RPC: only a non-empty array is a real decision. A bare
+  // `{ allowed: true }` (or any other object) is malformed — fail closed.
+  if (!Array.isArray(data) || data.length === 0) return null;
+  const row = data[0];
   if (!row || typeof row !== "object") return null;
   const allowed = (row as { allowed?: unknown }).allowed;
   if (typeof allowed !== "boolean") return null;

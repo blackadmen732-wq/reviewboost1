@@ -584,9 +584,11 @@ describe("rate limiting", () => {
       .map((call) => call.args["p_bucket"]);
 
     // Per stand alone would punish a busy restaurant sharing one address; per
-    // device alone would leave one printed code unbounded.
+    // device alone would leave one printed code unbounded. Client is consumed
+    // first so a rejected device does not spend the shared stand budget.
     expect(buckets).toContain("public-write-stand");
     expect(buckets).toContain("public-write-client");
+    expect(buckets.indexOf("public-write-client")).toBeLessThan(buckets.indexOf("public-write-stand"));
   });
 
   it("never sends a raw address to the database", async () => {
