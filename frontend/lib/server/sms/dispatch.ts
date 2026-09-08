@@ -162,7 +162,6 @@ export async function dispatchOnce(options?: {
           backoffSeconds: BACKOFF_BASE_SECONDS * Math.pow(2, Math.min(job.attempts, 6)),
         });
         if (!failRecord.recorded) {
-          summary.failRecordFailed += 1;
           throw new Error("fail_outbox_unrecorded");
         }
         // Terminal dead-letter fails the queued request and releases the
