@@ -6,7 +6,8 @@
 -- 3. sms_apply_delivery_status: add FOR UPDATE on attempt lookup.
 -- 4. sms_quota_apply_expirations: expire remaining unused credits, not the
 --    original allocation amount.
--- 5. Compliance indexes.
+-- 5. sms_quota_available: align pre-sweep read-path with partial expiry.
+-- 6. Compliance indexes.
 
 
 -- ======== 1. Transition table ============================================
@@ -279,7 +280,69 @@ end;
 $$;
 
 
--- ======== 5. Compliance indexes ==========================================
+-- ======== 5. sms_quota_available: align pre-sweep read with partial expiry
+--
+-- The read-path must subtract the same unused remainder as the sweep, not
+-- the full original allocation amount, so available stays correct between
+-- expires_at and the next cron sweep.
+
+create or replace function app.sms_quota_available(p_org_id uuid)
+returns bigint
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+    v_base    bigint;
+    v_unswept bigint := 0;
+    r         record;
+    v_used    bigint;
+begin
+    v_base := coalesce(
+        (select b.allocated - b.reserved - b.consumed
+           from public.sms_quota_balance b where b.org_id = p_org_id),
+        0::bigint);
+
+    for r in
+        select l.id, l.amount
+          from public.sms_quota_ledger l
+         where l.org_id = p_org_id
+           and l.kind = 'allocation'
+           and l.expires_at is not null
+           and l.expires_at <= now()
+           and not exists (
+               select 1 from public.sms_quota_ledger e
+                where e.org_id = p_org_id
+                  and e.kind = 'expiration'
+                  and e.correlation_key = 'expire:' || l.id::text)
+    loop
+        select coalesce(sum(
+            case when u.kind = 'reservation' then u.amount
+                 when u.kind in ('release', 'refund') then -u.amount
+                 else 0 end
+        ), 0) into v_used
+          from public.sms_quota_ledger u
+         where u.org_id = p_org_id
+           and u.kind in ('reservation', 'release', 'refund')
+           and u.effective_at >= (select al.effective_at from public.sms_quota_ledger al where al.id = r.id)
+           and u.effective_at <= coalesce(
+               (select min(al2.effective_at)
+                  from public.sms_quota_ledger al2
+                 where al2.org_id = p_org_id
+                   and al2.kind = 'allocation'
+                   and al2.effective_at > (select al3.effective_at from public.sms_quota_ledger al3 where al3.id = r.id)),
+               now());
+
+        v_unswept := v_unswept + greatest(0, r.amount - v_used);
+    end loop;
+
+    return v_base - v_unswept;
+end;
+$$;
+
+
+-- ======== 6. Compliance indexes ==========================================
 
 create index if not exists sms_consent_state_phone_hash_idx
     on public.sms_consent_state (phone_hash);
