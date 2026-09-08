@@ -70,7 +70,10 @@ export async function reconcileOnce(options?: {
         error: reason,
         backoffSeconds: BACKOFF_BASE_SECONDS * Math.pow(2, Math.min(job.attempts, 6)),
       });
-      if (!recorded.recorded) summary.failedRecord += 1;
+      if (!recorded.recorded) {
+        summary.failedRecord += 1;
+        return;
+      }
       if (recorded.status === "dead_letter") summary.released += 1;
       else summary.deferred += 1;
     };
@@ -100,6 +103,12 @@ export async function reconcileOnce(options?: {
       if (!row || row.outcome !== "ready" || !row.attempt_id) {
         await complete();
         summary.skipped += 1;
+        continue;
+      }
+
+      if (row.provider && row.provider !== provider.name) {
+        // Wrong adapter cannot prove absence — keep reserved.
+        await deferUnknown(`provider_mismatch: ${row.provider}`);
         continue;
       }
 

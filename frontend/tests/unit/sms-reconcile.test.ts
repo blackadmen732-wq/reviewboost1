@@ -139,6 +139,24 @@ describe("reconcileOnce", () => {
     expect(rpc.mock.calls.some(([name]) => name === "rpc_sms_complete_outbox")).toBe(false);
   });
 
+  it("defers when the attempt's provider does not match the configured adapter", async () => {
+    rpc.mockReset();
+    lookup.mockReset();
+    rpc.mockImplementation(async (name: string) => {
+      if (name === "rpc_sms_claim_outbox") return { data: [JOB], error: null };
+      if (name === "rpc_sms_reconcile_prepare") {
+        return { data: { ...ready(), provider: "twilio" }, error: null };
+      }
+      if (name === "rpc_sms_fail_outbox") return { data: "pending", error: null };
+      return { data: null, error: { message: `unexpected rpc ${name}` } };
+    });
+
+    const { reconcileOnce } = await load();
+    const summary = await reconcileOnce({ worker: "rw1", limit: 1 });
+    expect(summary).toMatchObject({ claimed: 1, deferred: 1, released: 0 });
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
   it("skips and completes when the request is already resolved", async () => {
     rpc.mockReset();
     lookup.mockReset();
