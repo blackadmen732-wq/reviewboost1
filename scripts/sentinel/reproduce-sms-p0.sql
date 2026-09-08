@@ -34,6 +34,19 @@ select app.sms_quota_allocate(
 select app.sms_quota_reserve(
     'a1000000-0000-0000-0000-0000000000f1', 30, 'sentinel-fifo-resv-1', null);
 
+-- Pin order: expired grant A is strictly older. Equal effective_at lets
+-- UUID order hide the stale prior_capacity bug.
+update public.sms_quota_ledger
+   set effective_at = now() - interval '10 seconds'
+ where org_id = 'a1000000-0000-0000-0000-0000000000f1'
+   and kind = 'allocation'
+   and correlation_key = 'sentinel-fifo-grant-a';
+update public.sms_quota_ledger
+   set effective_at = now() - interval '5 seconds'
+ where org_id = 'a1000000-0000-0000-0000-0000000000f1'
+   and kind = 'allocation'
+   and correlation_key = 'sentinel-fifo-grant-b';
+
 update public.sms_quota_ledger
    set expires_at = now() - interval '1 second'
  where org_id = 'a1000000-0000-0000-0000-0000000000f1'
