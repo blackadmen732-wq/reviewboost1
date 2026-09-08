@@ -42,13 +42,14 @@ begin
      limit 1;
 
     insert into public.sms_outbox (
-        org_id, topic, request_id, idempotency_key, payload
+        org_id, topic, request_id, idempotency_key, payload, available_at
     ) values (
         p_org_id,
         'sms.reconcile',
         p_request_id,
         'reconcile:' || p_request_id::text,
-        jsonb_build_object('attemptId', v_attempt)
+        jsonb_build_object('attemptId', v_attempt),
+        now() + interval '30 seconds'
     )
     on conflict (idempotency_key) do nothing
     returning id into v_id;

@@ -140,11 +140,14 @@ whose request is still `queued` (retryable 429 path) **fails the request and
 releases its reservation in the same transaction**. A dead-letter while the
 request is `sending` parks it as `provider_unknown` and keeps the reservation
 (the provider may already have accepted the message). Entering
-`provider_unknown` enqueues a `sms.reconcile` outbox job (idempotent). Dispatch
-claim is topic-filtered so it cannot pick reconcile work. A reconcile
-dead-letter **fails+releases** (lookup never confirmed a SID; still never a
-re-send). `fail_outbox` is retried in the worker; a lost write leaves the job
-leased until expiry, then the same terminal SQL paths run.
+`provider_unknown` enqueues a `sms.reconcile` outbox job (idempotent) with
+`available_at = now() + 30 seconds` so a same-tick empty Twilio list cannot
+release a send Twilio is still accepting. Dispatch claim is topic-filtered so
+it cannot pick reconcile work. A lookup of `not_found` within two minutes of
+`dispatched_at` is treated as `unknown` (Twilio may still be accepting). A
+reconcile dead-letter **fails+releases** (lookup never confirmed a SID; still
+never a re-send). `fail_outbox` is retried in the worker; a lost write leaves
+the job leased until expiry, then the same terminal SQL paths run.
 
 ## 9. Webhook inbox **[impl][test-ci]**
 
@@ -291,7 +294,7 @@ errors, rate-limited where it matters:
   timeout-after-accept lookup, fail_outbox retries, dead-letter vs retryable
   outbox outcomes, plus segments, phone normalization, keywords, quiet-hours/DST,
   cost, dedupe, and the timezone fail-closed policy.
-- **pgTAP** (`supabase/tests/text_requests_test.sql`): 128 assertions across RLS
+- **pgTAP** (`supabase/tests/text_requests_test.sql`): 129 assertions across RLS
   isolation, the consent ledger + projection, the suppression gate, STOP/START,
   phone-level opt-out, the state machine, quota (double-spend, idempotency,
   partial expiry, FIFO equal-timestamp attribution), the

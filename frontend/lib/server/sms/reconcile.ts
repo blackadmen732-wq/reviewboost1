@@ -18,6 +18,7 @@ import { serviceRoleClient } from "@/lib/server/supabase";
  */
 
 const BACKOFF_BASE_SECONDS = 30;
+const NOT_FOUND_GRACE_MS = 2 * 60 * 1000;
 
 export interface ReconcileSummary {
   claimed: number;
@@ -134,6 +135,13 @@ export async function reconcileOnce(options?: {
       }
 
       if (lookup.outcome === "not_found") {
+        const dispatchedMs = row.dispatched_at ? Date.parse(row.dispatched_at) : NaN;
+        const ageMs = Number.isFinite(dispatchedMs) ? Date.now() - dispatchedMs : Number.POSITIVE_INFINITY;
+        // A timeout's first empty list is not proof the provider never accepted.
+        if (ageMs < NOT_FOUND_GRACE_MS) {
+          await deferUnknown("lookup_not_found_grace");
+          continue;
+        }
         const { data: released, error: failError } = await svc.rpc("rpc_sms_reconcile_fail_release", {
           p_request_id: job.request_id,
           p_org_id: job.org_id,

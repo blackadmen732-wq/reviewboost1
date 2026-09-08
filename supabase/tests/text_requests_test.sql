@@ -8,14 +8,14 @@
 -- lifecycle, the outbox lease, webhook dedupe, and the single-in-flight guard.
 --
 --   supabase test db
---   128 assertions in this file.
+--   129 assertions in this file.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(128);
+select plan(129);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -1050,6 +1050,13 @@ select is(
         and request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid')),
     1, 'provider_unknown enqueues a durable reconcile job');
 
+select ok(
+    (select available_at > now() + interval '20 seconds'
+       from public.sms_outbox
+      where topic = 'sms.reconcile'
+        and request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid')),
+    'reconcile job is delayed so a same-tick empty list cannot release');
+
 update public.sms_outbox
    set available_at = now() + interval '1 hour'
  where topic = 'sms.dispatch' and status in ('pending', 'leased');
@@ -1157,7 +1164,7 @@ select app.sms_settle_attempt(
     '7c000000-0000-0000-0000-00000000000a', 'provider_unknown', null, 'timeout', '{}'::jsonb);
 
 update public.sms_outbox
-   set max_attempts = 1
+   set max_attempts = 1, available_at = now()
  where topic = 'sms.reconcile'
    and request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl');
 

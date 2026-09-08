@@ -92,6 +92,25 @@ describe("reconcileOnce", () => {
     );
   });
 
+  it("defers a recent not_found so a still-completing accept is not released", async () => {
+    rpc.mockReset();
+    lookup.mockReset();
+    lookup.mockResolvedValue({ outcome: "not_found", raw: { simulated: "not_accepted" } });
+    rpc.mockImplementation(async (name: string) => {
+      if (name === "rpc_sms_claim_outbox") return { data: [JOB], error: null };
+      if (name === "rpc_sms_reconcile_prepare") {
+        return { data: { ...ready(), dispatched_at: new Date().toISOString() }, error: null };
+      }
+      if (name === "rpc_sms_fail_outbox") return { data: "pending", error: null };
+      return { data: null, error: { message: `unexpected rpc ${name}` } };
+    });
+
+    const { reconcileOnce } = await load();
+    const summary = await reconcileOnce({ worker: "rw1", limit: 1 });
+    expect(summary).toMatchObject({ claimed: 1, deferred: 1, released: 0 });
+    expect(rpc.mock.calls.some(([name]) => name === "rpc_sms_reconcile_fail_release")).toBe(false);
+  });
+
   it("fails and releases when the provider confirms no message", async () => {
     rpc.mockReset();
     lookup.mockReset();
