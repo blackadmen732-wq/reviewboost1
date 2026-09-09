@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, timingSafeEqual } from "node:crypto";
 
 import type {
+  LookupResult,
   ParsedWebhook,
   SendParams,
   SendResult,
@@ -24,17 +25,21 @@ export interface FakeProviderOptions {
   failNumbers?: Record<string, SmsErrorClass>;
   /** Numbers whose submit "times out" — outcome provider_unknown. */
   unknownNumbers?: Set<string>;
+  /** Programmed reconciliation answers, keyed by provider message id. */
+  lookupByMessageId?: Record<string, LookupResult>;
 }
 
 export class FakeSmsProvider implements SmsProvider {
   readonly name = "fake";
   private readonly failNumbers: Record<string, SmsErrorClass>;
   private readonly unknownNumbers: Set<string>;
+  private readonly lookupByMessageId: Record<string, LookupResult>;
   public readonly sent: SendParams[] = [];
 
   constructor(options: FakeProviderOptions = {}) {
     this.failNumbers = options.failNumbers ?? {};
     this.unknownNumbers = options.unknownNumbers ?? new Set();
+    this.lookupByMessageId = options.lookupByMessageId ?? {};
   }
 
   async send(params: SendParams): Promise<SendResult> {
@@ -60,6 +65,10 @@ export class FakeSmsProvider implements SmsProvider {
     const identity = params.idempotencyKey ?? `${params.to}|${params.body}`;
     const id = createHash("sha256").update(identity).digest("hex").slice(0, 24);
     return { outcome: "submitted", providerMessageId: `fake_${id}`, raw: { simulated: "submitted" } };
+  }
+
+  async lookupStatus(messageId: string): Promise<LookupResult | null> {
+    return this.lookupByMessageId[messageId] ?? null;
   }
 
   classifyError(raw: unknown): SmsErrorClass {

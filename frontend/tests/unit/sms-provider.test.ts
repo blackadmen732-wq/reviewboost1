@@ -43,6 +43,16 @@ describe("fake provider", () => {
     expect(r).toMatchObject({ outcome: "failed", errorClass: "invalid_number" });
   });
 
+  it("looks up a programmed reconciliation status without sending again", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider({
+      lookupByMessageId: { fake_abc: { terminal: "delivered" } },
+    });
+    expect(await p.lookupStatus("fake_abc")).toEqual({ terminal: "delivered" });
+    expect(await p.lookupStatus("missing")).toBeNull();
+    expect(p.sent).toHaveLength(0);
+  });
+
   it("reports provider_unknown for a programmed timeout", async () => {
     const { FakeSmsProvider } = await loadFake();
     const p = new FakeSmsProvider({ unknownNumbers: new Set(["+15550000001"]) });

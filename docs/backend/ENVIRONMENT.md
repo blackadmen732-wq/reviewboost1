@@ -71,11 +71,19 @@ role key on startup. Copy them into `frontend/.env.local`.
 ## Separation of Environments
 
 - **Development**: local Supabase, `frontend/.env.local`
-- **Preview**: Vercel preview deployments, separate Supabase project
+- **Preview**: Vercel preview deployments, separate Supabase project.
+  Preview-scoped names are listed in `frontend/.env.preview.example`.
+  `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are required
+  so the proxy can verify sessions. Missing values fail closed: owner routes
+  redirect to login. They must never skip authentication.
 - **Production**: Vercel production, separate Supabase project
 
 Service role keys and encryption keys must differ across all three environments.
 Never reuse production credentials in development or preview.
+
+Vercel Preview must have Preview-scoped copies of every required variable.
+A Preview deploy that builds without them will 500 or deny owner surfaces
+until the Preview project is wired — not until authentication is skipped.
 
 ## Hosted Supabase Auth (production)
 

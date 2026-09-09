@@ -143,6 +143,14 @@ export class TwilioSmsProvider implements SmsProvider {
   }
 
   /**
+   * This sprint does not poll a live Twilio account. Leave the attempt
+   * unresolved until a signed webhook arrives.
+   */
+  async lookupStatus(): Promise<null> {
+    return null;
+  }
+
+  /**
    * Twilio's X-Twilio-Signature scheme: HMAC-SHA1, keyed with the auth token,
    * over the request URL concatenated with each POST parameter's name and value
    * in alphabetical order, base64-encoded. Verification is impossible without

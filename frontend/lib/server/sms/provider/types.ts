@@ -70,6 +70,11 @@ export type ParsedWebhook =
     }
   | { kind: "unknown"; dedupeKey: string; raw: Record<string, unknown> };
 
+export interface LookupResult {
+  terminal: "delivered" | "failed" | null;
+  errorClass?: SmsErrorClass;
+}
+
 export interface SmsProvider {
   readonly name: string;
   send(params: SendParams): Promise<SendResult>;
@@ -77,4 +82,9 @@ export interface SmsProvider {
   /** True only when the provider signature verifies against configured secrets. */
   verifySignature(input: WebhookInput): boolean;
   parseWebhook(input: WebhookInput): ParsedWebhook;
+  /**
+   * Optional status poll for reconciliation. Must never send. Returning null
+   * means "still unknown" — the attempt stays unresolved.
+   */
+  lookupStatus?(messageId: string): Promise<LookupResult | null>;
 }

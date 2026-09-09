@@ -239,6 +239,8 @@ errors, rate-limited where it matters:
 | POST | `/text-requests/{id}/cancel` | owner/admin | cancel if not yet dispatched |
 | POST | `/webhooks/sms/{provider}` | provider (signed) | delivery + inbound events |
 | POST | `/internal/sms/dispatch` | worker secret | run one dispatch batch |
+| GET/POST | `/internal/sms/reconcile` | worker secret | resolve `provider_unknown` via provider lookup (never re-send) |
+| GET/POST | `/internal/sms/expire-credits` | worker secret | sweep lapsed quota allocations |
 
 ## 17. Security model **[impl][test-ci]**
 
@@ -288,7 +290,10 @@ them trigger on `supabase/**`, `frontend/lib/server/**`, and `frontend/app/api/*
 - Twilio (or another gateway) account + `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
   and a From number / Messaging Service SID. **[needs-provider]**
 - `SMS_RATE_PER_SEGMENT_MICROS` + `SMS_RATE_CURRENCY` (real pricing). **[needs-provider]**
-- `SMS_WORKER_SECRET` for the dispatch trigger, and a scheduler (cron) to call it. **[needs-provider]**
+- `SMS_WORKER_SECRET` (or Vercel `CRON_SECRET`) for the dispatch, reconcile,
+  and expire-credits triggers. `frontend/vercel.json` schedules those paths.
+  Preview and production still need the secrets set; cron does not invent them.
+  **[needs-provider for live Twilio; fake provider is enough to exercise the workers]**
 - The provider's webhook URL pointed at `/api/v1/webhooks/sms/twilio`, and the
   URL used for signature verification matching the configured public URL.
 

@@ -205,6 +205,15 @@ export function tokenDigestKeyVersion(): number {
  * Call from a health check or a deploy gate to surface a misconfiguration
  * before traffic arrives rather than on the first customer request.
  */
+/**
+ * Preview deployments (Vercel `VERCEL_ENV=preview`) use a separate Supabase
+ * project. They are not production, but they are public URLs: missing env
+ * must fail closed rather than skip authentication.
+ */
+export function isPreviewDeployment(): boolean {
+  return process.env.VERCEL_ENV === "preview";
+}
+
 export function validateServerConfig(): { ok: true } | { ok: false; problems: string[] } {
   const problems: string[] = [];
 
@@ -215,6 +224,11 @@ export function validateServerConfig(): { ok: true } | { ok: false; problems: st
       problems.push(error instanceof Error ? error.message : "Unknown configuration error.");
     }
   }
+
+  const publicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const publicKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  if (!publicUrl) problems.push("NEXT_PUBLIC_SUPABASE_URL is required.");
+  if (!publicKey) problems.push("NEXT_PUBLIC_SUPABASE_ANON_KEY is required.");
 
   return problems.length === 0 ? { ok: true } : { ok: false, problems };
 }

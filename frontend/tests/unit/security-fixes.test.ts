@@ -15,7 +15,7 @@ describe("public customer API credentials", () => {
 
 describe("owner route protection", () => {
   it("includes /reviews and /customers in OWNER_PREFIXES", () => {
-    const filePath = path.resolve(__dirname, "../../proxy.ts");
+    const filePath = path.resolve(__dirname, "../../lib/security/owner-paths.ts");
     const source = fs.readFileSync(filePath, "utf-8");
 
     expect(source).toContain('"/reviews"');
@@ -23,13 +23,23 @@ describe("owner route protection", () => {
   });
 
   it("protects all known owner routes", () => {
-    const filePath = path.resolve(__dirname, "../../proxy.ts");
+    const filePath = path.resolve(__dirname, "../../lib/security/owner-paths.ts");
     const source = fs.readFileSync(filePath, "utf-8");
 
     const required = ["/home", "/feedback", "/praise", "/stands", "/settings", "/onboarding", "/reviews", "/customers", "/select-org"];
     for (const prefix of required) {
       expect(source, `missing ${prefix}`).toContain(`"${prefix}"`);
     }
+  });
+
+  it("never skips proxy authentication when Supabase env is missing", () => {
+    const filePath = path.resolve(__dirname, "../../proxy.ts");
+    const source = fs.readFileSync(filePath, "utf-8");
+
+    expect(source).toContain("readSupabasePublicEnv");
+    expect(source).toContain("mustRedirectOwnerToLogin");
+    expect(source).not.toMatch(/if\s*\(\s*!url\s*\|\|\s*!key\s*\)\s*\{\s*return response/);
+    expect(source).not.toContain("?? \"\"");
   });
 });
 
