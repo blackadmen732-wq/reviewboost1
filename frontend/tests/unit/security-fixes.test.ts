@@ -15,7 +15,7 @@ describe("public customer API credentials", () => {
 
 describe("owner route protection", () => {
   it("includes /reviews and /customers in OWNER_PREFIXES", () => {
-    const filePath = path.resolve(__dirname, "../../proxy.ts");
+    const filePath = path.resolve(__dirname, "../../lib/supabase/proxy-guard.ts");
     const source = fs.readFileSync(filePath, "utf-8");
 
     expect(source).toContain('"/reviews"');
@@ -23,13 +23,25 @@ describe("owner route protection", () => {
   });
 
   it("protects all known owner routes", () => {
-    const filePath = path.resolve(__dirname, "../../proxy.ts");
+    const filePath = path.resolve(__dirname, "../../lib/supabase/proxy-guard.ts");
     const source = fs.readFileSync(filePath, "utf-8");
 
     const required = ["/home", "/feedback", "/praise", "/stands", "/settings", "/onboarding", "/reviews", "/customers", "/select-org"];
     for (const prefix of required) {
       expect(source, `missing ${prefix}`).toContain(`"${prefix}"`);
     }
+  });
+
+  it("does not skip the owner gate when Supabase env is missing", () => {
+    const proxy = fs.readFileSync(path.resolve(__dirname, "../../proxy.ts"), "utf-8");
+    const guard = fs.readFileSync(path.resolve(__dirname, "../../lib/supabase/proxy-guard.ts"), "utf-8");
+
+    // The rejected preview "fix" returned NextResponse.next() as soon as env
+    // was absent, leaving OWNER_PREFIXES unsigned. Fail closed instead.
+    expect(proxy).not.toMatch(/if\s*\(\s*!url\s*\|\|\s*!key\s*\)\s*\{\s*return\s+(response|finalResponse)/);
+    expect(guard).toContain('action: "unavailable"');
+    expect(proxy).toContain("unavailable");
+    expect(proxy).toContain("503");
   });
 });
 
