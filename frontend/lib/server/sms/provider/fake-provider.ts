@@ -36,10 +36,21 @@ export interface FakeProviderOptions {
   timeoutAfterAcceptNumbers?: Set<string>;
   /** Numbers whose lookup is itself ambiguous (keep reserved, retry). */
   lookupUnknownNumbers?: Set<string>;
+  /** Numbers whose lookup reports multiple same-body candidates. */
+  lookupAmbiguousNumbers?: Set<string>;
+  /** Numbers whose lookup reports a truncated provider page. */
+  lookupTruncatedNumbers?: Set<string>;
 }
 
+type AcceptedRecord = {
+  sid: string;
+  terminal: "delivered" | "failed" | null;
+  to: string;
+  body: string;
+};
+
 /** Process-wide accepts so dispatch and reconcile share timeout-after-accept SIDs. */
-const sharedAccepted = new Map<string, { sid: string; terminal: "delivered" | "failed" | null }>();
+const sharedAccepted = new Map<string, AcceptedRecord>();
 
 export function resetFakeAccepted(): void {
   sharedAccepted.clear();
@@ -52,8 +63,10 @@ export class FakeSmsProvider implements SmsProvider {
   private readonly unknownNumbers: Set<string>;
   private readonly timeoutAfterAcceptNumbers: Set<string>;
   private readonly lookupUnknownNumbers: Set<string>;
+  private readonly lookupAmbiguousNumbers: Set<string>;
+  private readonly lookupTruncatedNumbers: Set<string>;
   /** Accepted messages keyed by idempotency (or content fallback). */
-  public readonly accepted = new Map<string, { sid: string; terminal: "delivered" | "failed" | null }>();
+  public readonly accepted = new Map<string, AcceptedRecord>();
   public readonly sent: SendParams[] = [];
 
   constructor(options: FakeProviderOptions = {}) {
@@ -62,6 +75,8 @@ export class FakeSmsProvider implements SmsProvider {
     this.unknownNumbers = options.unknownNumbers ?? new Set();
     this.timeoutAfterAcceptNumbers = options.timeoutAfterAcceptNumbers ?? new Set();
     this.lookupUnknownNumbers = options.lookupUnknownNumbers ?? new Set();
+    this.lookupAmbiguousNumbers = options.lookupAmbiguousNumbers ?? new Set();
+    this.lookupTruncatedNumbers = options.lookupTruncatedNumbers ?? new Set();
   }
 
   async send(params: SendParams): Promise<SendResult> {
@@ -73,7 +88,12 @@ export class FakeSmsProvider implements SmsProvider {
 
     if (this.timeoutAfterAcceptNumbers.has(params.to)) {
       const sid = fakeMessageId(params);
-      const record = { sid, terminal: null as "delivered" | "failed" | null };
+      const record: AcceptedRecord = {
+        sid,
+        terminal: null,
+        to: params.to,
+        body: params.body,
+      };
       this.accepted.set(identityKey(params), record);
       sharedAccepted.set(identityKey(params), record);
       return {
@@ -93,7 +113,12 @@ export class FakeSmsProvider implements SmsProvider {
     }
 
     const sid = fakeMessageId(params);
-    const record = { sid, terminal: null as "delivered" | "failed" | null };
+    const record: AcceptedRecord = {
+      sid,
+      terminal: null,
+      to: params.to,
+      body: params.body,
+    };
     this.accepted.set(identityKey(params), record);
     sharedAccepted.set(identityKey(params), record);
     return { outcome: "submitted", providerMessageId: sid, raw: { simulated: "submitted" } };
@@ -107,16 +132,50 @@ export class FakeSmsProvider implements SmsProvider {
     if (this.lookupUnknownNumbers.has(params.to)) {
       return { outcome: "unknown", errorClass: "timeout", raw: { simulated: "lookup_unknown" } };
     }
-    const accepted = this.accepted.get(identityKey(params)) ?? sharedAccepted.get(identityKey(params));
-    if (!accepted) {
-      return { outcome: "not_found", raw: { simulated: "not_accepted" } };
+    if (this.lookupAmbiguousNumbers.has(params.to)) {
+      return {
+        outcome: "unknown",
+        errorClass: "unknown",
+        raw: { error: "ambiguous_match", simulated: "lookup_ambiguous" },
+      };
     }
-    return {
-      outcome: "found",
-      providerMessageId: accepted.sid,
-      terminal: accepted.terminal,
-      raw: { simulated: "lookup_found" },
-    };
+    if (this.lookupTruncatedNumbers.has(params.to)) {
+      return {
+        outcome: "unknown",
+        errorClass: "unknown",
+        raw: { error: "lookup_page_truncated", count: 50, simulated: "lookup_truncated" },
+      };
+    }
+
+    const acceptedBySid = new Map<string, AcceptedRecord>();
+    for (const rec of this.accepted.values()) acceptedBySid.set(rec.sid, rec);
+    for (const rec of sharedAccepted.values()) acceptedBySid.set(rec.sid, rec);
+    const accepted = [...acceptedBySid.values()];
+    const bodyMatches = accepted.filter((rec) => rec.to === params.to && rec.body === params.body);
+    if (bodyMatches.length > 1) {
+      return {
+        outcome: "unknown",
+        errorClass: "unknown",
+        raw: { error: "ambiguous_match", count: bodyMatches.length },
+      };
+    }
+    if (bodyMatches.length === 1) {
+      const hit = bodyMatches[0]!;
+      return {
+        outcome: "found",
+        providerMessageId: hit.sid,
+        terminal: hit.terminal,
+        raw: { simulated: "lookup_found" },
+      };
+    }
+    if (accepted.some((rec) => rec.to === params.to)) {
+      return {
+        outcome: "unknown",
+        errorClass: "unknown",
+        raw: { error: "no_body_match", count: accepted.filter((rec) => rec.to === params.to).length },
+      };
+    }
+    return { outcome: "not_found", raw: { simulated: "not_accepted" } };
   }
 
   classifyError(raw: unknown): SmsErrorClass {
