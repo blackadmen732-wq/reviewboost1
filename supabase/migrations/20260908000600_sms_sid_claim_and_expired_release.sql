@@ -1,7 +1,8 @@
 -- SMS correctness follow-up on the #47 / #53 / #54 stack.
 --
--- Migration version 20260908000400 is contested (#48 privilege_attack_pass vs
--- #54 sms_reconcile_sid_conflict). This file is 000500 — do not steal 000400.
+-- Migration version 20260908000400 is #54 sms_reconcile_sid_conflict (leave
+-- it alone). 20260908000500 is #59 privilege_attack_pass. This file is
+-- 000600 — do not steal 000400 or 000500.
 --
 -- 1) Concurrent SID claiming: unique (provider, SID) plus advisory lock and
 --    unique_violation → sid_conflict so two unbound attempts cannot both
