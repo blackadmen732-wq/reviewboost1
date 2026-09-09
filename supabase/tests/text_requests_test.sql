@@ -8,14 +8,14 @@
 -- lifecycle, the outbox lease, webhook dedupe, and the single-in-flight guard.
 --
 --   supabase test db
---   167 assertions in this file.
+--   176 assertions in this file.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(167);
+select plan(176);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -774,6 +774,77 @@ select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 20, 'rel-e
 select is(
     (select reserved from app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 10, 'rel-exp-fresh-resv', null)),
     true, 'a later non-expired allocation remains spendable');
+
+-- ======================== SENTINEL H5: second refund residual =============
+
+-- Two failed deliveries against one expired grant. A singleton residual key
+-- plus ON CONFLICT DO NOTHING dropped leftover #2: available() stayed 0 while
+-- reserve spent allocated-reserved-consumed (Refund2 → reserve(10)=true;
+-- grant20 + refund2 → reserve(25)=true). Residual must be additive.
+delete from public.sms_quota_ledger where org_id = '7c000000-0000-0000-0000-00000000000b';
+delete from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b';
+
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 20, 'h5-alloc-1', null, null);
+select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 10, 'h5-resv-1', null);
+select app.sms_quota_consume('7c000000-0000-0000-0000-00000000000b', 10, 'h5-cons-1', null);
+select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 10, 'h5-resv-2', null);
+select app.sms_quota_consume('7c000000-0000-0000-0000-00000000000b', 10, 'h5-cons-2', null);
+update public.sms_quota_ledger
+   set expires_at = now() - interval '1 second'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'h5-alloc-1';
+select app.sms_quota_apply_expirations('7c000000-0000-0000-0000-00000000000b');
+select app.sms_quota_refund('7c000000-0000-0000-0000-00000000000b', 10, 'h5-ref-1', null);
+select app.sms_quota_refund('7c000000-0000-0000-0000-00000000000b', 10, 'h5-ref-2', null);
+
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    0::bigint, 'H5: available stays 0 after two refund residuals on one expired grant');
+
+select is(
+    (select reserved from app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 10, 'h5-illegal-10', null)),
+    false, 'H5: Refund2 → reserve(10) must not reopen expired leftovers');
+
+select is(
+    (select allocated from public.sms_quota_balance
+      where org_id = '7c000000-0000-0000-0000-00000000000b'),
+    0::bigint, 'H5: additive residual retires the expired grant in the projection');
+
+select is(
+    (select amount from public.sms_quota_ledger
+      where org_id = '7c000000-0000-0000-0000-00000000000b'
+        and kind = 'expiration'
+        and correlation_key = 'expire:' || (
+            select id::text from public.sms_quota_ledger
+             where org_id = '7c000000-0000-0000-0000-00000000000b'
+               and kind = 'allocation' and correlation_key = 'h5-alloc-1')
+            || ':residual'),
+    20::bigint, 'H5: residual ledger is additive across two refunds, not DO NOTHING');
+
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    (select b.allocated - b.reserved - b.consumed
+       from public.sms_quota_balance b
+      where b.org_id = '7c000000-0000-0000-0000-00000000000b'),
+    'H5: available() and the post-sweep reserve gate share the same projection');
+
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 20, 'h5-alloc-fresh', null, null);
+
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    20::bigint, 'H5: a later live grant of 20 is the only spendable quota');
+
+select is(
+    (select reserved from app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 25, 'h5-illegal-25', null)),
+    false, 'H5: grant20 + refund2 → reserve(25) must not spend expired leftovers');
+
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    20::bigint, 'H5: refused reserve(25) leaves the live grant untouched');
+
+select is(
+    (select reserved from app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 20, 'h5-live-20', null)),
+    true, 'H5: the later live grant remains fully spendable');
 
 -- ================================ receipt-before-SID lifecycle ============
 
