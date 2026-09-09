@@ -114,7 +114,13 @@ jobs:
               exit 1
             fi
           done
-          echo "All migration filenames follow convention."
+          dups=$(for f in supabase/migrations/*.sql; do basename "$f" | cut -c1-14; done | sort | uniq -d)
+          if [ -n "$dups" ]; then
+            echo "::error::Duplicate migration version prefixes:"
+            echo "$dups"
+            exit 1
+          fi
+          echo "All migration filenames follow convention and have unique versions."
 
       - name: Check for review gating patterns
         run: |
