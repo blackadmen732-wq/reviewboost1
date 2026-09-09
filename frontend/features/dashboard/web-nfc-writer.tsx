@@ -146,7 +146,7 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
         if (existingContent.readFailed) {
           setWriteState("error");
           setErrorMessage(
-            "ReviewBoost couldn't safely read this tag. Try again or use a blank NFC tag.",
+            "Could not read this tag. Try again, or use a blank one.",
           );
           return;
         }
