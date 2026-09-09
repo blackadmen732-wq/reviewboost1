@@ -28,7 +28,9 @@ export interface CustomerPageEditorModel {
 export function CustomerPageEditor({ initial }: { initial: CustomerPageEditorModel }) {
   const [transform, setTransform] = useState<HeroTransform>(initial.draft);
   const [heroUrl, setHeroUrl] = useState<string | null>(
-    initial.hasDraftHero ? `${initial.draftArtworkUrl}&t=${Date.now()}` : null,
+    initial.hasDraftHero
+      ? `${initial.draftArtworkUrl}&t=${initial.publishedAt ?? "draft"}`
+      : null,
   );
   const [busy, setBusy] = useState<"upload" | "publish" | null>(null);
   const [live, setLive] = useState(Boolean(initial.hasPublishedHero && initial.publishedAt));
