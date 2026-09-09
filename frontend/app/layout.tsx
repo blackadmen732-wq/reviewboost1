@@ -6,6 +6,7 @@ import { Providers } from "@/components/providers";
 import { PwaRegister } from "@/components/pwa-register";
 import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
+import "@/styles/customer-page.css";
 
 export const metadata: Metadata = {
   // A template, so every page reads "Home — ReviewBoost" without each one

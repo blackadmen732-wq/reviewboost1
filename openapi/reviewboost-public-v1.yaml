@@ -376,11 +376,12 @@ components:
     CustomerReviewContext:
       type: object
       additionalProperties: false
-      required: [business, location, googleReviewUrl, supportedLocales, defaultLocale]
+      required: [business, location, googleReviewUrl, supportedLocales, defaultLocale, presentation]
       description: >-
         Contains no organization id, location id, stand id, or subscription
         state. A caller who learned the tenant could write unlimited fabricated
-        feedback into it.
+        feedback into it. The guest page never renders location or ids even
+        when those fields exist.
       properties:
         business:
           type: object
@@ -411,6 +412,27 @@ components:
           uniqueItems: true
           items: { $ref: "#/components/schemas/Locale" }
         defaultLocale: { $ref: "#/components/schemas/Locale" }
+        presentation:
+          type: object
+          additionalProperties: false
+          required: [heroUrl, transform, tagline]
+          description: >-
+            Published customer-page artwork. heroUrl is token-scoped and never
+            carries an organization, location, or stand id.
+          properties:
+            heroUrl:
+              type: [string, "null"]
+            transform:
+              type: object
+              additionalProperties: false
+              required: [x, y, scale]
+              properties:
+                x: { type: number }
+                y: { type: number }
+                scale: { type: number }
+            tagline:
+              type: [string, "null"]
+              maxLength: 80
 
     CreateSessionRequest:
       type: object

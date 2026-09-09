@@ -12,9 +12,11 @@ import {
 } from "react";
 
 import { CustomerBlockingState } from "@/features/customer-flow/customer-blocking-state";
-import { CustomerFrame } from "@/features/customer-flow/customer-frame";
-import { CustomerHeader } from "@/features/customer-flow/customer-header";
+import { LanguageSelector } from "@/features/customer-flow/language-selector";
 import { CustomerLoading } from "@/features/customer-flow/customer-loading";
+import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
+import { clampHeroTransform } from "@/lib/owner/hero-transform";
+import { EMPTY_PRESENTATION } from "@/lib/owner/public-customer";
 import {
   customerFlowReducer,
   type CustomerFlowState,
@@ -415,16 +417,24 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   }
 
   const context = contextQuery.data;
+  const presentation = context.presentation ?? EMPTY_PRESENTATION;
 
   return (
-    <CustomerFrame poweredBy={messages.poweredBy}>
-      <CustomerHeader
-        context={context}
-        locale={state.locale}
-        messages={messages}
-        onLocaleChange={changeLocale}
-      />
-      <div ref={contentRef}>
+    <div ref={contentRef} className="customer-live">
+      <CustomerVisitView
+        heroUrl={presentation.heroUrl}
+        transform={clampHeroTransform(presentation.transform)}
+        heading={state.screen === "rating" ? messages.ratingHeading : ""}
+        support={state.screen === "rating" ? messages.ratingSupport : ""}
+        language={
+          <LanguageSelector
+            locale={state.locale}
+            supported={context.supportedLocales}
+            messages={messages}
+            onChange={changeLocale}
+          />
+        }
+      >
         <LazyMotion features={domAnimation} strict>
           <m.div key={state.screen} {...motionProps}>
             {state.screen === "rating" ? (
@@ -434,6 +444,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
                 rating={state.rating}
                 note={state.note}
                 status={state.feedbackStatus}
+                embedInVisit
                 onRatingChange={(rating) =>
                   dispatch({ type: "select-rating", rating })
                 }
@@ -474,7 +485,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
             ) : null}
           </m.div>
         </LazyMotion>
-      </div>
-    </CustomerFrame>
+      </CustomerVisitView>
+    </div>
   );
 }

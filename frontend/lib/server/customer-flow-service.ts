@@ -8,6 +8,7 @@ import type {
   SubmitResponseResponse,
   TeamPraiseResponse,
 } from "@/lib/api/customer-flow-types";
+import { getPublicPresentation } from "@/lib/server/customer-page-service";
 import {
   KEY_VERSION,
   clientFingerprint,
@@ -328,12 +329,15 @@ export async function getContext(token: string, meta: RequestMeta): Promise<Cust
       ? (locale as SupportedLocale)
       : DEFAULT_LOCALE;
 
+  const presentation = await getPublicPresentation(token);
+
   return {
     business: { name: stand.business_name, logoUrl: null },
     location: { name: stand.location_name },
     googleReviewUrl: stand.google_review_url,
     supportedLocales: [...SUPPORTED_LOCALES],
     defaultLocale,
+    presentation,
   };
 }
 

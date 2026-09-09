@@ -1,0 +1,125 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { clampHeroTransform, heroTransformStyle } from "@/lib/owner/hero-transform";
+import { buildEntitlementSnapshot, capabilityLabel } from "@/lib/owner/entitlements";
+import { PLAN_CATALOG } from "@/lib/owner/plan-catalog";
+import { lastUsedLabel, tagReadiness, tagReadinessLabel } from "@/lib/owner/tag-readiness";
+import { payloadContainsTenantIds } from "@/lib/owner/public-customer";
+import { PROGRAM_PHASE_COPY } from "@/lib/owner/nfc-phases";
+import { ratingsHeadline } from "@/features/dashboard/home-model";
+
+function source(path: string): string {
+  return readFileSync(join(process.cwd(), path), "utf8");
+}
+
+describe("hero transform", () => {
+  it("clamps drag and pinch so the photo cannot leave the frame", () => {
+    expect(clampHeroTransform({ x: 90, y: -90, scale: 9 })).toEqual({
+      x: 50,
+      y: -50,
+      scale: 3,
+    });
+    expect(heroTransformStyle({ x: 10, y: -4, scale: 1.5 })).toBe(
+      "translate(10%, -4%) scale(1.5)",
+    );
+  });
+});
+
+describe("tag readiness", () => {
+  it("is Needs NFC for a new Tag, Both after a code change, Ready when programmed", () => {
+    expect(tagReadiness({ nfcProvisionedAt: null, tokenRotatedAt: null })).toBe("needs-nfc");
+    expect(
+      tagReadiness({
+        nfcProvisionedAt: "2026-09-01T00:00:00.000Z",
+        tokenRotatedAt: "2026-09-08T00:00:00.000Z",
+      }),
+    ).toBe("both");
+    expect(
+      tagReadiness({
+        nfcProvisionedAt: "2026-09-08T00:00:00.000Z",
+        tokenRotatedAt: "2026-09-01T00:00:00.000Z",
+      }),
+    ).toBe("ready");
+    expect(tagReadinessLabel("needs-nfc")).toBe("Needs NFC");
+    expect(lastUsedLabel(null)).toBe("Not used yet");
+  });
+});
+
+describe("entitlements", () => {
+  it("uses catalog limits and never includes SMS on a plan", () => {
+    expect(PLAN_CATALOG.starter).toMatchObject({
+      locationLimit: 1,
+      tagLimit: 3,
+      smsIncluded: 0,
+    });
+    const starter = buildEntitlementSnapshot({
+      planId: "starter",
+      status: "active",
+      locationsUsed: 1,
+      tagsUsed: 3,
+    });
+    expect(starter.canCreateTag).toBe(false);
+    expect(starter.tags).toBe("limit-reached");
+    expect(starter.sms).toBe("locked");
+    expect(capabilityLabel("locked")).toBe("Upgrade to unlock");
+
+    const cancelled = buildEntitlementSnapshot({
+      planId: "pro",
+      status: "cancelled",
+      locationsUsed: 1,
+      tagsUsed: 1,
+    });
+    expect(cancelled.canUseSoftware).toBe(false);
+    expect(cancelled.canCreateTag).toBe(false);
+    expect(cancelled.tags).toBe("cancelled");
+  });
+});
+
+describe("public customer hygiene", () => {
+  it("flags org, location, and stand ids", () => {
+    expect(
+      payloadContainsTenantIds({
+        business: { name: "Mario’s" },
+        locationId: "22222222-2222-2222-2222-222222222222",
+      }),
+    ).toBe(true);
+    expect(
+      payloadContainsTenantIds({
+        heroUrl: "/api/v1/public/q/abcdefghijklmnop/artwork",
+        transform: { x: 0, y: 0, scale: 1 },
+      }),
+    ).toBe(false);
+  });
+
+  it("customer visit view never renders location or ids", () => {
+    const view = source("features/customer-page/customer-visit-view.tsx");
+    expect(view).not.toMatch(/location\.name|locationName|orgId|standId|locationId/);
+    expect(view).toContain("visit-card");
+    expect(view).toContain("data-hero-layer");
+  });
+});
+
+describe("program Tag words", () => {
+  it("is a human sequence with no jargon", () => {
+    const joined = Object.values(PROGRAM_PHASE_COPY)
+      .map((item) => `${item.title} ${item.body}`)
+      .join(" ");
+    expect(joined).toMatch(/Hold near Tag/);
+    expect(joined).toMatch(/Tag ready/);
+    expect(joined).not.toMatch(/NDEF|RPC|token hash/i);
+    const sheet = source("features/tags/program-tag-sheet.tsx");
+    expect(sheet).not.toMatch(/\bNDEF\b/);
+    expect(sheet).toContain("Test customer page");
+  });
+});
+
+describe("Home headline", () => {
+  it("is one number and one arrow", () => {
+    expect(ratingsHeadline({ ratingsThisWeek: 12, ratingsLastWeek: 9 })).toBe(
+      "12 ratings this week, up 3",
+    );
+    expect(ratingsHeadline({ ratingsThisWeek: 1, ratingsLastWeek: 0 })).toBe("1 rating this week");
+  });
+});
