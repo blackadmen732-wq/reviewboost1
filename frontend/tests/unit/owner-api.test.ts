@@ -53,7 +53,7 @@ function queryBuilder(columns: string, rows?: unknown[]) {
   let orFilter: string | null = null;
   const chain = () => builder;
 
-  for (const method of ["eq", "lt", "order", "limit", "update", "select"]) {
+  for (const method of ["eq", "lt", "neq", "order", "limit", "update", "select"]) {
     builder[method] = chain;
   }
   builder["or"] = (filter: string) => {

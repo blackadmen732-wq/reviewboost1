@@ -30,6 +30,11 @@ export function OwnerHome({
         <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
           {businessName}
         </h1>
+        {model.headline ? (
+          <p className="mt-3 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
+            {model.headline}
+          </p>
+        ) : null}
       </header>
 
       {model.kind === "empty" ? (

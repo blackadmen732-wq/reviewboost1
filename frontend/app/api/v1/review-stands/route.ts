@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { requireOrganizationContext, requireRole } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
+import { assertCanCreateTag, getEntitlementSnapshot } from "@/lib/server/entitlements-service";
 import { createStand, listStands } from "@/lib/server/owner-service";
 
 /**
@@ -31,6 +32,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
     const context = await requireOrganizationContext(request);
     requireRole(context.role, ["owner", "admin"]);
+    assertCanCreateTag(await getEntitlementSnapshot(context, context.orgId));
 
     const body = await readJsonBody(request);
     const { locationId, label } = body as Record<string, unknown>;

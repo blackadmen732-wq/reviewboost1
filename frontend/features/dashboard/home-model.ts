@@ -14,6 +14,8 @@ export interface HomeCounts {
   recentCount: number;
   hasGoogleLink: boolean;
   googleLinkInvalid?: boolean;
+  ratingsThisWeek?: number;
+  ratingsLastWeek?: number;
 }
 
 export interface HomeStand {
@@ -60,6 +62,7 @@ export interface HomeModel {
   showPreview: boolean;
   previewStandId: string | null;
   tagStatus: TagStatus;
+  headline: string | null;
 }
 
 export function isHomeEmpty(counts: Pick<HomeCounts, "recentCount" | "ratingsToday">): boolean {
@@ -182,7 +185,22 @@ export function deriveHomeModel({
     showPreview: hasStand,
     previewStandId: previewStand?.standId ?? null,
     tagStatus: tags,
+    headline: ratingsHeadline(counts),
   };
+}
+
+export function ratingsHeadline(counts: Pick<HomeCounts, "ratingsThisWeek" | "ratingsLastWeek">): string | null {
+  const thisWeek = counts.ratingsThisWeek;
+  if (thisWeek == null) return null;
+  const lastWeek = counts.ratingsLastWeek ?? 0;
+  const word = thisWeek === 1 ? "rating" : "ratings";
+  if (lastWeek === 0) {
+    return thisWeek === 0 ? null : `${thisWeek} ${word} this week`;
+  }
+  const delta = thisWeek - lastWeek;
+  if (delta === 0) return `${thisWeek} ${word} this week, same as last week`;
+  if (delta > 0) return `${thisWeek} ${word} this week, up ${delta}`;
+  return `${thisWeek} ${word} this week, down ${Math.abs(delta)}`;
 }
 
 export function tagStatusLine(status: TagStatus): string {

@@ -48,6 +48,11 @@ export function startOfLocalDay(timezone: string, now: Date = new Date()): Date 
   return new Date(wallClockAsUtc.getTime() + offsetMs(timezone, wallClockAsUtc));
 }
 
+/** Midnight seven local days ago — the start of “this week” as owners say it. */
+export function startOfLocalWeek(timezone: string, now: Date = new Date()): Date {
+  return new Date(startOfLocalDay(timezone, now).getTime() - 6 * 86_400_000);
+}
+
 /** Start of the current month in the business's zone. */
 export function startOfLocalMonth(timezone: string, now: Date = new Date()): Date {
   const parts = new Intl.DateTimeFormat("en-CA", {

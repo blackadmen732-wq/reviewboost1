@@ -10,7 +10,7 @@ import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
 import { logger } from "@/lib/server/logger";
 import { supabaseServer } from "@/lib/supabase/server";
-import { startOfLocalDay, startOfLocalMonth } from "@/lib/utils/local-day";
+import { startOfLocalDay, startOfLocalMonth, startOfLocalWeek } from "@/lib/utils/local-day";
 
 export { localHour, startOfLocalDay, startOfLocalMonth } from "@/lib/utils/local-day";
 
@@ -625,6 +625,7 @@ export interface Stand {
   locationName: string | null;
   tokenRotatedAt: string | null;
   nfcProvisionedAt: string | null;
+  lastOpenedAt: string | null;
 }
 
 /**
@@ -641,7 +642,7 @@ export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
   const [standsResult, locationsResult] = await Promise.all([
     supabase
       .from("review_stands")
-      .select("id, location_id, label, stand_type, status, public_token_prefix, token_rotated_at, nfc_provisioned_at")
+      .select("id, location_id, label, stand_type, status, public_token_prefix, token_rotated_at, nfc_provisioned_at, last_opened_at")
       .eq("org_id", orgId)
       .order("created_at", { ascending: true }),
     supabase
@@ -667,7 +668,13 @@ export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
     locationName: locationMap.get(row.location_id as string) ?? null,
     tokenRotatedAt: (row.token_rotated_at as string | null) ?? null,
     nfcProvisionedAt: (row.nfc_provisioned_at as string | null) ?? null,
+    lastOpenedAt: (row.last_opened_at as string | null) ?? null,
   }));
+});
+
+export const getStand = cache(async (orgId: string, standId: string): Promise<Stand | null> => {
+  const stands = await listStands(orgId);
+  return stands.find((stand) => stand.standId === standId) ?? null;
 });
 
 export interface OwnerLocation {
@@ -730,6 +737,8 @@ export function ownerGoogleLinkFlags(url: string | null | undefined): {
 
 export interface OwnerCounts {
   ratingsToday: number;
+  ratingsThisWeek: number;
+  ratingsLastWeek: number;
   unread: number;
   unmatchedPraise: number;
   activeStands: number;
@@ -751,13 +760,26 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
 
   const dayStart = startOfLocalDay(timezone);
   const monthStart = startOfLocalMonth(timezone);
+  const weekStart = startOfLocalWeek(timezone);
+  const priorWeekStart = new Date(weekStart.getTime() - 7 * 86_400_000);
 
-  const [today, unread, praise, stands, location, recent] = await Promise.all([
+  const [today, thisWeek, lastWeek, unread, praise, stands, location, recent] = await Promise.all([
     supabase
       .from("customer_responses")
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
       .gte("submitted_at", dayStart.toISOString()),
+    supabase
+      .from("customer_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .gte("submitted_at", weekStart.toISOString()),
+    supabase
+      .from("customer_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .gte("submitted_at", priorWeekStart.toISOString())
+      .lt("submitted_at", weekStart.toISOString()),
     supabase
       .from("customer_responses")
       .select("id", { count: "exact", head: true })
@@ -780,6 +802,8 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
   ]);
 
   if (today.error) dataFailure("owner_counts.today", today.error);
+  if (thisWeek.error) dataFailure("owner_counts.week", thisWeek.error);
+  if (lastWeek.error) dataFailure("owner_counts.last_week", lastWeek.error);
   if (unread.error) dataFailure("owner_counts.unread", unread.error);
   if (praise.error) dataFailure("owner_counts.praise", praise.error);
   if (stands.error) dataFailure("owner_counts.stands", stands.error);
@@ -789,6 +813,8 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
 
   return {
     ratingsToday: today.count ?? 0,
+    ratingsThisWeek: thisWeek.count ?? 0,
+    ratingsLastWeek: lastWeek.count ?? 0,
     unread: unread.count ?? 0,
     unmatchedPraise: praise.count ?? 0,
     activeStands: stands.count ?? 0,
