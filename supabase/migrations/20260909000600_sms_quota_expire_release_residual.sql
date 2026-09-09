@@ -19,6 +19,61 @@ as $$
        );
 $$;
 
+create or replace function app.sms_quota_net_used(p_org_id uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+    select coalesce(sum(case
+               when u.kind = 'reservation' then u.amount
+               when u.kind in ('release', 'refund') then -u.amount
+               else 0 end), 0)
+      from public.sms_quota_ledger u
+     where u.org_id = p_org_id
+       and u.kind in ('reservation', 'release', 'refund');
+$$;
+
+-- Residual on a swept grant is unused cover after org net_used is attributed
+-- to swept grants in FIFO order. A later live grant must not steal that
+-- attribution (that would look like a release and expire consumed credits).
+create or replace function app.sms_quota_expired_residual(p_org_id uuid, p_allocation_id uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+    with swept as (
+        select l.id,
+               l.effective_at,
+               greatest(0, l.amount - app.sms_quota_expired_amount(p_org_id, l.id)) as cover
+          from public.sms_quota_ledger l
+         where l.org_id = p_org_id
+           and l.kind = 'allocation'
+           and exists (
+               select 1 from public.sms_quota_ledger e
+                where e.org_id = p_org_id
+                  and e.kind = 'expiration'
+                  and e.correlation_key = 'expire:' || l.id::text)
+    ),
+    ranked as (
+        select s.id,
+               s.cover,
+               coalesce(sum(s.cover) over (
+                   order by s.effective_at, s.id
+                   rows between unbounded preceding and 1 preceding
+               ), 0) as prior_cover
+          from swept s
+    )
+    select coalesce(
+        (select greatest(0, r.cover - least(r.cover, greatest(0, app.sms_quota_net_used(p_org_id) - r.prior_cover)))
+           from ranked r
+          where r.id = p_allocation_id),
+        0);
+$$;
+
 create or replace function app.sms_quota_fifo_used(p_org_id uuid, p_allocation_id uuid)
 returns bigint
 language sql
@@ -68,7 +123,6 @@ declare
     r           record;
     v_used      bigint;
     v_remaining bigint;
-    v_already   bigint;
     v_residual  bigint;
     v_inserted  uuid;
     v_total     bigint := 0;
@@ -120,9 +174,7 @@ begin
                   and e.correlation_key = 'expire:' || l.id::text)
          order by l.effective_at, l.id
     loop
-        v_used := coalesce(app.sms_quota_fifo_used(p_org_id, r.id), 0);
-        v_already := app.sms_quota_expired_amount(p_org_id, r.id);
-        v_residual := greatest(0, r.amount - v_already - v_used);
+        v_residual := app.sms_quota_expired_residual(p_org_id, r.id);
         if v_residual > 0 then
             v_inserted := null;
             insert into public.sms_quota_ledger (org_id, kind, amount, correlation_key, request_id, note)
@@ -160,7 +212,6 @@ declare
     v_unswept  bigint := 0;
     r          record;
     v_used     bigint;
-    v_already  bigint;
 begin
     v_base := coalesce(
         (select b.allocated - b.reserved - b.consumed
@@ -197,9 +248,7 @@ begin
                   and e.correlation_key = 'expire:' || l.id::text)
          order by l.effective_at, l.id
     loop
-        v_used := coalesce(app.sms_quota_fifo_used(p_org_id, r.id), 0);
-        v_already := app.sms_quota_expired_amount(p_org_id, r.id);
-        v_unswept := v_unswept + greatest(0, r.amount - v_already - v_used);
+        v_unswept := v_unswept + app.sms_quota_expired_residual(p_org_id, r.id);
     end loop;
 
     return v_base - v_unswept;
@@ -279,5 +328,13 @@ begin
     revoke all on function app.sms_quota_expired_amount(uuid, uuid)
         from public, anon, authenticated;
     grant execute on function app.sms_quota_expired_amount(uuid, uuid)
+        to service_role;
+    revoke all on function app.sms_quota_net_used(uuid)
+        from public, anon, authenticated;
+    grant execute on function app.sms_quota_net_used(uuid)
+        to service_role;
+    revoke all on function app.sms_quota_expired_residual(uuid, uuid)
+        from public, anon, authenticated;
+    grant execute on function app.sms_quota_expired_residual(uuid, uuid)
         to service_role;
 end $$;
