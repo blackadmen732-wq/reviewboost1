@@ -6,6 +6,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertDialog } from "@/components/ui/dialog";
 import { notify } from "@/components/ui/toast";
+import {
+  tagProgramPhase,
+  tagProgramPhaseLabel,
+  type HomeStand,
+} from "@/features/dashboard/home-model";
 import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { WebNfcWriter } from "@/features/dashboard/web-nfc-writer";
@@ -33,7 +38,6 @@ const MAX_CUSTOM_PNG = 4096;
 export function StandCard({
   standId,
   label,
-  standType,
   status,
   tokenPrefix,
   tokenRotatedAt,
@@ -50,9 +54,15 @@ export function StandCard({
 
   const [rotatedLocally, setRotatedLocally] = useState(false);
   const hasNfc = nfcProvisionedAt !== null;
-  const tokenWasRotatedAfterNfc =
-    rotatedLocally ||
-    (hasNfc && tokenRotatedAt !== null && new Date(tokenRotatedAt) > new Date(nfcProvisionedAt!));
+  const standForPhase: HomeStand = {
+    standId,
+    label,
+    status,
+    nfcProvisionedAt,
+    tokenRotatedAt,
+  };
+  const programPhase = rotatedLocally ? "needs-reprogramming" : tagProgramPhase(standForPhase);
+  const tokenWasRotatedAfterNfc = programPhase === "needs-reprogramming";
 
   async function rotate() {
     setBusy(true);
@@ -164,7 +174,7 @@ export function StandCard({
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      notify.success("Link copied", "Paste it into NFC Tools or share it directly.");
+      notify.success("Link copied", "Paste it into NFC Tools, or share it.");
     } catch {
       notify.error("Could not copy the link", "Please try again.");
     }
@@ -191,7 +201,7 @@ export function StandCard({
       if (!url) throw new Error("no_url");
       window.open(url, "_blank", "noopener,noreferrer");
     } catch {
-      notify.error("Could not open stand page", "Please try again.");
+      notify.error("Could not open the customer page", "Please try again.");
     }
   }
 
@@ -201,8 +211,8 @@ export function StandCard({
         <p className="truncate text-lg font-semibold text-ink">{label}</p>
         <p className="mt-1 text-sm text-muted">
           Code {tokenPrefix}… · {status === "active" ? "live" : status}
-          {standType === "physical_nfc" ? " · NFC" : ""}
-          {hasNfc ? " · tag programmed" : ""}
+          {" · "}
+          {tagProgramPhaseLabel(programPhase)}
         </p>
         {tokenWasRotatedAfterNfc ? (
           <p className="mt-3 text-sm text-ink">
@@ -351,26 +361,18 @@ export function StandCard({
             </p>
             <WebNfcWriter standId={standId} />
             <div className="rounded-[var(--radius-control)] border border-border p-3">
-              <p className="mb-2 font-medium text-ink">Recommended NFC tags</p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>NTAG213 — works with all phones</li>
-                <li>NTAG215 — more storage, widely compatible</li>
-              </ul>
-            </div>
-            <div className="rounded-[var(--radius-control)] border border-border p-3">
-              <p className="mb-2 font-medium text-ink">Using NFC Tools (any phone)</p>
+              <p className="mb-2 font-medium text-ink">Using NFC Tools</p>
               <ol className="list-decimal pl-5 space-y-1">
-                <li>Install <strong>NFC Tools</strong> from App Store or Play Store</li>
-                <li>Open the app and tap <strong>Write</strong></li>
-                <li>Tap <strong>Add a record</strong> → <strong>URL / URI</strong></li>
-                <li>Use <strong>Copy the tag link</strong> above and paste it</li>
-                <li>Tap <strong>Write</strong> and hold your phone to the tag</li>
-                <li>Verify: tap the tag with your phone to confirm it opens the correct page</li>
+                <li>Install NFC Tools on your phone</li>
+                <li>Open Write, then add a web address</li>
+                <li>Paste the tag link from above</li>
+                <li>Hold your phone to the tag</li>
+                <li>Tap the tag to check the right page opens</li>
               </ol>
             </div>
             <p className="text-xs">
-              Do not permanently write-lock tags. If the code is rotated, the tag
-              must be rewritten.
+              Do not lock the tag. If the code changes, you will need to program
+              it again.
             </p>
           </div>
         </details>
@@ -387,7 +389,7 @@ export function StandCard({
         </button>
         {hasNfc && (
           <p className="mt-1 pl-2 text-xs text-muted">
-            This will also invalidate the NFC tag. You will need to rewrite it.
+            This will also stop the programmed tag. You will need to program it again.
           </p>
         )}
       </div>
@@ -398,7 +400,7 @@ export function StandCard({
         title="Your printed code will stop working"
         description={
           hasNfc
-            ? "Anyone who scans the old QR code or taps the NFC tag will see nothing. You will have to print the new code and rewrite the NFC tag."
+            ? "Anyone who scans the old code or taps the old tag will see nothing. Print the new code and program the tag again."
             : "Anyone who scans the old one will see nothing. You will have to print the new code and replace it on every table."
         }
         confirmLabel="Yes, make a new code"

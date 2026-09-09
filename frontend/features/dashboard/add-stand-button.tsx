@@ -49,13 +49,13 @@ export function AddStandButton({ locations }: AddStandButtonProps) {
     setBusy(false);
 
     if (!response.ok) {
-      notify.error("Could not create stand", "Please try again.");
+      notify.error("Could not create a Tag", "Please try again.");
       return;
     }
 
     setOpen(false);
     setLabel("");
-    notify.success("Stand created", "Print the new code and place it where customers pay.");
+    notify.success("Tag created", "Print the code or program the tag, then put it where people pay.");
     router.refresh();
   }
 
@@ -72,7 +72,7 @@ export function AddStandButton({ locations }: AddStandButtonProps) {
             {locations.length > 1 && (
               <div>
                 <label htmlFor="add-stand-location" className="mb-1 block text-sm font-medium text-ink">
-                  Location
+                  Place
                 </label>
                 <select
                   id="add-stand-location"

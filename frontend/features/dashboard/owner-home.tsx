@@ -11,8 +11,8 @@ import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page"
 /**
  * Owner Home. One question: do I need to do anything?
  *
- * Empty and active are different layouts. Empty is a name, a sentence, one
- * action. Active is attention, then real unread rows, then tag status.
+ * Empty with a blocker names the blocker. Empty that is ready waits honestly.
+ * Returning is attention, then real unread rows, then tag status.
  */
 
 export function OwnerHome({
@@ -42,14 +42,27 @@ export function OwnerHome({
 }
 
 function EmptyHome({ model }: { model: HomeModel }) {
+  const blocker = model.attentions[0] ?? null;
+
   return (
     <section className="max-w-[36rem]">
-      <p className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-        No ratings yet.
-      </p>
-      <p className="mt-3 max-w-[34ch] text-base leading-relaxed text-muted">
-        Print your code or program a tag and put it where people pay.
-      </p>
+      {blocker ? (
+        <>
+          <p className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
+            {blocker.title}
+          </p>
+          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{blocker.body}</p>
+        </>
+      ) : (
+        <>
+          <p className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
+            No ratings yet.
+          </p>
+          <p className="mt-3 max-w-[34ch] text-base leading-relaxed text-muted">
+            Your tag is ready. Put it where people pay.
+          </p>
+        </>
+      )}
 
       {model.primary ? (
         <div className="mt-8 max-w-xs">

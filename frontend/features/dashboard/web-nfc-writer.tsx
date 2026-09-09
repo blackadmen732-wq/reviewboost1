@@ -71,7 +71,7 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
     const recorded = await recordProvision();
     if (recorded) {
       setWriteState("success");
-      notify.success("Status saved", "NFC provisioning status has been recorded.");
+      notify.success("Marked as programmed", "This tag is programmed.");
     } else {
       setWriteState("partial");
     }
@@ -83,14 +83,14 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
 
     if (!isWebNfcAvailable()) {
       setWriteState("error");
-      setErrorMessage("Web NFC is not available in this browser. Use Chrome on Android.");
+      setErrorMessage("This browser cannot program a tag. Use Chrome on Android, or NFC Tools.");
       return;
     }
 
     const url = await fetchStandUrl();
     if (!url) {
       setWriteState("error");
-      setErrorMessage("Could not load the stand URL. Please reload the page.");
+      setErrorMessage("Could not load the tag link. Please reload the page.");
       return;
     }
     standUrlRef.current = url;
@@ -156,8 +156,8 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
           if (recorded) {
             setWriteState("success");
             notify.success(
-              "NFC tag verified",
-              "The tag already has the correct link. Status recorded.",
+              "Already programmed",
+              "This tag already has the right link.",
             );
           } else {
             setWriteState("partial");
@@ -167,9 +167,7 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
 
         if (existingContent.hasContent) {
           setWriteState("confirm-overwrite");
-          setErrorMessage(
-            `This tag already has content (${existingContent.description}). Writing will replace it.`,
-          );
+          setErrorMessage("This tag already has something on it. Programming will replace it.");
           return;
         }
       }
@@ -221,26 +219,24 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
         const recorded = await recordProvision();
         if (recorded) {
           setWriteState("success");
-          notify.success("NFC tag written", "The tag has been verified and recorded.");
+          notify.success("Tag programmed", "Hold a phone to the tag to check.");
         } else {
           setWriteState("partial");
         }
       } else {
         setWriteState("error");
         setErrorMessage(
-          "Tag was written but read-back verification failed. Tap the tag to check, then try again.",
+          "The tag was programmed but we could not check it. Tap the tag, then try again.",
         );
       }
     } catch (e) {
       setWriteState("error");
       if (e instanceof DOMException && e.name === "NotAllowedError") {
-        setErrorMessage("NFC permission was denied. Allow NFC access and try again.");
+        setErrorMessage("This phone did not allow tagging. Allow it and try again.");
       } else if (e instanceof DOMException && e.name === "NotSupportedError") {
-        setErrorMessage("This device does not support NFC writing.");
+        setErrorMessage("This phone cannot program a tag.");
       } else {
-        setErrorMessage(
-          e instanceof Error ? e.message : "NFC write failed. Please try again.",
-        );
+        setErrorMessage("Could not program the tag. Please try again.");
       }
     }
   }, [fetchStandUrl, recordProvision]);
@@ -251,20 +247,20 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
     <div className="rounded-[var(--radius-control)] border border-border p-4">
       <div className="mb-3 flex items-center gap-2">
         <Smartphone className="size-4 text-ink" aria-hidden="true" />
-        <p className="text-sm font-medium text-ink">Write NFC Tag (Android Chrome)</p>
+        <p className="text-sm font-medium text-ink">Program this tag</p>
       </div>
 
       {writeState === "idle" && (
         <Button variant="secondary" onClick={() => void handleWrite()}>
           <Smartphone className="size-5" aria-hidden="true" />
-          Write to NFC Tag
+          Program this tag
         </Button>
       )}
 
       {(writeState === "checking" || writeState === "writing") && (
         <div className="flex items-center gap-3 text-sm text-muted">
           <div className="size-5 animate-spin rounded-full border-2 border-border border-t-brand-text" />
-          <p>Hold your phone to the NFC tag...</p>
+          <p>Hold your phone to the tag…</p>
         </div>
       )}
 
@@ -276,7 +272,7 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
           </div>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => void handleWrite(true)}>
-              Overwrite tag
+              Replace what is on it
             </Button>
             <Button variant="secondary" onClick={() => setWriteState("idle")}>
               Cancel
@@ -288,7 +284,7 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
       {writeState === "verifying" && (
         <div className="flex items-center gap-3 text-sm text-muted">
           <div className="size-5 animate-spin rounded-full border-2 border-border border-t-brand-text" />
-          <p>Verifying tag contents...</p>
+          <p>Checking the tag…</p>
         </div>
       )}
 
@@ -296,10 +292,10 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2 text-sm text-[color:var(--rb-success)]">
             <CheckCircle className="size-4" aria-hidden="true" />
-            <p>NFC tag written successfully</p>
+            <p>This tag is programmed.</p>
           </div>
           <Button variant="secondary" onClick={() => void handleWrite()}>
-            Write Another Tag
+            Program another
           </Button>
         </div>
       )}
@@ -309,11 +305,11 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
           <div className="flex items-center gap-2 text-sm text-[color:var(--rb-info,var(--rb-success))]">
             <Info className="size-4 shrink-0" aria-hidden="true" />
             <p>
-              Your NFC tag works, but ReviewBoost couldn&apos;t save its setup status.
+              The tag is programmed. We could not mark it here — try again.
             </p>
           </div>
           <Button variant="secondary" onClick={() => void retryServerRecord()}>
-            Retry saving status
+            Mark as programmed
           </Button>
         </div>
       )}

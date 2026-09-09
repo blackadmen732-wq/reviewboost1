@@ -23,7 +23,12 @@ export interface HomeStand {
 
 export type HomeKind = "empty" | "active";
 
-export type AttentionKind = "google" | "unread" | "tag-missing" | "tag-rewrite";
+export type AttentionKind =
+  | "google"
+  | "unread"
+  | "tag-missing"
+  | "tag-unprogrammed"
+  | "tag-rewrite";
 
 export interface Attention {
   kind: AttentionKind;
@@ -32,9 +37,11 @@ export interface Attention {
 }
 
 export interface HomePrimary {
-  label: "Create a Tag" | "Print your code" | "Finish setup" | "Read feedback";
-  href: "/stands" | "/onboarding" | "/feedback";
+  label: "Create a Tag" | "Print your code" | "Add Google link" | "Program a tag" | "Read feedback";
+  href: "/stands" | "/onboarding" | "/feedback" | "/settings";
 }
+
+export type TagProgramPhase = "not-programmed" | "programmed" | "needs-reprogramming";
 
 export interface TagStatus {
   total: number;
@@ -61,6 +68,18 @@ export function tagNeedsRewrite(stand: HomeStand): boolean {
   return new Date(stand.tokenRotatedAt) > new Date(stand.nfcProvisionedAt);
 }
 
+export function tagProgramPhase(stand: HomeStand): TagProgramPhase {
+  if (stand.nfcProvisionedAt === null) return "not-programmed";
+  if (tagNeedsRewrite(stand)) return "needs-reprogramming";
+  return "programmed";
+}
+
+export function tagProgramPhaseLabel(phase: TagProgramPhase): string {
+  if (phase === "not-programmed") return "Not programmed";
+  if (phase === "needs-reprogramming") return "Needs reprogramming";
+  return "Programmed";
+}
+
 export function summarizeTags(stands: HomeStand[]): TagStatus {
   return {
     total: stands.length,
@@ -84,27 +103,12 @@ export function deriveHomeModel({
   const hasStand = tags.live > 0 || tags.total > 0;
   const previewStand = stands.find((stand) => stand.status === "active") ?? stands[0] ?? null;
 
+  const googleHref = hasLocation ? "/settings" : "/onboarding";
+  const createHref = hasLocation ? "/stands" : "/onboarding";
+
   const attentions: Attention[] = [];
-  if (!counts.hasGoogleLink) {
-    attentions.push({
-      kind: "google",
-      title: "Google review link is missing",
-      body: "Customers can rate you here. They cannot be sent to Google until the link is added.",
-    });
-  }
-  if (!hasStand) {
-    attentions.push({
-      kind: "tag-missing",
-      title: "No tag yet",
-      body: "Create a tag or print a code and put it where people pay.",
-    });
-  } else if (tags.needsRewrite > 0) {
-    attentions.push({
-      kind: "tag-rewrite",
-      title: tags.needsRewrite === 1 ? "One tag needs reprogramming" : `${tags.needsRewrite} tags need reprogramming`,
-      body: "The code changed after the last NFC write. Rewrite the tag or reprint the code.",
-    });
-  }
+
+  // Returning work first so unread is the headline when there is any.
   if (counts.unread > 0) {
     attentions.push({
       kind: "unread",
@@ -113,20 +117,51 @@ export function deriveHomeModel({
     });
   }
 
-  const createHref = hasLocation ? "/stands" : "/onboarding";
+  if (!counts.hasGoogleLink) {
+    attentions.push({
+      kind: "google",
+      title: "Google review link is missing",
+      body: "Every Tag uses this one link. Without it, customers can rate you here but cannot be sent to Google.",
+    });
+  }
+
+  if (!hasStand) {
+    attentions.push({
+      kind: "tag-missing",
+      title: "No tag yet",
+      body: "Create a tag, then print the code or program it, and put it where people pay.",
+    });
+  } else if (tags.needsRewrite > 0) {
+    attentions.push({
+      kind: "tag-rewrite",
+      title: tags.needsRewrite === 1 ? "One tag needs reprogramming" : `${tags.needsRewrite} tags need reprogramming`,
+      body: "The code changed. Program the tag again, or reprint the code.",
+    });
+  } else if (tags.programmed === 0) {
+    attentions.push({
+      kind: "tag-unprogrammed",
+      title: "Tag is not programmed yet",
+      body: "Print the code or program the tag. Same link either way.",
+    });
+  }
 
   let primary: HomePrimary | null;
-  if (kind === "empty") {
-    primary = hasStand
-      ? { label: "Print your code", href: "/stands" }
-      : { label: "Create a Tag", href: createHref };
-  } else if (counts.unread > 0) {
+  if (counts.unread > 0 && kind === "active") {
     primary = { label: "Read feedback", href: "/feedback" };
   } else if (!counts.hasGoogleLink) {
-    primary = { label: "Finish setup", href: "/onboarding" };
+    primary = { label: "Add Google link", href: googleHref };
   } else if (!hasStand) {
     primary = { label: "Create a Tag", href: createHref };
+  } else if (tags.needsRewrite > 0) {
+    primary = { label: "Program a tag", href: "/stands" };
+  } else if (kind === "empty" || tags.programmed === 0) {
+    primary = { label: "Print your code", href: "/stands" };
   } else {
+    primary = null;
+  }
+
+  // Ready empty: Google is set, a tag exists and is programmed. Waiting.
+  if (kind === "empty" && counts.hasGoogleLink && hasStand && tags.programmed > 0 && tags.needsRewrite === 0) {
     primary = null;
   }
 
@@ -145,15 +180,12 @@ export function tagStatusLine(status: TagStatus): string {
 
   const tagWord = status.total === 1 ? "tag" : "tags";
   const parts = [`${status.total} ${tagWord}`];
-  if (status.programmed > 0) {
-    parts.push(
-      status.programmed === 1 ? "1 programmed" : `${status.programmed} programmed`,
-    );
+  if (status.needsRewrite > 0) {
+    parts.push(status.needsRewrite === 1 ? "1 needs reprogramming" : `${status.needsRewrite} need reprogramming`);
+  } else if (status.programmed > 0) {
+    parts.push(status.programmed === 1 ? "1 programmed" : `${status.programmed} programmed`);
   } else {
     parts.push("not programmed yet");
-  }
-  if (status.needsRewrite > 0) {
-    parts.push(status.needsRewrite === 1 ? "1 needs a rewrite" : `${status.needsRewrite} need a rewrite`);
   }
   return parts.join(" · ");
 }

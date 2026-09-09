@@ -36,8 +36,13 @@ const stand: HomeStand = {
   tokenRotatedAt: null,
 };
 
+const programmed: HomeStand = {
+  ...stand,
+  nfcProvisionedAt: "2026-09-01T00:00:00.000Z",
+};
+
 describe("OwnerHome", () => {
-  it("empty state is a name, one sentence, and one primary action", () => {
+  it("empty without a tag names the blocker and one primary action", () => {
     const model = deriveHomeModel({
       counts: emptyCounts,
       stands: [],
@@ -47,7 +52,7 @@ describe("OwnerHome", () => {
     render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
 
     expect(screen.getByRole("heading", { name: "Oak & Vine" })).toBeVisible();
-    expect(screen.getByText("No ratings yet.")).toBeVisible();
+    expect(screen.getByText("No tag yet")).toBeVisible();
     expect(screen.getByRole("link", { name: "Create a Tag" })).toHaveAttribute("href", "/stands");
     expect(screen.queryByRole("link", { name: "Print your code" })).not.toBeInTheDocument();
     expect(screen.queryByText("Preview customer page")).not.toBeInTheDocument();
@@ -55,7 +60,25 @@ describe("OwnerHome", () => {
     expect(screen.queryByText("Customers")).not.toBeInTheDocument();
   });
 
-  it("empty with a tag offers print and preview, not a second green CTA", () => {
+  it("empty missing Google link blocks the loop before print", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, hasGoogleLink: false },
+      stands: [stand],
+      hasLocation: true,
+    });
+
+    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+
+    expect(screen.getByText("Google review link is missing")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Add Google link" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
+    expect(screen.queryByRole("link", { name: "Print your code" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview customer page" })).toBeVisible();
+  });
+
+  it("empty with an unprogrammed tag offers print and preview, not a second green CTA", () => {
     const model = deriveHomeModel({
       counts: emptyCounts,
       stands: [stand],
@@ -64,9 +87,25 @@ describe("OwnerHome", () => {
 
     render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
 
+    expect(screen.getByText("Tag is not programmed yet")).toBeVisible();
     expect(screen.getByRole("link", { name: "Print your code" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Preview customer page" })).toBeVisible();
     expect(screen.getAllByRole("link")).toHaveLength(1);
+  });
+
+  it("ready empty waits honestly", () => {
+    const model = deriveHomeModel({
+      counts: emptyCounts,
+      stands: [programmed],
+      hasLocation: true,
+    });
+
+    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+
+    expect(screen.getByText("No ratings yet.")).toBeVisible();
+    expect(screen.getByText("Your tag is ready. Put it where people pay.")).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Print your code" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Create a Tag" })).not.toBeInTheDocument();
   });
 
   it("returning home shows real unread rows and one green CTA", () => {
