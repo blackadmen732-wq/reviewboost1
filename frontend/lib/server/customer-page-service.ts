@@ -62,16 +62,16 @@ export async function getCustomerPageState(
 
   return {
     draft: clampHeroTransform({
-      x: row?.draft_offset_x,
-      y: row?.draft_offset_y,
-      scale: row?.draft_scale,
+      x: row?.draft_offset_x ?? 0,
+      y: row?.draft_offset_y ?? 0,
+      scale: row?.draft_scale ?? 1,
     }),
     draftTagline: row?.draft_tagline ?? null,
     hasDraftHero: Boolean(row?.has_draft_hero),
     published: clampHeroTransform({
-      x: row?.published_offset_x,
-      y: row?.published_offset_y,
-      scale: row?.published_scale,
+      x: row?.published_offset_x ?? 0,
+      y: row?.published_offset_y ?? 0,
+      scale: row?.published_scale ?? 1,
     }),
     publishedTagline: row?.published_tagline ?? null,
     hasPublishedHero: Boolean(row?.has_published_hero),
