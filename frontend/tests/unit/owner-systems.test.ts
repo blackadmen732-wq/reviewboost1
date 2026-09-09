@@ -143,6 +143,20 @@ describe("program Tag words", () => {
   });
 });
 
+describe("Owner Systems SoT v1.7", () => {
+  it("locks design philosophy and keeps Home slots", () => {
+    const spec = readFileSync(
+      join(process.cwd(), "..", "product-design/2026-09-09-OWNER-SYSTEMS-SPEC-v1.md"),
+      "utf8",
+    );
+    expect(spec).toContain("Owner Systems Spec v1.7");
+    expect(spec).toContain("v1.6");
+    expect(spec).toContain("v1.5");
+    expect(spec).toContain("no corporate jargon");
+    expect(spec).toContain("Home never changes layout");
+  });
+});
+
 describe("Home muscle memory", () => {
   it("keeps the same Home slots — name, action, unread, Tags", () => {
     const home = source("features/dashboard/owner-home.tsx");

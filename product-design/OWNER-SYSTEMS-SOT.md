@@ -1,8 +1,8 @@
 # Owner Systems Spec — binding (this repo)
 
-The Marcus/FORGE SoT file lives at
-`/workspace/product-design/2026-09-09-OWNER-SYSTEMS-SPEC-v1.md` on that box.
-This note is the lock for this checkout.
+**Spec version: v1.7**
+
+Canonical path: `product-design/2026-09-09-OWNER-SYSTEMS-SPEC-v1.md`
 
 **Do not merge. Do not touch PR #66. Customer V2 is frozen.**
 Customer Page remains priority **#1**.
@@ -21,34 +21,30 @@ Must match:
 - ReviewBoost footer + promise line
 - **No location**
 
-## v1.9 — WYSIWYG (bind now)
+## v1.5 — Customer Page live preview
 
 Owner uploads one composite → phone frame shows the **exact** customer view →
 drag / pinch / zoom to position → publish.
 
 **What they see while positioning = what the customer sees.**
 
-- Rating card stays **FIXED** (position and size). Only the photo moves.
-- No separate “edit then hope.” No save-and-check guessing.
-- Owner live preview **is** that customer view — same tree, same crop.
+## v1.6 — Home brief
 
-## v1.10 — same pixels
+| Rule | Detail |
+|---|---|
+| **One number + one arrow** | e.g. “12 ratings this week, up 3.” No chart |
+| **One action** | Single button. Nothing else competes for the tap |
+| **One warning, max** | Once, plain words, then out of the way |
+| **Zero settings on Home** | Settings live in Settings |
 
-The crop the owner sets in the phone frame **is** what `/q` shows.
-Same aspect, same hero/card split, same transform. No drift.
+## v1.7 — DESIGN PHILOSOPHY (locked)
 
-## v1.6 — Home brief + DESIGN PHILOSOPHY (locked)
+- Simple daily-life words only — no corporate jargon
+- Respect Marc’s color system — don’t retheme casually
+- Home never changes layout — same position, color, word
+- Visual-first, big taps, no paragraphs
+- Premium = fewer elements + whitespace
 
-Home brief: one number + one arrow, one action, one warning max, zero settings on Home.
+## Later binds (already shipped on this branch)
 
-Marc DESIGN PHILOSOPHY — all Owner UI (especially Home + Customer Page):
-
-- Simple daily-life words only; many users aren’t fluent English — no corporate jargon
-- Respect Marc’s intentional color system — don’t retheme casually
-- Muscle memory: Home never changes layout — same position, color, word
-- Visual-first, big taps, no paragraphs (DoorDash-level obvious)
-- Premium = fewer elements + whitespace; strip until almost too empty
-
-## Still bound
-
-- **v1.8** — easy navigation (DoorDash-like), **not** barren / whitespace theater
+- **v1.9 / v1.10** — same canvas and crop on owner phone and `/q`

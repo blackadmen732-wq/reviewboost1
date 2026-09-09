@@ -11,7 +11,7 @@ import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page"
 /**
  * Owner Home. One question: do I need to do anything?
  *
- * Muscle memory (SoT v1.6 philosophy): do not move these slots —
+ * Muscle memory (SoT v1.7): do not move these slots —
  * business name, one number, one warning, one green action, then
  * unread rows and Tags status. Same position, color, word.
  */
