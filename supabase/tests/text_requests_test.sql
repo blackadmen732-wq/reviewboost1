@@ -8,14 +8,14 @@
 -- lifecycle, the outbox lease, webhook dedupe, and the single-in-flight guard.
 --
 --   supabase test db
---   160 assertions in this file.
+--   167 assertions in this file.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(160);
+select plan(167);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -1403,6 +1403,118 @@ select throws_ok(
              order by a2.attempt_number desc limit 1) $$,
     '23505', NULL,
     'unique SID index rejects a second claim of the same provider id');
+
+-- 09000200 REPLACE'd attach_sid after 08000600 and dropped unique_violation.
+-- Sequential exists() still returns sid_conflict; the race does not — it
+-- raises 23505 unless the handler is restored. Force that path in-process:
+-- a BEFORE UPDATE trigger commits the SID onto the sibling row after
+-- exists() has passed, so the UPDATE hits unique_violation.
+select ok(
+    pg_get_functiondef(
+        'app.sms_reconcile_attach_sid(uuid, uuid, text, text, text)'::regprocedure)
+        ~ 'unique_violation',
+    'attach_sid maps unique_violation after later CREATE OR REPLACE');
+
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('o',64),
+    'v1:enc', 1::smallint, '1616', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('o',64), 'v1:enc', 1::smallint, '1616', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-uv-a', '7b000000-0000-0000-0000-000000000001', 'req-uv-a');
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-uv-a'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-uv-a'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'provider_unknown', null, 'timeout', '{}'::jsonb);
+
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('p',64),
+    'v1:enc', 1::smallint, '1717', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('p',64), 'v1:enc', 1::smallint, '1717', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-uv-b', '7b000000-0000-0000-0000-000000000001', 'req-uv-b');
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-uv-b'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-uv-b'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'provider_unknown', null, 'timeout', '{}'::jsonb);
+
+select set_config('tests.uv_winner_attempt_id',
+    (select a.id::text from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-uv-a'
+     order by a.attempt_number desc limit 1), true);
+select set_config('tests.uv_loser_attempt_id',
+    (select a.id::text from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-uv-b'
+     order by a.attempt_number desc limit 1), true);
+
+create or replace function tests.force_attach_unique_violation()
+returns trigger
+language plpgsql
+as $$
+begin
+    if NEW.provider_message_id is not distinct from 'fake_uv_handler_sid'
+       and OLD.provider_message_id is null
+       and NEW.id::text is not distinct from current_setting('tests.uv_loser_attempt_id', true) then
+        update public.sms_delivery_attempts a
+           set provider_message_id = NEW.provider_message_id
+         where a.id = current_setting('tests.uv_winner_attempt_id')::uuid;
+    end if;
+    return NEW;
+end;
+$$;
+
+create trigger tests_force_attach_unique_violation
+    before update on public.sms_delivery_attempts
+    for each row
+    execute function tests.force_attach_unique_violation();
+
+select is(
+    app.sms_reconcile_attach_sid(
+        current_setting('tests.uv_loser_attempt_id')::uuid,
+        '7c000000-0000-0000-0000-00000000000a', 'fake_uv_handler_sid', 'delivered', null),
+    'sid_conflict',
+    'unique_violation inside attach_sid returns sid_conflict not SQLSTATE 23505');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-uv-b'),
+    'provider_unknown', 'unique_violation loser stays provider_unknown');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'consumption'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-uv-b')::text),
+    0, 'unique_violation loser does not consume');
+
+drop trigger tests_force_attach_unique_violation on public.sms_delivery_attempts;
+
+select is(
+    app.sms_reconcile_attach_sid(
+        current_setting('tests.uv_winner_attempt_id')::uuid,
+        '7c000000-0000-0000-0000-00000000000a', 'fake_uv_handler_sid', null, null),
+    'submitted', 'winning claim after unique_violation still attaches');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-uv-a'),
+    'submitted', 'unique_violation winner is submitted');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'consumption'
+        and correlation_key in (
+            'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-uv-a')::text,
+            'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-uv-b')::text)),
+    1, 'unique_violation race consumes exactly once');
 
 -- Confirmed not-sent: fail+release.
 select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('h',64),
