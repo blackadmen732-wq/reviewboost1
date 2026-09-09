@@ -3,8 +3,8 @@
 import type { ReactNode } from "react";
 
 /**
- * Phone chrome around the live customer view.
- * The screen inside is the customer page — not a sketch of it.
+ * Phone chrome around the live customer view (SoT v1.9).
+ * The screen inside is the customer page — same 390/844 canvas as /q.
  */
 
 export function PhoneFrame({

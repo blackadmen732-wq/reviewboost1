@@ -1,7 +1,10 @@
 /**
  * Quiet blank page for owners who will design in another app.
  * Guides only — no pizza, no logo, no half-made graphic.
+ * Card band matches the live canvas so the photo lands where stars sit.
  */
+
+import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
 
 export function downloadBlankCustomerTemplate(): void {
   const width = 1080;
@@ -15,7 +18,7 @@ export function downloadBlankCustomerTemplate(): void {
   ctx.fillStyle = "#F8F5F0";
   ctx.fillRect(0, 0, width, height);
 
-  const cardTop = Math.round(height * 0.58);
+  const cardTop = Math.round(height * CUSTOMER_CANVAS.heroShare);
   ctx.fillStyle = "#FFFFFF";
   roundRect(ctx, 0, cardTop, width, height - cardTop, 72);
   ctx.fill();

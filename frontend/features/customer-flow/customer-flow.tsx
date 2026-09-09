@@ -426,6 +426,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
         transform={clampHeroTransform(presentation.transform)}
         heading={state.screen === "rating" ? messages.ratingHeading : ""}
         support={state.screen === "rating" ? messages.ratingSupport : ""}
+        footerLine={messages.footerPromise}
         language={
           <LanguageSelector
             locale={state.locale}

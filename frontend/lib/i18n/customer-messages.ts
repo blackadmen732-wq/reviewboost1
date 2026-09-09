@@ -45,6 +45,7 @@ export interface CustomerMessages {
   doneBody: string;
   closePage: string;
   poweredBy: string;
+  footerPromise: string;
   businessLogoAlt: (businessName: string) => string;
 }
 
@@ -110,6 +111,7 @@ const en: CustomerMessages = {
   doneBody: "Thanks for helping a local business improve.",
   closePage: "You can close this page.",
   poweredBy: "Powered by ReviewBoost",
+  footerPromise: "Real businesses. Real feedback. A brighter tomorrow.",
   businessLogoAlt: (businessName) => `${businessName} logo`,
 };
 
@@ -169,6 +171,7 @@ const es: CustomerMessages = {
   doneBody: "Gracias por ayudar a mejorar un negocio local.",
   closePage: "Puedes cerrar esta página.",
   poweredBy: "Con tecnología de ReviewBoost",
+  footerPromise: "Negocios reales. Comentarios reales. Un mañana más brillante.",
   businessLogoAlt: (businessName) => `Logo de ${businessName}`,
 };
 
@@ -228,6 +231,7 @@ const ht: CustomerMessages = {
   doneBody: "Mèsi paske ou ede yon biznis lokal amelyore.",
   closePage: "Ou ka fèmen paj sa a.",
   poweredBy: "ReviewBoost mache paj sa a",
+  footerPromise: "Biznis reyèl. Kòmantè reyèl. Yon demen pi klere.",
   businessLogoAlt: (businessName) => `Logo ${businessName}`,
 };
 

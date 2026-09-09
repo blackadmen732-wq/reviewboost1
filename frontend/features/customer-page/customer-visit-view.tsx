@@ -3,6 +3,7 @@
 import type { PointerEvent, ReactNode, WheelEvent } from "react";
 
 import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
+import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
 import {
   clampHeroTransform,
   heroTransformStyle,
@@ -14,17 +15,16 @@ import { cn } from "@/lib/utils/cn";
  * The customer page. Owner preview and live /q render this same tree.
  * Positioning in the phone frame is this view — not a mock, not a later check.
  *
- * Mario SoT: rich hero, fixed white “How was your visit?” card, five stars,
- * ReviewBoost footer. No location. No org/tag ids.
+ * SoT v1.9 / v1.10: Mario’s Pizza — rich hero, fixed white card, five stars,
+ * ReviewBoost footer. No location. Same crop the customer sees.
  */
 
 export interface CustomerVisitViewProps {
   heroUrl: string | null;
   transform: HeroTransform;
-  tagline?: string | null;
   heading: string;
   support: string;
-  poweredBy?: string;
+  footerLine: string;
   children: ReactNode;
   language?: ReactNode;
   /** Owner editor only: drag/pinch the hero. The card never receives this. */
@@ -38,9 +38,9 @@ export interface CustomerVisitViewProps {
 export function CustomerVisitView({
   heroUrl,
   transform,
-  tagline,
   heading,
   support,
+  footerLine,
   children,
   language,
   heroInteractive = false,
@@ -52,7 +52,12 @@ export function CustomerVisitView({
   const crop = clampHeroTransform(transform);
 
   return (
-    <div className="visit-stage" data-customer-visit>
+    <div
+      className="visit-stage"
+      data-customer-visit
+      data-customer-canvas={CUSTOMER_CANVAS.aspectRatio}
+      data-card-fixed=""
+    >
       <div
         className={cn("visit-hero", heroInteractive && "visit-hero--live")}
         data-hero-layer
@@ -75,7 +80,6 @@ export function CustomerVisitView({
         ) : (
           <div className="visit-hero__empty" aria-hidden="true" />
         )}
-        {tagline ? <p className="visit-tagline">{tagline}</p> : null}
         {language ? <div className="visit-language">{language}</div> : null}
       </div>
 
@@ -91,6 +95,7 @@ export function CustomerVisitView({
         <div className="visit-card__body">{children}</div>
         <footer className="visit-footer">
           <ReviewBoostLogo pose="poweredBy" size="poweredBy" />
+          <p className="visit-footer__line">{footerLine}</p>
         </footer>
       </section>
     </div>

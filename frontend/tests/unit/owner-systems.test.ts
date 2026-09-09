@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
 import { clampHeroTransform, heroTransformStyle } from "@/lib/owner/hero-transform";
 import { buildEntitlementSnapshot, capabilityLabel } from "@/lib/owner/entitlements";
 import { PLAN_CATALOG } from "@/lib/owner/plan-catalog";
@@ -98,6 +99,33 @@ describe("public customer hygiene", () => {
     expect(view).not.toMatch(/location\.name|locationName|orgId|standId|locationId/);
     expect(view).toContain("visit-card");
     expect(view).toContain("data-hero-layer");
+    expect(view).toContain("data-card-fixed");
+    expect(view).not.toMatch(/visit-tagline|tagline \?/);
+  });
+});
+
+describe("WYSIWYG canvas (SoT v1.9 / v1.10)", () => {
+  it("locks the Mario iPhone canvas", () => {
+    expect(CUSTOMER_CANVAS).toMatchObject({
+      width: 390,
+      height: 844,
+      aspectRatio: "390 / 844",
+      heroShare: 0.54,
+      cardShare: 0.46,
+    });
+  });
+
+  it("owner phone and live /q share the Mario canvas", () => {
+    const css = source("styles/customer-page.css");
+    const editor = source("features/customer-page/customer-page-editor.tsx");
+    const live = source("features/customer-flow/customer-flow.tsx");
+    expect(css).toContain("aspect-ratio: 390 / 844");
+    expect(css).toContain("flex: 0 0 46%");
+    expect(css).not.toContain("height: 640px");
+    expect(editor).toContain("CustomerVisitView");
+    expect(live).toContain("CustomerVisitView");
+    expect(editor).toContain("footerLine");
+    expect(live).toContain("footerLine");
   });
 });
 

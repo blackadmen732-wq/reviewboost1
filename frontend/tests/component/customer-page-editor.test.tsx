@@ -27,9 +27,12 @@ describe("Customer page editor", () => {
 
     expect(screen.getByText(customerMessages.en.ratingHeading)).toBeVisible();
     expect(screen.getByText(customerMessages.en.ratingSupport)).toBeVisible();
+    expect(screen.getByText(customerMessages.en.footerPromise)).toBeVisible();
     expect(screen.getByRole("img", { name: "Customer page" })).toBeInTheDocument();
     expect(document.querySelector("[data-rating-card]")).toBeTruthy();
     expect(document.querySelector("[data-hero-layer]")).toBeTruthy();
+    expect(document.querySelector("[data-customer-canvas='390 / 844']")).toBeTruthy();
+    expect(document.querySelector("[data-card-fixed]")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Add photo" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Publish" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Download blank page" })).toBeVisible();

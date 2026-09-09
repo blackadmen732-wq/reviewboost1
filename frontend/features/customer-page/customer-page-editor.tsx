@@ -10,7 +10,7 @@ import { CustomerVisitView } from "@/features/customer-page/customer-visit-view"
 import { VisitStars } from "@/features/customer-page/visit-stars";
 import { downloadBlankCustomerTemplate } from "@/features/customer-page/blank-template";
 import { useHeroGestures } from "@/features/customer-page/use-hero-gestures";
-import { DEFAULT_HERO_TRANSFORM, type HeroTransform } from "@/lib/owner/hero-transform";
+import { type HeroTransform } from "@/lib/owner/hero-transform";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
@@ -100,7 +100,7 @@ export function CustomerPageEditor({ initial }: { initial: CustomerPageEditorMod
     <div className="customer-page-editor">
       <div className="customer-page-editor__preview">
         <p className="mb-3 text-sm font-medium text-muted">
-          {live ? "Live on your Tags" : "Not on Tags yet"}
+          {live ? "Live on your Tags — this is the customer page" : "Not on Tags yet — this is the customer page"}
         </p>
         <PhoneFrame>
           <CustomerVisitView
@@ -108,6 +108,7 @@ export function CustomerPageEditor({ initial }: { initial: CustomerPageEditorMod
             transform={transform}
             heading={messages.ratingHeading}
             support={messages.ratingSupport}
+            footerLine={messages.footerPromise}
             heroInteractive={Boolean(heroUrl)}
             {...gestures}
           >
@@ -119,7 +120,8 @@ export function CustomerPageEditor({ initial }: { initial: CustomerPageEditorMod
       <div className="customer-page-editor__rail">
         <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink">Your photo</h2>
         <p className="mt-1 text-base leading-relaxed text-muted">
-          One picture. Put your name on it. Drag to move. Pinch or scroll to zoom. The stars stay put.
+          What you see is what they see. Put your name on the picture. Drag to move. Pinch or
+          scroll to zoom. The stars stay put.
         </p>
 
         <input

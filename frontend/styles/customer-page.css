@@ -1,18 +1,20 @@
-/* Shared customer visit view — owner preview and live /q are this tree. */
+/* Shared customer visit view — owner preview and live /q are this tree.
+   Canvas is 390/844 (Mario SoT). Hero 54% / card 46%. Card never moves. */
 
 .visit-stage {
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
-  min-height: 100%;
-  background: var(--rb-canvas);
+  min-height: 0;
+  background: #fff;
   overflow: hidden;
 }
 
 .visit-hero {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 1 54%;
+  height: 54%;
   min-height: 0;
   overflow: hidden;
   background: #1a1a1a;
@@ -39,21 +41,7 @@
 .visit-hero__empty {
   width: 100%;
   height: 100%;
-  background: var(--rb-canvas);
-}
-
-.visit-tagline {
-  position: absolute;
-  right: 16px;
-  bottom: 20px;
-  left: 16px;
-  margin: 0;
-  color: #fff;
-  font-size: 0.75rem;
-  letter-spacing: 0.14em;
-  text-align: center;
-  text-transform: uppercase;
-  text-shadow: 0 1px 8px rgb(0 0 0 / 45%);
+  background: #1a1a1a;
 }
 
 .visit-language {
@@ -70,43 +58,64 @@
 }
 
 .visit-card {
-  flex: 0 0 auto;
+  display: flex;
+  flex: 0 0 46%;
+  flex-direction: column;
+  height: 46%;
+  max-height: 46%;
   z-index: 2;
   background: #fff;
-  border-radius: 28px 28px 0 0;
-  padding: 28px 22px 18px;
+  border-radius: 32px 32px 0 0;
+  padding: 28px 24px 16px;
+  overflow: hidden;
 }
 
 .visit-card__copy {
+  flex: 0 0 auto;
   text-align: center;
 }
 
 .visit-heading {
   margin: 0;
   color: var(--rb-ink);
-  font-size: clamp(1.75rem, 7vw, 2.15rem);
+  font-size: clamp(1.7rem, 7.2vw, 2.2rem);
   font-weight: 720;
-  letter-spacing: -0.04em;
-  line-height: 1.1;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
 }
 
 .visit-support {
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   color: var(--rb-muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 620;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .visit-card__body {
-  margin-top: 18px;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 20px;
+  overflow: auto;
 }
 
 .visit-footer {
   display: grid;
+  flex: 0 0 auto;
   place-items: center;
-  margin-top: 18px;
+  margin-top: 12px;
+  gap: 4px;
+}
+
+.visit-footer__line {
+  margin: 0;
+  color: var(--rb-muted);
+  font-size: 0.58rem;
+  font-weight: 620;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
 }
 
 .visit-stars {
@@ -119,7 +128,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 14px;
+  gap: 16px;
 }
 
 .visit-star {
@@ -139,13 +148,13 @@
   width: 48px;
   height: 48px;
   place-items: center;
-  color: #c5c5c5;
+  color: #c8c8c8;
   cursor: pointer;
 }
 
 .visit-star__label svg {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   fill: transparent;
 }
 
@@ -172,7 +181,7 @@
   position: relative;
   overflow: hidden;
   border: 10px solid #111;
-  border-radius: 36px;
+  border-radius: 40px;
   background: #111;
   box-shadow: 0 18px 40px -24px rgb(23 26 24 / 55%);
 }
@@ -190,17 +199,25 @@
 }
 
 .phone-frame__screen {
-  height: 640px;
+  aspect-ratio: 390 / 844;
+  width: 100%;
+  height: auto;
   overflow: hidden;
-  background: var(--rb-canvas);
+  background: #fff;
 }
 
 .customer-live {
+  display: grid;
   min-height: 100dvh;
+  place-items: center;
+  background: #fff;
 }
 
 .customer-live .visit-stage {
-  min-height: 100dvh;
+  width: min(100vw, calc(100dvh * 390 / 844));
+  height: min(100dvh, calc(100vw * 844 / 390));
+  max-height: 100dvh;
+  aspect-ratio: 390 / 844;
 }
 
 .customer-page-editor {
