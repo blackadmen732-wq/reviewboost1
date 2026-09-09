@@ -133,6 +133,34 @@ describe("reconcileOnce", () => {
     expect(rpc.mock.calls.some(([name]) => name === "rpc_sms_reconcile_attach_sid")).toBe(false);
   });
 
+  it("defers when attach returns sid_conflict (keeps reservation)", async () => {
+    rpc.mockReset();
+    lookup.mockReset();
+    lookup.mockResolvedValue({
+      outcome: "found",
+      providerMessageId: "fake_samebody_sid",
+      terminal: "delivered",
+      raw: { simulated: "lookup_found" },
+    });
+    rpc.mockImplementation(async (name: string) => {
+      if (name === "rpc_sms_claim_outbox") return { data: [JOB], error: null };
+      if (name === "rpc_sms_reconcile_prepare") return { data: ready(), error: null };
+      if (name === "rpc_sms_reconcile_attach_sid") return { data: "sid_conflict", error: null };
+      if (name === "rpc_sms_fail_outbox") return { data: "pending", error: null };
+      return { data: null, error: { message: `unexpected rpc ${name}` } };
+    });
+
+    const { reconcileOnce } = await load();
+    const summary = await reconcileOnce({ worker: "rw1", limit: 1 });
+    expect(summary).toMatchObject({ claimed: 1, deferred: 1, attached: 0, applied: 0, released: 0 });
+    expect(rpc).toHaveBeenCalledWith(
+      "rpc_sms_fail_outbox",
+      expect.objectContaining({ p_id: "job-r1", p_worker: "rw1", p_error: "attach_sid_conflict" }),
+    );
+    expect(rpc.mock.calls.some(([name]) => name === "rpc_sms_complete_outbox")).toBe(false);
+    expect(rpc.mock.calls.some(([name]) => name === "rpc_sms_reconcile_fail_release")).toBe(false);
+  });
+
   it("defers when lookup is still unknown (keeps reservation)", async () => {
     rpc.mockReset();
     lookup.mockReset();
