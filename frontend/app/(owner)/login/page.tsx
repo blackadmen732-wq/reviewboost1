@@ -3,17 +3,25 @@ import { redirect } from "next/navigation";
 
 import { AuthFrame } from "@/features/auth/auth-frame";
 import { SignInFlow } from "@/features/auth/sign-in-flow";
+import { isGetStartedNext } from "@/features/public/public-copy";
 import { safeInternalPath } from "@/lib/security/safe-redirect";
 import { publicFrontendUrl } from "@/lib/server/env";
 import { currentUser } from "@/lib/supabase/server";
 
-export const metadata: Metadata = {
-  title: "Sign in — ReviewBoost",
-  // Sign-in pages have no business in a search index.
-  robots: { index: false, follow: false },
-};
-
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}): Promise<Metadata> {
+  const { next } = await searchParams;
+  const destination = safeInternalPath(next, publicFrontendUrl());
+  return {
+    title: isGetStartedNext(destination) ? "Get started" : "Sign in",
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function LoginPage({
   searchParams,
@@ -32,7 +40,10 @@ export default async function LoginPage({
 
   return (
     <AuthFrame>
-      <SignInFlow next={destination} />
+      <SignInFlow
+        next={destination}
+        intent={isGetStartedNext(destination) ? "start" : "signin"}
+      />
     </AuthFrame>
   );
 }

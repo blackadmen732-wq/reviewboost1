@@ -6,7 +6,7 @@ import { OnboardingFlow } from "@/features/onboarding/onboarding-flow";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Set up — ReviewBoost",
+  title: "Set up",
   robots: { index: false, follow: false },
 };
 

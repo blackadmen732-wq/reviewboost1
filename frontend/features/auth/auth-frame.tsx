@@ -16,7 +16,7 @@ export function AuthFrame({
 }) {
   return (
     <div className="min-h-dvh bg-canvas text-ink">
-      <header className="px-5 pt-6 sm:px-8">
+      <header className="px-5 pt-6 print:hidden sm:px-8">
         <Link
           href="/"
           className="inline-flex rounded-[var(--radius-control)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"

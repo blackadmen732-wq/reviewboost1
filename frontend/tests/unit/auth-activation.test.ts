@@ -32,6 +32,23 @@ describe("login, verify, and activation chrome", () => {
     const page = code("app/page.tsx");
     expect(page).toContain("PublicHome");
     expect(page).not.toMatch(/redirect\("\/login"\)/);
+    expect(page).toContain("catch");
+    expect(page).toContain("signedIn");
+  });
+
+  it("Get started and Sign in are the same OTP door with different copy", () => {
+    const login = code("app/(owner)/login/page.tsx");
+    const signIn = code("features/auth/sign-in-flow.tsx");
+    expect(login).toContain("isGetStartedNext");
+    expect(signIn).toContain('intent === "start" ? "Get started" : "Sign in"');
+  });
+
+  it("keeps crawlers off owner, login, and customer tokens", () => {
+    const robots = code("app/robots.ts");
+    expect(robots).toContain('allow: ["/", "/how-it-works"');
+    expect(robots).toContain('"/login"');
+    expect(robots).toContain('"/onboarding"');
+    expect(robots).toContain('"/q/"');
   });
 
   it("onboarding still posts to the existing API once", () => {

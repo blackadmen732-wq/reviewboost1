@@ -20,7 +20,13 @@ type Step = "email" | "verify";
 
 const RESEND_SECONDS = 30;
 
-export function SignInFlow({ next }: { next: string }) {
+export function SignInFlow({
+  next,
+  intent = "signin",
+}: {
+  next: string;
+  intent?: "signin" | "start";
+}) {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -158,10 +164,11 @@ export function SignInFlow({ next }: { next: string }) {
       className="flex flex-col gap-8"
       noValidate
       data-auth-step="login"
+      data-auth-intent={intent}
     >
       <div className="flex flex-col gap-3">
         <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.02em] text-ink">
-          Sign in
+          {intent === "start" ? "Get started" : "Sign in"}
         </h1>
         <p className="text-base leading-relaxed text-muted">
           Customers scan a code on your counter. You get more reviews — from

@@ -126,8 +126,10 @@ export function OnboardingFlow() {
 
   return (
     <div className="flex flex-col gap-8" data-onboarding-step={step}>
-      {back ? <BackButton onClick={() => go(back)} /> : null}
-      <Progress current={onboardingStepNumber(step)} />
+      <div className="flex flex-col gap-8 print:hidden">
+        {back ? <BackButton onClick={() => go(back)} /> : null}
+        <Progress current={onboardingStepNumber(step)} />
+      </div>
 
       {step === "business" ? (
         <BusinessStep
@@ -447,7 +449,7 @@ function PrintStep({
         )}
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 print:hidden">
         <Button variant="action" size="lg" onClick={() => window.print()}>
           <Printer className="size-5" aria-hidden="true" />
           Print this code
