@@ -101,7 +101,7 @@ version. Fixes must be new later versions. Every forward is `CREATE OR REPLACE`
 | Database already applied | Recorded version | Missing on this branch | Repair |
 |---|---|---|---|
 | #45 only (`de342a5b`) | `00100` = privilege | `apply_delivery_status` FOR UPDATE + compliance indexes (`00200` still applies and carries the evolved settle) | `20260909000100` |
-| #48 reset (`1ab4eb68`) | `00400` = privilege | SMS SID `00400` | `20260909000200` reapplies attach SID |
+| #48 reset (`1ab4eb68`) | `00400` = privilege | SMS SID `00400` **and** SMS `00100`–`00300` (CLI will not insert versions before the last recorded remote without `--include-all`) | `migration up --include-all`; SID body from `20260909000200` |
 | #45 then #48, no reset | `00100` = privilege | SMS settle **and** SID | both `09000100` and `09000200` |
 | #47 (`64e76371`) | `00100`–`00300` = SMS | SID + privilege + FIFO delta | `00400`, `00500`, `09000300` |
 | #54 (`e0115c39`) | `00100`–`00400` = SMS | privilege (and FIFO already in their `00200`) | `00500`; `09000300` is a no-op replace |
