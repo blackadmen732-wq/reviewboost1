@@ -22,14 +22,16 @@ npx --yes supabase@2.117.0 db reset --yes --local   # second reset
 npx --yes supabase@2.117.0 db diff --schema public,app
 ```
 
-Results (pre-`20260909000400` index follow-up):
+Results:
 
-- Reset applied all `20260908` / `20260909` files including forwards.
-- `migration list`: local == remote through `20260909000300`.
-- **pgTAP `Files=8, Tests=451, Result: PASS`** (includes `privilege_attack_test.sql`
-  and 143 `text_requests_test.sql` assertions).
-- Second reset finished without error.
-- `db diff --schema public,app`: **No schema changes found**.
+- Reset applied all `20260908` / `20260909` files including forwards and
+  `20260909000400` org-time indexes.
+- **pgTAP `Files=8, Tests=451, Result: PASS`** after the index follow-up
+  (includes `privilege_attack_test.sql` and 143 `text_requests_test.sql`
+  assertions).
+- Second reset (pre-index commit) finished without error; `db diff --schema
+  public,app` was empty at that tip.
+- Final tip `429f8c7`: fresh reset + pgTAP **451 PASS**.
 
 ## Upgrade with existing data (main → this branch)
 
