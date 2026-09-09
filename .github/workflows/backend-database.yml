@@ -41,7 +41,9 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pin so CI does not resolve "latest" (GitHub API rate-limit flake).
+          # 2.117.0 matches scripts/dev/tool-versions.sh on this repo.
+          version: 2.117.0
 
       - name: Start Supabase
         run: supabase start --exclude studio,imgproxy,edge-runtime,logflare,vector,pooler

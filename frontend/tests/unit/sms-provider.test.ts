@@ -12,6 +12,11 @@ const loadTwilio = () => import("@/lib/server/sms/provider/twilio");
 const loadProvider = () => import("@/lib/server/sms/provider");
 
 describe("fake provider", () => {
+  afterEach(async () => {
+    const { resetFakeAccepted } = await loadFake();
+    resetFakeAccepted();
+  });
+
   it("submits by default with a stable message id", async () => {
     const { FakeSmsProvider } = await loadFake();
     const p = new FakeSmsProvider();
@@ -46,8 +51,64 @@ describe("fake provider", () => {
   it("reports provider_unknown for a programmed timeout", async () => {
     const { FakeSmsProvider } = await loadFake();
     const p = new FakeSmsProvider({ unknownNumbers: new Set(["+15550000001"]) });
-    const r = await p.send({ to: "+15550000001", body: "hi" });
+    const r = await p.send({ to: "+15550000001", body: "hi", idempotencyKey: "req:never" });
     expect(r.outcome).toBe("provider_unknown");
+    const looked = await p.lookup({
+      idempotencyKey: "req:never",
+      to: "+15550000001",
+      body: "hi",
+    });
+    expect(looked.outcome).toBe("not_found");
+  });
+
+  it("shares timeout-after-accept SIDs across FakeSmsProvider instances", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const sender = new FakeSmsProvider({ timeoutAfterAcceptNumbers: new Set(["+15550000002"]) });
+    const sent = await sender.send({ to: "+15550000002", body: "hi", idempotencyKey: "req:shared" });
+    expect(sent.outcome).toBe("provider_unknown");
+    const lookuper = new FakeSmsProvider();
+    const looked = await lookuper.lookup({
+      idempotencyKey: "req:shared",
+      to: "+15550000002",
+      body: "hi",
+    });
+    expect(looked.outcome).toBe("found");
+  });
+
+  it("timeout-after-accept hides the SID on send and returns it from lookup", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider({ timeoutAfterAcceptNumbers: new Set(["+15550000002"]) });
+    const sent = await p.send({ to: "+15550000002", body: "hi", idempotencyKey: "req:late-sid" });
+    expect(sent.outcome).toBe("provider_unknown");
+    expect(sent.providerMessageId).toBeUndefined();
+    const looked = await p.lookup({
+      idempotencyKey: "req:late-sid",
+      to: "+15550000002",
+      body: "hi",
+    });
+    expect(looked.outcome).toBe("found");
+    if (looked.outcome === "found") {
+      expect(looked.providerMessageId).toMatch(/^fake_/);
+    }
+  });
+
+  it("lookup is unknown when programmed, and not_found when send never accepted", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider({ lookupUnknownNumbers: new Set(["+15550000003"]) });
+    const looked = await p.lookup({
+      idempotencyKey: "req:missing",
+      to: "+15550000003",
+      body: "hi",
+    });
+    expect(looked.outcome).toBe("unknown");
+
+    const p2 = new FakeSmsProvider();
+    const missing = await p2.lookup({
+      idempotencyKey: "req:never-sent",
+      to: "+15550000004",
+      body: "hi",
+    });
+    expect(missing.outcome).toBe("not_found");
   });
 
   it("parses status and inbound webhooks", async () => {
@@ -176,6 +237,263 @@ describe("twilio provider", () => {
       rawBody: "MessageSid=SM9&SmsStatus=received&From=%2B15551230000&Body=STOP",
     });
     expect(r).toMatchObject({ kind: "inbound_message", from: "+15551230000", body: "STOP" });
+  });
+});
+
+describe("twilio send outcome classification", () => {
+  const OLD = { ...process.env };
+  afterEach(() => {
+    process.env = { ...OLD };
+    vi.restoreAllMocks();
+  });
+
+  function configureEnv() {
+    process.env.TWILIO_ACCOUNT_SID = "ACtest00000000000000000000000000";
+    process.env.TWILIO_AUTH_TOKEN = "test_auth_token";
+    process.env.TWILIO_FROM_NUMBER = "+15550001111";
+  }
+
+  it("returns retryable on HTTP 429", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        json: () => Promise.resolve({ code: 20429 }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("retryable");
+    expect(result.errorClass).toBe("rate_limited");
+  });
+
+  it("returns provider_unknown on HTTP 500 (ambiguous, do NOT retry)", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ code: 20500 }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("provider_unknown");
+    expect(result.errorClass).toBe("provider_error");
+  });
+
+  it("returns provider_unknown on HTTP 503", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: () => Promise.resolve({}),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("provider_unknown");
+  });
+
+  it("returns failed on HTTP 400 (clear rejection)", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ code: 21211 }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("failed");
+    expect(result.errorClass).toBe("invalid_number");
+  });
+
+  it("returns failed on HTTP 401 (auth error = clear rejection)", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({}),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("failed");
+  });
+
+  it("returns provider_unknown on network timeout (not retryable)", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("The operation was aborted due to timeout")),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("provider_unknown");
+    expect(result.errorClass).toBe("timeout");
+  });
+
+  it("returns submitted on HTTP 201 with SID", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ sid: "SM123abc", status: "queued" }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().send({ to: "+15551230000", body: "hi" });
+    expect(result.outcome).toBe("submitted");
+    expect(result.providerMessageId).toBe("SM123abc");
+  });
+
+  it("lookup is unknown when Twilio is not configured (does not invent not_found)", async () => {
+    delete process.env.TWILIO_ACCOUNT_SID;
+    delete process.env.TWILIO_AUTH_TOKEN;
+    delete process.env.TWILIO_FROM_NUMBER;
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(result.outcome).toBe("unknown");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("lookup GETs Messages and never POSTs a new send", async () => {
+    configureEnv();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          messages: [{ sid: "SMrecovered", status: "delivered", body: "hi", date_created: "2026-09-08T12:00:00Z" }],
+        }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+      sentAfter: new Date("2026-09-08T11:00:00Z"),
+    });
+    expect(result).toMatchObject({ outcome: "found", providerMessageId: "SMrecovered", terminal: "delivered" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe("GET");
+    expect(url).toContain("/Messages.json");
+    expect(url).toContain(encodeURIComponent("+15551230000"));
+  });
+
+  it("lookup is unknown for a lone candidate whose body does not match", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            messages: [{ sid: "SMother", status: "delivered", body: "different", date_created: "2026-09-08T12:00:00Z" }],
+          }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(result.outcome).toBe("unknown");
+  });
+
+  it("lookup is unknown when a full page has no match (do not fail+release)", async () => {
+    configureEnv();
+    const messages = Array.from({ length: 50 }, (_, i) => ({
+      sid: `SM${String(i).padStart(4, "0")}`,
+      status: "delivered",
+      body: "other",
+      date_created: "2026-09-08T12:00:00Z",
+    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ messages }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(result.outcome).toBe("unknown");
+  });
+
+  it("lookup returns not_found when the list is empty", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ messages: [] }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(result.outcome).toBe("not_found");
+  });
+
+  it("lookup returns unknown on a 5xx list response", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: () => Promise.resolve({}),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(result.outcome).toBe("unknown");
+  });
+});
+
+describe("fake provider retryable outcome", () => {
+  it("returns retryable for a programmed retryable number", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider({ retryableNumbers: new Set(["+15559990000"]) });
+    const r = await p.send({ to: "+15559990000", body: "hi" });
+    expect(r.outcome).toBe("retryable");
+    expect(r.errorClass).toBe("rate_limited");
   });
 });
 
