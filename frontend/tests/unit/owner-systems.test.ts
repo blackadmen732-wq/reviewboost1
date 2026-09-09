@@ -110,8 +110,8 @@ describe("WYSIWYG canvas (SoT v1.9 / v1.10)", () => {
       width: 390,
       height: 844,
       aspectRatio: "390 / 844",
-      heroShare: 0.54,
-      cardShare: 0.46,
+      heroShare: 0.56,
+      cardShare: 0.44,
     });
   });
 
@@ -120,7 +120,7 @@ describe("WYSIWYG canvas (SoT v1.9 / v1.10)", () => {
     const editor = source("features/customer-page/customer-page-editor.tsx");
     const live = source("features/customer-flow/customer-flow.tsx");
     expect(css).toContain("aspect-ratio: 390 / 844");
-    expect(css).toContain("flex: 0 0 46%");
+    expect(css).toContain("flex: 0 0 44%");
     expect(css).not.toContain("height: 640px");
     expect(editor).toContain("CustomerVisitView");
     expect(live).toContain("CustomerVisitView");

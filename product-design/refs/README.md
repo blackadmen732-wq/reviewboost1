@@ -2,5 +2,6 @@
 
 `customer-page-visual-sot-mario-pizza.png` — Mario’s Pizza mock.
 
-Owner Systems Spec **v1.9 / v1.10**: this is the exact customer view the
-owner must see in the phone frame while they position the photo.
+**Perfect example.** LIVE phone preview = this customer view:
+hero composite, fixed white “How was your visit?” card, five stars,
+ReviewBoost footer, no location.

@@ -9,7 +9,8 @@ Customer Page remains priority **#1**.
 
 ## Visual SoT
 
-Mario’s Pizza phone mock is the **perfect example** of the customer page:
+Mario’s Pizza phone mock is the **PERFECT EXAMPLE** of the customer page.
+LIVE phone preview must match this customer view.
 
 `product-design/refs/customer-page-visual-sot-mario-pizza.png`
 

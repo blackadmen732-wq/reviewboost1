@@ -21,4 +21,16 @@ Bind all Owner UI, especially Home and the Customer Page owner flow:
 - Visual-first, big taps, no paragraphs (DoorDash-level obvious)
 - Premium = fewer elements + whitespace; strip until almost too empty
 
-Visual SoT for the customer page: `refs/customer-page-visual-sot-mario-pizza.png`
+## Visual SoT — Mario’s Pizza (perfect example)
+
+`refs/customer-page-visual-sot-mario-pizza.png`
+
+LIVE phone preview **is** this customer view:
+
+- Rich hero **composite**
+- Fixed white **“How was your visit?”** card
+- Five outline stars
+- ReviewBoost footer
+- **No location**
+
+Owner chrome stays easy to navigate — not barren.

@@ -44,7 +44,7 @@ export function VisitStars({
                 aria-label={messages.ratingSpoken[rating]}
               />
               <label className="visit-star__label" htmlFor={`visit-rating-${rating}`} data-filled={selected || undefined}>
-                <Star aria-hidden="true" strokeWidth={1.6} />
+                <Star aria-hidden="true" strokeWidth={1.25} />
               </label>
             </span>
           );

@@ -1,5 +1,5 @@
 /* Shared customer visit view — owner preview and live /q are this tree.
-   Canvas is 390/844 (Mario SoT). Hero 54% / card 46%. Card never moves. */
+   Canvas is 390/844 (Mario SoT). Hero 56% / card 44%. Card never moves. */
 
 .visit-stage {
   display: flex;
@@ -13,8 +13,8 @@
 
 .visit-hero {
   position: relative;
-  flex: 1 1 54%;
-  height: 54%;
+  flex: 1 1 56%;
+  height: 56%;
   min-height: 0;
   overflow: hidden;
   background: #1a1a1a;
@@ -59,14 +59,14 @@
 
 .visit-card {
   display: flex;
-  flex: 0 0 46%;
+  flex: 0 0 44%;
   flex-direction: column;
-  height: 46%;
-  max-height: 46%;
+  height: 44%;
+  max-height: 44%;
   z-index: 2;
   background: #fff;
-  border-radius: 32px 32px 0 0;
-  padding: 28px 24px 16px;
+  border-radius: 36px 36px 0 0;
+  padding: 32px 24px 14px;
   overflow: hidden;
 }
 
@@ -78,10 +78,10 @@
 .visit-heading {
   margin: 0;
   color: var(--rb-ink);
-  font-size: clamp(1.7rem, 7.2vw, 2.2rem);
+  font-size: clamp(1.85rem, 7.6vw, 2.35rem);
   font-weight: 720;
-  letter-spacing: -0.03em;
-  line-height: 1.08;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
 }
 
 .visit-heading:focus {
@@ -132,7 +132,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 18px;
 }
 
 .visit-star {
@@ -149,16 +149,16 @@
 
 .visit-star__label {
   display: grid;
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   place-items: center;
-  color: #c8c8c8;
+  color: #c5c5c5;
   cursor: pointer;
 }
 
 .visit-star__label svg {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   fill: transparent;
 }
 

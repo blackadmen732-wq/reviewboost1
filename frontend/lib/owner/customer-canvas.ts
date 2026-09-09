@@ -12,7 +12,7 @@ export const CUSTOMER_CANVAS = {
   height: 844,
   /** CSS `aspect-ratio` for the phone screen and live stage. */
   aspectRatio: "390 / 844",
-  /** Hero (photo) share of stage height. Card is the remainder. */
-  heroShare: 0.54,
-  cardShare: 0.46,
+  /** Hero (photo) share of stage height. Card is the remainder. Mario SoT. */
+  heroShare: 0.56,
+  cardShare: 0.44,
 } as const;
