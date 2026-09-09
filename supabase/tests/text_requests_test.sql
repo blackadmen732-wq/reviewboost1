@@ -8,13 +8,14 @@
 -- lifecycle, the outbox lease, webhook dedupe, and the single-in-flight guard.
 --
 --   supabase test db
+--   129 assertions in this file.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(59);
+select plan(129);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -482,6 +483,748 @@ select throws_ok(
               99, 'fake', 'created' $$,
     '23505', NULL,
     'a second in-flight attempt for one request is rejected by the unique guard');
+
+-- ================================ transition table fixes ==================
+
+-- sending → queued is now allowed (429 retryable).
+select ok(app.sms_request_transition_allowed('sending', 'queued'),
+    'sending -> queued is allowed (retryable 429)');
+
+-- provider_unknown → queued is now blocked (duplicate-send footgun).
+select ok(not app.sms_request_transition_allowed('provider_unknown', 'queued'),
+    'provider_unknown -> queued is blocked (duplicate-send risk)');
+
+-- failed → queued is now blocked.
+select ok(not app.sms_request_transition_allowed('failed', 'queued'),
+    'failed -> queued is blocked (create new request instead)');
+
+-- queued → failed is allowed (outbox retry budget exhausted).
+select ok(app.sms_request_transition_allowed('queued', 'failed'),
+    'queued -> failed is allowed (exhausted outbox retries)');
+
+-- ================================ settle_attempt retryable ================
+
+-- Schedule a request, begin dispatch, then settle as retryable. The attempt
+-- should be failed, the request should be back at queued, and quota stays
+-- reserved (not released).
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('a',64),
+    'v1:enc', 1::smallint, '0101', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('a',64), 'v1:enc', 1::smallint, '0101', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-retryable', '7b000000-0000-0000-0000-000000000001', 'req-retryable');
+
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-retryable'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+
+select is(
+    app.sms_settle_attempt(
+        (select a.id from public.sms_delivery_attempts a
+          join public.text_requests tr on tr.id = a.request_id
+         where tr.dedupe_key = 'sched-dedupe-retryable'
+         order by a.attempt_number desc limit 1),
+        '7c000000-0000-0000-0000-00000000000a', 'retryable', null, 'rate_limited', '{}'::jsonb),
+    'retryable', 'settling retryable returns retryable');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-retryable'),
+    'queued', 'retryable moves request back to queued for retry');
+
+select is(
+    (select a.status::text from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-retryable'
+     order by a.attempt_number desc limit 1),
+    'failed', 'retryable attempt is marked failed');
+
+-- ================================ credit expiry fixes ====================
+
+-- Use Org B for isolated quota tests. Clear any existing Org B balance state.
+delete from public.sms_quota_ledger where org_id = '7c000000-0000-0000-0000-00000000000b';
+delete from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b';
+
+-- Test: allocate 100, consume 60, expire → available must be 0 (not -60).
+-- Then allocate 100 again → available must be 100 (not 40).
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 100, 'expiry-alloc-1',
+    null, null);
+
+-- Simulate consumption of 60 credits. We need to reserve first, then consume.
+select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 60, 'expiry-resv-1', null);
+select app.sms_quota_consume('7c000000-0000-0000-0000-00000000000b', 60, 'expiry-cons-1', null);
+
+-- Mark the allocation as expired retroactively. We set expires_at after
+-- reserve/consume so that reserve's internal apply_expirations call doesn't
+-- fire before the usage entries exist.
+update public.sms_quota_ledger
+   set expires_at = now() - interval '1 second'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'expiry-alloc-1';
+
+-- Now expire. The fixed function should expire only the remaining 40, not 100.
+select is(
+    app.sms_quota_apply_expirations('7c000000-0000-0000-0000-00000000000b'),
+    1, 'one allocation expired');
+
+-- Check the expiration ledger entry is for the remaining 40, not the original 100.
+select is(
+    (select amount from public.sms_quota_ledger
+     where org_id = '7c000000-0000-0000-0000-00000000000b' and kind = 'expiration' limit 1),
+    40::bigint, 'expiry amount is remaining 40, not original 100');
+
+-- Balance: allocated should be 60 (100 - 40 expired), consumed 60, available 0.
+select is(
+    (select allocated from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b'),
+    60::bigint, 'allocated = 100 - 40 expired = 60');
+
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    0::bigint, 'available = 0 after expiry (allocated 60 - consumed 60)');
+
+-- Now allocate 100 more → available must be 100.
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 100, 'expiry-alloc-2', null, null);
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    100::bigint, 'after new allocation: available = 100, not 40 (the bug)');
+
+-- ================================ overlapping grants ======================
+
+-- Two grants, both expire. Each should expire only its own unused remainder.
+delete from public.sms_quota_ledger where org_id = '7c000000-0000-0000-0000-00000000000b';
+delete from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b';
+
+-- Grant A: 50 credits. Consume 20 against it.
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 50, 'overlap-alloc-a',
+    null, null);
+select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 20, 'overlap-resv-a', null);
+select app.sms_quota_consume('7c000000-0000-0000-0000-00000000000b', 20, 'overlap-cons-a', null);
+
+-- Grant B: 30 credits. Consume 10 against it.
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 30, 'overlap-alloc-b',
+    null, null);
+select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 10, 'overlap-resv-b', null);
+select app.sms_quota_consume('7c000000-0000-0000-0000-00000000000b', 10, 'overlap-cons-b', null);
+
+-- Space allocations into distinct effective_at windows. FIFO attribution
+-- (effective_at, id) no longer needs this, but keeping the order explicit
+-- documents which grant is oldest.
+update public.sms_quota_ledger set effective_at = now() - interval '10 seconds'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'overlap-alloc-a';
+update public.sms_quota_ledger set effective_at = now() - interval '8 seconds'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'reservation' and correlation_key = 'overlap-resv-a';
+update public.sms_quota_ledger set effective_at = now() - interval '5 seconds'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'overlap-alloc-b';
+update public.sms_quota_ledger set effective_at = now() - interval '3 seconds'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'reservation' and correlation_key = 'overlap-resv-b';
+update public.sms_quota_ledger
+   set expires_at = now() - interval '2 seconds'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'overlap-alloc-a';
+update public.sms_quota_ledger
+   set expires_at = now() - interval '1 second'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'overlap-alloc-b';
+
+-- Both expire: A expires 30 (50-20), B expires 20 (30-10).
+select is(
+    app.sms_quota_apply_expirations('7c000000-0000-0000-0000-00000000000b'),
+    2, 'two overlapping allocations expired');
+
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    0::bigint, 'overlapping grants: available = 0 after both expire');
+
+-- Balance projection: allocated = 80 - 50 expired = 30, consumed = 30.
+select is(
+    (select allocated from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b'),
+    30::bigint, 'overlapping grants: allocated projection after expiry');
+
+-- ================================ reserve across expiry ===================
+
+delete from public.sms_quota_ledger where org_id = '7c000000-0000-0000-0000-00000000000b';
+delete from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b';
+
+-- Allocate 50 (expired) + 50 (fresh). Reserve 30. Only fresh quota is spendable.
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 50, 'race-alloc-expired',
+    now() - interval '1 second', null);
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 50, 'race-alloc-fresh', null, null);
+
+-- The reservation sweeps expirations first, then checks availability.
+select is(
+    (select reserved from app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 30, 'race-resv-1', null)),
+    true, 'reservation against fresh quota succeeds after expired is swept');
+
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    20::bigint, 'available = 50 fresh - 30 reserved = 20');
+
+-- A reservation beyond the remaining should fail.
+select is(
+    (select reserved from app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 25, 'race-resv-too-big', null)),
+    false, 'reservation beyond fresh available is refused');
+
+-- ================================ refund after expiry =====================
+
+delete from public.sms_quota_ledger where org_id = '7c000000-0000-0000-0000-00000000000b';
+delete from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b';
+
+-- Allocate 50, consume 50, expire the grant, then refund 10. The refund restores
+-- consumed quota regardless of expiry status: a provider refund is real money back.
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 50, 'refund-alloc-1',
+    null, null);
+select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 50, 'refund-resv-1', null);
+select app.sms_quota_consume('7c000000-0000-0000-0000-00000000000b', 50, 'refund-cons-1', null);
+
+-- Mark expired retroactively after consumption exists.
+update public.sms_quota_ledger
+   set expires_at = now() - interval '1 second'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation' and correlation_key = 'refund-alloc-1';
+
+-- Expire: all 50 consumed, so remaining is 0. A zero-amount marker is recorded.
+select app.sms_quota_apply_expirations('7c000000-0000-0000-0000-00000000000b');
+
+-- Refund 10 after expiry.
+select app.sms_quota_refund('7c000000-0000-0000-0000-00000000000b', 10, 'refund-ref-1', null);
+
+-- consumed drops from 50 to 40. allocated stayed at 50 (0 expired since all consumed).
+-- available = 50 - 40 = 10.
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    10::bigint, 'refund after expiry restores available quota');
+
+-- ================================ replay ledger = balance =================
+
+-- The ledger is the source of truth. Replay all entries and verify the balance
+-- projection matches.
+select is(
+    (select b.allocated - b.reserved - b.consumed
+       from public.sms_quota_balance b
+      where b.org_id = '7c000000-0000-0000-0000-00000000000b'),
+    (select
+        coalesce(sum(case when kind = 'allocation' then amount else 0 end), 0)
+      - coalesce(sum(case when kind = 'expiration' then amount else 0 end), 0)
+      - coalesce(sum(case when kind = 'reservation' then amount else 0 end), 0)
+      + coalesce(sum(case when kind = 'release' then amount else 0 end), 0)
+      + coalesce(sum(case when kind = 'refund' then amount else 0 end), 0)
+     from public.sms_quota_ledger
+     where org_id = '7c000000-0000-0000-0000-00000000000b')::bigint,
+    'replayed ledger matches balance projection for Org B');
+
+-- ================================ receipt-before-SID lifecycle ============
+
+-- Prove the race: terminal webhook arrives before attempt exists, then after the
+-- attempt is settled the same webhook applies exactly once.
+
+-- 1. A delivery receipt arrives for a provider_message_id that has no attempt yet.
+select is(
+    app.sms_apply_delivery_status('fake', 'fake_receipt_early', 'delivered', null),
+    'no_matching_attempt', 'receipt before SID returns no_matching_attempt');
+
+-- 2. Now create the request and settle the attempt with that SID.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('b',64),
+    'v1:enc', 1::smallint, '0202', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('b',64), 'v1:enc', 1::smallint, '0202', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-early-rcpt', '7b000000-0000-0000-0000-000000000001', 'req-early-rcpt');
+
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-early-rcpt'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+
+-- Settle the attempt as submitted with the same SID.
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-early-rcpt'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'submitted', 'fake_receipt_early', null, '{}'::jsonb);
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-early-rcpt'),
+    'submitted', 'request is submitted after settling with SID');
+
+-- 3. Now replay the same delivery receipt — it should apply exactly once.
+select is(
+    app.sms_apply_delivery_status('fake', 'fake_receipt_early', 'delivered', null),
+    'delivered', 'replayed receipt after SID resolves to delivered');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-early-rcpt'),
+    'delivered', 'request reaches delivered after receipt replay');
+
+-- 4. A second replay of the same receipt is idempotent (already delivered).
+select is(
+    app.sms_apply_delivery_status('fake', 'fake_receipt_early', 'delivered', null),
+    'ignored', 'second replay of same receipt is ignored (already delivered)');
+
+-- ================================ equal-timestamp FIFO expiry ==============
+
+-- Two grants created in one transaction share now(). Inclusive timestamp
+-- windows would attribute the same 30 reserved credits to both grants and
+-- expire only 40 (leaving 30 spendable). FIFO (effective_at, id) expires 70.
+delete from public.sms_quota_ledger where org_id = '7c000000-0000-0000-0000-00000000000b';
+delete from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b';
+
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 50, 'fifo-alloc-a',
+    null, null);
+select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 50, 'fifo-alloc-b',
+    null, null);
+select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 30, 'fifo-resv-1', null);
+
+-- Force identical effective_at so the old window query would overlap completely.
+update public.sms_quota_ledger
+   set effective_at = timestamptz '2026-01-01 00:00:00+00'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind in ('allocation', 'reservation');
+update public.sms_quota_ledger
+   set expires_at = now() - interval '1 second'
+ where org_id = '7c000000-0000-0000-0000-00000000000b'
+   and kind = 'allocation';
+
+-- Pre-sweep read path must use the same FIFO remainder (70 unswept unused).
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    0::bigint, 'equal-timestamp grants: available is 0 before the sweep');
+
+select is(
+    app.sms_quota_apply_expirations('7c000000-0000-0000-0000-00000000000b'),
+    2, 'equal-timestamp grants: both allocations expired');
+
+select is(
+    (select coalesce(sum(amount), 0)::bigint from public.sms_quota_ledger
+      where org_id = '7c000000-0000-0000-0000-00000000000b' and kind = 'expiration'),
+    70::bigint, 'equal-timestamp grants: expire 70 (100-30), not 40 from double-attribution');
+
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    0::bigint, 'equal-timestamp grants: available is 0 after sweep');
+
+select is(
+    (select allocated from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b'),
+    30::bigint, 'equal-timestamp grants: allocated projection is the reserved remainder');
+
+-- ================================ atomic receipt replay after settle ======
+
+-- Park a terminal receipt, then settle the attempt with that SID. Replay must
+-- run inside settle — the request becomes delivered without a second webhook.
+select is(
+    (select inserted from app.sms_webhook_receive(
+        'fake', 'evt-atomic-sid', 'evt-atomic-sid', 'status', true, '{}'::jsonb, 'v1:enc')),
+    true, 'atomic-replay webhook is inserted');
+
+select is(
+    app.sms_apply_or_park_delivery_status(
+        (select id from public.sms_webhook_inbox where provider = 'fake' and dedupe_key = 'evt-atomic-sid'),
+        'fake', 'fake_atomic_sid', 'delivered', null),
+    'no_matching_attempt', 'parked receipt before SID returns no_matching_attempt');
+
+select is(
+    (select status::text from public.sms_webhook_inbox
+      where provider = 'fake' and dedupe_key = 'evt-atomic-sid'),
+    'received', 'parked receipt stays received for internal replay');
+
+select is(
+    (select pending_terminal from public.sms_webhook_inbox
+      where provider = 'fake' and dedupe_key = 'evt-atomic-sid'),
+    'delivered', 'parked receipt stores the terminal status by SID');
+
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('c',64),
+    'v1:enc', 1::smallint, '0303', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('c',64), 'v1:enc', 1::smallint, '0303', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-atomic-rcpt', '7b000000-0000-0000-0000-000000000001', 'req-atomic-rcpt');
+
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-atomic-rcpt'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-atomic-rcpt'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'submitted', 'fake_atomic_sid', null, '{}'::jsonb);
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-atomic-rcpt'),
+    'delivered', 'settle with SID atomically applies the parked delivered receipt');
+
+select is(
+    (select status::text from public.sms_webhook_inbox
+      where provider = 'fake' and dedupe_key = 'evt-atomic-sid'),
+    'processed', 'parked inbox row is processed by settle replay');
+
+select is(
+    (select pending_terminal from public.sms_webhook_inbox
+      where provider = 'fake' and dedupe_key = 'evt-atomic-sid'),
+    null, 'pending terminal is cleared after internal replay');
+
+-- ================================ dead-letter releases queued quota =======
+
+-- Retryable settle leaves the request queued with reservation. Exhausting the
+-- outbox must fail the request and release credits in the same transaction.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('d',64),
+    'v1:enc', 1::smallint, '0404', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('d',64), 'v1:enc', 1::smallint, '0404', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-deadletter', '7b000000-0000-0000-0000-000000000001', 'req-deadletter');
+
+update public.sms_outbox
+   set max_attempts = 1
+ where request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-deadletter');
+
+-- Keep this claim isolated from earlier leftover pending jobs.
+update public.sms_outbox
+   set available_at = now() + interval '1 hour'
+ where status in ('pending', 'leased')
+   and request_id is distinct from (
+       select id from public.text_requests where dedupe_key = 'sched-dedupe-deadletter');
+
+select app.sms_outbox_claim('worker-dl', 10, 60);
+
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-deadletter'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-deadletter'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'retryable', null, 'rate_limited', '{}'::jsonb);
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-deadletter'),
+    'queued', 'retryable before exhaust leaves the request queued');
+
+select is(
+    app.sms_outbox_fail(
+        (select id from public.sms_outbox
+          where request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-deadletter')),
+        'worker-dl', 'retryable: rate_limited', 30)::text,
+    'dead_letter', 'final retryable fail_outbox dead-letters the job');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-deadletter'),
+    'failed', 'dead-letter fails the queued request');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where org_id = '7c000000-0000-0000-0000-00000000000a'
+        and kind = 'release'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-deadletter')::text),
+    1, 'dead-letter releases the queued reservation');
+
+-- A retryable fail before the budget is exhausted must NOT fail the request.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('e',64),
+    'v1:enc', 1::smallint, '0505', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('e',64), 'v1:enc', 1::smallint, '0505', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-retry-ok', '7b000000-0000-0000-0000-000000000001', 'req-retry-ok');
+
+update public.sms_outbox
+   set available_at = now() + interval '1 hour'
+ where status in ('pending', 'leased')
+   and request_id is distinct from (
+       select id from public.text_requests where dedupe_key = 'sched-dedupe-retry-ok');
+
+select app.sms_outbox_claim('worker-rt', 10, 60);
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-retry-ok'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-retry-ok'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'retryable', null, 'rate_limited', '{}'::jsonb);
+
+select is(
+    app.sms_outbox_fail(
+        (select id from public.sms_outbox
+          where request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-retry-ok')),
+        'worker-rt', 'retryable: rate_limited', 30)::text,
+    'pending', 'retryable fail_outbox before max_attempts requeues the job');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-retry-ok'),
+    'queued', 'request stays queued while outbox retries remain');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'release'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-retry-ok')::text),
+    0, 'reservation is kept while retries remain');
+
+-- Dead-letter while sending (unknown whether the provider was reached): park,
+-- do not release.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('f',64),
+    'v1:enc', 1::smallint, '0606', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('f',64), 'v1:enc', 1::smallint, '0606', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-dl-sending', '7b000000-0000-0000-0000-000000000001', 'req-dl-sending');
+
+update public.sms_outbox
+   set max_attempts = 1
+ where request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-dl-sending');
+
+update public.sms_outbox
+   set available_at = now() + interval '1 hour'
+ where status in ('pending', 'leased')
+   and request_id is distinct from (
+       select id from public.text_requests where dedupe_key = 'sched-dedupe-dl-sending');
+
+select app.sms_outbox_claim('worker-ds', 10, 60);
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-dl-sending'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+
+select is(
+    app.sms_outbox_fail(
+        (select id from public.sms_outbox
+          where request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-dl-sending')),
+        'worker-ds', 'infra_timeout', 30)::text,
+    'dead_letter', 'fail_outbox while sending dead-letters the job');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-dl-sending'),
+    'provider_unknown', 'dead-letter while sending parks as provider_unknown');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'release'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-dl-sending')::text),
+    0, 'sending dead-letter keeps the reservation for reconciliation');
+
+select is(
+    (select count(*)::integer from public.sms_outbox
+      where topic = 'sms.reconcile'
+        and request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-dl-sending')),
+    1, 'sending dead-letter enqueues a reconcile job');
+
+-- ====================== provider_unknown / parked-SID reconcile ==========
+
+-- Timeout-after-accept: settle without a SID, park a terminal receipt by SID,
+-- then attach the looked-up SID. Replay runs in the same transaction.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('g',64),
+    'v1:enc', 1::smallint, '0707', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('g',64), 'v1:enc', 1::smallint, '0707', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-reconcile-sid', '7b000000-0000-0000-0000-000000000001', 'req-reconcile-sid');
+
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-reconcile-sid'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'provider_unknown', null, 'timeout', '{}'::jsonb);
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid'),
+    'provider_unknown', 'timeout settle parks the request as provider_unknown');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'release'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid')::text),
+    0, 'provider_unknown keeps the reservation until reconcile');
+
+select is(
+    (select count(*)::integer from public.sms_outbox
+      where topic = 'sms.reconcile'
+        and request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid')),
+    1, 'provider_unknown enqueues a durable reconcile job');
+
+select ok(
+    (select available_at > now() + interval '20 seconds'
+       from public.sms_outbox
+      where topic = 'sms.reconcile'
+        and request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid')),
+    'reconcile job is delayed so a same-tick empty list cannot release');
+
+update public.sms_outbox
+   set available_at = now() + interval '1 hour'
+ where topic = 'sms.dispatch' and status in ('pending', 'leased');
+
+select is(
+    (select count(*)::integer from app.sms_outbox_claim('worker-no-rec', 10, 60, 'sms.dispatch')),
+    0, 'dispatch claim does not pick sms.reconcile jobs');
+
+select is(
+    (select inserted from app.sms_webhook_receive(
+        'fake', 'evt-timeout-sid', 'evt-timeout-sid', 'status', true, '{}'::jsonb, 'v1:enc')),
+    true, 'timeout-after-accept webhook is inserted');
+
+select is(
+    app.sms_apply_or_park_delivery_status(
+        (select id from public.sms_webhook_inbox where provider = 'fake' and dedupe_key = 'evt-timeout-sid'),
+        'fake', 'fake_timeout_sid', 'delivered', null),
+    'no_matching_attempt', 'receipt parked by SID while attempt has no SID');
+
+select is(
+    app.sms_reconcile_attach_sid(
+        (select a.id from public.sms_delivery_attempts a
+          join public.text_requests tr on tr.id = a.request_id
+         where tr.dedupe_key = 'sched-dedupe-reconcile-sid'
+         order by a.attempt_number desc limit 1),
+        '7c000000-0000-0000-0000-00000000000a', 'fake_timeout_sid', null, null),
+    'delivered', 'attach SID replays the parked delivered receipt');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid'),
+    'delivered', 'timeout-after-accept request is delivered after SID attach');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'consumption'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-sid')::text),
+    1, 'attach SID consumes the reserved quota once');
+
+select is(
+    (select status::text from public.sms_webhook_inbox
+      where provider = 'fake' and dedupe_key = 'evt-timeout-sid'),
+    'processed', 'parked receipt is processed by reconcile attach');
+
+select is(
+    app.sms_reconcile_attach_sid(
+        (select a.id from public.sms_delivery_attempts a
+          join public.text_requests tr on tr.id = a.request_id
+         where tr.dedupe_key = 'sched-dedupe-reconcile-sid'
+         order by a.attempt_number desc limit 1),
+        '7c000000-0000-0000-0000-00000000000a', 'fake_timeout_sid', null, null),
+    'delivered', 'attach SID is idempotent after delivery');
+
+-- Confirmed not-sent: fail+release.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('h',64),
+    'v1:enc', 1::smallint, '0808', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('h',64), 'v1:enc', 1::smallint, '0808', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-reconcile-miss', '7b000000-0000-0000-0000-000000000001', 'req-reconcile-miss');
+
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-miss'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-reconcile-miss'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'provider_unknown', null, 'timeout', '{}'::jsonb);
+
+select is(
+    app.sms_reconcile_fail_release(
+        (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-miss'),
+        '7c000000-0000-0000-0000-00000000000a', 'provider_not_found'),
+    'failed', 'lookup not_found fails the request');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'release'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-miss')::text),
+    1, 'lookup not_found releases the reservation');
+
+select is(
+    (select outcome from app.sms_reconcile_prepare(
+        (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-miss'),
+        '7c000000-0000-0000-0000-00000000000a')),
+    'already_failed', 'prepare is a no-op after fail+release');
+
+-- Reconcile outbox budget exhausted: fail+release, never re-send.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('i',64),
+    'v1:enc', 1::smallint, '0909', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('i',64), 'v1:enc', 1::smallint, '0909', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-reconcile-dl', '7b000000-0000-0000-0000-000000000001', 'req-reconcile-dl');
+
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-reconcile-dl'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'provider_unknown', null, 'timeout', '{}'::jsonb);
+
+update public.sms_outbox
+   set max_attempts = 1, available_at = now()
+ where topic = 'sms.reconcile'
+   and request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl');
+
+update public.sms_outbox
+   set available_at = now() + interval '1 hour'
+ where status in ('pending', 'leased')
+   and (topic is distinct from 'sms.reconcile'
+        or request_id is distinct from (
+            select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl'));
+
+select is(
+    (select count(*)::integer from app.sms_outbox_claim('worker-rec-dl', 10, 60, 'sms.reconcile')
+      where request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl')),
+    1, 'reconcile topic claims the provider_unknown job');
+
+select is(
+    app.sms_outbox_fail(
+        (select id from public.sms_outbox
+          where topic = 'sms.reconcile'
+            and request_id = (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl')),
+        'worker-rec-dl', 'lookup_unknown: timeout', 30)::text,
+    'dead_letter', 'exhausted reconcile job dead-letters');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl'),
+    'failed', 'reconcile dead-letter fails the unknown request');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'release'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-reconcile-dl')::text),
+    1, 'reconcile dead-letter releases the reservation');
+
+-- ================================ webhook inbox replay ====================
+
+-- Verify that a webhook inbox row left in 'received' (not 'processed') is
+-- reclaimable by sms_webhook_receive (inserted=true).
+select is(
+    (select inserted from app.sms_webhook_receive('fake', 'evt-replay-1', 'evt-replay-1', 'status', true, '{}'::jsonb, 'v1:enc')),
+    true, 'first webhook receive inserts the event');
+
+-- Settle as received (simulating unmatched receipt).
+select app.sms_webhook_settle(
+    (select id from public.sms_webhook_inbox where provider = 'fake' and dedupe_key = 'evt-replay-1'),
+    'received', null, 'unmatched_receipt');
+
+-- A provider retry reclaims it (inserted=true because status is not 'processed').
+select is(
+    (select inserted from app.sms_webhook_receive('fake', 'evt-replay-1', 'evt-replay-1', 'status', true, '{}'::jsonb, 'v1:enc')),
+    true, 'retry of unprocessed webhook is reclaimed for reprocessing');
+
+-- Settle as processed.
+select app.sms_webhook_settle(
+    (select id from public.sms_webhook_inbox where provider = 'fake' and dedupe_key = 'evt-replay-1'),
+    'processed', null, null);
+
+-- Now a retry is a true duplicate.
+select is(
+    (select inserted from app.sms_webhook_receive('fake', 'evt-replay-1', 'evt-replay-1', 'status', true, '{}'::jsonb, 'v1:enc')),
+    false, 'retry of processed webhook is a harmless no-op');
 
 select * from finish();
 rollback;

@@ -111,7 +111,9 @@ permanently sticky against a genuine later START.
 `suppressed`, `failed`, `provider_unknown`, `cancelled`. Edges are enforced by
 `app.sms_request_transition_allowed`; there is no mutable `sent=true` boolean.
 `provider_unknown` (a timeout after submit) is **never auto-retried** and keeps
-its quota reserved until reconciliation resolves it.
+its quota reserved until a durable reconciler resolves it: attach a looked-up
+SID (and replay any parked receipts), or fail+release. The reconciler never
+sends.
 
 ## 7. Delivery attempts & duplicate protection **[impl][test-ci]**
 
@@ -133,7 +135,19 @@ safe and a crashed worker's lease is reclaimable. `complete`/`fail`/`defer` are
 **lease-owner guarded**, so a stale worker cannot mutate a job another worker has
 reclaimed. Failures back off exponentially; `max_attempts` sends a job to
 `dead_letter` (a durable "needs a human"), never a silent drop — including an
-expired-lease job that has already used all its attempts.
+expired-lease job that has already used all its attempts. A dead-lettered job
+whose request is still `queued` (retryable 429 path) **fails the request and
+releases its reservation in the same transaction**. A dead-letter while the
+request is `sending` parks it as `provider_unknown` and keeps the reservation
+(the provider may already have accepted the message). Entering
+`provider_unknown` enqueues a `sms.reconcile` outbox job (idempotent) with
+`available_at = now() + 30 seconds` so a same-tick empty Twilio list cannot
+release a send Twilio is still accepting. Dispatch claim is topic-filtered so
+it cannot pick reconcile work. A lookup of `not_found` within two minutes of
+`dispatched_at` is treated as `unknown` (Twilio may still be accepting). A
+reconcile dead-letter **fails+releases** (lookup never confirmed a SID; still
+never a re-send). `fail_outbox` is retried in the worker; a lost write leaves
+the job leased until expiry, then the same terminal SQL paths run.
 
 ## 9. Webhook inbox **[impl][test-ci]**
 
@@ -145,21 +159,31 @@ namespace and rejected (HTTP 403). A verified event is written by
 but a retry of an event that never reached `processed` (a transient failure) is
 **reclaimed for reprocessing** (all business handlers are idempotent). The
 `processed` settle is error-checked so a lost settle leaves the row reclaimable
-rather than acknowledged-and-skipped. The raw body is stored encrypted.
+rather than acknowledged-and-skipped. A terminal delivery receipt that arrives
+before the attempt records its provider message id is **parked by SID**
+(`pending_terminal`) and acknowledged with HTTP 200; `app.sms_settle_attempt`
+**and `app.sms_reconcile_attach_sid` replay it in the same transaction** that
+persists the SID — including timeout-after-accept, where the provider accepted
+but we never stored the SID. Recovery does not depend on an unsolicited
+provider retry. The raw body is stored encrypted.
 
 ## 10. Provider boundary **[impl]** / Twilio **[needs-provider]**
 
-`SmsProvider` (`send`, `classifyError`, `verifySignature`, `parseWebhook`) is the
-only thing domain code depends on. `FakeSmsProvider` is deterministic and drives
-every test **[test-ci]**. In **production** the fake no longer trusts every
+`SmsProvider` (`send`, `lookup`, `classifyError`, `verifySignature`, `parseWebhook`) is the
+only thing domain code depends on. `lookup` is **read-only** (never a send).
+`FakeSmsProvider` is deterministic and drives every test, including
+timeout-after-accept (SID minted internally, omitted from `send`, returned by
+`lookup`) **[test-ci]**. In **production** the fake no longer trusts every
 webhook: it requires a shared secret (`SMS_FAKE_WEBHOOK_SECRET` in the
 `x-fake-signature` header), closing the forged-consent hole. `TwilioSmsProvider`
 maps Twilio's API, X-Twilio-Signature scheme, and status/inbound webhooks —
 inbound messages (which Twilio tags `SmsStatus=received`) are classified by their
 `Body`, so STOP/START are never misrouted into the delivery-status branch; a
 `StatusCallback` is set when `SMS_PUBLIC_WEBHOOK_BASE_URL` is configured so direct
-sends still reach a terminal state. **No credentials are committed, and it
-performs no send unless `TWILIO_*` are configured at runtime.**
+sends still reach a terminal state. `lookup` is a **GET** of `Messages.json`
+(never a re-POST, which could send if the original never arrived). Unconfigured
+credentials return `unknown`, not `not_found`. **No credentials are committed, and it
+performs no send unless `TWILIO_*` are configured at runtime.** **[needs-provider]** for a live lookup.
 
 ## 11. Quiet hours **[impl][test-ci]**
 
@@ -223,8 +247,11 @@ key does not double-count. **Expiry is enforced**: `app.sms_quota_apply_expirati
 cron target) appends an idempotent `expiration` entry and removes lapsed
 allocations from the projection, and `app.sms_quota_available` discounts any
 not-yet-swept expired allocation — so an allocation past its `expires_at` is never
-spendable. pgTAP asserts an already-expired grant yields zero available and a
-reservation against it is refused.
+spendable. Unused remainder is attributed with **locked FIFO** (`effective_at`,
+then `id`) so equal-timestamp grants cannot claim the same ledger movement.
+pgTAP asserts an already-expired grant yields zero available, a reservation
+against it is refused, and equal-timestamp overlapping grants expire
+`sum(grants) - net_reserved` (not a double-attributed remainder).
 
 ## 16. API endpoints **[impl][test-ci for auth/isolation via pgTAP]**
 
@@ -238,7 +265,7 @@ errors, rate-limited where it matters:
 | POST | `/text-requests/preview` | owner/admin | segment + cost preview |
 | POST | `/text-requests/{id}/cancel` | owner/admin | cancel if not yet dispatched |
 | POST | `/webhooks/sms/{provider}` | provider (signed) | delivery + inbound events |
-| POST | `/internal/sms/dispatch` | worker secret | run one dispatch batch |
+| POST | `/internal/sms/dispatch` | worker secret | run one dispatch batch, then one reconcile batch |
 
 ## 17. Security model **[impl][test-ci]**
 
@@ -262,18 +289,19 @@ errors, rate-limited where it matters:
 
 ## 18. Tests **[test-ci]**
 
-- **vitest** (`tests/unit/sms-*.test.ts`): 78 cases across segments, phone
-  normalization, keywords, quiet-hours/DST (incl. spring-forward gap), cost
-  (incl. safe-integer/overflow boundaries), dedupe, the provider boundary (Twilio
-  signature verification, inbound-vs-status classification, fake production
-  signature, message-id identity, rate safe-integer validation), and the
-  timezone fail-closed / fallback policy in `resolveStand`.
-- **pgTAP** (`supabase/tests/text_requests_test.sql`): 59 assertions across RLS
+- **vitest** (`tests/unit/sms-*.test.ts`): provider, webhook, dispatch, and
+  reconcile coverage including 429/5xx classification, parked unmatched receipts,
+  timeout-after-accept lookup, fail_outbox retries, dead-letter vs retryable
+  outbox outcomes, plus segments, phone normalization, keywords, quiet-hours/DST,
+  cost, dedupe, and the timezone fail-closed policy.
+- **pgTAP** (`supabase/tests/text_requests_test.sql`): 129 assertions across RLS
   isolation, the consent ledger + projection, the suppression gate, STOP/START,
-  phone-level opt-out (STOP-before-consent + retry idempotency), the state
-  machine, quota (incl. double-spend refusal, idempotency, and expiry), the
+  phone-level opt-out, the state machine, quota (double-spend, idempotency,
+  partial expiry, FIFO equal-timestamp attribution), the
   schedule→dispatch→settle lifecycle, quiet-hours defer, stranded-send recovery,
-  outbox leasing, webhook dedupe, and the single-in-flight guard.
+  outbox leasing, dead-letter fail+release, webhook dedupe, receipt-before-SID
+  park + atomic settle replay, provider_unknown reconcile (SID attach + parked
+  replay, fail+release, topic-filtered claim), and the single-in-flight guard.
 
 ## 19. CI
 
