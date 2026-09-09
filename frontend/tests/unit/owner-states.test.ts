@@ -56,6 +56,6 @@ describe("owner empty, error, offline, permission language", () => {
     expect(nfc).toContain("This phone did not allow tagging. Allow it and try again.");
     expect(nfc).toContain("Could not read this tag. Try again, or use a blank one.");
     expect(nfc).not.toMatch(/couldn'?t/i);
-    expect(nfc).not.toMatch(/\bNDEF\b/);
+    expect(nfc).not.toMatch(/NTAG\d/);
   });
 });
