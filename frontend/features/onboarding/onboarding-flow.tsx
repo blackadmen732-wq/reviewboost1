@@ -6,6 +6,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
+import { TestGoogleLinkButton } from "@/features/dashboard/google-link-care";
+import { GOOGLE_LINK_BLAST, GOOGLE_LINK_HELP_STEPS } from "@/features/dashboard/google-link-copy";
 import {
   advanceOnboarding,
   type CreatedStand,
@@ -258,14 +260,11 @@ function GoogleStep({
           This is where every customer goes to leave you a review — the same
           link, whatever they rated.
         </p>
+        <p className="text-sm leading-relaxed text-muted">{GOOGLE_LINK_BLAST}</p>
       </div>
 
       <ol className="flex flex-col gap-3 rounded-[var(--radius-card)] bg-quiet p-5">
-        {[
-          "Open your business on Google",
-          "Tap “Ask for reviews”",
-          "Copy the link and paste it below",
-        ].map((instruction, index) => (
+        {GOOGLE_LINK_HELP_STEPS.map((instruction, index) => (
           <li key={instruction} className="flex items-start gap-3">
             <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface text-sm font-bold text-ink">
               {index + 1}
@@ -313,6 +312,8 @@ function GoogleStep({
 
         {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
       </div>
+
+      <TestGoogleLinkButton url={trimmedUrl} />
 
       <div className="flex flex-col gap-3">
         <Button

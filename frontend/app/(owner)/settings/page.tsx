@@ -3,7 +3,8 @@ import Link from "next/link";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
-import { EditableRow, GoogleLinkHelp } from "@/features/dashboard/settings-form";
+import { GoogleLinkCare } from "@/features/dashboard/google-link-care";
+import { EditableRow } from "@/features/dashboard/settings-form";
 import { SignOutButton } from "@/features/dashboard/sign-out-button";
 import { getPrimaryLocation, requireOwner } from "@/lib/server/owner-data";
 
@@ -28,17 +29,7 @@ export default async function SettingsPage() {
           This is the page customers are sent to after they rate you. Without it,
           a printed code cannot finish the job.
         </p>
-        <EditableRow
-          field="googleReviewUrl"
-          label="Google link"
-          value={location?.googleReviewUrl ?? null}
-          type="url"
-          placeholder="https://g.page/..."
-          help="Paste the link customers use to review you on Google. Leave it empty to remove it."
-          emptyText="Not set yet — codes cannot send people to Google"
-          warnWhenEmpty
-        />
-        <GoogleLinkHelp />
+        <GoogleLinkCare value={location?.googleReviewUrl ?? null} />
       </section>
 
       <section className="mb-12 flex flex-col gap-3">
