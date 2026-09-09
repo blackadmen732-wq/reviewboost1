@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { blockGoogle, filledStars, openPage, star } from "./support/customer-page";
+import { captureHandoff, filledStars, openPage, star } from "./support/customer-page";
 
 /**
  * The reference composition, pinned.
@@ -39,7 +39,7 @@ async function settle(page: Page) {
 test.describe("@visual the customer page", () => {
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
-    await blockGoogle(page);
+    await captureHandoff(page);
   });
 
   test("waiting, idle, rated, and handing off", async ({ page }) => {

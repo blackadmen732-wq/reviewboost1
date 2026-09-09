@@ -1,17 +1,17 @@
-import { expect, type Locator, type Page, type Request } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
  * The pieces every customer-page spec needs, in one place.
  *
- * All of them exist because of one awkward fact about testing this page: the
- * happy path ends by leaving it. `location.assign` to Google is the last thing a
- * successful tap does, and a real navigation takes the page — and with it the
- * fixture call log — out from under the assertions.
+ * The happy path ends by leaving the page. `location.assign` to Google is the
+ * last thing a successful tap does, and a real navigation takes the page — and
+ * with it the fixture call log — out from under the assertions.
  *
  * So the destination is intercepted, two ways. `stubGoogle` answers with a
  * stand-in page, which is how a spec proves the customer actually arrives.
- * `blockGoogle` refuses the navigation and records the attempt, which keeps the
- * customer page alive so what happened before the handoff can still be read.
+ * `captureHandoff` replaces `location.assign` so the customer page stays
+ * mounted and the attempt is recorded on the window. Aborting the Google
+ * request is not enough: the navigation still unloads the page.
  */
 
 export const ratings = [1, 2, 3, 4, 5] as const;
@@ -33,6 +33,12 @@ export interface FixtureCall {
   rating?: number;
 }
 
+declare global {
+  interface Window {
+    __RB_HANDOFFS__?: string[];
+  }
+}
+
 /** Answers the Google navigation, so the spec can assert the customer got there. */
 export async function stubGoogle(page: Page): Promise<void> {
   await page.route(googlePattern, (route) =>
@@ -45,18 +51,22 @@ export async function stubGoogle(page: Page): Promise<void> {
 }
 
 /**
- * Refuses the Google navigation and records every attempt.
+ * Keeps the customer page mounted and records every `location.assign`.
  *
- * Aborting keeps the customer page mounted, which is the only way to inspect the
- * fixture call log and the sheet as they were at the moment of handoff.
+ * Must run before the first navigation: the replacement is installed as an
+ * init script, so it is in place before the app's own code loads.
  */
-export async function blockGoogle(page: Page): Promise<Request[]> {
-  const attempts: Request[] = [];
-  await page.route(googlePattern, (route) => {
-    attempts.push(route.request());
-    return route.abort();
+export async function captureHandoff(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.__RB_HANDOFFS__ = [];
+    Location.prototype.assign = function assign(url) {
+      window.__RB_HANDOFFS__?.push(String(url));
+    };
   });
-  return attempts;
+}
+
+export async function handoffs(page: Page): Promise<string[]> {
+  return page.evaluate(() => window.__RB_HANDOFFS__ ?? []);
 }
 
 export function star(page: Page, rating: Rating): Locator {

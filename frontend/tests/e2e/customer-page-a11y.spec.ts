@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import {
   alert,
-  blockGoogle,
+  captureHandoff,
   filledStars,
   instruction,
   openPage,
@@ -29,7 +29,7 @@ async function expectNoSeriousViolations(page: Page, state: string) {
 
 test.describe("customer page accessibility", () => {
   test("is clean while waiting, choosing, and after a rating is taken", async ({ page }) => {
-    await blockGoogle(page);
+    await captureHandoff(page);
 
     await page.goto("/q/fixture-slow");
     await expect(page.locator(".cp-sheet[data-status='loading']")).toBeVisible();
@@ -49,7 +49,7 @@ test.describe("customer page accessibility", () => {
   });
 
   test("is clean when something has gone wrong", async ({ context, page }) => {
-    await blockGoogle(page);
+    await captureHandoff(page);
 
     await page.goto("/q/fixture-inactive");
     await expect(page.getByRole("heading", { name: "This Tag isn’t available." })).toBeVisible();
@@ -113,7 +113,7 @@ test.describe("customer page accessibility", () => {
   });
 
   test("keeps every state's copy inside a live region the customer will hear", async ({ page }) => {
-    await blockGoogle(page);
+    await captureHandoff(page);
     await openPage(page, "fixture-response-error");
 
     await expect(instruction(page)).toHaveAttribute("role", "status");

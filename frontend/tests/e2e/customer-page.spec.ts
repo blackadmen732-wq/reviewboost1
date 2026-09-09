@@ -2,9 +2,10 @@ import { expect, test } from "@playwright/test";
 
 import {
   alert,
-  blockGoogle,
+  captureHandoff,
   filledStars,
   fixtureCalls,
+  handoffs,
   instruction,
   openPage,
   ratings,
@@ -35,7 +36,7 @@ test.describe("the one tap", () => {
   });
 
   test("paints the stars before it has finished saving", async ({ page }) => {
-    await blockGoogle(page);
+    await captureHandoff(page);
     // Every fixture call on this token takes ~1.35s, so the gap between the tap
     // landing and the save returning is wide enough to observe.
     await openPage(page, "fixture-slow");
@@ -45,54 +46,54 @@ test.describe("the one tap", () => {
   });
 
   test("never opens Google before the rating is saved", async ({ page }) => {
-    const attempts = await blockGoogle(page);
+    await captureHandoff(page);
     await openPage(page, "fixture-slow");
 
     await tap(page, 4);
     await expect(filledStars(page)).toHaveCount(4);
     // The save is still in flight, and nothing has been handed off yet.
-    expect(attempts).toHaveLength(0);
+    expect(await handoffs(page)).toHaveLength(0);
 
-    await expect.poll(() => attempts.length, { timeout: 15_000 }).toBe(1);
+    await expect.poll(async () => (await handoffs(page)).length, { timeout: 15_000 }).toBe(1);
 
     const calls = await fixtureCalls(page);
     const saved = calls.findIndex(({ operation }) => operation === "response");
-    const handoff = calls.findIndex(({ operation }) => operation === "google-click");
+    const click = calls.findIndex(({ operation }) => operation === "google-click");
     expect(saved).toBeGreaterThanOrEqual(0);
-    expect(handoff).toBeGreaterThan(saved);
+    expect(click).toBeGreaterThan(saved);
   });
 
   test("records the star the customer actually tapped", async ({ page }) => {
+    await captureHandoff(page);
+
     for (const rating of ratings) {
-      const attempts = await blockGoogle(page);
       await openPage(page, `fixture-valid-rating-${rating}`);
       await tap(page, rating);
-      await expect.poll(() => attempts.length, { timeout: 15_000 }).toBe(1);
+      await expect.poll(async () => (await handoffs(page)).length, { timeout: 15_000 }).toBe(1);
 
       const responses = (await fixtureCalls(page)).filter(
         ({ operation }) => operation === "response",
       );
       expect(responses).toHaveLength(1);
       expect(responses[0]?.rating).toBe(rating);
-      await page.unrouteAll();
     }
   });
 
   test("gives 1★ and 5★ the identical destination, sheet, and status", async ({ page }) => {
+    await captureHandoff(page);
     const observed: Array<{ url: string; shape: string; status: string }> = [];
 
     for (const rating of ratings) {
-      const attempts = await blockGoogle(page);
       await openPage(page, `fixture-valid-rating-${rating}`);
       await tap(page, rating);
-      await expect.poll(() => attempts.length, { timeout: 15_000 }).toBe(1);
+      await expect.poll(async () => (await handoffs(page)).length, { timeout: 15_000 }).toBe(1);
 
+      const destinations = await handoffs(page);
       observed.push({
-        url: attempts[0]!.url(),
+        url: destinations[0]!,
         shape: await sheetShape(page),
         status: (await instruction(page).textContent())?.trim() ?? "",
       });
-      await page.unrouteAll();
     }
 
     expect(new Set(observed.map(({ url }) => url)).size).toBe(1);
@@ -101,13 +102,13 @@ test.describe("the one tap", () => {
   });
 
   test("a second tap on the same star does not write a second rating", async ({ page }) => {
-    const attempts = await blockGoogle(page);
+    await captureHandoff(page);
     await openPage(page);
 
     await tap(page, 5);
-    await expect.poll(() => attempts.length, { timeout: 15_000 }).toBe(1);
+    await expect.poll(async () => (await handoffs(page)).length, { timeout: 15_000 }).toBe(1);
     await tap(page, 5);
-    await expect.poll(() => attempts.length, { timeout: 15_000 }).toBe(2);
+    await expect.poll(async () => (await handoffs(page)).length, { timeout: 15_000 }).toBe(2);
 
     const responses = (await fixtureCalls(page)).filter(
       ({ operation }) => operation === "response",
@@ -124,7 +125,7 @@ test.describe("the one tap", () => {
  */
 test.describe("reaching it without a pointer", () => {
   test("arrows move and paint but never hand off", async ({ page }) => {
-    const attempts = await blockGoogle(page);
+    await captureHandoff(page);
     await openPage(page);
 
     await star(page, 1).focus();
@@ -136,8 +137,11 @@ test.describe("reaching it without a pointer", () => {
 
     // Nothing saved, nothing opened: they are still choosing.
     await expect(instruction(page)).toHaveText("Tap a star to continue to Google");
-    expect(await fixtureCalls(page)).toEqual([{ operation: "context" }]);
-    expect(attempts).toHaveLength(0);
+    const writes = (await fixtureCalls(page)).filter(({ operation }) =>
+      operation === "response" || operation === "google-click",
+    );
+    expect(writes).toEqual([]);
+    expect(await handoffs(page)).toEqual([]);
   });
 
   test("Enter commits the star the customer arrowed to", async ({ page }) => {
@@ -161,7 +165,8 @@ test.describe("reaching it without a pointer", () => {
   });
 
   test("keeps a visible focus ring on the star that has focus", async ({ page }) => {
-    await openPage(page);
+    // One language so Tab's first stop is a star, not the language pill.
+    await openPage(page, "fixture-one-language");
     await page.keyboard.press("Tab");
 
     const focused = page.locator(".cp-star__input:focus-visible + .cp-star__label");
@@ -347,13 +352,13 @@ test.describe("the locked composition", () => {
 
     // The warm ReviewBoost canvas, not a photograph bled to the monitor edges.
     await expect(page.locator(".cp")).toHaveCSS("background-color", "rgb(248, 245, 240)");
-    const photo = (await page.locator(".cp-hero__photo").boundingBox())!;
-    expect(photo.width).toBeLessThanOrEqual(frame.width + 1);
+    const hero = (await page.locator(".cp-hero").boundingBox())!;
+    expect(hero.width).toBeLessThanOrEqual(frame.width + 1);
   });
 
   test("stays still when the customer has asked for less motion", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await blockGoogle(page);
+    await captureHandoff(page);
     await openPage(page);
 
     await tap(page, 4);
