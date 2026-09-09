@@ -99,7 +99,6 @@ export function customerFlowReducer(
       return {
         ...state,
         screen: "google",
-        rating: null,
         note: "",
         sessionId: action.sessionId,
         responseId: action.responseId,
@@ -108,7 +107,6 @@ export function customerFlowReducer(
     case "google-click-started":
       return {
         ...state,
-        screen: "praise",
         googleClickKey: action.idempotencyKey,
         googleClickPending: true,
       };
