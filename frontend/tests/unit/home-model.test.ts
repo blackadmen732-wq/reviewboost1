@@ -96,13 +96,37 @@ describe("deriveHomeModel", () => {
     expect(model.attentions.some((item) => item.kind === "tag-unprogrammed")).toBe(true);
   });
 
-  it("sends Google and Create a Tag to onboarding when there is no location", () => {
+  it("empty without a tag still offers Create a Tag when Google is missing", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, hasGoogleLink: false },
+      stands: [],
+      hasLocation: true,
+    });
+
+    expect(model.primary).toEqual({ label: "Create a Tag", href: "/stands" });
+    expect(model.attentions[0]?.kind).toBe("tag-missing");
+    expect(model.attentions.some((item) => item.kind === "google")).toBe(true);
+  });
+
+  it("names an invalid Google link once a tag exists", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, hasGoogleLink: false, googleLinkInvalid: true },
+      stands: [liveStand],
+      hasLocation: true,
+    });
+
+    expect(model.primary).toEqual({ label: "Add Google link", href: "/settings" });
+    expect(model.attentions[0]?.kind).toBe("google");
+    expect(model.attentions[0]?.title).toBe("Google review link is not a Google link");
+  });
+
+  it("sends Create a Tag to onboarding when there is no location", () => {
     const noLink = deriveHomeModel({
       counts: { ...emptyCounts, hasGoogleLink: false },
       stands: [],
       hasLocation: false,
     });
-    expect(noLink.primary).toEqual({ label: "Add Google link", href: "/onboarding" });
+    expect(noLink.primary).toEqual({ label: "Create a Tag", href: "/onboarding" });
 
     const model = deriveHomeModel({
       counts: emptyCounts,

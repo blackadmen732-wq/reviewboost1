@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 
 import { tryDecrypt } from "@/lib/server/crypto";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
+import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
 import { logger } from "@/lib/server/logger";
 import { supabaseServer } from "@/lib/supabase/server";
 import { startOfLocalDay, startOfLocalMonth } from "@/lib/utils/local-day";
@@ -715,6 +716,16 @@ export const listLocations = cache(async (orgId: string): Promise<OwnerLocation[
   }));
 });
 
+export function ownerGoogleLinkFlags(url: string | null | undefined): {
+  hasGoogleLink: boolean;
+  googleLinkInvalid: boolean;
+} {
+  const trimmed = url?.trim() ?? "";
+  if (!trimmed) return { hasGoogleLink: false, googleLinkInvalid: false };
+  const valid = isValidGoogleReviewUrl(trimmed);
+  return { hasGoogleLink: valid, googleLinkInvalid: !valid };
+}
+
 // ------------------------------------------------------------- counters ----
 
 export interface OwnerCounts {
@@ -725,6 +736,7 @@ export interface OwnerCounts {
   recentAverage: number | null;
   recentCount: number;
   hasGoogleLink: boolean;
+  googleLinkInvalid: boolean;
 }
 
 /**
@@ -785,7 +797,7 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
         ? ratings.reduce((total, rating) => total + rating, 0) / ratings.length
         : null,
     recentCount: ratings.length,
-    hasGoogleLink: Boolean(location?.googleReviewUrl),
+    ...ownerGoogleLinkFlags(location?.googleReviewUrl),
   };
 });
 

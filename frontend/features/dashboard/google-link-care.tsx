@@ -9,8 +9,11 @@ import { Input } from "@/components/ui/input";
 import { notify } from "@/components/ui/toast";
 import {
   GOOGLE_LINK_BLAST,
-  GOOGLE_LINK_EMPTY,
-  canOpenGoogleReviewUrl,
+  GOOGLE_LINK_INVALID,
+  googleLinkDisplay,
+  googleLinkRefusal,
+  googleLinkState,
+  openGoogleReviewUrl,
 } from "@/features/dashboard/google-link-copy";
 import { GoogleLinkHelp } from "@/features/dashboard/settings-form";
 import { isValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
@@ -20,12 +23,18 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
  * The Google review link, with Test / Open / Save.
  *
  * Test opens the draft before it is saved. Open opens what is already live.
- * Save writes through the existing settings API. Nothing else is invented.
+ * Save writes through the existing settings API. Missing and invalid are named.
+ * A refused open always says why.
  */
 
-function openLink(url: string) {
-  if (!canOpenGoogleReviewUrl(url) || !isValidatedGoogleReviewUrl(url.trim())) return;
-  window.open(url.trim(), "_blank", "noopener,noreferrer");
+function refuseOrOpen(url: string, onRefuse: (message: string) => void): boolean {
+  const state = openGoogleReviewUrl(url);
+  const refusal = googleLinkRefusal(state);
+  if (refusal) {
+    onRefuse(refusal);
+    return false;
+  }
+  return true;
 }
 
 export function GoogleLinkCare({ value }: { value: string | null }) {
@@ -38,10 +47,16 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
 
   const trimmed = draft.trim();
   const draftLooksRight = trimmed !== "" && isValidatedGoogleReviewUrl(trimmed);
+  const savedState = googleLinkState(value);
+
+  function speakRefusal(message: string) {
+    setError(message);
+    notify.error("That link will not open", message);
+  }
 
   async function save() {
     if (trimmed !== "" && !draftLooksRight) {
-      setError("That does not look like a Google review link.");
+      setError(GOOGLE_LINK_INVALID);
       return;
     }
 
@@ -89,7 +104,7 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-google-link-state={savedState}>
       {editing ? (
         <div className="rounded-[var(--radius-card)] border border-brand bg-surface p-4">
           <label className="block text-sm font-medium text-muted" htmlFor="setting-googleReviewUrl">
@@ -118,7 +133,11 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
             </p>
           ) : null}
 
-          {error ? (
+          {trimmed !== "" && !draftLooksRight ? (
+            <p role="alert" className="mt-2 text-sm text-danger">
+              {GOOGLE_LINK_INVALID}
+            </p>
+          ) : error ? (
             <p role="alert" className="mt-2 text-sm text-danger">
               {error}
             </p>
@@ -129,8 +148,8 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <Button
               variant="secondary"
-              disabled={!draftLooksRight || busy}
-              onClick={() => openLink(trimmed)}
+              disabled={busy}
+              onClick={() => refuseOrOpen(trimmed, speakRefusal)}
             >
               <ExternalLink className="size-4" aria-hidden="true" />
               Test
@@ -155,13 +174,25 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
         <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-muted">Google link</p>
-            <p className={`break-words text-base font-medium ${value ? "text-ink" : "text-muted"}`}>
-              {value || GOOGLE_LINK_EMPTY}
+            <p
+              className={`break-words text-base font-medium ${savedState === "valid" ? "text-ink" : "text-muted"}`}
+            >
+              {googleLinkDisplay(value)}
             </p>
+            {savedState === "invalid" ? (
+              <p role="alert" className="mt-2 text-sm text-danger">
+                {GOOGLE_LINK_INVALID}
+              </p>
+            ) : null}
             {justSaved ? (
               <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-brand-text">
                 <Check className="size-4" strokeWidth={3} aria-hidden="true" />
                 Saved
+              </p>
+            ) : null}
+            {error && savedState !== "invalid" ? (
+              <p role="alert" className="mt-2 text-sm text-danger">
+                {error}
               </p>
             ) : null}
           </div>
@@ -182,11 +213,11 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
 
       {!editing ? <p className="max-w-[42ch] text-sm leading-relaxed text-muted">{GOOGLE_LINK_BLAST}</p> : null}
 
-      {!editing && value ? (
+      {!editing && savedState !== "missing" ? (
         <Button
           variant="secondary"
           className="w-auto"
-          onClick={() => openLink(value)}
+          onClick={() => refuseOrOpen(value ?? "", speakRefusal)}
         >
           <ExternalLink className="size-4" aria-hidden="true" />
           Open
@@ -199,11 +230,25 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
 }
 
 export function TestGoogleLinkButton({ url }: { url: string }) {
-  const ready = isValidatedGoogleReviewUrl(url.trim());
+  const [refusal, setRefusal] = useState<string | null>(null);
+
   return (
-    <Button variant="secondary" disabled={!ready} onClick={() => openLink(url)}>
-      <ExternalLink className="size-4" aria-hidden="true" />
-      Test
-    </Button>
+    <div className="flex flex-col gap-2">
+      <Button
+        variant="secondary"
+        onClick={() => {
+          const opened = refuseOrOpen(url, setRefusal);
+          if (opened) setRefusal(null);
+        }}
+      >
+        <ExternalLink className="size-4" aria-hidden="true" />
+        Test
+      </Button>
+      {refusal ? (
+        <p role="alert" className="text-sm text-danger">
+          {refusal}
+        </p>
+      ) : null}
+    </div>
   );
 }

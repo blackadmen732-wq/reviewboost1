@@ -60,6 +60,21 @@ describe("OwnerHome", () => {
     expect(screen.queryByText("Customers")).not.toBeInTheDocument();
   });
 
+  it("empty without a tag or Google link still starts at Create a Tag", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, hasGoogleLink: false },
+      stands: [],
+      hasLocation: true,
+    });
+
+    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+
+    expect(screen.getByText("No tag yet")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Create a Tag" })).toHaveAttribute("href", "/stands");
+    expect(screen.queryByRole("link", { name: "Add Google link" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Print your code" })).not.toBeInTheDocument();
+  });
+
   it("empty missing Google link blocks the loop before print", () => {
     const model = deriveHomeModel({
       counts: { ...emptyCounts, hasGoogleLink: false },

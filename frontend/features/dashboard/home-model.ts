@@ -5,12 +5,15 @@
  * Fake counts never enter this model.
  */
 
+import { GOOGLE_LINK_INVALID } from "@/features/dashboard/google-link-copy";
+
 export interface HomeCounts {
   ratingsToday: number;
   unread: number;
   activeStands: number;
   recentCount: number;
   hasGoogleLink: boolean;
+  googleLinkInvalid?: boolean;
 }
 
 export interface HomeStand {
@@ -117,27 +120,34 @@ export function deriveHomeModel({
     });
   }
 
-  if (!counts.hasGoogleLink) {
-    attentions.push({
-      kind: "google",
-      title: "Google review link is missing",
-      body: "Every Tag uses this one link. Without it, customers can rate you here but cannot be sent to Google.",
-    });
-  }
-
+  // Empty path: create a tag first. Google is the headline only once a tag exists.
   if (!hasStand) {
     attentions.push({
       kind: "tag-missing",
       title: "No tag yet",
       body: "Create a tag, then print the code or program it, and put it where people pay.",
     });
-  } else if (tags.needsRewrite > 0) {
+  }
+
+  if (!counts.hasGoogleLink) {
+    attentions.push({
+      kind: "google",
+      title: counts.googleLinkInvalid
+        ? "Google review link is not a Google link"
+        : "Google review link is missing",
+      body: counts.googleLinkInvalid
+        ? GOOGLE_LINK_INVALID
+        : "Every Tag uses this one link. Without it, customers can rate you here but cannot be sent to Google.",
+    });
+  }
+
+  if (hasStand && tags.needsRewrite > 0) {
     attentions.push({
       kind: "tag-rewrite",
       title: tags.needsRewrite === 1 ? "One tag needs reprogramming" : `${tags.needsRewrite} tags need reprogramming`,
       body: "The code changed. Program the tag again, or reprint the code.",
     });
-  } else if (tags.programmed === 0) {
+  } else if (hasStand && tags.programmed === 0) {
     attentions.push({
       kind: "tag-unprogrammed",
       title: "Tag is not programmed yet",
@@ -148,10 +158,10 @@ export function deriveHomeModel({
   let primary: HomePrimary | null;
   if (counts.unread > 0 && kind === "active") {
     primary = { label: "Read feedback", href: "/feedback" };
-  } else if (!counts.hasGoogleLink) {
-    primary = { label: "Add Google link", href: googleHref };
   } else if (!hasStand) {
     primary = { label: "Create a Tag", href: createHref };
+  } else if (!counts.hasGoogleLink) {
+    primary = { label: "Add Google link", href: googleHref };
   } else if (tags.needsRewrite > 0) {
     primary = { label: "Program a tag", href: "/stands" };
   } else if (kind === "empty" || tags.programmed === 0) {

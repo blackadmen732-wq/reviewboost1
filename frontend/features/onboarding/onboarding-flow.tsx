@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
 import { TestGoogleLinkButton } from "@/features/dashboard/google-link-care";
-import { GOOGLE_LINK_BLAST, GOOGLE_LINK_HELP_STEPS } from "@/features/dashboard/google-link-copy";
+import {
+  GOOGLE_LINK_BLAST,
+  GOOGLE_LINK_HELP_STEPS,
+  GOOGLE_LINK_INVALID,
+  GOOGLE_LINK_LATER,
+} from "@/features/dashboard/google-link-copy";
 import {
   advanceOnboarding,
   type CreatedStand,
@@ -34,6 +39,7 @@ export function OnboardingFlow() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedStand | null>(null);
+  const [googleLinkSaved, setGoogleLinkSaved] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const qr = useAuthenticatedQr(created?.standId ?? null);
@@ -60,8 +66,44 @@ export function OnboardingFlow() {
     setStep(next);
   }
 
+  async function persistGoogleUrl(url: string, accessToken: string): Promise<boolean> {
+    const response = await fetch("/api/v1/settings", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ googleReviewUrl: url }),
+    });
+    return response.ok;
+  }
+
   async function finish(withUrl: string | undefined) {
     if (created) {
+      if (withUrl) {
+        setBusy(true);
+        setError(null);
+
+        const {
+          data: { session },
+        } = await supabaseBrowser().auth.getSession();
+
+        if (!session) {
+          setBusy(false);
+          setError("Your session expired. Please sign in again.");
+          return;
+        }
+
+        const saved = await persistGoogleUrl(withUrl, session.access_token);
+        setBusy(false);
+
+        if (!saved) {
+          setError("Could not save that. Please try again.");
+          return;
+        }
+
+        setGoogleLinkSaved(true);
+      }
       go(advanceOnboarding("google", created));
       return;
     }
@@ -108,6 +150,7 @@ export function OnboardingFlow() {
 
     const body = (await response.json()) as { data: CreatedStand };
     setCreated(body.data);
+    setGoogleLinkSaved(Boolean(withUrl));
     go(advanceOnboarding("google", body.data));
   }
 
@@ -162,6 +205,7 @@ export function OnboardingFlow() {
       {step === "preview" && created ? (
         <PreviewStep
           standUrl={created.standUrl}
+          googleLinkSaved={googleLinkSaved}
           onContinue={() => go(advanceOnboarding("preview", created))}
         />
       ) : null}
@@ -169,6 +213,7 @@ export function OnboardingFlow() {
       {step === "tag" && created ? (
         <TagStep
           businessName={name.trim()}
+          googleLinkSaved={googleLinkSaved}
           onContinue={() => go(advanceOnboarding("tag", created))}
         />
       ) : null}
@@ -177,12 +222,13 @@ export function OnboardingFlow() {
         <PrintStep
           qr={qr}
           copied={copied}
+          googleLinkSaved={googleLinkSaved}
           onCopy={() => void copyStandUrl()}
           onContinue={() => go(advanceOnboarding("print", created))}
         />
       ) : null}
 
-      {step === "ready" ? <ReadyStep /> : null}
+      {step === "ready" ? <ReadyStep googleLinkSaved={googleLinkSaved} /> : null}
     </div>
   );
 }
@@ -306,10 +352,7 @@ function GoogleStep({
         ) : null}
 
         {trimmedUrl !== "" && !urlLooksRight ? (
-          <InlineNotice kind="error">
-            That does not look like a Google link. It should start with
-            g.page or google.com.
-          </InlineNotice>
+          <InlineNotice kind="error">{GOOGLE_LINK_INVALID}</InlineNotice>
         ) : null}
 
         {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
@@ -338,9 +381,11 @@ function GoogleStep({
 
 function PreviewStep({
   standUrl,
+  googleLinkSaved,
   onContinue,
 }: {
   standUrl: string;
+  googleLinkSaved: boolean;
   onContinue: () => void;
 }) {
   return (
@@ -352,6 +397,7 @@ function PreviewStep({
         <p className="text-base leading-relaxed text-muted">
           The live page. We do not restyle it here. Open it, then come back.
         </p>
+        <GoogleUnsetNote show={!googleLinkSaved} />
       </div>
 
       <Button variant="action" size="lg" asChild>
@@ -370,9 +416,11 @@ function PreviewStep({
 
 function TagStep({
   businessName,
+  googleLinkSaved,
   onContinue,
 }: {
   businessName: string;
+  googleLinkSaved: boolean;
   onContinue: () => void;
 }) {
   return (
@@ -383,9 +431,10 @@ function TagStep({
         </h1>
         <p className="text-base leading-relaxed text-muted">
           A Tag is the code people scan. You have one
-          {businessName ? ` for ${businessName}` : ""}. Print it or program a
-          blank NFC tag with the same link.
+          {businessName ? ` for ${businessName}` : ""}. Print the code or
+          program a blank NFC tag with the same link.
         </p>
+        <GoogleUnsetNote show={!googleLinkSaved} />
       </div>
 
       <Button variant="action" size="lg" onClick={onContinue}>
@@ -398,11 +447,13 @@ function TagStep({
 function PrintStep({
   qr,
   copied,
+  googleLinkSaved,
   onCopy,
   onContinue,
 }: {
   qr: ReturnType<typeof useAuthenticatedQr>;
   copied: boolean;
+  googleLinkSaved: boolean;
   onCopy: () => void;
   onContinue: () => void;
 }) {
@@ -416,6 +467,7 @@ function PrintStep({
           Put the code where people pay. To program a tag, write this same link
           onto a blank NFC tag — you can also do that from Tags after setup.
         </p>
+        <GoogleUnsetNote show={!googleLinkSaved} />
       </div>
 
       <div className="rounded-[var(--radius-card)] border border-border bg-surface p-6">
@@ -478,7 +530,7 @@ function PrintStep({
   );
 }
 
-function ReadyStep() {
+function ReadyStep({ googleLinkSaved }: { googleLinkSaved: boolean }) {
   return (
     <>
       <div className="flex flex-col gap-2">
@@ -488,12 +540,22 @@ function ReadyStep() {
         <p className="text-base leading-relaxed text-muted">
           Print the code or program the tag, then put it where people pay.
         </p>
+        <GoogleUnsetNote show={!googleLinkSaved} />
       </div>
 
       <Button variant="action" size="lg" asChild>
         <a href="/home">Go to Home</a>
       </Button>
     </>
+  );
+}
+
+function GoogleUnsetNote({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <p className="text-sm leading-relaxed text-muted" data-google-unset="true">
+      {GOOGLE_LINK_LATER}
+    </p>
   );
 }
 
