@@ -2,6 +2,12 @@
 -- request's message (same To, same body, different logical send). Refuse
 -- binding a SID already claimed by a different attempt before consume or
 -- terminal replay.
+--
+-- Version ownership (ATLAS): this file is 20260908000500. PR #54 originally
+-- shipped the same SQL as 20260908000400_sms_reconcile_sid_conflict.sql.
+-- 00400 is reserved for privilege_attack_pass (#45+#48). DBs that already
+-- applied the SID SQL under 00400 are repaired by 20260908000600 (privilege
+-- + FIFO replay); this 00500 CREATE OR REPLACE is a no-op on those DBs.
 
 create or replace function app.sms_reconcile_attach_sid(
     p_attempt_id          uuid,
