@@ -77,6 +77,42 @@ role key on startup. Copy them into `frontend/.env.local`.
 Service role keys and encryption keys must differ across all three environments.
 Never reuse production credentials in development or preview.
 
+## Preview must wire Supabase env (fail closed)
+
+Vercel preview (and any other hosted deploy) **must** set
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` against that
+preview project's publishable credentials, plus the matching server-side
+`SUPABASE_*` secrets.
+
+Those values are required to construct a Supabase client. The proxy will not
+pass empty strings into `createServerClient` (that 500s every matched request,
+including the public homepage). It also will **not** skip the owner-page auth
+gate when the values are missing. Owner prefixes (`/home`, `/feedback`,
+`/praise`, `/stands`, `/settings`, `/onboarding`, `/reviews`, `/customers`,
+`/select-org`) fail closed with HTTP 503. Public routes may still render.
+
+Do not "fix" a preview homepage 500 by returning `NextResponse.next()` before
+the owner-route check. Wire the preview Supabase project instead.
+
+## Internal SMS worker scheduler
+
+`frontend/vercel.json` registers Vercel Cron for:
+
+| Path | Schedule | Purpose |
+|---|---|---|
+| `GET /api/v1/internal/sms/dispatch` | `*/5 * * * *` | One outbox dispatch batch |
+| `GET /api/v1/internal/sms/expire-quota` | `15 6 * * *` | `rpc_sms_quota_expire` credit sweep |
+
+Both routes also accept POST for an external scheduler. They authenticate with
+`Authorization: Bearer` against `SMS_WORKER_SECRET` or `CRON_SECRET` (Vercel
+sends `CRON_SECRET` automatically when that env is set). If neither secret is
+configured the routes 404. They do not send live SMS; the dispatch worker uses
+whatever `getSmsProvider()` selects (`SMS_PROVIDER=fake` in tests).
+
+Delivery reconciliation is webhook-driven (`/api/v1/webhooks/sms/{provider}`).
+Stranded `sending` rows are recovered on the next dispatch claim. There is no
+Twilio status poller.
+
 ## Hosted Supabase Auth (production)
 
 ReviewBoost is passwordless: the app calls `signInWithOtp` → `verifyOtp` and the

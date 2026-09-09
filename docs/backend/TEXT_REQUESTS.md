@@ -238,7 +238,8 @@ errors, rate-limited where it matters:
 | POST | `/text-requests/preview` | owner/admin | segment + cost preview |
 | POST | `/text-requests/{id}/cancel` | owner/admin | cancel if not yet dispatched |
 | POST | `/webhooks/sms/{provider}` | provider (signed) | delivery + inbound events |
-| POST | `/internal/sms/dispatch` | worker secret | run one dispatch batch |
+| GET/POST | `/internal/sms/dispatch` | worker / cron secret | run one dispatch batch (GET is Vercel Cron) |
+| GET/POST | `/internal/sms/expire-quota` | worker / cron secret | `rpc_sms_quota_expire` sweep |
 
 ## 17. Security model **[impl][test-ci]**
 
@@ -288,7 +289,12 @@ them trigger on `supabase/**`, `frontend/lib/server/**`, and `frontend/app/api/*
 - Twilio (or another gateway) account + `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
   and a From number / Messaging Service SID. **[needs-provider]**
 - `SMS_RATE_PER_SEGMENT_MICROS` + `SMS_RATE_CURRENCY` (real pricing). **[needs-provider]**
-- `SMS_WORKER_SECRET` for the dispatch trigger, and a scheduler (cron) to call it. **[needs-provider]**
+- `SMS_WORKER_SECRET` (or Vercel `CRON_SECRET`) for the dispatch and
+  credit-expiry triggers. Vercel Cron wiring lives in `frontend/vercel.json`
+  (`*/5 * * * *` dispatch, daily `15 6 * * *` expire-quota). The routes exist
+  and are unit-tested with the fake provider / mocked RPCs; a live send still
+  **[needs-provider]**. Delivery reconciliation stays webhook-driven — there is
+  no Twilio poller.
 - The provider's webhook URL pointed at `/api/v1/webhooks/sms/twilio`, and the
   URL used for signature verification matching the configured public URL.
 
