@@ -14,30 +14,33 @@ import { cookies } from "next/headers";
  * session, not an elevated one.
  */
 export async function supabaseServer() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    throw new Error("Supabase environment variables are not configured");
+  }
+
   const store = await cookies();
 
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-    {
-      cookies: {
-        getAll() {
-          return store.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            for (const { name, value, options } of cookiesToSet) {
-              store.set(name, value, options);
-            }
-          } catch {
-            // Server Components cannot set cookies. Refresh is handled by the
-            // middleware, so failing quietly here is correct rather than
-            // crashing a render.
+  return createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return store.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          for (const { name, value, options } of cookiesToSet) {
+            store.set(name, value, options);
           }
-        },
+        } catch {
+          // Server Components cannot set cookies. Refresh is handled by the
+          // middleware, so failing quietly here is correct rather than
+          // crashing a render.
+        }
       },
     },
-  );
+  });
 }
 
 /** The signed-in user, or null. Never throws — callers decide what to do. */

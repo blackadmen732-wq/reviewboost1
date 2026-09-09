@@ -19,32 +19,34 @@ import { NextResponse, type NextRequest } from "next/server";
 const OWNER_PREFIXES = ["/home", "/feedback", "/praise", "/stands", "/settings", "/onboarding", "/reviews", "/customers", "/select-org"];
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  const response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          for (const { name, value } of cookiesToSet) {
-            request.cookies.set(name, value);
-          }
-          response = NextResponse.next({ request });
-          for (const { name, value, options } of cookiesToSet) {
-            response.cookies.set(name, value, options);
-          }
-        },
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    return response;
+  }
+
+  let finalResponse = response;
+
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        for (const { name, value } of cookiesToSet) {
+          request.cookies.set(name, value);
+        }
+        finalResponse = NextResponse.next({ request });
+        for (const { name, value, options } of cookiesToSet) {
+          finalResponse.cookies.set(name, value, options);
+        }
       },
     },
-  );
+  });
 
-  // Must be `getUser`, not `getSession`. getSession reads the cookie and trusts
-  // it; getUser verifies with the auth server. Protecting a route on an
-  // unverified claim is protecting nothing.
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -55,15 +57,13 @@ export async function proxy(request: NextRequest) {
   );
 
   if (isOwnerPage && !user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    // Carries where they were going, so signing in lands them there instead of
-    // dumping them on a home page to navigate again.
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  return response;
+  return finalResponse;
 }
 
 export const config = {
