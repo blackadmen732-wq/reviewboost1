@@ -27,7 +27,8 @@ also a production-data rewrite: every live stand, every printed sticker, and
 every already-programmed tag would need a dual-read window or they go dark.
 
 This PR does not need that to ship Tags list/detail, Program Tag, or the
-customer-page preview. QR and NFC already open the same customer page.
+customer-page preview (`20260909000900_customer_page_and_entitlements.sql`).
+QR and NFC already open the same customer page.
 
 ## Dual-read plan (when we do it later)
 

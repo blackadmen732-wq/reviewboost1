@@ -1,4 +1,6 @@
--- Additive owner-systems foundation. Does not touch stand tokens or
+-- Additive owner-systems foundation. Version 20260909000900 so this
+-- file does not collide with Train B #59 (090001–090004) or #64 SMS
+-- forwards (090006–090008). Does not touch stand tokens or
 -- rpc_public_resolve_stand. Single-token QR/NFC stays the live path.
 -- See docs/dev/DUAL_QR_NFC_BACKCOMPAT.md.
 
