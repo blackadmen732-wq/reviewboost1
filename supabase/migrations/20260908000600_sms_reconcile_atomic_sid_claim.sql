@@ -3,8 +3,8 @@
 -- plus attach returning sid_conflict on unique_violation closes the race
 -- without consume.
 --
--- Does not touch 20260908000400_sms_reconcile_sid_conflict.sql (SMS/#54 SID
--- ownership). ATLAS #59 owns 20260909000100–20260909000400.
+-- Stacked on #59: 00400 remains SID attach; 00500 remains privilege.
+-- This file is 00600 (Marcus). Do not also ship 09000500 for this fix.
 
 drop index if exists public.sms_delivery_attempts_provider_sid_uidx;
 
