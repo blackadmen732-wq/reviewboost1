@@ -24,30 +24,38 @@ echo "== Fake-provider / Twilio-adapter vitest (no network send) =="
     tests/unit/sms-dispatch.test.ts
 )
 
-if ! command -v psql >/dev/null 2>&1; then
-  echo "psql not installed; skipping local SQL race. pgTAP still runs via supabase test db when invoked."
-  exit 0
-fi
+psql_cmd() {
+  if [[ -n "${SMS_PROVE_PSQL:-}" ]]; then
+    # shellcheck disable=SC2086
+    ${SMS_PROVE_PSQL} "$@"
+  elif command -v psql >/dev/null 2>&1; then
+    local db_url="${SMS_PROVE_DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}"
+    psql "$db_url" "$@"
+  elif docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'supabase_db_reviewboost'; then
+    docker exec -i supabase_db_reviewboost psql -U postgres -d postgres "$@"
+  else
+    return 127
+  fi
+}
 
-DB_URL="${SMS_PROVE_DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}"
-if ! psql "$DB_URL" -Atqc "select 1" >/dev/null 2>&1; then
-  echo "Local Supabase Postgres is not reachable at $DB_URL — skip concurrent SID race."
+if ! psql_cmd -Atqc "select 1" >/dev/null 2>&1; then
+  echo "Local Supabase Postgres is not reachable — skip concurrent SID race."
   echo "Run \`supabase db reset && supabase test db\` when the stack is up."
   exit 0
 fi
 
 echo "== Concurrent SID claim race (two sessions, fake SIDs only) =="
-psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$REPO_ROOT/scripts/sms/prove-concurrent-sid-setup.sql"
+psql_cmd -v ON_ERROR_STOP=1 -f - < "$REPO_ROOT/scripts/sms/prove-concurrent-sid-setup.sql"
 
 OUT_A="$(mktemp)"
 OUT_B="$(mktemp)"
-psql "$DB_URL" -v ON_ERROR_STOP=1 -c \
+psql_cmd -v ON_ERROR_STOP=1 -c \
   "select app.sms_reconcile_attach_sid(
       (select attempt_a from public.sms_prove_race),
       (select org_id from public.sms_prove_race),
       'fake_race_sid', 'delivered', null);" >"$OUT_A" &
 PID_A=$!
-psql "$DB_URL" -v ON_ERROR_STOP=1 -c \
+psql_cmd -v ON_ERROR_STOP=1 -c \
   "select app.sms_reconcile_attach_sid(
       (select attempt_b from public.sms_prove_race),
       (select org_id from public.sms_prove_race),
@@ -61,6 +69,6 @@ cat "$OUT_A"
 echo "--- session B ---"
 cat "$OUT_B"
 
-psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$REPO_ROOT/scripts/sms/prove-concurrent-sid-assert.sql"
+psql_cmd -v ON_ERROR_STOP=1 -f - < "$REPO_ROOT/scripts/sms/prove-concurrent-sid-assert.sql"
 
 echo "SMS correctness prove: no duplicate SID claim, no double consume."
