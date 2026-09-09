@@ -2,6 +2,9 @@
 -- pass the exists() check and double-claim. A unique (provider, SID) index
 -- plus attach returning sid_conflict on unique_violation closes the race
 -- without consume.
+--
+-- Does not touch 20260908000400_sms_reconcile_sid_conflict.sql (SMS/#54 SID
+-- ownership). ATLAS #59 owns 20260909000100–20260909000400.
 
 drop index if exists public.sms_delivery_attempts_provider_sid_uidx;
 
