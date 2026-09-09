@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { AuthFrame } from "@/features/auth/auth-frame";
 import { SignInFlow } from "@/features/auth/sign-in-flow";
 import { safeInternalPath } from "@/lib/security/safe-redirect";
 import { publicFrontendUrl } from "@/lib/server/env";
@@ -30,8 +31,8 @@ export default async function LoginPage({
   if (user) redirect(destination);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
+    <AuthFrame>
       <SignInFlow next={destination} />
-    </main>
+    </AuthFrame>
   );
 }
