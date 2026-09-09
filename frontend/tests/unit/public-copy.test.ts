@@ -6,8 +6,10 @@ import { describe, expect, it } from "vitest";
 import {
   HOW_IT_WORKS,
   INTEGRITY,
+  isGetStartedNext,
   PRICING,
   PRODUCT,
+  PUBLIC_FOOTER,
   PUBLIC_HERO,
   START_HREF,
 } from "@/features/public/public-copy";
@@ -53,6 +55,10 @@ describe("public + activation copy", () => {
   it("sends Get started into onboarding after login", () => {
     expect(START_HREF).toBe("/login?next=/onboarding");
     expect(PUBLIC_HERO.primary.href).toBe(START_HREF);
+    expect(isGetStartedNext("/onboarding")).toBe(true);
+    expect(isGetStartedNext("/home")).toBe(false);
+    expect(PUBLIC_FOOTER.map((item) => item.href)).toContain("/how-it-works");
+    expect(PUBLIC_FOOTER.map((item) => item.href)).toContain("/privacy");
   });
 
   it("states the rating-blind Google opportunity", () => {

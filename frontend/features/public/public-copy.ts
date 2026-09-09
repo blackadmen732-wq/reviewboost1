@@ -16,11 +16,17 @@ export const PUBLIC_NAV = [
 ] as const;
 
 export const PUBLIC_FOOTER = [
+  { href: "/how-it-works", label: "How it works" },
+  { href: "/product", label: "Product" },
   { href: "/integrity", label: "Integrity" },
   { href: "/pricing", label: "Pricing" },
   { href: "/security", label: "Security" },
   { href: "/privacy", label: "Privacy" },
 ] as const;
+
+export function isGetStartedNext(path: string): boolean {
+  return path === "/onboarding" || path.startsWith("/onboarding?");
+}
 
 export const PUBLIC_HERO = {
   title: "A code on the counter. The same Google chance for every customer.",

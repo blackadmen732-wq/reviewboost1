@@ -18,7 +18,7 @@ vi.mock("next/link", () => ({
 }));
 
 import { PublicHome } from "@/features/public/public-home";
-import { INTEGRITY, PUBLIC_HERO, START_HREF } from "@/features/public/public-copy";
+import { INTEGRITY, PUBLIC_HERO, SECURITY, START_HREF } from "@/features/public/public-copy";
 
 describe("PublicHome", () => {
   it("leads with the honest hero and one Action CTA", () => {
@@ -36,6 +36,9 @@ describe("PublicHome", () => {
     render(<PublicHome />);
 
     expect(screen.getByText(INTEGRITY.headline)).toBeVisible();
+    expect(screen.getByText(SECURITY.headline)).toBeVisible();
+    expect(screen.getAllByRole("link", { name: "Security" })[0]).toHaveAttribute("href", "/security");
+    expect(screen.getAllByRole("link", { name: "Privacy" })[0]).toHaveAttribute("href", "/privacy");
     expect(screen.queryByText(/\$\d/)).not.toBeInTheDocument();
     expect(screen.queryByText(/trusted by/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/reviews prevented/i)).not.toBeInTheDocument();

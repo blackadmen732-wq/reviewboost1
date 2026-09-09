@@ -52,6 +52,20 @@ export function PublicShell({ children }: { children: ReactNode }) {
             </Button>
           </div>
         </div>
+        <nav
+          className="mx-auto flex max-w-[1080px] flex-wrap gap-x-5 gap-y-2 px-5 pb-3 md:hidden sm:px-8"
+          aria-label="Public"
+        >
+          {PUBLIC_NAV.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="text-sm font-medium text-muted transition-colors duration-150 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
       </header>
 
       <main>{children}</main>

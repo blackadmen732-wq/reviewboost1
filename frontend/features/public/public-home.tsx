@@ -6,8 +6,10 @@ import {
   HOW_IT_WORKS,
   INTEGRITY,
   PRICING,
+  PRIVACY,
   PRODUCT,
   PUBLIC_HERO,
+  SECURITY,
   START_HREF,
 } from "@/features/public/public-copy";
 import { PublicShell } from "@/features/public/public-shell";
@@ -121,6 +123,31 @@ export function PublicHome() {
               className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
             >
               How we charge
+            </Link>
+          </p>
+        </div>
+      </section>
+
+      <section className="border-t border-border">
+        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
+          <p className="text-sm font-medium text-muted">Security and privacy</p>
+          <h2 className="mt-4 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
+            {SECURITY.headline}
+          </h2>
+          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{SECURITY.lede}</p>
+          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{PRIVACY.lede}</p>
+          <p className="mt-10 flex flex-wrap gap-x-6 gap-y-2">
+            <Link
+              href="/security"
+              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
+            >
+              Security
+            </Link>
+            <Link
+              href="/privacy"
+              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
+            >
+              Privacy
             </Link>
           </p>
         </div>
