@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Download, ExternalLink, Printer, RefreshCw, Smartphone, Wifi } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, Printer, RefreshCw, Smartphone } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -196,42 +196,22 @@ export function StandCard({
   }
 
   return (
-    <div className="rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-lg font-semibold text-ink">{label}</p>
-          <p className="text-sm text-muted">
-            Code {tokenPrefix}… · {status === "active" ? "Working" : status}
-            {standType === "physical_nfc" && " · NFC"}
+    <div className="border-t border-border pt-8">
+      <div className="mb-6">
+        <p className="truncate text-lg font-semibold text-ink">{label}</p>
+        <p className="mt-1 text-sm text-muted">
+          Code {tokenPrefix}… · {status === "active" ? "live" : status}
+          {standType === "physical_nfc" ? " · NFC" : ""}
+          {hasNfc ? " · tag programmed" : ""}
+        </p>
+        {tokenWasRotatedAfterNfc ? (
+          <p className="mt-3 text-sm text-ink">
+            This tag still has the old code. Program it again, or reprint.
           </p>
-        </div>
+        ) : null}
       </div>
 
-      {/* NFC provisioning status */}
-      {hasNfc && (
-        <div className={`mb-4 flex items-start gap-2 rounded-[var(--radius-control)] p-3 text-sm ${
-          tokenWasRotatedAfterNfc
-            ? "border border-[color:var(--rb-danger-border)] bg-[color:var(--rb-danger-bg)] text-danger"
-            : "bg-[color:var(--rb-success-bg)] text-[color:var(--rb-success)]"
-        }`}>
-          <Wifi className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <div>
-            {tokenWasRotatedAfterNfc ? (
-              <p>
-                <strong>NFC tag needs rewriting.</strong> The code was changed after this tag was
-                written. The physical tag still links to the old code.
-              </p>
-            ) : (
-              <p>
-                NFC tag written ·{" "}
-                {new Date(nfcProvisionedAt!).toLocaleDateString()}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="mb-5 rounded-[var(--radius-control)] bg-white p-4">
+      <div className="mb-6 rounded-[var(--radius-card)] border border-border bg-surface p-4">
         {qr.status === "error" || qr.status === "expired" ? (
           <div className="mx-auto flex aspect-square w-full max-w-[240px] items-center justify-center">
             <div className="flex flex-col items-center gap-3">
@@ -263,9 +243,9 @@ export function StandCard({
       </div>
 
       <div className="flex flex-col gap-3">
-        <Button onClick={() => window.print()}>
+        <Button variant="action" onClick={() => window.print()}>
           <Printer className="size-5" aria-hidden="true" />
-          Print this code
+          Print your code
         </Button>
 
         <Button
@@ -344,16 +324,15 @@ export function StandCard({
           ) : (
             <Copy className="size-5" aria-hidden="true" />
           )}
-          {copied ? "Link copied" : "Copy NFC link"}
+          {copied ? "Link copied" : "Copy the tag link"}
         </Button>
 
-        {/* Test Stand */}
         <Button
           variant="secondary"
           onClick={() => void testStand()}
         >
           <ExternalLink className="size-5" aria-hidden="true" />
-          Test Stand
+          Preview customer page
         </Button>
       </div>
 
@@ -362,14 +341,13 @@ export function StandCard({
         <details className="group">
           <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-muted hover:text-ink">
             <Smartphone className="size-4" aria-hidden="true" />
-            Write to NFC tag
+            Program a tag
             <span className="ml-auto text-xs text-muted group-open:rotate-90 transition-transform">&#9654;</span>
           </summary>
           <div className="mt-3 space-y-3 text-sm text-muted">
             <p>
-              Use Android Chrome or the NFC Tools app on any phone to write
-              this stand&apos;s URL to an NFC tag. The tag will contain the same link as
-              the QR code.
+              Write the same link as this code onto a blank tag. A customer
+              taps the tag and the page opens — no app for them.
             </p>
             <WebNfcWriter standId={standId} />
             <div className="rounded-[var(--radius-control)] border border-border p-3">
@@ -385,7 +363,7 @@ export function StandCard({
                 <li>Install <strong>NFC Tools</strong> from App Store or Play Store</li>
                 <li>Open the app and tap <strong>Write</strong></li>
                 <li>Tap <strong>Add a record</strong> → <strong>URL / URI</strong></li>
-                <li>Use the <strong>Copy NFC link</strong> button above and paste it</li>
+                <li>Use <strong>Copy the tag link</strong> above and paste it</li>
                 <li>Tap <strong>Write</strong> and hold your phone to the tag</li>
                 <li>Verify: tap the tag with your phone to confirm it opens the correct page</li>
               </ol>

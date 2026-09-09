@@ -61,13 +61,13 @@ export function AddStandButton({ locations }: AddStandButtonProps) {
 
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
+      <Button variant="action" className="w-auto" onClick={() => setOpen(true)}>
         <Plus className="size-5" aria-hidden="true" />
-        Add stand
+        Create a Tag
       </Button>
 
       <DialogRoot open={open} onOpenChange={setOpen}>
-        <DialogContent title="Add a new stand" description="Create a new QR code for customers to scan.">
+        <DialogContent title="Create a Tag" description="A printed code or an NFC tag customers can use.">
           <div className="flex flex-col gap-4 py-2">
             {locations.length > 1 && (
               <div>
@@ -105,8 +105,8 @@ export function AddStandButton({ locations }: AddStandButtonProps) {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row-reverse">
-            <Button variant="primary" loading={busy} onClick={() => void handleCreate()} className="sm:flex-1">
-              Create stand
+            <Button variant="action" loading={busy} onClick={() => void handleCreate()} className="sm:flex-1">
+              Create a Tag
             </Button>
             <Button variant="secondary" onClick={() => setOpen(false)} className="sm:flex-1">
               Cancel

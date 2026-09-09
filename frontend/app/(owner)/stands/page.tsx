@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import { QrCode } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
-import { AppShell } from "@/features/dashboard/app-shell";
+import { PageHeader } from "@/components/ui/page-header";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { StandCard } from "@/features/dashboard/stand-card";
 import { AddStandButton } from "@/features/dashboard/add-stand-button";
 import { listStands, listLocations, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Your codes — ReviewBoost",
+  title: "Tags — ReviewBoost",
   robots: { index: false, follow: false },
 };
 
@@ -30,33 +30,41 @@ export default async function StandsPage() {
   }
 
   return (
-    <AppShell>
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Your codes</h1>
-          <p className="mt-1 text-base text-muted">Put these where customers pay.</p>
-        </div>
-        {locations.length > 0 && (
-          <AddStandButton locations={locations.map((l) => ({ locationId: l.locationId, name: l.name }))} />
-        )}
-      </div>
+    <OwnerShell businessName={organization.name}>
+      <PageHeader
+        title="Tags"
+        description="Print a code or program a tag. Put it where people pay."
+        action={
+          locations.length > 0 ? (
+            <AddStandButton
+              locations={locations.map((l) => ({ locationId: l.locationId, name: l.name }))}
+            />
+          ) : null
+        }
+      />
 
       {stands.length === 0 ? (
         <EmptyState
-          icon={QrCode}
-          title="No codes yet"
-          description="Finish setting up and your first code appears here."
+          title="No tags yet"
+          description="Create a tag, print the code, and put it on the counter."
+          action={
+            locations.length > 0 ? (
+              <AddStandButton
+                locations={locations.map((l) => ({ locationId: l.locationId, name: l.name }))}
+              />
+            ) : undefined
+          }
         />
       ) : (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-12">
           {[...grouped.entries()].map(([locationId, locationStands]) => (
             <div key={locationId}>
               {grouped.size > 1 && (
-                <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
+                <h2 className="mb-4 text-sm font-medium text-muted">
                   {locationMap.get(locationId) ?? "Unknown location"}
                 </h2>
               )}
-              <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-10">
                 {locationStands.map((stand) => (
                   <StandCard
                     key={stand.standId}
@@ -74,6 +82,6 @@ export default async function StandsPage() {
           ))}
         </div>
       )}
-    </AppShell>
+    </OwnerShell>
   );
 }
