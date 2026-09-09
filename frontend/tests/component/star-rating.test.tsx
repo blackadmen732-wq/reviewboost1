@@ -69,7 +69,10 @@ describe("RatingScreen", () => {
 
       expect(screen.getByRole("textbox", { name: /want to add a note/i })).toBeVisible();
       expect(screen.getByRole("button", { name: "Continue" })).toBeVisible();
-      expect(screen.getByText(customerMessages.en.ratingLabels[rating])).toBeVisible();
+      expect(
+        screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[rating] }),
+      ).toBeChecked();
+      expect(screen.queryByText(customerMessages.en.ratingLabels[rating])).not.toBeInTheDocument();
     },
   );
 

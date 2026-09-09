@@ -22,7 +22,7 @@ describe("owner empty, error, offline, permission language", () => {
     expect(home).toContain("No ratings yet.");
     expect(home).toContain("Your tag is ready. Put it where people pay.");
     expect(tags).toContain("No tags yet");
-    expect(tags).toContain("Create a tag, print the code");
+    expect(tags).toContain("Create a Tag, print the code");
     expect(feedback).toContain("All caught up");
     expect(feedback).toContain("Nothing yet");
   });
