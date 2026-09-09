@@ -134,6 +134,12 @@ describe("vercel cron wiring", () => {
     );
     for (const cron of vercel.crons) {
       expect(cron.schedule).toMatch(/^[0-9*,/\- ]+$/);
+      // Vercel Hobby refuses expressions that run more than once per day
+      // ("Hobby accounts are limited to daily cron jobs"). Keep both
+      // schedules daily so preview deploys. External POSTs can still be denser.
+      const [, hour] = cron.schedule.split(" ");
+      expect(hour, cron.path).not.toBe("*");
+      expect(cron.schedule, cron.path).not.toMatch(/^\*\//);
     }
   });
 });

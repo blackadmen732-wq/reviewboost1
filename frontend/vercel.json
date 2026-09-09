@@ -4,7 +4,7 @@
   "crons": [
     {
       "path": "/api/v1/internal/sms/dispatch",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/v1/internal/sms/expire-quota",

@@ -100,8 +100,13 @@ the owner-route check. Wire the preview Supabase project instead.
 
 | Path | Schedule | Purpose |
 |---|---|---|
-| `GET /api/v1/internal/sms/dispatch` | `*/5 * * * *` | One outbox dispatch batch |
+| `GET /api/v1/internal/sms/dispatch` | `0 6 * * *` | One outbox dispatch batch |
 | `GET /api/v1/internal/sms/expire-quota` | `15 6 * * *` | `rpc_sms_quota_expire` credit sweep |
+
+Both expressions are **once per day** so a Vercel Hobby project can deploy
+`frontend/vercel.json`. An external scheduler may still POST more often. A Pro
+plan can tighten the dispatch expression (e.g. `*/5 * * * *`) without a code
+change to the routes.
 
 Both routes also accept POST for an external scheduler. They authenticate with
 `Authorization: Bearer` against `SMS_WORKER_SECRET` or `CRON_SECRET` (Vercel

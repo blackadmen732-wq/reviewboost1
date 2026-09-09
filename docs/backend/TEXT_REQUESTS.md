@@ -291,7 +291,8 @@ them trigger on `supabase/**`, `frontend/lib/server/**`, and `frontend/app/api/*
 - `SMS_RATE_PER_SEGMENT_MICROS` + `SMS_RATE_CURRENCY` (real pricing). **[needs-provider]**
 - `SMS_WORKER_SECRET` (or Vercel `CRON_SECRET`) for the dispatch and
   credit-expiry triggers. Vercel Cron wiring lives in `frontend/vercel.json`
-  (`*/5 * * * *` dispatch, daily `15 6 * * *` expire-quota). The routes exist
+  (daily `0 6 * * *` dispatch, daily `15 6 * * *` expire-quota; Hobby-safe).
+  The routes exist
   and are unit-tested with the fake provider / mocked RPCs; a live send still
   **[needs-provider]**. Delivery reconciliation stays webhook-driven — there is
   no Twilio poller.
