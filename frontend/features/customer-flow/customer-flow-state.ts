@@ -99,6 +99,7 @@ export function customerFlowReducer(
       return {
         ...state,
         screen: "google",
+        rating: null,
         note: "",
         sessionId: action.sessionId,
         responseId: action.responseId,
