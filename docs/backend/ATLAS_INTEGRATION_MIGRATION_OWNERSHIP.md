@@ -79,7 +79,11 @@ one signature so #45 is orderable **behind** this resolution.
 20260908000300  provider_unknown reconcile   #47
 20260908000400  SID attach conflict          #54
 20260908000500  privilege / grant pass       #45
-20260909000100  FORWARD sms settle           idempotent; repairs #45 DBs
+20260909000100  FORWARD 00100 remainder      apply_delivery_status + indexes
+                                             (not the superseded settle/quota
+                                             bodies — 00200 already replaced
+                                             those; replaying 00100 would
+                                             regress a #45 DB)
 20260909000200  FORWARD SID conflict         idempotent; repairs #48 DBs
 20260909000300  FORWARD FIFO remaining       #54 delta; repairs #47 DBs
 ```
@@ -96,7 +100,7 @@ version. Fixes must be new later versions. Every forward is `CREATE OR REPLACE`
 
 | Database already applied | Recorded version | Missing on this branch | Repair |
 |---|---|---|---|
-| #45 only (`de342a5b`) | `00100` = privilege | SMS settle `00100` | `20260909000100` reapplies settle SQL |
+| #45 only (`de342a5b`) | `00100` = privilege | `apply_delivery_status` FOR UPDATE + compliance indexes (`00200` still applies and carries the evolved settle) | `20260909000100` |
 | #48 reset (`1ab4eb68`) | `00400` = privilege | SMS SID `00400` | `20260909000200` reapplies attach SID |
 | #45 then #48, no reset | `00100` = privilege | SMS settle **and** SID | both `09000100` and `09000200` |
 | #47 (`64e76371`) | `00100`–`00300` = SMS | SID + privilege + FIFO delta | `00400`, `00500`, `09000300` |
