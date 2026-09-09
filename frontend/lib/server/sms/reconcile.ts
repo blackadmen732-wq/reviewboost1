@@ -163,7 +163,12 @@ export async function reconcileOnce(options?: {
       });
       if (attachError) throw attachError;
 
-      if (attached === "sid_conflict" || attached === "invalid" || attached === "not_found") {
+      if (
+        attached === "sid_conflict"
+        || attached === "ambiguous_match"
+        || attached === "invalid"
+        || attached === "not_found"
+      ) {
         await deferUnknown(`attach_${String(attached)}`);
         continue;
       }

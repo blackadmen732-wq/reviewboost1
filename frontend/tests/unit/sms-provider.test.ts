@@ -75,6 +75,22 @@ describe("fake provider", () => {
     expect(looked.outcome).toBe("found");
   });
 
+  it("lookup never sends and does not mint a new SID", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider();
+    const sent = await p.send({ to: "+15551230000", body: "hi", idempotencyKey: "req:lookup-only" });
+    expect(sent.outcome).toBe("submitted");
+    const before = p.sent.length;
+    const looked = await p.lookup({
+      idempotencyKey: "req:lookup-only",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(looked.outcome).toBe("found");
+    expect(looked).toMatchObject({ providerMessageId: sent.providerMessageId });
+    expect(p.sent).toHaveLength(before);
+  });
+
   it("timeout-after-accept hides the SID on send and returns it from lookup", async () => {
     const { FakeSmsProvider } = await loadFake();
     const p = new FakeSmsProvider({ timeoutAfterAcceptNumbers: new Set(["+15550000002"]) });
@@ -399,6 +415,32 @@ describe("twilio send outcome classification", () => {
     expect(init.method).toBe("GET");
     expect(url).toContain("/Messages.json");
     expect(url).toContain(encodeURIComponent("+15551230000"));
+  });
+
+  it("lookup is unknown when two exact bodies match (do not attach either SID)", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            messages: [
+              { sid: "SMone", status: "delivered", body: "hi", date_created: "2026-09-08T12:00:00Z" },
+              { sid: "SMtwo", status: "queued", body: "hi", date_created: "2026-09-08T12:01:00Z" },
+            ],
+          }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(result.outcome).toBe("unknown");
+    expect(result).toMatchObject({ raw: { error: "ambiguous_match", count: 2 } });
   });
 
   it("lookup is unknown for a lone candidate whose body does not match", async () => {

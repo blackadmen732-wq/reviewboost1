@@ -8,14 +8,14 @@
 -- lifecycle, the outbox lease, webhook dedupe, and the single-in-flight guard.
 --
 --   supabase test db
---   143 assertions in this file.
+--   157 assertions in this file.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(143);
+select plan(157);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -672,8 +672,9 @@ select is(
 delete from public.sms_quota_ledger where org_id = '7c000000-0000-0000-0000-00000000000b';
 delete from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b';
 
--- Allocate 50, consume 50, expire the grant, then refund 10. The refund restores
--- consumed quota regardless of expiry status: a provider refund is real money back.
+-- Allocate 50, consume 50, expire the grant, then refund 10. The grant has
+-- lapsed: a provider refund must not make expired credits spendable again.
+-- Billing money-back is a new allocation, not resurrected send capacity.
 select app.sms_quota_allocate('7c000000-0000-0000-0000-00000000000b', 50, 'refund-alloc-1',
     null, null);
 select app.sms_quota_reserve('7c000000-0000-0000-0000-00000000000b', 50, 'refund-resv-1', null);
@@ -691,11 +692,14 @@ select app.sms_quota_apply_expirations('7c000000-0000-0000-0000-00000000000b');
 -- Refund 10 after expiry.
 select app.sms_quota_refund('7c000000-0000-0000-0000-00000000000b', 10, 'refund-ref-1', null);
 
--- consumed drops from 50 to 40. allocated stayed at 50 (0 expired since all consumed).
--- available = 50 - 40 = 10.
 select is(
     app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
-    10::bigint, 'refund after expiry restores available quota');
+    0::bigint, 'refund after expiry does not restore spendable credits');
+
+select is(
+    (select reserved from app.sms_quota_reserve(
+        '7c000000-0000-0000-0000-00000000000b', 10, 'refund-resv-after-expiry', null)),
+    false, 'refunded expired credits cannot be reserved');
 
 -- ================================ replay ledger = balance =================
 
@@ -881,6 +885,35 @@ select is(
 select is(
     app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
     0::bigint, 'after B expires, available is 0 not negative');
+
+-- Release the reservation FIFO retained to cover. That leftover is still an
+-- expired grant — it must not become spendable.
+select ok(
+    app.sms_quota_release('7c000000-0000-0000-0000-00000000000b', 30, 'ghost-fifo-rel-b', null),
+    'release of expired-grant reservation succeeds');
+
+select is(
+    app.sms_quota_available('7c000000-0000-0000-0000-00000000000b'),
+    0::bigint, 'release after expired grant does not restore spendable credits');
+
+select is(
+    (select reserved from app.sms_quota_reserve(
+        '7c000000-0000-0000-0000-00000000000b', 30, 'ghost-fifo-resv-after-rel', null)),
+    false, 'expired released credits cannot be reserved');
+
+select is(
+    (select allocated from public.sms_quota_balance where org_id = '7c000000-0000-0000-0000-00000000000b'),
+    0::bigint, 'residual expiry removes retained expired allocation after release');
+
+select is(
+    (select coalesce(sum(amount), 0)::bigint from public.sms_quota_ledger
+      where org_id = '7c000000-0000-0000-0000-00000000000b'
+        and kind = 'expiration'
+        and correlation_key like 'expire:' || (
+            select id::text from public.sms_quota_ledger
+             where org_id = '7c000000-0000-0000-0000-00000000000b'
+               and kind = 'allocation' and correlation_key = 'ghost-fifo-b') || '%'),
+    50::bigint, 'grant B residual + first expire sum to the full 50');
 
 -- ================================ atomic receipt replay after settle ======
 
@@ -1245,6 +1278,103 @@ select is(
       where kind = 'release'
         and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-samebody-b')::text),
     0, 'SID conflict keeps the victim reservation (no fail+release)');
+
+select throws_ok(
+    format(
+        'update public.sms_delivery_attempts set provider_message_id = %L where id = %L',
+        'fake_samebody_sid',
+        (select a.id from public.sms_delivery_attempts a
+          join public.text_requests tr on tr.id = a.request_id
+         where tr.dedupe_key = 'sched-dedupe-samebody-b'
+         order by a.attempt_number desc limit 1)),
+    '23505',
+    NULL,
+    'unique SID index rejects a concurrent second claim');
+
+-- Settle must not consume when the provider SID is already owned.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('n',64),
+    'v1:enc', 1::smallint, '1616', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('n',64), 'v1:enc', 1::smallint, '1616', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-settle-sid', '7b000000-0000-0000-0000-000000000001', 'req-settle-sid');
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-settle-sid'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+
+select is(
+    app.sms_settle_attempt(
+        (select a.id from public.sms_delivery_attempts a
+          join public.text_requests tr on tr.id = a.request_id
+         where tr.dedupe_key = 'sched-dedupe-settle-sid'
+         order by a.attempt_number desc limit 1),
+        '7c000000-0000-0000-0000-00000000000a', 'submitted', 'fake_samebody_sid', null, '{}'::jsonb),
+    'sid_conflict', 'settle refuses a SID another attempt already owns');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-settle-sid'),
+    'sending', 'settle SID conflict leaves the request unsubmitted');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'consumption'
+        and correlation_key = 'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-settle-sid')::text),
+    0, 'settle SID conflict does not consume quota');
+
+-- Two provider_unknown rows for the same recipient: a singleton SID is a guess.
+select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('m',64),
+    'v1:enc', 1::smallint, '1414', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('m',64), 'v1:enc', 1::smallint, '1414', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-ambig-a', '7b000000-0000-0000-0000-000000000001', 'req-ambig-a');
+select app.sms_schedule_request(
+    '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
+    repeat('m',64), 'v1:enc', 1::smallint, '1414', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
+    tests.noon_zone(), now(), 'sched-dedupe-ambig-b', '7b000000-0000-0000-0000-000000000001', 'req-ambig-b');
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-ambig-a'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+select app.sms_begin_dispatch(
+    (select id from public.text_requests where dedupe_key = 'sched-dedupe-ambig-b'),
+    '7c000000-0000-0000-0000-00000000000a', 'fake');
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-ambig-a'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'provider_unknown', null, 'timeout', '{}'::jsonb);
+select app.sms_settle_attempt(
+    (select a.id from public.sms_delivery_attempts a
+      join public.text_requests tr on tr.id = a.request_id
+     where tr.dedupe_key = 'sched-dedupe-ambig-b'
+     order by a.attempt_number desc limit 1),
+    '7c000000-0000-0000-0000-00000000000a', 'provider_unknown', null, 'timeout', '{}'::jsonb);
+
+select is(
+    app.sms_reconcile_attach_sid(
+        (select a.id from public.sms_delivery_attempts a
+          join public.text_requests tr on tr.id = a.request_id
+         where tr.dedupe_key = 'sched-dedupe-ambig-a'
+         order by a.attempt_number desc limit 1),
+        '7c000000-0000-0000-0000-00000000000a', 'fake_ambig_sid', 'delivered', null),
+    'ambiguous_match', 'same-recipient dual unknown must not guess a SID');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-ambig-a'),
+    'provider_unknown', 'ambiguous attach leaves request A provider_unknown');
+
+select is(
+    (select status::text from public.text_requests where dedupe_key = 'sched-dedupe-ambig-b'),
+    'provider_unknown', 'ambiguous attach leaves request B provider_unknown');
+
+select is(
+    (select count(*)::integer from public.sms_quota_ledger
+      where kind = 'consumption'
+        and correlation_key in (
+            'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-ambig-a')::text,
+            'req:' || (select id from public.text_requests where dedupe_key = 'sched-dedupe-ambig-b')::text)),
+    0, 'ambiguous match consumes neither reservation');
 
 -- Confirmed not-sent: fail+release.
 select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('h',64),
