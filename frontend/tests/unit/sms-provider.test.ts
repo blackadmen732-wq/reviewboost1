@@ -92,6 +92,60 @@ describe("fake provider", () => {
     }
   });
 
+  it("lookup is unknown when two accepted messages share to+body (ambiguous)", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider({ timeoutAfterAcceptNumbers: new Set(["+15550000005"]) });
+    await p.send({ to: "+15550000005", body: "same body", idempotencyKey: "req:one" });
+    await p.send({ to: "+15550000005", body: "same body", idempotencyKey: "req:two" });
+    const looked = await p.lookup({
+      idempotencyKey: "req:one",
+      to: "+15550000005",
+      body: "same body",
+    });
+    expect(looked.outcome).toBe("unknown");
+    expect(looked).not.toHaveProperty("providerMessageId");
+    expect(looked.raw).toMatchObject({ error: "ambiguous_match", count: 2 });
+  });
+
+  it("lookup is unknown for a programmed ambiguous number", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider({ lookupAmbiguousNumbers: new Set(["+15550000006"]) });
+    await p.send({ to: "+15550000006", body: "hi", idempotencyKey: "req:amb" });
+    const looked = await p.lookup({
+      idempotencyKey: "req:amb",
+      to: "+15550000006",
+      body: "hi",
+    });
+    expect(looked.outcome).toBe("unknown");
+    expect(looked.raw).toMatchObject({ error: "ambiguous_match" });
+  });
+
+  it("lookup is unknown when the only accept has a different body", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider();
+    await p.send({ to: "+15550000007", body: "hello", idempotencyKey: "req:other" });
+    const looked = await p.lookup({
+      idempotencyKey: "req:missing",
+      to: "+15550000007",
+      body: "goodbye",
+    });
+    expect(looked.outcome).toBe("unknown");
+    expect(looked).not.toHaveProperty("providerMessageId");
+    expect(looked.raw).toMatchObject({ error: "no_body_match" });
+  });
+
+  it("lookup is unknown when programmed as a truncated page", async () => {
+    const { FakeSmsProvider } = await loadFake();
+    const p = new FakeSmsProvider({ lookupTruncatedNumbers: new Set(["+15550000008"]) });
+    const looked = await p.lookup({
+      idempotencyKey: "req:page",
+      to: "+15550000008",
+      body: "hi",
+    });
+    expect(looked.outcome).toBe("unknown");
+    expect(looked.raw).toMatchObject({ error: "lookup_page_truncated" });
+  });
+
   it("lookup is unknown when programmed, and not_found when send never accepted", async () => {
     const { FakeSmsProvider } = await loadFake();
     const p = new FakeSmsProvider({ lookupUnknownNumbers: new Set(["+15550000003"]) });
@@ -401,6 +455,28 @@ describe("twilio send outcome classification", () => {
     expect(url).toContain(encodeURIComponent("+15551230000"));
   });
 
+  it("lookup finds a singleton only when the body matches exactly", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            messages: [{ sid: "SMexact", status: "queued", body: "hi", date_created: "2026-09-08T12:00:00Z" }],
+          }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(result).toMatchObject({ outcome: "found", providerMessageId: "SMexact" });
+  });
+
   it("lookup is unknown for a lone candidate whose body does not match", async () => {
     configureEnv();
     vi.stubGlobal(
@@ -419,8 +495,38 @@ describe("twilio send outcome classification", () => {
       idempotencyKey: "req:x",
       to: "+15551230000",
       body: "hi",
+      sentAfter: new Date("2026-09-08T11:00:00Z"),
     });
     expect(result.outcome).toBe("unknown");
+    expect(result).not.toHaveProperty("providerMessageId");
+    expect(result.raw).toMatchObject({ error: "no_body_match" });
+  });
+
+  it("lookup is unknown when two messages share the exact body (ambiguous)", async () => {
+    configureEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            messages: [
+              { sid: "SMone", status: "delivered", body: "hi", date_created: "2026-09-08T12:00:00Z" },
+              { sid: "SMtwo", status: "delivered", body: "hi", date_created: "2026-09-08T12:05:00Z" },
+            ],
+          }),
+      }),
+    );
+    const { TwilioSmsProvider } = await loadTwilio();
+    const result = await new TwilioSmsProvider().lookup({
+      idempotencyKey: "req:x",
+      to: "+15551230000",
+      body: "hi",
+    });
+    expect(result.outcome).toBe("unknown");
+    expect(result).not.toHaveProperty("providerMessageId");
+    expect(result.raw).toMatchObject({ error: "ambiguous_match", count: 2 });
   });
 
   it("lookup is unknown when a full page has no match (do not fail+release)", async () => {
@@ -446,6 +552,9 @@ describe("twilio send outcome classification", () => {
       body: "hi",
     });
     expect(result.outcome).toBe("unknown");
+    expect(result.outcome).not.toBe("not_found");
+    expect(result).not.toHaveProperty("providerMessageId");
+    expect(result.raw).toMatchObject({ error: "lookup_page_truncated", count: 50 });
   });
 
   it("lookup returns not_found when the list is empty", async () => {
