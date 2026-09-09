@@ -33,6 +33,8 @@ describe("Customer page editor", () => {
     expect(document.querySelector("[data-hero-layer]")).toBeTruthy();
     expect(document.querySelector("[data-customer-canvas='390 / 844']")).toBeTruthy();
     expect(document.querySelector("[data-card-fixed]")).toBeTruthy();
+    expect(screen.getByText("Not on Tags yet")).toBeVisible();
+    expect(screen.getByText("Drag to move. Stars stay put.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Add photo" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Publish" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Download blank page" })).toBeVisible();

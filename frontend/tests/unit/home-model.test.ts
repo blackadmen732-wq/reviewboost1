@@ -117,7 +117,7 @@ describe("deriveHomeModel", () => {
 
     expect(model.primary).toEqual({ label: "Add Google link", href: "/settings" });
     expect(model.attentions[0]?.kind).toBe("google");
-    expect(model.attentions[0]?.title).toBe("Google review link is not a Google link");
+    expect(model.attentions[0]?.title).toBe("That Google link is wrong");
   });
 
   it("sends Create a Tag to onboarding when there is no location", () => {

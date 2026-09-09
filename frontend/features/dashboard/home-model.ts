@@ -128,19 +128,17 @@ export function deriveHomeModel({
     attentions.push({
       kind: "tag-missing",
       title: "No tag yet",
-      body: "Create a tag, then print the code or program it, and put it where people pay.",
+      body: "Create a Tag and put it where people pay.",
     });
   }
 
   if (!counts.hasGoogleLink) {
     attentions.push({
       kind: "google",
-      title: counts.googleLinkInvalid
-        ? "Google review link is not a Google link"
-        : "Google review link is missing",
+      title: counts.googleLinkInvalid ? "That Google link is wrong" : "Google link is missing",
       body: counts.googleLinkInvalid
         ? GOOGLE_LINK_INVALID
-        : "Every Tag uses this one link. Without it, customers can rate you here but cannot be sent to Google.",
+        : "Set it in Settings. Every Tag uses this one link.",
     });
   }
 

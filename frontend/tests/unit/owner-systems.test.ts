@@ -143,6 +143,20 @@ describe("program Tag words", () => {
   });
 });
 
+describe("Home muscle memory", () => {
+  it("keeps the same Home slots — name, action, unread, Tags", () => {
+    const home = source("features/dashboard/owner-home.tsx");
+    expect(home).toContain("businessName");
+    expect(home).toContain("EmptyHome");
+    expect(home).toContain("ActiveHome");
+    expect(home).toContain("FeedbackList");
+    expect(home).toContain("PreviewCustomerPage");
+    expect(home).toContain("tagStatusLine");
+    expect(home).toContain('variant="action"');
+    expect(home).not.toMatch(/entitlement|KPI|analytics|optimize|configure/i);
+  });
+});
+
 describe("Home headline", () => {
   it("is one number and one arrow", () => {
     expect(ratingsHeadline({ ratingsThisWeek: 12, ratingsLastWeek: 9 })).toBe(

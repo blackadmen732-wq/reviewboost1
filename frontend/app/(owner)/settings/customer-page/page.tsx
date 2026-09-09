@@ -47,7 +47,7 @@ export default async function CustomerPageSettingsPage() {
       </p>
       <PageHeader
         title="Customer page"
-        description="What you see in the phone is what they see. The stars stay put."
+        description="This is what they see."
       />
       <CustomerPageEditor
         initial={{

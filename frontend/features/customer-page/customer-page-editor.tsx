@@ -102,7 +102,7 @@ export function CustomerPageEditor({ initial }: { initial: CustomerPageEditorMod
     <div className="customer-page-editor">
       <div className="customer-page-editor__preview">
         <p className="mb-3 text-sm font-medium text-muted">
-          {live ? "Live on your Tags — this is the customer page" : "Not on Tags yet — this is the customer page"}
+          {live ? "On your Tags" : "Not on Tags yet"}
         </p>
         <PhoneFrame>
           <CustomerVisitView
@@ -121,10 +121,7 @@ export function CustomerPageEditor({ initial }: { initial: CustomerPageEditorMod
 
       <div className="customer-page-editor__rail">
         <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink">Your photo</h2>
-        <p className="mt-1 text-base leading-relaxed text-muted">
-          What you see is what they see. Put your name on the picture. Drag to move. Pinch or
-          scroll to zoom. The stars stay put.
-        </p>
+        <p className="mt-1 text-base text-muted">Drag to move. Stars stay put.</p>
 
         <input
           ref={fileRef}

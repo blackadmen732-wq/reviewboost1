@@ -11,8 +11,9 @@ import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page"
 /**
  * Owner Home. One question: do I need to do anything?
  *
- * Empty with a blocker names the blocker. Empty that is ready waits honestly.
- * Returning is attention, then real unread rows, then tag status.
+ * Muscle memory (SoT v1.6 philosophy): do not move these slots —
+ * business name, one number, one warning, one green action, then
+ * unread rows and Tags status. Same position, color, word.
  */
 
 export function OwnerHome({

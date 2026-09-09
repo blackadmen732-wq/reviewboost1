@@ -37,8 +37,18 @@ drag / pinch / zoom to position → publish.
 The crop the owner sets in the phone frame **is** what `/q` shows.
 Same aspect, same hero/card split, same transform. No drift.
 
+## v1.6 — Home brief + DESIGN PHILOSOPHY (locked)
+
+Home brief: one number + one arrow, one action, one warning max, zero settings on Home.
+
+Marc DESIGN PHILOSOPHY — all Owner UI (especially Home + Customer Page):
+
+- Simple daily-life words only; many users aren’t fluent English — no corporate jargon
+- Respect Marc’s intentional color system — don’t retheme casually
+- Muscle memory: Home never changes layout — same position, color, word
+- Visual-first, big taps, no paragraphs (DoorDash-level obvious)
+- Premium = fewer elements + whitespace; strip until almost too empty
+
 ## Still bound
 
-- **v1.6 Home** — one number + one arrow, one action, one warning max, zero settings on Home
-- **v1.7 philosophy** — daily words, locked colors, Home muscle memory, visual-first big taps
 - **v1.8** — easy navigation (DoorDash-like), **not** barren / whitespace theater

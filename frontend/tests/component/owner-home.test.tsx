@@ -84,7 +84,7 @@ describe("OwnerHome", () => {
 
     render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
 
-    expect(screen.getByText("Google review link is missing")).toBeVisible();
+    expect(screen.getByText("Google link is missing")).toBeVisible();
     expect(screen.getByRole("link", { name: "Add Google link" })).toHaveAttribute(
       "href",
       "/settings",
