@@ -493,9 +493,9 @@
 
 .cp-sheet__brandline {
   margin: 0;
-  /* Kept extremely secondary: this is a brand line, not a message the customer
-     needs. It must never compete with the stars. */
-  color: color-mix(in srgb, var(--rb-muted) 62%, var(--rb-surface));
+  /* Secondary to the stars, but still a real line of text — muted on white
+     clears 4.5:1, which the earlier faded mix did not. */
+  color: var(--rb-muted);
   font-size: clamp(7px, 2.2cqw, 9.5px);
   font-weight: 600;
   line-height: 1.4;

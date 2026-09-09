@@ -5,6 +5,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import { CustomerPage } from "@/features/customer-page/customer-page";
 import { CustomerPageFallback } from "@/features/customer-page/customer-page-fallback";
+import { handoffToGoogle } from "@/features/customer-page/google-handoff";
 import type { CustomerPageStatus } from "@/features/customer-page/customer-page-status";
 import {
   customerPageReducer,
@@ -206,7 +207,7 @@ export function CustomerPageClient({ token }: CustomerPageClientProps) {
           });
       }
 
-      window.location.assign(googleReviewUrl);
+      handoffToGoogle(googleReviewUrl);
     },
     [contextQuery.data?.googleReviewUrl, token],
   );

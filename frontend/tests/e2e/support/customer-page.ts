@@ -9,9 +9,11 @@ import { expect, type Locator, type Page } from "@playwright/test";
  *
  * So the destination is intercepted, two ways. `stubGoogle` answers with a
  * stand-in page, which is how a spec proves the customer actually arrives.
- * `captureHandoff` replaces `location.assign` so the customer page stays
- * mounted and the attempt is recorded on the window. Aborting the Google
- * request is not enough: the navigation still unloads the page.
+ * `captureHandoff` installs `window.__RB_HANDOFFS__` before the app loads.
+ * Under the fixture flag the customer page records the destination and stays
+ * mounted, which is the only way to read the save that just happened.
+ * Replacing `Location.assign` does not work in Chromium, and aborting the
+ * Google request still unloads the page.
  */
 
 export const ratings = [1, 2, 3, 4, 5] as const;
@@ -51,17 +53,14 @@ export async function stubGoogle(page: Page): Promise<void> {
 }
 
 /**
- * Keeps the customer page mounted and records every `location.assign`.
+ * Keeps the customer page mounted and records every Google handoff.
  *
- * Must run before the first navigation: the replacement is installed as an
- * init script, so it is in place before the app's own code loads.
+ * Must run before the first navigation: the array is installed as an init
+ * script, so the app sees it before the first tap.
  */
 export async function captureHandoff(page: Page): Promise<void> {
   await page.addInitScript(() => {
     window.__RB_HANDOFFS__ = [];
-    Location.prototype.assign = function assign(url) {
-      window.__RB_HANDOFFS__?.push(String(url));
-    };
   });
 }
 

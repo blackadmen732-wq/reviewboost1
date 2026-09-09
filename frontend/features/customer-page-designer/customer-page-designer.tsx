@@ -106,10 +106,10 @@ export function CustomerPageDesigner({
   // Read by the debounced write, the flush on the way out, and publish — all of
   // which run after a render and want the newest values, not the ones that were
   // current when they were created.
-  const latest = useRef({ scope, design });
+  const latest = useRef({ scope, design, edited });
   useEffect(() => {
-    latest.current = { scope, design };
-  }, [scope, design]);
+    latest.current = { scope, design, edited };
+  }, [scope, design, edited]);
 
   useEffect(() => {
     if (edited === null) return;
@@ -121,8 +121,15 @@ export function CustomerPageDesigner({
   }, [edited, store]);
 
   // A pending write must not be lost to a navigation a moment after the edit.
+  // Only the owner's own edits are flushed: writing the hydrated empty record
+  // would replace a published page with a blank draft, which is exactly what
+  // React Strict Mode's extra unmount used to do.
   useEffect(() => {
-    const flush = () => store.saveDraft(latest.current.scope, latest.current.design);
+    const flush = () => {
+      const current = latest.current;
+      if (current.edited === null) return;
+      store.saveDraft(current.scope, current.design);
+    };
     window.addEventListener("pagehide", flush);
     return () => {
       window.removeEventListener("pagehide", flush);

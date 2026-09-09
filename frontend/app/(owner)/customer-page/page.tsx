@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { AppShell } from "@/features/dashboard/app-shell";
 import { CustomerPageDesigner } from "@/features/customer-page-designer/customer-page-designer";
-import { listLocations, requireOwner } from "@/lib/server/owner-data";
+import { loadDesignerOwner } from "@/lib/server/designer-owner";
 import { supportedLocales } from "@/lib/i18n/config";
 
 export const metadata: Metadata = {
@@ -19,9 +19,13 @@ export const dynamic = "force-dynamic";
  */
 const editingRoles = ["owner", "admin"];
 
-export default async function CustomerPageDesignerPage() {
-  const { organization } = await requireOwner("/customer-page");
-  const locations = await listLocations(organization.orgId);
+export default async function CustomerPageDesignerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ role?: string; locations?: string }>;
+}) {
+  const query = await searchParams;
+  const { organization, locations } = await loadDesignerOwner(query);
 
   return (
     <AppShell businessName={organization.name}>

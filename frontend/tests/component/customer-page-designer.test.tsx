@@ -202,6 +202,32 @@ describe("customer page designer — published versus not", () => {
     expect(screen.getByText("Changes not published")).toBeVisible();
   });
 
+  it("does not write a draft just because the designer unmounted", () => {
+    const harness = fakeStore();
+    harness.seed(
+      { orgId: "org-1", locationId: null },
+      { published: design({ look: "classic", heroImage: photo }), draft: null, publishedAt: "x" },
+    );
+
+    const { unmount } = renderWithProviders(
+      <CustomerPageDesigner
+        orgId="org-1"
+        businessName="Mario’s Pizza"
+        locations={[{ locationId: "loc-1", name: "Downtown" }]}
+        languages={["en"]}
+        canEdit
+        store={harness.store}
+      />,
+    );
+
+    unmount();
+
+    expect(harness.calls).not.toContain("saveDraft");
+    const record = harness.store.read({ orgId: "org-1", locationId: null });
+    expect(record.draft).toBeNull();
+    expect(record.published?.look).toBe("classic");
+  });
+
   it("saves the draft without publishing it", async () => {
     const { user, store, calls } = renderDesigner();
 

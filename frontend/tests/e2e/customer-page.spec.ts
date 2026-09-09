@@ -69,7 +69,9 @@ test.describe("the one tap", () => {
     for (const rating of ratings) {
       await openPage(page, `fixture-valid-rating-${rating}`);
       await tap(page, rating);
-      await expect.poll(async () => (await handoffs(page)).length, { timeout: 15_000 }).toBe(1);
+      await expect
+        .poll(async () => (await handoffs(page)).at(-1) ?? null, { timeout: 15_000 })
+        .toMatch(/search\.google\.com/);
 
       const responses = (await fixtureCalls(page)).filter(
         ({ operation }) => operation === "response",
@@ -86,11 +88,13 @@ test.describe("the one tap", () => {
     for (const rating of ratings) {
       await openPage(page, `fixture-valid-rating-${rating}`);
       await tap(page, rating);
-      await expect.poll(async () => (await handoffs(page)).length, { timeout: 15_000 }).toBe(1);
+      await expect
+        .poll(async () => (await handoffs(page)).at(-1) ?? null, { timeout: 15_000 })
+        .toMatch(/search\.google\.com/);
 
       const destinations = await handoffs(page);
       observed.push({
-        url: destinations[0]!,
+        url: destinations.at(-1)!,
         shape: await sheetShape(page),
         status: (await instruction(page).textContent())?.trim() ?? "",
       });
@@ -272,17 +276,19 @@ test.describe("the locked composition", () => {
   test("gives the business roughly 70% and the sheet roughly 30%", async ({ page }) => {
     await openPage(page);
 
-    const viewport = page.viewportSize()!.height;
+    // Measured against the frame, not the monitor: on a phone the frame is the
+    // viewport; on a desktop it is the centred card. The proportion is the same.
+    const frame = (await page.locator(".cp__frame").boundingBox())!;
     const hero = (await page.locator(".cp-hero").boundingBox())!;
     const rating = (await sheet(page).boundingBox())!;
 
-    expect(hero.height / viewport).toBeGreaterThan(0.6);
-    expect(hero.height / viewport).toBeLessThan(0.78);
-    expect(rating.height / viewport).toBeGreaterThan(0.24);
-    // The hero starts at the top and the sheet finishes at the bottom, with the
-    // sheet overlapping the photograph rather than sitting in a gap below it.
-    expect(hero.y).toBeLessThanOrEqual(1);
-    expect(rating.y + rating.height).toBeGreaterThanOrEqual(viewport - 1);
+    expect(hero.height / frame.height).toBeGreaterThan(0.6);
+    expect(hero.height / frame.height).toBeLessThan(0.78);
+    expect(rating.height / frame.height).toBeGreaterThan(0.24);
+    // The hero starts at the top of the frame and the sheet finishes at the
+    // bottom, overlapping the photograph rather than sitting in a gap below it.
+    expect(hero.y).toBeLessThanOrEqual(frame.y + 1);
+    expect(rating.y + rating.height).toBeGreaterThanOrEqual(frame.y + frame.height - 1);
   });
 
   test("keeps the stars reachable without scrolling", async ({ page }) => {
@@ -347,8 +353,11 @@ test.describe("the locked composition", () => {
     const frame = (await page.locator(".cp__frame").boundingBox())!;
     expect(frame.width).toBeGreaterThanOrEqual(420);
     expect(frame.width).toBeLessThanOrEqual(560);
-    // Centred on the cream canvas rather than filling the monitor.
-    expect(Math.abs(frame.x + frame.width / 2 - 720)).toBeLessThan(4);
+    // Centred on the cream canvas rather than filling the monitor. Measured
+    // against the canvas, not a hardcoded 720, because a scrollbar shifts the
+    // usable width by a few pixels.
+    const canvas = (await page.locator(".cp").boundingBox())!;
+    expect(Math.abs(frame.x + frame.width / 2 - (canvas.x + canvas.width / 2))).toBeLessThan(4);
 
     // The warm ReviewBoost canvas, not a photograph bled to the monitor edges.
     await expect(page.locator(".cp")).toHaveCSS("background-color", "rgb(248, 245, 240)");

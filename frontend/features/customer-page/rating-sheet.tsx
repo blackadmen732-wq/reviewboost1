@@ -82,7 +82,9 @@ export function RatingSheet({
           <span>{messages.poweredByPrefix}</span>
           <Wordmark size="sm" tone="mono" className="cp-sheet__mark" />
         </p>
-        <p className="cp-sheet__brandline">{messages.brandLine}</p>
+        <p className="cp-sheet__brandline" aria-hidden="true">
+          {messages.brandLine}
+        </p>
       </footer>
     </section>
   );

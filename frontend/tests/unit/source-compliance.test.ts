@@ -56,11 +56,13 @@ describe("customer fast path source boundaries", () => {
 
   it("gives every rating the same Google handoff", () => {
     const client = code(source("features/customer-page/customer-page-client.tsx"));
+    const handoff = code(source("features/customer-page/google-handoff.ts"));
 
     // One destination, read straight off the context, never chosen.
-    const destinations = client.match(/location\.assign\([^)]*\)/g) ?? [];
+    const destinations = client.match(/handoffToGoogle\([^)]*\)/g) ?? [];
     expect(destinations).toHaveLength(1);
     expect(destinations[0]).toContain("googleReviewUrl");
+    expect(handoff.match(/location\.assign\([^)]*\)/g)).toEqual(["location.assign(url)"]);
   });
 
   it("keeps the forbidden steps out of the customer section", () => {
