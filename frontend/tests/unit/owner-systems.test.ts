@@ -17,11 +17,21 @@ function source(path: string): string {
 
 describe("hero transform", () => {
   it("clamps drag and pinch so the photo cannot leave the frame", () => {
-    expect(clampHeroTransform({ x: 90, y: -90, scale: 9 })).toEqual({
-      x: 50,
-      y: -50,
-      scale: 3,
+    const clamped = clampHeroTransform({ x: 90, y: -90, scale: 9 });
+    expect(clamped.scale).toBe(3);
+    expect(clamped.x).toBeCloseTo(33.33, 1);
+    expect(clamped.y).toBeCloseTo(-33.33, 1);
+  });
+
+  it("prevents panning at scale 1", () => {
+    expect(clampHeroTransform({ x: 50, y: -50, scale: 1 })).toEqual({
+      x: 0,
+      y: 0,
+      scale: 1,
     });
+  });
+
+  it("renders a valid CSS transform string", () => {
     expect(heroTransformStyle({ x: 10, y: -4, scale: 1.5 })).toBe(
       "translate(10%, -4%) scale(1.5)",
     );
