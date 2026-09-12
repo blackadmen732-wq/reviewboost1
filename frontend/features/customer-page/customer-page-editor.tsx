@@ -140,16 +140,17 @@ export function CustomerPageEditor({ initial }: { initial: CustomerPageEditorMod
             variant="action"
             size="lg"
             onClick={() => fileRef.current?.click()}
+            disabled={busy !== null}
             loading={busy === "upload"}
           >
             <ImagePlus className="size-5" aria-hidden="true" />
             {heroUrl ? "Replace photo" : "Add photo"}
           </Button>
-          <Button variant="secondary" size="lg" onClick={() => void publish()} loading={busy === "publish"}>
+          <Button variant="secondary" size="lg" onClick={() => void publish()} disabled={busy !== null} loading={busy === "publish"}>
             <Upload className="size-5" aria-hidden="true" />
             Publish
           </Button>
-          <Button variant="secondary" size="lg" onClick={() => downloadBlankCustomerTemplate()}>
+          <Button variant="secondary" size="lg" onClick={() => downloadBlankCustomerTemplate()} disabled={busy !== null}>
             <Download className="size-5" aria-hidden="true" />
             Download blank page
           </Button>

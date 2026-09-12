@@ -119,8 +119,8 @@ describe("WYSIWYG canvas (SoT v1.9 / v1.10)", () => {
     const css = source("styles/customer-page.css");
     const editor = source("features/customer-page/customer-page-editor.tsx");
     const visitView = source("features/customer-page/customer-visit-view.tsx");
-    expect(css).toContain("aspect-ratio: 390 / 844");
-    expect(css).toContain("flex: 0 0 44%");
+    expect(css).toContain("container-type: inline-size");
+    expect(css).toContain("flex: 1 1 auto");
     expect(css).not.toContain("height: 640px");
     expect(editor).toContain("CustomerVisitView");
     expect(visitView).toContain("CustomerVisitView");

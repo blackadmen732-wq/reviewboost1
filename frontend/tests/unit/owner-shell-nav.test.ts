@@ -10,24 +10,22 @@ function source(path: string): string {
 }
 
 describe("OwnerShell IA", () => {
-  it("desktop is Home / Feedback / Tags / Team / Settings", () => {
+  it("desktop is Home / Feedback / Tags / Settings", () => {
     expect(DESKTOP_NAV.map((item) => item.label)).toEqual([
       "Home",
       "Feedback",
       "Tags",
-      "Team",
       "Settings",
     ]);
     expect(DESKTOP_NAV.map((item) => item.href)).toEqual([
       "/home",
       "/feedback",
       "/stands",
-      "/praise",
       "/settings",
     ]);
   });
 
-  it("mobile is four tabs without Team", () => {
+  it("mobile matches desktop — four tabs", () => {
     expect(MOBILE_NAV.map((item) => item.label)).toEqual([
       "Home",
       "Feedback",
@@ -37,10 +35,11 @@ describe("OwnerShell IA", () => {
     expect(MOBILE_NAV).toHaveLength(4);
   });
 
-  it("does not resurrect Customers or Praise in main nav", () => {
+  it("does not resurrect Customers, Praise, or Team in main nav", () => {
     const labels = [...DESKTOP_NAV, ...MOBILE_NAV].map((item) => item.label);
     expect(labels).not.toContain("Customers");
     expect(labels).not.toContain("Praise");
+    expect(labels).not.toContain("Team");
     expect(labels).not.toContain("Reviews");
   });
 

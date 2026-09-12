@@ -47,7 +47,7 @@ describe("owner chrome", () => {
     expect(screen.queryByText("Praise")).not.toBeInTheDocument();
   });
 
-  it("desktop sidebar is Home, Feedback, Tags, Team, Settings", () => {
+  it("desktop sidebar is Home, Feedback, Tags, Settings", () => {
     render(<DesktopSidebar unreadCount={2} businessName="Oak & Vine" />);
 
     const aside = screen.getByRole("complementary", { name: "Main" });
@@ -58,11 +58,11 @@ describe("owner chrome", () => {
     expect(screen.getByText("Home")).toBeVisible();
     expect(screen.getByText("Feedback")).toBeVisible();
     expect(screen.getByText("Tags")).toBeVisible();
-    expect(screen.getByText("Team")).toBeVisible();
     expect(screen.getByText("Settings")).toBeVisible();
     expect(screen.getByText("Oak & Vine")).toBeVisible();
     expect(screen.getByLabelText("2 unread")).toBeVisible();
     expect(screen.queryByText("Customers")).not.toBeInTheDocument();
     expect(screen.queryByText("Praise")).not.toBeInTheDocument();
+    expect(screen.queryByText("Team")).not.toBeInTheDocument();
   });
 });

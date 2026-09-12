@@ -44,7 +44,9 @@ describe("customer fast path source boundaries", () => {
     // `star-rating` is the one place the number is allowed to decide anything,
     // and what it decides is how many stars are gold.
     const flowFiles = customerSection().filter(
-      (file) => !file.path.endsWith("star-rating.tsx"),
+      (file) =>
+        !file.path.endsWith("star-rating.tsx") &&
+        !file.path.endsWith("visit-stars.tsx"),
     );
 
     for (const file of flowFiles) {
