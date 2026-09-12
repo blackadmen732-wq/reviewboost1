@@ -31,6 +31,16 @@ export const buttonVariants = cva(
         ghost: "border-transparent bg-transparent text-ink hover:bg-quiet",
         destructive:
           "border-danger bg-danger text-white shadow-[var(--shadow-control)] hover:brightness-95",
+        // Ink on white, for screens where the brand green would compete with
+        // the thing being looked at — the Customer Page designer sits next to a
+        // photograph, and its primary action has to stay out of the way.
+        ink: [
+          "border-ink bg-ink text-[color:var(--rb-surface)] shadow-[var(--shadow-button)]",
+          "hover:bg-[color:color-mix(in_srgb,var(--rb-ink)_88%,var(--rb-canvas))] hover:shadow-[var(--shadow-button-hover)]",
+          // Inactive rather than faded-out: a white label at half opacity on a
+          // half-faded ink pill is unreadable, which reads as broken.
+          "disabled:border-border disabled:bg-quiet disabled:text-muted",
+        ].join(" "),
       },
       size: {
         sm: "min-h-11 px-4 text-sm",

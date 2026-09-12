@@ -25,7 +25,8 @@
   --color-danger: var(--rb-danger);
   --color-info: var(--rb-info);
   --color-focus: var(--rb-focus);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-hanken);
+  --font-display: var(--font-bricolage);
 }
 
 :root {
@@ -35,10 +36,10 @@
   --rb-canvas: #f8f5f0;
   --rb-surface: #ffffff;
   --rb-quiet: #f2efe9;
-  --rb-ink: #171a18;
-  --rb-muted: #5d655f;
-  --rb-border: #d8ded9;
-  --rb-border-strong: #b7c0ba;
+  --rb-ink: #1a1712;
+  --rb-muted: #6b635b;
+  --rb-border: #e8e1d7;
+  --rb-border-strong: #cfc5b6;
   --rb-brand: #00a86b;
   --rb-brand-hover: #009a61;
   --rb-brand-active: #008f5b;
@@ -51,6 +52,7 @@
   --rb-on-action: #ffffff;
   --rb-star: #bf7d00;
   --rb-star-soft: #fff3d0;
+  --rb-star-empty: #8f8579;
   --rb-warning: #9a6417;
   --rb-danger: #b33a3a;
   --rb-danger-soft: #faeaea;
@@ -128,10 +130,10 @@
   --rb-canvas: #f8f5f0;
   --rb-surface: #ffffff;
   --rb-quiet: #f2efe9;
-  --rb-ink: #171a18;
-  --rb-muted: #5d655f;
-  --rb-border: #d8ded9;
-  --rb-border-strong: #b7c0ba;
+  --rb-ink: #1a1712;
+  --rb-muted: #6b635b;
+  --rb-border: #e8e1d7;
+  --rb-border-strong: #cfc5b6;
   --rb-brand: #00a86b;
   --rb-brand-hover: #009a61;
   --rb-brand-active: #008f5b;
@@ -188,7 +190,7 @@ html {
   min-width: 320px;
   background: var(--rb-canvas);
   font-family:
-    var(--font-geist-sans),
+    var(--font-hanken),
     ui-sans-serif,
     system-ui,
     -apple-system,
@@ -207,12 +209,22 @@ body {
   background: var(--rb-canvas);
   color: var(--rb-ink);
 }
-button,
-input,
-select,
-textarea {
-  color: inherit;
-  font: inherit;
+/*
+ * Layered, and it matters. Tailwind's utilities live in `@layer utilities`, and
+ * unlayered CSS beats every layer — so as a plain rule this one quietly won
+ * against `text-white` and every other colour utility on a <button>, which is
+ * why a destructive button rendered ink on red. Normalising the inherited font
+ * and colour is base behaviour; it should lose to a utility that asks for
+ * something specific.
+ */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    color: inherit;
+    font: inherit;
+  }
 }
 button,
 a,

@@ -1,5 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { GeistSans } from "geist/font/sans";
+import {
+  Anton,
+  Bricolage_Grotesque,
+  Cormorant_Garamond,
+  Hanken_Grotesk,
+  Kaushan_Script,
+  Playfair_Display,
+} from "next/font/google";
 import type { ReactNode } from "react";
 
 import { Providers } from "@/components/providers";
@@ -7,6 +14,74 @@ import { PwaRegister } from "@/components/pwa-register";
 import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
 import "@/styles/customer-page.css";
+
+/**
+ * Hanken Grotesk carries everything a person reads and taps: body copy,
+ * labels, controls, navigation, and the customer page's rating sheet.
+ */
+const hankenGrotesk = Hanken_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-hanken",
+  display: "swap",
+});
+
+/** Display moments only. Never body copy, never a business's own identity. */
+const bricolageGrotesque = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-bricolage",
+  display: "swap",
+  preload: false,
+});
+
+/*
+ * The Look faces. Each one belongs to exactly one customer-page Look, so a
+ * business's identity is set in type chosen for that business rather than in
+ * ReviewBoost's own voice.
+ *
+ * None of them are preloaded. A customer page renders one Look, and the owner's
+ * Look picker is the only screen that shows all six — paying six preloads on
+ * every page to save one late swap on two screens is the wrong trade when the
+ * stars must never wait for the hero.
+ */
+const kaushanScript = Kaushan_Script({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-look-signature",
+  display: "swap",
+  preload: false,
+});
+
+const anton = Anton({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-look-bold",
+  display: "swap",
+  preload: false,
+});
+
+const playfairDisplay = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-look-editorial",
+  display: "swap",
+  preload: false,
+});
+
+const cormorantGaramond = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  variable: "--font-look-classic",
+  display: "swap",
+  preload: false,
+});
+
+const fontVariables = [
+  hankenGrotesk.variable,
+  bricolageGrotesque.variable,
+  kaushanScript.variable,
+  anton.variable,
+  playfairDisplay.variable,
+  cormorantGaramond.variable,
+].join(" ");
 
 export const metadata: Metadata = {
   // A template, so every page reads "Home — ReviewBoost" without each one
@@ -56,7 +131,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
+    <html lang="en" className={fontVariables} suppressHydrationWarning>
       <head>
         {/*
           iOS shows a white launch screen for a home-screen PWA unless a
@@ -67,7 +142,7 @@ export default function RootLayout({
         */}
         <style>{`html{background-color:#F8F5F0}@media (prefers-color-scheme:dark){html{background-color:#14120F}}`}</style>
       </head>
-      <body className={GeistSans.className}>
+      <body className={hankenGrotesk.className}>
         <Providers>{children}</Providers>
         <Toaster />
         <PwaRegister />

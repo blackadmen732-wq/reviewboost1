@@ -2,49 +2,43 @@ import type { Locale } from "@/lib/i18n/config";
 
 export type RatingValue = 1 | 2 | 3 | 4 | 5;
 
+/**
+ * Every word a customer can read.
+ *
+ * The dictionary is small because the page is small: one question, one
+ * instruction, five labels, and the handful of lines that appear when something
+ * goes wrong. There is no note prompt, no second question, no thank-you copy and
+ * no button label for continuing, because none of those steps exist. A message
+ * added here is a step added to the fastest path in the product, so it needs the
+ * same scrutiny as a schema change.
+ */
 export interface CustomerMessages {
   language: string;
   languageNames: Record<Locale, string>;
-  opening: string;
-  unavailableHeading: string;
-  unavailableBody: string;
-  loadErrorHeading: string;
-  loadErrorBody: string;
-  tryAgain: string;
+  /** The tiny code inside the hero's language control. */
+  languageCodes: Record<Locale, string>;
+  question: string;
+  tapInstruction: string;
   ratingHeading: string;
   ratingSupport: string;
   ratingGroup: string;
   ratingSpoken: Record<RatingValue, string>;
-  ratingLabels: Record<RatingValue, string>;
-  noteLabel: string;
-  optional: string;
-  notePlaceholder: string;
-  noteTrust: (businessName: string) => string;
-  continue: string;
-  sending: string;
-  submitErrorHeading: string;
-  submitErrorBody: string;
-  offline: string;
-  thanksHeading: string;
-  feedbackSent: (businessName: string) => string;
-  googlePrompt: string;
-  googleAction: string;
-  googleContinue: string;
-  googleTrust: (businessName: string) => string;
-  praiseHeading: string;
-  praiseSupport: (businessName: string) => string;
-  firstNameLabel: string;
-  praiseNoteLabel: string;
-  praiseNotePlaceholder: string;
-  sendThanks: string;
-  skip: string;
-  requiredFirstName: string;
-  praiseErrorHeading: string;
-  praiseErrorBody: string;
-  doneHeading: string;
-  doneBody: string;
-  closePage: string;
-  poweredBy: string;
+  opening: string;
+  ratingSaved: string;
+  saveFailedHeading: string;
+  saveFailedBody: string;
+  offlineHeading: string;
+  offlineBody: string;
+  tryAgain: string;
+  unavailableHeading: string;
+  unavailableBody: string;
+  loadErrorHeading: string;
+  loadErrorBody: string;
+  loading: string;
+  previewLabel: string;
+  /** Reads ahead of the ReviewBoost wordmark, which is rendered as the mark. */
+  poweredByPrefix: string;
+  brandLine: string;
   footerPromise: string;
   businessLogoAlt: (businessName: string) => string;
 }
@@ -55,62 +49,43 @@ const languageNames = {
   ht: "Kreyòl ayisyen",
 } satisfies Record<Locale, string>;
 
+const languageCodes = {
+  en: "EN",
+  es: "ES",
+  ht: "HT",
+} satisfies Record<Locale, string>;
+
 const en: CustomerMessages = {
   language: "Language",
   languageNames,
-  opening: "Opening the review page…",
-  unavailableHeading: "This review link isn’t active.",
-  unavailableBody: "Please ask the business for a new one.",
-  loadErrorHeading: "That didn’t go through.",
-  loadErrorBody: "Check your connection and try again.",
-  tryAgain: "Try again",
+  languageCodes,
+  question: "How was your visit?",
+  tapInstruction: "Tap a star to continue to Google",
   ratingHeading: "How was your visit?",
   ratingSupport: "Tap a star to continue to Google.",
   ratingGroup: "Rate your visit from 1 to 5 stars",
   ratingSpoken: {
-    1: "1 star — Not good",
-    2: "2 stars — Could be better",
-    3: "3 stars — Good",
-    4: "4 stars — Great",
-    5: "5 stars — Excellent",
+    1: "1 star",
+    2: "2 stars",
+    3: "3 stars",
+    4: "4 stars",
+    5: "5 stars",
   },
-  ratingLabels: {
-    1: "Not good",
-    2: "Could be better",
-    3: "Good",
-    4: "Great",
-    5: "Excellent",
-  },
-  noteLabel: "Want to add a note?",
-  optional: "optional",
-  notePlaceholder: "Tell us anything you’d like us to know",
-  noteTrust: (businessName) => `Your note goes directly to ${businessName}.`,
-  continue: "Continue",
-  sending: "Sending…",
-  submitErrorHeading: "That didn’t go through.",
-  submitErrorBody: "Your feedback is still here. Check your connection and try again.",
-  offline: "You’re offline. We’ll try when you reconnect.",
-  thanksHeading: "Thanks for sharing.",
-  feedbackSent: (businessName) => `Your feedback was sent to ${businessName}.`,
-  googlePrompt: "Want to share your experience on Google too?",
-  googleAction: "Leave a Google review",
-  googleContinue: "Continue without Google",
-  googleTrust: (businessName) =>
-    `Google reviews are public. Your note to ${businessName} is private.`,
-  praiseHeading: "Want to thank someone?",
-  praiseSupport: (businessName) => `Only ${businessName} will see this.`,
-  firstNameLabel: "Their first name",
-  praiseNoteLabel: "What did they do well?",
-  praiseNotePlaceholder: "Share a few words (optional)",
-  sendThanks: "Send thanks",
-  skip: "Skip",
-  requiredFirstName: "Enter their first name to send thanks.",
-  praiseErrorHeading: "That didn’t go through.",
-  praiseErrorBody: "Your thanks is still here. Check your connection and try again.",
-  doneHeading: "You’re all done.",
-  doneBody: "Thanks for helping a local business improve.",
-  closePage: "You can close this page.",
-  poweredBy: "Powered by ReviewBoost",
+  opening: "Opening Google…",
+  ratingSaved: "Rating saved.",
+  saveFailedHeading: "Couldn’t connect.",
+  saveFailedBody: "Your rating is still selected.",
+  offlineHeading: "You’re offline.",
+  offlineBody: "Your rating is still selected. We’ll try again when you reconnect.",
+  tryAgain: "Try again",
+  unavailableHeading: "This Tag isn’t available.",
+  unavailableBody: "Ask the business for help.",
+  loadErrorHeading: "Couldn’t connect.",
+  loadErrorBody: "Check your connection and try again.",
+  loading: "Loading…",
+  previewLabel: "Preview",
+  poweredByPrefix: "Powered by",
+  brandLine: "Real businesses · Real feedback · A brighter tomorrow",
   footerPromise: "Real businesses. Real feedback. A brighter tomorrow.",
   businessLogoAlt: (businessName) => `${businessName} logo`,
 };
@@ -118,59 +93,35 @@ const en: CustomerMessages = {
 const es: CustomerMessages = {
   language: "Idioma",
   languageNames,
-  opening: "Abriendo la página de reseñas…",
-  unavailableHeading: "Este enlace de reseña no está activo.",
-  unavailableBody: "Pídele uno nuevo al negocio.",
-  loadErrorHeading: "No se pudo enviar.",
-  loadErrorBody: "Revisa tu conexión e inténtalo de nuevo.",
-  tryAgain: "Intentar de nuevo",
+  languageCodes,
+  question: "¿Cómo estuvo tu visita?",
+  tapInstruction: "Toca una estrella para continuar a Google",
   ratingHeading: "¿Cómo estuvo tu visita?",
   ratingSupport: "Toca una estrella para continuar a Google.",
   ratingGroup: "Califica tu visita de 1 a 5 estrellas",
   ratingSpoken: {
-    1: "1 estrella — No estuvo bien",
-    2: "2 estrellas — Podría ser mejor",
-    3: "3 estrellas — Bien",
-    4: "4 estrellas — Muy bien",
-    5: "5 estrellas — Excelente",
+    1: "1 estrella",
+    2: "2 estrellas",
+    3: "3 estrellas",
+    4: "4 estrellas",
+    5: "5 estrellas",
   },
-  ratingLabels: {
-    1: "No estuvo bien",
-    2: "Podría ser mejor",
-    3: "Bien",
-    4: "Muy bien",
-    5: "Excelente",
-  },
-  noteLabel: "¿Quieres agregar una nota?",
-  optional: "opcional",
-  notePlaceholder: "Cuéntanos lo que quieras que sepamos",
-  noteTrust: (businessName) => `Tu nota va directamente a ${businessName}.`,
-  continue: "Continuar",
-  sending: "Enviando…",
-  submitErrorHeading: "No se pudo enviar.",
-  submitErrorBody: "Tus comentarios siguen aquí. Revisa tu conexión e inténtalo de nuevo.",
-  offline: "No tienes conexión. Lo intentaremos cuando vuelvas a conectarte.",
-  thanksHeading: "Gracias por compartir.",
-  feedbackSent: (businessName) => `Tus comentarios se enviaron a ${businessName}.`,
-  googlePrompt: "¿También quieres compartir tu experiencia en Google?",
-  googleAction: "Dejar una reseña en Google",
-  googleContinue: "Continuar sin Google",
-  googleTrust: (businessName) =>
-    `Las reseñas de Google son públicas. Tu nota para ${businessName} es privada.`,
-  praiseHeading: "¿Quieres agradecerle a alguien?",
-  praiseSupport: (businessName) => `Solo ${businessName} verá esto.`,
-  firstNameLabel: "Su nombre",
-  praiseNoteLabel: "¿Qué hizo bien?",
-  praiseNotePlaceholder: "Comparte unas palabras (opcional)",
-  sendThanks: "Enviar agradecimiento",
-  skip: "Omitir",
-  requiredFirstName: "Escribe su nombre para enviar el agradecimiento.",
-  praiseErrorHeading: "No se pudo enviar.",
-  praiseErrorBody: "Tu agradecimiento sigue aquí. Revisa tu conexión e inténtalo de nuevo.",
-  doneHeading: "Eso es todo.",
-  doneBody: "Gracias por ayudar a mejorar un negocio local.",
-  closePage: "Puedes cerrar esta página.",
-  poweredBy: "Con tecnología de ReviewBoost",
+  opening: "Abriendo Google…",
+  ratingSaved: "Calificación guardada.",
+  saveFailedHeading: "No se pudo conectar.",
+  saveFailedBody: "Tu calificación sigue seleccionada.",
+  offlineHeading: "No tienes conexión.",
+  offlineBody:
+    "Tu calificación sigue seleccionada. Lo intentaremos cuando vuelvas a conectarte.",
+  tryAgain: "Intentar de nuevo",
+  unavailableHeading: "Esta etiqueta no está disponible.",
+  unavailableBody: "Pídele ayuda al negocio.",
+  loadErrorHeading: "No se pudo conectar.",
+  loadErrorBody: "Revisa tu conexión e inténtalo de nuevo.",
+  loading: "Cargando…",
+  previewLabel: "Vista previa",
+  poweredByPrefix: "Con tecnología de",
+  brandLine: "Negocios reales · Opiniones reales · Un mañana mejor",
   footerPromise: "Negocios reales. Comentarios reales. Un mañana más brillante.",
   businessLogoAlt: (businessName) => `Logo de ${businessName}`,
 };
@@ -178,62 +129,36 @@ const es: CustomerMessages = {
 const ht: CustomerMessages = {
   language: "Lang",
   languageNames,
-  opening: "N ap ouvri paj revi a…",
-  unavailableHeading: "Lyen revi sa a pa aktif.",
-  unavailableBody: "Tanpri mande biznis la yon nouvo lyen.",
-  loadErrorHeading: "Sa pa t pase.",
-  loadErrorBody: "Verifye koneksyon ou epi eseye ankò.",
-  tryAgain: "Eseye ankò",
+  languageCodes,
+  question: "Kijan vizit ou te ye?",
+  tapInstruction: "Peze yon etwal pou kontinye sou Google",
   ratingHeading: "Kijan vizit ou te ye?",
   ratingSupport: "Peze yon etwal pou kontinye sou Google.",
   ratingGroup: "Bay vizit ou ant 1 ak 5 etwal",
   ratingSpoken: {
-    1: "1 etwal — Pa bon",
-    2: "2 etwal — Li ta ka pi bon",
-    3: "3 etwal — Bon",
-    4: "4 etwal — Trè bon",
-    5: "5 etwal — Ekselan",
+    1: "1 etwal",
+    2: "2 etwal",
+    3: "3 etwal",
+    4: "4 etwal",
+    5: "5 etwal",
   },
-  ratingLabels: {
-    1: "Pa bon",
-    2: "Li ta ka pi bon",
-    3: "Bon",
-    4: "Trè bon",
-    5: "Ekselan",
-  },
-  noteLabel: "Ou vle ajoute yon nòt?",
-  optional: "opsyonèl",
-  notePlaceholder: "Di nou nenpòt bagay ou ta renmen nou konnen",
-  noteTrust: (businessName) => `Nòt ou ale dirèkteman bay ${businessName}.`,
-  continue: "Kontinye",
-  sending: "N ap voye…",
-  submitErrorHeading: "Sa pa t pase.",
-  submitErrorBody: "Kòmantè ou toujou la. Verifye koneksyon ou epi eseye ankò.",
-  offline: "Ou pa konekte. N ap eseye lè ou rekonekte.",
-  thanksHeading: "Mèsi paske ou pataje.",
-  feedbackSent: (businessName) => `Kòmantè ou te voye bay ${businessName}.`,
-  googlePrompt: "Ou vle pataje eksperyans ou sou Google tou?",
-  googleAction: "Kite yon revi sou Google",
-  googleContinue: "Kontinye san Google",
-  googleTrust: (businessName) =>
-    `Revi Google yo piblik. Nòt ou pou ${businessName} prive.`,
-  praiseHeading: "Ou vle remèsye yon moun?",
-  praiseSupport: (businessName) => `Se sèlman ${businessName} ki pral wè sa.`,
-  firstNameLabel: "Prenon yo",
-  praiseNoteLabel: "Kisa yo te fè byen?",
-  praiseNotePlaceholder: "Pataje kèk mo (opsyonèl)",
-  sendThanks: "Voye remèsiman",
-  skip: "Sote",
-  requiredFirstName: "Antre prenon yo pou voye remèsiman.",
-  praiseErrorHeading: "Sa pa t pase.",
-  praiseErrorBody: "Remèsiman ou toujou la. Verifye koneksyon ou epi eseye ankò.",
-  doneHeading: "Ou fini.",
-  doneBody: "Mèsi paske ou ede yon biznis lokal amelyore.",
-  closePage: "Ou ka fèmen paj sa a.",
-  poweredBy: "ReviewBoost mache paj sa a",
+  opening: "N ap ouvri Google…",
+  ratingSaved: "Nòt la sove.",
+  saveFailedHeading: "Koneksyon an pa t mache.",
+  saveFailedBody: "Nòt ou toujou chwazi.",
+  offlineHeading: "Ou pa konekte.",
+  offlineBody: "Nòt ou toujou chwazi. N ap eseye ankò lè ou rekonekte.",
+  tryAgain: "Eseye ankò",
+  unavailableHeading: "Etikèt sa a pa disponib.",
+  unavailableBody: "Mande biznis la pou èd.",
+  loadErrorHeading: "Koneksyon an pa t mache.",
+  loadErrorBody: "Verifye koneksyon ou epi eseye ankò.",
+  loading: "N ap chaje…",
+  previewLabel: "Apèsi",
+  poweredByPrefix: "Fonksyone ak",
+  brandLine: "Biznis reyèl · Opinyon reyèl · Yon demen pi klere",
   footerPromise: "Biznis reyèl. Kòmantè reyèl. Yon demen pi klere.",
   businessLogoAlt: (businessName) => `Logo ${businessName}`,
 };
 
 export const customerMessages: Record<Locale, CustomerMessages> = { en, es, ht };
-

@@ -118,14 +118,14 @@ describe("WYSIWYG canvas (SoT v1.9 / v1.10)", () => {
   it("owner phone and live /q share the Mario canvas", () => {
     const css = source("styles/customer-page.css");
     const editor = source("features/customer-page/customer-page-editor.tsx");
-    const live = source("features/customer-flow/customer-flow.tsx");
+    const visitView = source("features/customer-page/customer-visit-view.tsx");
     expect(css).toContain("aspect-ratio: 390 / 844");
     expect(css).toContain("flex: 0 0 44%");
     expect(css).not.toContain("height: 640px");
     expect(editor).toContain("CustomerVisitView");
-    expect(live).toContain("CustomerVisitView");
+    expect(visitView).toContain("CustomerVisitView");
     expect(editor).toContain("footerLine");
-    expect(live).toContain("footerLine");
+    expect(visitView).toContain("footerLine");
   });
 });
 

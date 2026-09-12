@@ -1,21 +1,20 @@
 import { describe, expect, it } from "vitest";
 
+import { initialCustomerPageState } from "@/features/customer-page/customer-page-state";
 import {
   clearCustomerDraft,
   loadCustomerDraft,
   saveCustomerDraft,
-} from "@/features/customer-flow/recovery-storage";
-import { initialCustomerFlowState } from "@/features/customer-flow/customer-flow-state";
+} from "@/features/customer-page/recovery-storage";
 
 describe("same-tab customer recovery", () => {
-  it("retains the draft and stable idempotency keys only for its token", () => {
+  it("retains the rating and its idempotency keys, scoped to one token", () => {
     const draft = {
-      ...initialCustomerFlowState,
+      ...initialCustomerPageState,
       rating: 3 as const,
-      note: "Mwen te renmen sèvis la",
+      phase: "failed" as const,
       sessionKey: "session-key-123456",
       responseKey: "response-key-123456",
-      feedbackStatus: "error" as const,
       locale: "ht" as const,
     };
 
@@ -25,28 +24,50 @@ describe("same-tab customer recovery", () => {
     expect(loadCustomerDraft("another-token")).toBeNull();
   });
 
-  it("converts interrupted submitting state into a recoverable error", () => {
+  it("turns a save that was interrupted mid-flight into a retryable failure", () => {
     saveCustomerDraft("fixture-valid", {
-      ...initialCustomerFlowState,
+      ...initialCustomerPageState,
       rating: 4,
-      feedbackStatus: "submitting",
+      phase: "saving",
+      responseKey: "response-key-abcdef",
     });
 
-    expect(loadCustomerDraft("fixture-valid")?.feedbackStatus).toBe("error");
+    const recovered = loadCustomerDraft("fixture-valid");
+    expect(recovered?.phase).toBe("failed");
+    // The star the customer tapped survives, and so does the key, so the retry
+    // cannot produce a second rating for the same tap.
+    expect(recovered?.rating).toBe(4);
+    expect(recovered?.responseKey).toBe("response-key-abcdef");
   });
 
-  it("rejects corrupt storage and clears completed data", () => {
-    window.sessionStorage.setItem("reviewboost:customer-flow:fixture-valid", "{broken");
-    expect(loadCustomerDraft("fixture-valid")).toBeNull();
+  it("keeps a completed rating so returning from Google does not offer a second one", () => {
+    saveCustomerDraft("fixture-valid", {
+      ...initialCustomerPageState,
+      rating: 5,
+      phase: "saved",
+      sessionId: "session_1",
+      responseId: "response_1",
+    });
 
-    saveCustomerDraft("fixture-valid", { ...initialCustomerFlowState, screen: "finished" });
+    expect(loadCustomerDraft("fixture-valid")?.phase).toBe("saved");
+  });
+
+  it("rejects corrupt storage rather than rendering from it", () => {
+    window.sessionStorage.setItem("reviewboost:customer-page:fixture-valid", "{broken");
     expect(loadCustomerDraft("fixture-valid")).toBeNull();
   });
 
-  it("can explicitly remove a private draft", () => {
-    saveCustomerDraft("fixture-valid", { ...initialCustomerFlowState, note: "private" });
+  it("ignores a draft written by an older version of the page", () => {
+    window.sessionStorage.setItem(
+      "reviewboost:customer-page:fixture-valid",
+      JSON.stringify({ version: 1, rating: 4, phase: "idle" }),
+    );
+    expect(loadCustomerDraft("fixture-valid")).toBeNull();
+  });
+
+  it("can explicitly remove a draft", () => {
+    saveCustomerDraft("fixture-valid", { ...initialCustomerPageState, rating: 2 });
     clearCustomerDraft("fixture-valid");
     expect(loadCustomerDraft("fixture-valid")).toBeNull();
   });
 });
-

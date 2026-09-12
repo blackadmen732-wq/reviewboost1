@@ -113,6 +113,11 @@ export const productionCustomerFlowApi: CustomerFlowApi = {
           header: { "Idempotency-Key": options.idempotencyKey },
         },
         body,
+        // This request is sent as the page navigates to Google, so without
+        // `keepalive` the browser is entitled to cancel it mid-flight and the
+        // handoff goes unrecorded. It is never awaited: tracking does not get to
+        // delay the customer.
+        keepalive: true,
         ...(options.signal ? { signal: options.signal } : {}),
       });
 

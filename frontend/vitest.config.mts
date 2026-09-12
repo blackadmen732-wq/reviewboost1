@@ -12,7 +12,12 @@ export default defineConfig({
     include: ["tests/**/*.test.{ts,tsx}"],
     coverage: {
       reporter: ["text", "html"],
-      include: ["features/customer-flow/**/*.{ts,tsx}", "lib/api/**/*.ts"],
+      include: [
+        "features/customer-page/**/*.{ts,tsx}",
+        "features/customer-page-designer/**/*.{ts,tsx}",
+        "lib/api/**/*.ts",
+        "lib/customer-page/**/*.ts",
+      ],
     },
   },
 });

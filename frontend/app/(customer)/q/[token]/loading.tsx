@@ -1,8 +1,5 @@
-"use client";
-
-import { CustomerLoading } from "@/features/customer-flow/customer-loading";
-import { customerMessages } from "@/lib/i18n/customer-messages";
+import { CustomerPageSkeleton } from "@/features/customer-page/customer-page-skeleton";
 
 export default function LoadingCustomerReviewPage() {
-  return <CustomerLoading messages={customerMessages.en} />;
+  return <CustomerPageSkeleton />;
 }
