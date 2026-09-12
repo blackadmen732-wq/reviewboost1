@@ -52,8 +52,3 @@ export function LogoMark({
     </svg>
   );
 }
-
-/**
- * @deprecated Use LogoMark instead. Kept temporarily for in-progress references.
- */
-export const LogoMarkPlaceholder = LogoMark;
