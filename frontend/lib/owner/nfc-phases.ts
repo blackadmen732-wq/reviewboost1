@@ -7,10 +7,14 @@ export type ProgramPhase =
   | "idle"
   | "hold"
   | "looking"
+  | "reading"
+  | "confirm-overwrite"
   | "found"
   | "programming"
   | "checking"
+  | "verifying"
   | "ready"
+  | "partial"
   | "failed";
 
 export const PROGRAM_PHASE_COPY: Record<
@@ -29,6 +33,14 @@ export const PROGRAM_PHASE_COPY: Record<
     title: "Looking…",
     body: "Hold near the Tag.",
   },
+  reading: {
+    title: "Reading Tag…",
+    body: "Checking what is on this Tag.",
+  },
+  "confirm-overwrite": {
+    title: "Tag has existing content",
+    body: "This Tag already has something on it. Programming will replace it.",
+  },
   found: {
     title: "Found",
     body: "This Tag is ready to program.",
@@ -39,11 +51,19 @@ export const PROGRAM_PHASE_COPY: Record<
   },
   checking: {
     title: "Checking…",
-    body: "Making sure the right page opens.",
+    body: "Verifying the Tag.",
+  },
+  verifying: {
+    title: "Recording…",
+    body: "Saving the provisioning record.",
   },
   ready: {
     title: "Tag ready",
     body: "A customer can tap this now.",
+  },
+  partial: {
+    title: "Tag programmed",
+    body: "The Tag is programmed but ReviewBoost could not record it. Retry verification.",
   },
   failed: {
     title: "Could not program",

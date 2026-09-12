@@ -1,12 +1,12 @@
-import { LogoMarkPlaceholder } from "@/components/brand/logo-mark";
+import { LogoMark } from "@/components/brand/logo-mark";
 import { cn } from "@/lib/utils/cn";
 
 /**
  * One logo slot for the owner product.
  *
  * Poses and sizes follow the 2026-09-09 pack (full / mark / poweredBy;
- * nav / footer / poweredBy). The mark asset is a placeholder — swap
- * `logo-mark.tsx` when Marc pastes Figma. Do not invent a second mark.
+ * nav / footer / poweredBy). Uses the real ReviewBoost speech-bubble mark
+ * from /Branding.
  *
  * Clearspace is 0.25 × mark size on every side (`--rb-logo-clearspace`).
  */
@@ -49,7 +49,7 @@ export function ReviewBoostLogo({
         <span className="text-[length:var(--rb-text-caption)] text-muted">Powered by</span>
       ) : null}
 
-      <LogoMarkPlaceholder size={mark} />
+      <LogoMark size={mark} />
 
       {pose === "mark" ? (
         <span className="sr-only">ReviewBoost</span>

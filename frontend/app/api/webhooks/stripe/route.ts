@@ -30,8 +30,15 @@ export async function POST(request: Request): Promise<Response> {
     return new Response("Webhook signature verification failed", { status: 400 });
   }
 
+  const alreadyProcessed = await checkEventIdempotency(event.id);
+  if (alreadyProcessed) {
+    logger.info("stripe.webhook_duplicate", { eventId: event.id, type: event.type });
+    return new Response("ok", { status: 200 });
+  }
+
   try {
     await handleStripeEvent(event);
+    await recordEventProcessed(event.id, event.type);
   } catch (err) {
     logger.error("stripe.webhook_handler_failed", {
       eventType: event.type,
@@ -43,6 +50,24 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   return new Response("ok", { status: 200 });
+}
+
+async function checkEventIdempotency(eventId: string): Promise<boolean> {
+  const db = serviceRoleClient();
+  const { data } = await db
+    .from("stripe_webhook_events")
+    .select("event_id")
+    .eq("event_id", eventId)
+    .maybeSingle();
+  return data !== null;
+}
+
+async function recordEventProcessed(eventId: string, eventType: string): Promise<void> {
+  const db = serviceRoleClient();
+  await db.from("stripe_webhook_events").upsert(
+    { event_id: eventId, event_type: eventType, processed_at: new Date().toISOString() },
+    { onConflict: "event_id" },
+  );
 }
 
 async function handleStripeEvent(event: import("stripe").default.Event): Promise<void> {
@@ -68,25 +93,51 @@ async function handleStripeEvent(event: import("stripe").default.Event): Promise
   }
 }
 
+function resolveCustomerId(customer: string | { id: string } | null | undefined): string | null {
+  if (!customer) return null;
+  return typeof customer === "string" ? customer : customer.id;
+}
+
 async function upsertSubscription(
   orgId: string,
   subscription: import("stripe").default.Subscription,
 ): Promise<void> {
   const priceId = subscription.items.data[0]?.price.id;
   const plan = priceId ? getPlanByPriceId(priceId) : undefined;
+
+  if (priceId && !plan) {
+    logger.error("stripe.unknown_price_id", { orgId, priceId, subscriptionId: subscription.id });
+    throw new Error(`Unknown Stripe Price ID: ${priceId}. Refusing to map to a plan.`);
+  }
+
   const planId = plan?.id ?? "starter";
+  const customerId = resolveCustomerId(subscription.customer);
 
   const db = serviceRoleClient();
+
+  if (customerId) {
+    const { data: conflicting } = await db
+      .from("subscriptions")
+      .select("org_id")
+      .eq("stripe_customer_id", customerId)
+      .neq("org_id", orgId)
+      .maybeSingle();
+    if (conflicting) {
+      logger.error("stripe.cross_org_customer", {
+        orgId,
+        conflictingOrgId: conflicting.org_id,
+        customerId,
+      });
+      throw new Error(`Stripe customer ${customerId} already mapped to a different org`);
+    }
+  }
 
   const { error: subError } = await db.from("subscriptions").upsert(
     {
       org_id: orgId,
       plan_id: planId,
       status: subscription.status,
-      stripe_customer_id:
-        typeof subscription.customer === "string"
-          ? subscription.customer
-          : subscription.customer.id,
+      stripe_customer_id: customerId,
       stripe_subscription_id: subscription.id,
       stripe_price_id: priceId ?? null,
       current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
@@ -115,10 +166,7 @@ async function upsertSubscription(
     p_plan_id: planId,
     p_status: entitlementStatus,
     p_source: "stripe",
-    p_stripe_customer_id:
-      typeof subscription.customer === "string"
-        ? subscription.customer
-        : subscription.customer.id,
+    p_stripe_customer_id: customerId,
     p_stripe_subscription_id: subscription.id,
   });
 
@@ -185,6 +233,7 @@ async function handleSubscriptionDeleted(
 
   if (subError) {
     logger.error("stripe.delete_subscription_failed", { orgId, error: subError });
+    throw subError;
   }
 
   const { error: entError } = await db.rpc("rpc_apply_entitlement_snapshot", {
@@ -192,15 +241,13 @@ async function handleSubscriptionDeleted(
     p_plan_id: "starter",
     p_status: "cancelled",
     p_source: "stripe",
-    p_stripe_customer_id:
-      typeof subscription.customer === "string"
-        ? subscription.customer
-        : subscription.customer.id,
+    p_stripe_customer_id: resolveCustomerId(subscription.customer),
     p_stripe_subscription_id: subscription.id,
   });
 
   if (entError) {
     logger.error("stripe.revert_entitlement_failed", { orgId, error: entError });
+    throw entError;
   }
 
   logger.info("stripe.subscription_cancelled", { orgId, subscriptionId: subscription.id });
@@ -228,17 +275,19 @@ async function handlePaymentFailed(
     const orgId = subscription.metadata?.org_id;
     if (orgId) {
       const db = serviceRoleClient();
-      await db.rpc("rpc_apply_entitlement_snapshot", {
+      const { error } = await db.rpc("rpc_apply_entitlement_snapshot", {
         p_org_id: orgId,
         p_plan_id: "starter",
         p_status: "past_due",
         p_source: "stripe",
-        p_stripe_customer_id:
-          typeof subscription.customer === "string"
-            ? subscription.customer
-            : subscription.customer.id,
+        p_stripe_customer_id: resolveCustomerId(subscription.customer),
         p_stripe_subscription_id: subscription.id,
       });
+
+      if (error) {
+        logger.error("stripe.payment_failed_downgrade_error", { orgId, error });
+        throw error;
+      }
 
       logger.warn("stripe.payment_failed_downgrade", { orgId, attemptCount: invoice.attempt_count });
     }
