@@ -147,6 +147,23 @@ jobs:
       - name: Run staging seed script tests
         run: node --test scripts/backend/__tests__/seed-stand-remote.test.mjs
 
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
+        working-directory: frontend
+
+      - name: Audit mobile dependencies
+        run: npm audit --audit-level=high
+        working-directory: apps/mobile
+
   dev-script-tests:
     runs-on: ubuntu-latest
     steps:

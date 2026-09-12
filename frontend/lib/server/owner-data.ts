@@ -412,30 +412,24 @@ export async function getRatingBreakdown(orgId: string): Promise<{
 }> {
   const supabase = await supabaseServer();
 
-  const results = await Promise.all(
-    ([1, 2, 3, 4, 5] as const).map((rating) =>
-      supabase
-        .from("customer_responses")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .eq("rating", rating),
-    ),
-  );
+  const { data, error } = await supabase.rpc("rating_breakdown", { target_org_id: orgId });
 
-  for (const r of results) {
-    if (r.error) dataFailure("rating_breakdown", r.error);
-  }
+  if (error) dataFailure("rating_breakdown", error);
 
   const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<1 | 2 | 3 | 4 | 5, number>;
   let total = 0;
   let weighted = 0;
 
-  ([1, 2, 3, 4, 5] as const).forEach((rating, index) => {
-    const count = results[index]?.count ?? 0;
-    counts[rating] = count;
-    total += count;
-    weighted += count * rating;
-  });
+  if (data) {
+    for (const row of data as Array<{ rating: number; cnt: number }>) {
+      const r = row.rating as 1 | 2 | 3 | 4 | 5;
+      if (r >= 1 && r <= 5) {
+        counts[r] = row.cnt;
+        total += row.cnt;
+        weighted += row.cnt * r;
+      }
+    }
+  }
 
   return { counts, total, average: total > 0 ? weighted / total : null };
 }

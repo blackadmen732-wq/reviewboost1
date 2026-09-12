@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { ApiError, ERROR_CODE, type FieldError } from "@/lib/server/errors";
 import { logger } from "@/lib/server/logger";
+import { captureException } from "@/lib/server/sentry";
 import { publicFrontendUrl } from "@/lib/server/env";
 
 /**
@@ -202,6 +203,8 @@ export async function handle(
       requestId,
       error,
     });
+
+    captureException(error, { route, requestId });
 
     return errorResponse(
       request,
