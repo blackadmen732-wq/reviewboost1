@@ -22,8 +22,6 @@ export function POST(request: Request): Promise<Response> {
     const ctx = await requireOrganizationContext(request);
     requireRole(ctx.role, ["owner", "admin"]);
 
-    // TODO: Look up the Stripe customer ID from the org's subscription record.
-    // For now, return an error explaining billing needs to be set up first.
     const stripeCustomerId = await lookupStripeCustomer(ctx.orgId);
     if (!stripeCustomerId) {
       throw new ApiError(404, ERROR_CODE.notFound, "No billing account found. Subscribe to a plan first.");
@@ -39,8 +37,13 @@ export function POST(request: Request): Promise<Response> {
   });
 }
 
-async function lookupStripeCustomer(_orgId: string): Promise<string | null> {
-  // TODO: Query the subscriptions table for this org's stripe_customer_id.
-  // This is populated by the checkout.session.completed webhook.
-  return null;
+async function lookupStripeCustomer(orgId: string): Promise<string | null> {
+  const { serviceRoleClient } = await import("@/lib/server/supabase");
+  const { data, error } = await serviceRoleClient()
+    .from("subscriptions")
+    .select("stripe_customer_id")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error || !data?.stripe_customer_id) return null;
+  return data.stripe_customer_id;
 }
