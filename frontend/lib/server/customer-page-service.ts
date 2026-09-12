@@ -36,9 +36,9 @@ function firstRow<T>(data: unknown): T | null {
 }
 
 export async function getCustomerPageState(
-  context: AuthenticatedContext,
+  context: AuthenticatedContext & { orgId: string },
 ): Promise<CustomerPageState> {
-  const { data, error } = await context.db.rpc("rpc_get_customer_page");
+  const { data, error } = await context.db.rpc("rpc_get_customer_page", { p_org_id: context.orgId });
   if (error) {
     if (error.message?.includes("not_found_or_forbidden")) {
       throw new ApiError(403, ERROR_CODE.forbidden, "Only the owner can change the customer page.");
@@ -82,11 +82,12 @@ export async function getCustomerPageState(
 }
 
 export async function saveCustomerPageDraft(
-  context: AuthenticatedContext,
+  context: AuthenticatedContext & { orgId: string },
   input: { transform: HeroTransform; tagline?: string | null },
 ): Promise<void> {
   const transform = clampHeroTransform(input.transform);
   const { error } = await context.db.rpc("rpc_save_customer_page_draft", {
+    p_org_id: context.orgId,
     p_offset_x: transform.x,
     p_offset_y: transform.y,
     p_scale: transform.scale,
@@ -101,11 +102,12 @@ export async function saveCustomerPageDraft(
 }
 
 export async function saveCustomerPageArtwork(
-  context: AuthenticatedContext,
+  context: AuthenticatedContext & { orgId: string },
   mime: string,
   bytes: Buffer,
 ): Promise<void> {
   const { error } = await context.db.rpc("rpc_save_customer_page_artwork", {
+    p_org_id: context.orgId,
     p_mime: mime,
     p_bytes: `\\x${bytes.toString("hex")}`,
   });
@@ -120,8 +122,8 @@ export async function saveCustomerPageArtwork(
   }
 }
 
-export async function publishCustomerPage(context: AuthenticatedContext): Promise<void> {
-  const { error } = await context.db.rpc("rpc_publish_customer_page");
+export async function publishCustomerPage(context: AuthenticatedContext & { orgId: string }): Promise<void> {
+  const { error } = await context.db.rpc("rpc_publish_customer_page", { p_org_id: context.orgId });
   if (error) {
     if (error.message?.includes("not_found_or_forbidden")) {
       throw new ApiError(403, ERROR_CODE.forbidden, "Only the owner can change the customer page.");
@@ -131,10 +133,11 @@ export async function publishCustomerPage(context: AuthenticatedContext): Promis
 }
 
 export async function getCustomerPageArtwork(
-  context: AuthenticatedContext,
+  context: AuthenticatedContext & { orgId: string },
   side: "draft" | "published",
 ): Promise<{ mime: string; bytes: Buffer } | null> {
   const { data, error } = await context.db.rpc("rpc_get_customer_page_artwork", {
+    p_org_id: context.orgId,
     p_side: side,
   });
   if (error) {

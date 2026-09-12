@@ -2,17 +2,11 @@ import { logger } from "@/lib/server/logger";
 import { captureException } from "@/lib/server/sentry";
 import { getStripe, stripeWebhookSecret, isStripeConfigured } from "@/lib/server/billing/stripe";
 import { getPlanByPriceId } from "@/lib/server/billing/plans";
+import { serviceRoleClient } from "@/lib/server/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Stripe webhook endpoint.
- *
- * Signature verification is mandatory — an unverified webhook is a direct path
- * to granting arbitrary plans. The raw body must be read before JSON parsing,
- * because Stripe's signature covers the raw bytes.
- */
 export async function POST(request: Request): Promise<Response> {
   if (!isStripeConfigured()) {
     return new Response("Stripe is not configured", { status: 503 });
@@ -74,6 +68,73 @@ async function handleStripeEvent(event: import("stripe").default.Event): Promise
   }
 }
 
+async function upsertSubscription(
+  orgId: string,
+  subscription: import("stripe").default.Subscription,
+): Promise<void> {
+  const priceId = subscription.items.data[0]?.price.id;
+  const plan = priceId ? getPlanByPriceId(priceId) : undefined;
+  const planId = plan?.id ?? "starter";
+
+  const db = serviceRoleClient();
+
+  const { error: subError } = await db.from("subscriptions").upsert(
+    {
+      org_id: orgId,
+      plan_id: planId,
+      status: subscription.status,
+      stripe_customer_id:
+        typeof subscription.customer === "string"
+          ? subscription.customer
+          : subscription.customer.id,
+      stripe_subscription_id: subscription.id,
+      stripe_price_id: priceId ?? null,
+      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      cancel_at: subscription.cancel_at
+        ? new Date(subscription.cancel_at * 1000).toISOString()
+        : null,
+    },
+    { onConflict: "org_id" },
+  );
+
+  if (subError) {
+    logger.error("stripe.upsert_subscription_failed", { orgId, error: subError });
+    throw subError;
+  }
+
+  const entitlementStatus =
+    subscription.status === "active" || subscription.status === "trialing"
+      ? "active"
+      : subscription.status === "canceled"
+        ? "cancelled"
+        : "past_due";
+
+  const { error: entError } = await db.rpc("rpc_apply_entitlement_snapshot", {
+    p_org_id: orgId,
+    p_plan_id: planId,
+    p_status: entitlementStatus,
+    p_source: "stripe",
+    p_stripe_customer_id:
+      typeof subscription.customer === "string"
+        ? subscription.customer
+        : subscription.customer.id,
+    p_stripe_subscription_id: subscription.id,
+  });
+
+  if (entError) {
+    logger.error("stripe.apply_entitlement_failed", { orgId, error: entError });
+    throw entError;
+  }
+
+  logger.info("stripe.subscription_synced", {
+    orgId,
+    planId,
+    status: subscription.status,
+    subscriptionId: subscription.id,
+  });
+}
+
 async function handleCheckoutCompleted(
   session: import("stripe").default.Checkout.Session,
 ): Promise<void> {
@@ -89,15 +150,12 @@ async function handleCheckoutCompleted(
     return;
   }
 
-  logger.info("stripe.checkout_completed", {
-    orgId,
-    subscriptionId: typeof subscriptionId === "string" ? subscriptionId : subscriptionId.id,
-  });
+  const stripe = await getStripe();
+  const subscription = await stripe.subscriptions.retrieve(
+    typeof subscriptionId === "string" ? subscriptionId : subscriptionId.id,
+  );
 
-  // TODO: Upsert subscription record in the database.
-  // The subscription table should store:
-  //   org_id, stripe_customer_id, stripe_subscription_id, plan_id, status, current_period_end
-  // This is the point where the entitlement projection gets updated.
+  await upsertSubscription(orgId, subscription);
 }
 
 async function handleSubscriptionUpdated(
@@ -109,19 +167,7 @@ async function handleSubscriptionUpdated(
     return;
   }
 
-  const priceId = subscription.items.data[0]?.price.id;
-  const plan = priceId ? getPlanByPriceId(priceId) : undefined;
-
-  logger.info("stripe.subscription_updated", {
-    orgId,
-    subscriptionId: subscription.id,
-    status: subscription.status,
-    planId: plan?.id ?? "unknown",
-  });
-
-  // TODO: Update subscription record and entitlement projection.
-  // When downgrading: preserve data, disable capabilities that exceed the
-  // new plan's limits. Never delete tags, locations, or feedback.
+  await upsertSubscription(orgId, subscription);
 }
 
 async function handleSubscriptionDeleted(
@@ -130,14 +176,34 @@ async function handleSubscriptionDeleted(
   const orgId = subscription.metadata?.org_id;
   if (!orgId) return;
 
-  logger.info("stripe.subscription_deleted", {
-    orgId,
-    subscriptionId: subscription.id,
+  const db = serviceRoleClient();
+
+  const { error: subError } = await db
+    .from("subscriptions")
+    .update({ status: "canceled", cancel_at: new Date().toISOString() })
+    .eq("org_id", orgId);
+
+  if (subError) {
+    logger.error("stripe.delete_subscription_failed", { orgId, error: subError });
+  }
+
+  const { error: entError } = await db.rpc("rpc_apply_entitlement_snapshot", {
+    p_org_id: orgId,
+    p_plan_id: "starter",
+    p_status: "cancelled",
+    p_source: "stripe",
+    p_stripe_customer_id:
+      typeof subscription.customer === "string"
+        ? subscription.customer
+        : subscription.customer.id,
+    p_stripe_subscription_id: subscription.id,
   });
 
-  // TODO: Revert org to free/starter tier.
-  // Preserve all data, tags, NFC hardware identity, QR codes, feedback.
-  // Disable paid capabilities only.
+  if (entError) {
+    logger.error("stripe.revert_entitlement_failed", { orgId, error: entError });
+  }
+
+  logger.info("stripe.subscription_cancelled", { orgId, subscriptionId: subscription.id });
 }
 
 async function handlePaymentFailed(
@@ -151,6 +217,30 @@ async function handlePaymentFailed(
     attemptCount: invoice.attempt_count,
   });
 
-  // TODO: After N failed attempts, downgrade to starter.
-  // Send notification to org owners about payment failure.
+  if (!subscriptionId) return;
+
+  if ((invoice.attempt_count ?? 0) >= 3) {
+    const stripe = await getStripe();
+    const subscription = await stripe.subscriptions.retrieve(
+      typeof subscriptionId === "string" ? subscriptionId : subscriptionId.id,
+    );
+
+    const orgId = subscription.metadata?.org_id;
+    if (orgId) {
+      const db = serviceRoleClient();
+      await db.rpc("rpc_apply_entitlement_snapshot", {
+        p_org_id: orgId,
+        p_plan_id: "starter",
+        p_status: "past_due",
+        p_source: "stripe",
+        p_stripe_customer_id:
+          typeof subscription.customer === "string"
+            ? subscription.customer
+            : subscription.customer.id,
+        p_stripe_subscription_id: subscription.id,
+      });
+
+      logger.warn("stripe.payment_failed_downgrade", { orgId, attemptCount: invoice.attempt_count });
+    }
+  }
 }
