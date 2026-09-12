@@ -10,6 +10,7 @@ export default defineConfig({
     testTimeout: 20_000,
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.{ts,tsx}"],
+    exclude: ["tests/integration/**", "node_modules/**"],
     coverage: {
       reporter: ["text", "html"],
       include: [

@@ -231,9 +231,12 @@ describe("token rotation — null previous hash when no rotation", () => {
 
   it("passes null when digestStandTokenWithPreviousKey returns null", async () => {
     const cryptoMock = await import("@/lib/server/crypto");
-    const standSpy = vi.spyOn(cryptoMock, "digestStandTokenWithPreviousKey" as never).mockReturnValue(null as never);
-    const sessSpy = vi.spyOn(cryptoMock, "digestSessionTokenWithPreviousKey" as never).mockReturnValue(null as never);
-    const respSpy = vi.spyOn(cryptoMock, "digestResponseTokenWithPreviousKey" as never).mockReturnValue(null as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const standSpy = vi.spyOn(cryptoMock as any, "digestStandTokenWithPreviousKey").mockReturnValue(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sessSpy = vi.spyOn(cryptoMock as any, "digestSessionTokenWithPreviousKey").mockReturnValue(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const respSpy = vi.spyOn(cryptoMock as any, "digestResponseTokenWithPreviousKey").mockReturnValue(null);
 
     const { createSession } = await import("@/lib/server/customer-flow-service");
     await createSession("raw-token", { locale: "en", idempotencyKey: "k5" }, meta);
@@ -248,8 +251,10 @@ describe("token rotation — null previous hash when no rotation", () => {
 
   it("passes null session/response previous hashes when no rotation", async () => {
     const cryptoMock = await import("@/lib/server/crypto");
-    const sessSpy = vi.spyOn(cryptoMock, "digestSessionTokenWithPreviousKey" as never).mockReturnValue(null as never);
-    const respSpy = vi.spyOn(cryptoMock, "digestResponseTokenWithPreviousKey" as never).mockReturnValue(null as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sessSpy = vi.spyOn(cryptoMock as any, "digestSessionTokenWithPreviousKey").mockReturnValue(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const respSpy = vi.spyOn(cryptoMock as any, "digestResponseTokenWithPreviousKey").mockReturnValue(null);
 
     rpcResult = [{ outcome: "created", response_status: 204, response_body_encrypted: null }];
     const { recordGoogleClick } = await import("@/lib/server/customer-flow-service");

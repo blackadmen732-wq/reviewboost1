@@ -80,7 +80,7 @@ export function ProgramTagSheet({
         resolve({ hasContent: false, isSameUrl: false, description: "", readFailed: true });
       }, 8000);
 
-      const reader = ndef as { addEventListener: Function; scan: () => Promise<void> };
+      const reader = ndef as { addEventListener: (event: string, handler: (e: { message: { records: Array<{ recordType: string; data?: unknown }> } }) => void, options?: { once: boolean }) => void; scan: () => Promise<void> };
       reader.addEventListener(
         "reading",
         ({ message }: { message: { records: Array<{ recordType: string; data?: unknown }> } }) => {
@@ -118,7 +118,7 @@ export function ProgramTagSheet({
   const verifyWriteback = useCallback(async (ndef: unknown, canonicalUrl: string): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
       const timeout = setTimeout(() => resolve(false), 5000);
-      const reader = ndef as { addEventListener: Function; scan: () => Promise<void> };
+      const reader = ndef as { addEventListener: (event: string, handler: (e: { message: { records: Array<{ recordType: string; data?: unknown }> } }) => void, options?: { once: boolean }) => void; scan: () => Promise<void> };
       reader.addEventListener(
         "reading",
         ({ message }: { message: { records: Array<{ recordType: string; data?: unknown }> } }) => {

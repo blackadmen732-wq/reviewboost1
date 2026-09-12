@@ -54,20 +54,26 @@ export async function POST(request: Request): Promise<Response> {
 
 async function checkEventIdempotency(eventId: string): Promise<boolean> {
   const db = serviceRoleClient();
-  const { data } = await db
+  const { data, error } = await db
     .from("stripe_webhook_events")
     .select("event_id")
     .eq("event_id", eventId)
     .maybeSingle();
+  if (error) {
+    throw new Error(`Idempotency check failed: ${error.message}`);
+  }
   return data !== null;
 }
 
 async function recordEventProcessed(eventId: string, eventType: string): Promise<void> {
   const db = serviceRoleClient();
-  await db.from("stripe_webhook_events").upsert(
+  const { error } = await db.from("stripe_webhook_events").upsert(
     { event_id: eventId, event_type: eventType, processed_at: new Date().toISOString() },
     { onConflict: "event_id" },
   );
+  if (error) {
+    throw new Error(`Failed to record processed event: ${error.message}`);
+  }
 }
 
 async function handleStripeEvent(event: import("stripe").default.Event): Promise<void> {
@@ -190,12 +196,9 @@ async function handleCheckoutCompleted(
   const subscriptionId = session.subscription;
 
   if (!orgId || !subscriptionId) {
-    logger.warn("stripe.checkout_missing_metadata", {
-      sessionId: session.id,
-      hasOrgId: Boolean(orgId),
-      hasSubscription: Boolean(subscriptionId),
-    });
-    return;
+    throw new Error(
+      `checkout.session.completed missing required metadata: org_id=${orgId ?? "null"}, subscription=${subscriptionId ?? "null"}, sessionId=${session.id}`,
+    );
   }
 
   const stripe = await getStripe();
@@ -206,10 +209,26 @@ async function handleCheckoutCompleted(
   await upsertSubscription(orgId, subscription);
 }
 
+async function resolveOrgId(subscription: import("stripe").default.Subscription): Promise<string | null> {
+  const fromMetadata = subscription.metadata?.org_id;
+  if (fromMetadata) return fromMetadata;
+
+  const db = serviceRoleClient();
+  const { data, error } = await db
+    .from("subscriptions")
+    .select("org_id")
+    .eq("stripe_subscription_id", subscription.id)
+    .maybeSingle();
+  if (error) {
+    throw new Error(`Failed to look up org for subscription ${subscription.id}: ${error.message}`);
+  }
+  return data?.org_id ?? null;
+}
+
 async function handleSubscriptionUpdated(
   subscription: import("stripe").default.Subscription,
 ): Promise<void> {
-  const orgId = subscription.metadata?.org_id;
+  const orgId = await resolveOrgId(subscription);
   if (!orgId) {
     logger.warn("stripe.subscription_update_no_org", { subscriptionId: subscription.id });
     return;
@@ -221,8 +240,11 @@ async function handleSubscriptionUpdated(
 async function handleSubscriptionDeleted(
   subscription: import("stripe").default.Subscription,
 ): Promise<void> {
-  const orgId = subscription.metadata?.org_id;
-  if (!orgId) return;
+  const orgId = await resolveOrgId(subscription);
+  if (!orgId) {
+    logger.warn("stripe.subscription_delete_no_org", { subscriptionId: subscription.id });
+    return;
+  }
 
   const db = serviceRoleClient();
 

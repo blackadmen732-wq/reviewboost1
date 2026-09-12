@@ -26,8 +26,8 @@ export default function HowItWorksPage() {
         ))}
       </ol>
       <p>
-        After they rate, you see the words they left. Low stars can open a private
-        note so you can make it right. That note never replaces the Google link.
+        After they rate, you see the rating they left. Every customer gets the
+        same Google review link, regardless of the stars they chose.
       </p>
       <div className="mt-4 max-w-xs">
         <Button asChild variant="action">

@@ -46,7 +46,7 @@ export const HOW_IT_WORKS = [
   },
   {
     title: "Everyone is offered Google",
-    body: "The rating never decides who gets the public review link. You also see the words they left for you.",
+    body: "The rating never decides who gets the public review link.",
   },
 ] as const;
 
@@ -84,7 +84,7 @@ export const SECURITY = {
 
 export const PRIVACY = {
   headline: "We do not ask your customers who they are.",
-  lede: "The public page takes a rating and, if they want, a few words. That is all.",
+  lede: "The public page takes a star rating. That is all.",
 } as const;
 
 export const CLOSE = {

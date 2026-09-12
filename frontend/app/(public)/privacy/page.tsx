@@ -6,7 +6,7 @@ import { PublicArticle } from "@/features/public/public-article";
 
 export const metadata: Metadata = {
   title: "Privacy",
-  description: "The public page takes a rating and optional words. We do not ask customers who they are.",
+  description: "The public page takes a star rating. We do not ask customers who they are.",
 };
 
 export default function PrivacyPage() {
@@ -14,14 +14,13 @@ export default function PrivacyPage() {
     <PublicArticle title={PRIVACY.headline} lede={PRIVACY.lede}>
       <h2>On the customer page</h2>
       <p>
-        A rating. Optional words. Optional praise for someone on the team, by
-        first name. No name field, no phone, no email, no marketing box.
+        A star rating. No name field, no phone, no email, no text input, no
+        marketing box.
       </p>
       <h2>On the owner side</h2>
       <p>
         We keep the email you sign in with, the business name, the Google review
-        link you paste, and the ratings and notes from your Tags. Notes are for
-        you. They are not a public review.
+        link you paste, and the ratings from your Tags.
       </p>
       <h2>Google</h2>
       <p>
