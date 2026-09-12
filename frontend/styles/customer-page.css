@@ -1,0 +1,279 @@
+/* Shared customer visit view — owner preview and live /q are this tree.
+   Canvas is 390/844 (Mario SoT). Hero 56% / card 44%. Card never moves. */
+
+.visit-stage {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: #fff;
+  overflow: hidden;
+}
+
+.visit-hero {
+  position: relative;
+  flex: 1 1 56%;
+  height: 56%;
+  min-height: 0;
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
+.visit-hero--live {
+  touch-action: none;
+  cursor: grab;
+}
+
+.visit-hero--live:active {
+  cursor: grabbing;
+}
+
+.visit-hero__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: center center;
+  user-select: none;
+  pointer-events: none;
+}
+
+.visit-hero__empty {
+  width: 100%;
+  height: 100%;
+  background: #1a1a1a;
+}
+
+.visit-language {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+}
+
+.visit-language .language-selector,
+.visit-language .language-select {
+  min-height: 40px;
+  color: #fff;
+}
+
+.visit-card {
+  display: flex;
+  flex: 0 0 44%;
+  flex-direction: column;
+  height: 44%;
+  max-height: 44%;
+  z-index: 2;
+  background: #fff;
+  border-radius: 36px 36px 0 0;
+  padding: 32px 24px 14px;
+  overflow: hidden;
+}
+
+.visit-card__copy {
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.visit-heading {
+  margin: 0;
+  color: var(--rb-ink);
+  font-size: clamp(1.85rem, 7.6vw, 2.35rem);
+  font-weight: 720;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.visit-heading:focus {
+  outline: none;
+}
+
+.visit-support {
+  margin: 12px 0 0;
+  color: var(--rb-muted);
+  font-size: 0.72rem;
+  font-weight: 620;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.visit-card__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 20px;
+  overflow: auto;
+}
+
+.visit-footer {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  margin-top: 12px;
+  gap: 4px;
+}
+
+.visit-footer__line {
+  margin: 0;
+  color: var(--rb-muted);
+  font-size: 0.58rem;
+  font-weight: 620;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.visit-stars {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.visit-stars__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.visit-star {
+  display: block;
+}
+
+.visit-star__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.visit-star__label {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  color: #c5c5c5;
+  cursor: pointer;
+}
+
+.visit-star__label svg {
+  width: 44px;
+  height: 44px;
+  fill: transparent;
+}
+
+.visit-star__label[data-filled="true"] {
+  color: var(--rb-star);
+}
+
+.visit-star__label[data-filled="true"] svg {
+  fill: currentColor;
+}
+
+.visit-star__input:focus-visible + .visit-star__label {
+  outline: 2px solid var(--rb-focus);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.phone-frame {
+  width: min(100%, 360px);
+  margin-inline: auto;
+}
+
+.phone-frame__bezel {
+  position: relative;
+  overflow: hidden;
+  border: 10px solid #111;
+  border-radius: 40px;
+  background: #111;
+  box-shadow: 0 18px 40px -24px rgb(23 26 24 / 55%);
+}
+
+.phone-frame__island {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  z-index: 3;
+  width: 96px;
+  height: 22px;
+  border-radius: 12px;
+  background: #111;
+  transform: translateX(-50%);
+}
+
+.phone-frame__screen {
+  aspect-ratio: 390 / 844;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+  background: #fff;
+}
+
+.customer-live {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  background: #fff;
+}
+
+.customer-live .visit-stage {
+  width: min(100vw, calc(100dvh * 390 / 844));
+  height: min(100dvh, calc(100vw * 844 / 390));
+  max-height: 100dvh;
+  aspect-ratio: 390 / 844;
+}
+
+.customer-page-editor {
+  display: grid;
+  gap: 28px;
+}
+
+@media (min-width: 880px) {
+  .customer-page-editor {
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+    align-items: start;
+    gap: 40px;
+  }
+}
+
+.customer-page-editor__rail {
+  padding-bottom: 24px;
+}
+
+.nfc-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: rgb(23 26 24 / 55%);
+}
+
+.nfc-sheet__panel {
+  display: flex;
+  min-height: 72dvh;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 32px 24px 28px;
+  background: var(--rb-surface);
+  border-radius: 28px 28px 0 0;
+}
+
+.nfc-sheet__phase {
+  text-align: center;
+}
+
+.nfc-sheet__title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.nfc-sheet__body {
+  margin: 12px 0 0;
+  color: var(--rb-muted);
+  font-size: 1.125rem;
+}

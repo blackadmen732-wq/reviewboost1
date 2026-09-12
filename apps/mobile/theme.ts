@@ -4,17 +4,21 @@ export const colors = {
   onBrand: "#0d2118",
   brandHover: "#009a61",
   brandActive: "#008f5b",
+  action: "#007a4d",
+  actionHover: "#006b43",
+  actionPressed: "#005b39",
+  onAction: "#ffffff",
 
   canvas: "#f8f5f0",
   surface: "#FFFFFF",
-  surfaceAlt: "#F5F3EF",
+  surfaceAlt: "#F2EFE9",
 
-  ink: "#1a1712",
-  inkMuted: "#6B7280",
+  ink: "#171A18",
+  inkMuted: "#5D655F",
   inkFaint: "#9CA3AF",
 
-  border: "#E5E7EB",
-  borderLight: "#D1D5DB",
+  border: "#D8DED9",
+  borderLight: "#B7C0BA",
 
   danger: "#b33a3a",
   dangerBg: "#FEF2F2",
@@ -33,8 +37,8 @@ export const colors = {
 } as const;
 
 export const radii = {
-  control: 14,
-  card: 20,
+  control: 12,
+  card: 16,
   badge: 8,
 } as const;
 

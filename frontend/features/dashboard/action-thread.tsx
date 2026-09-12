@@ -96,16 +96,10 @@ export function ActionThread({
       </p>
 
       {actions.length > 0 ? (
-        <ol className="mb-4 flex flex-col gap-3">
+        <ol className="mb-6 divide-y divide-border border-y border-border">
           {actions.map((action) => (
-            <li
-              key={action.noteId}
-              className="rounded-[var(--radius-card)] border border-border bg-surface p-4"
-            >
+            <li key={action.noteId} className="py-4">
               <div className="mb-1.5 flex items-center gap-2">
-                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-text">
-                  {action.authorName.slice(0, 1).toUpperCase()}
-                </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
                   {action.authorName}
                 </span>
@@ -131,7 +125,7 @@ export function ActionThread({
         placeholder="Called them back and said sorry…"
       />
 
-      <Button className="mt-3" disabled={!canSubmit} loading={busy} loadingLabel="Saving…" onClick={() => void add()}>
+      <Button variant="action" className="mt-3" disabled={!canSubmit} loading={busy} loadingLabel="Saving…" onClick={() => void add()}>
         <Send className="size-5" aria-hidden="true" />
         Save note
       </Button>

@@ -138,6 +138,15 @@ export interface components {
             googleReviewUrl: string;
             supportedLocales: components["schemas"]["Locale"][];
             defaultLocale: components["schemas"]["Locale"];
+            presentation: {
+                heroUrl: string | null;
+                transform: {
+                    x: number;
+                    y: number;
+                    scale: number;
+                };
+                tagline: string | null;
+            };
         };
         CreateSessionRequest: {
             locale: components["schemas"]["Locale"];

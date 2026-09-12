@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Textarea } from "@/components/ui/textarea";
 import { CustomerActionBar } from "@/features/customer-flow/customer-action-bar";
-import { StarRating } from "@/features/customer-flow/star-rating";
+import { VisitStars } from "@/features/customer-page/visit-stars";
 import type { SubmissionStatus } from "@/features/customer-flow/customer-flow-state";
 import type {
   CustomerMessages,
@@ -23,6 +23,8 @@ interface RatingScreenProps {
   onRatingChange: (rating: RatingValue) => void;
   onNoteChange: (note: string) => void;
   onSubmit: () => void;
+  /** Heading lives on the shared visit card so preview and live match. */
+  embedInVisit?: boolean;
 }
 
 export function RatingScreen({
@@ -34,6 +36,7 @@ export function RatingScreen({
   onRatingChange,
   onNoteChange,
   onSubmit,
+  embedInVisit = false,
 }: RatingScreenProps) {
   const isSubmitting = status === "submitting";
   const isOffline = status === "offline";
@@ -47,15 +50,17 @@ export function RatingScreen({
 
   return (
     <section className="flow-screen" data-flow-screen="rating">
-      <div className="screen-heading-group">
-        <h1 className="customer-question" data-screen-heading tabIndex={-1}>
-          {messages.ratingHeading}
-        </h1>
-        <p className="customer-support">{messages.ratingSupport}</p>
-      </div>
+      {embedInVisit ? null : (
+        <div className="screen-heading-group">
+          <h1 className="customer-question" data-screen-heading tabIndex={-1}>
+            {messages.ratingHeading}
+          </h1>
+          <p className="customer-support">{messages.ratingSupport}</p>
+        </div>
+      )}
 
       <form className="customer-form" onSubmit={handleSubmit}>
-        <StarRating
+        <VisitStars
           value={rating}
           onChange={onRatingChange}
           messages={messages}
