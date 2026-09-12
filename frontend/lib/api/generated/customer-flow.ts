@@ -118,7 +118,7 @@ export interface components {
     schemas: {
         /** @enum {string} */
         Locale: "en" | "es" | "ht";
-        /** @description Contains no organization id, location id, stand id, or subscription state. A caller who learned the tenant could write unlimited fabricated feedback into it. */
+        /** @description Contains no organization id, location id, stand id, or subscription state. A caller who learned the tenant could write unlimited fabricated feedback into it. The guest page never renders location or ids even when those fields exist. */
         CustomerReviewContext: {
             business: {
                 name: string;
@@ -138,6 +138,16 @@ export interface components {
             googleReviewUrl: string;
             supportedLocales: components["schemas"]["Locale"][];
             defaultLocale: components["schemas"]["Locale"];
+            /** @description Published customer-page artwork. heroUrl is token-scoped and never carries an organization, location, or stand id. */
+            presentation: {
+                heroUrl: string | null;
+                transform: {
+                    x: number;
+                    y: number;
+                    scale: number;
+                };
+                tagline: string | null;
+            };
         };
         CreateSessionRequest: {
             locale: components["schemas"]["Locale"];

@@ -81,7 +81,7 @@ export function ResolveButton({
   }
 
   return (
-    <Button loading={busy} loadingLabel="Saving…" onClick={() => void setResolved(true)}>
+    <Button variant="action" loading={busy} loadingLabel="Saving…" onClick={() => void setResolved(true)}>
       <Check className="size-5" aria-hidden="true" />
       Mark as sorted
     </Button>

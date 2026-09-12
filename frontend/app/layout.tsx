@@ -6,12 +6,14 @@ import { Providers } from "@/components/providers";
 import { PwaRegister } from "@/components/pwa-register";
 import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
+import "@/styles/customer-page.css";
 
 export const metadata: Metadata = {
   // A template, so every page reads "Home — ReviewBoost" without each one
   // repeating the brand.
   title: { default: "ReviewBoost", template: "%s — ReviewBoost" },
-  description: "Collect honest reviews for your local business.",
+  description:
+    "A code on the counter. The same Google review opportunity for every customer.",
   applicationName: "ReviewBoost",
   // Next serves app/icon.tsx and app/apple-icon.tsx automatically; these point
   // at the exported files so a manifest or a third party has something stable.

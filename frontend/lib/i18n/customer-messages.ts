@@ -45,6 +45,7 @@ export interface CustomerMessages {
   doneBody: string;
   closePage: string;
   poweredBy: string;
+  footerPromise: string;
   businessLogoAlt: (businessName: string) => string;
 }
 
@@ -64,7 +65,7 @@ const en: CustomerMessages = {
   loadErrorBody: "Check your connection and try again.",
   tryAgain: "Try again",
   ratingHeading: "How was your visit?",
-  ratingSupport: "Tap a star to let us know.",
+  ratingSupport: "Tap a star to continue to Google",
   ratingGroup: "Rate your visit from 1 to 5 stars",
   ratingSpoken: {
     1: "1 star — Not good",
@@ -83,7 +84,7 @@ const en: CustomerMessages = {
   noteLabel: "Want to add a note?",
   optional: "optional",
   notePlaceholder: "Tell us anything you’d like us to know",
-  noteTrust: (businessName) => `Your note goes directly to ${businessName}.`,
+  noteTrust: (businessName) => `Your rating goes privately to ${businessName}.`,
   continue: "Continue",
   sending: "Sending…",
   submitErrorHeading: "That didn’t go through.",
@@ -91,11 +92,11 @@ const en: CustomerMessages = {
   offline: "You’re offline. We’ll try when you reconnect.",
   thanksHeading: "Thanks for sharing.",
   feedbackSent: (businessName) => `Your feedback was sent to ${businessName}.`,
-  googlePrompt: "Want to share your experience on Google too?",
+  googlePrompt: "Opening Google…",
   googleAction: "Leave a Google review",
   googleContinue: "Continue without Google",
   googleTrust: (businessName) =>
-    `Google reviews are public. Your note to ${businessName} is private.`,
+    `Google reviews are public. ReviewBoost does not post the review for you. Your rating to ${businessName} is private.`,
   praiseHeading: "Want to thank someone?",
   praiseSupport: (businessName) => `Only ${businessName} will see this.`,
   firstNameLabel: "Their first name",
@@ -110,6 +111,7 @@ const en: CustomerMessages = {
   doneBody: "Thanks for helping a local business improve.",
   closePage: "You can close this page.",
   poweredBy: "Powered by ReviewBoost",
+  footerPromise: "Real businesses. Real feedback. A brighter tomorrow.",
   businessLogoAlt: (businessName) => `${businessName} logo`,
 };
 
@@ -123,7 +125,7 @@ const es: CustomerMessages = {
   loadErrorBody: "Revisa tu conexión e inténtalo de nuevo.",
   tryAgain: "Intentar de nuevo",
   ratingHeading: "¿Cómo estuvo tu visita?",
-  ratingSupport: "Toca una estrella para contarnos.",
+  ratingSupport: "Toca una estrella para ir a Google",
   ratingGroup: "Califica tu visita de 1 a 5 estrellas",
   ratingSpoken: {
     1: "1 estrella — No estuvo bien",
@@ -142,7 +144,7 @@ const es: CustomerMessages = {
   noteLabel: "¿Quieres agregar una nota?",
   optional: "opcional",
   notePlaceholder: "Cuéntanos lo que quieras que sepamos",
-  noteTrust: (businessName) => `Tu nota va directamente a ${businessName}.`,
+  noteTrust: (businessName) => `Tu calificación va en privado a ${businessName}.`,
   continue: "Continuar",
   sending: "Enviando…",
   submitErrorHeading: "No se pudo enviar.",
@@ -150,11 +152,11 @@ const es: CustomerMessages = {
   offline: "No tienes conexión. Lo intentaremos cuando vuelvas a conectarte.",
   thanksHeading: "Gracias por compartir.",
   feedbackSent: (businessName) => `Tus comentarios se enviaron a ${businessName}.`,
-  googlePrompt: "¿También quieres compartir tu experiencia en Google?",
+  googlePrompt: "Abriendo Google…",
   googleAction: "Dejar una reseña en Google",
   googleContinue: "Continuar sin Google",
   googleTrust: (businessName) =>
-    `Las reseñas de Google son públicas. Tu nota para ${businessName} es privada.`,
+    `Las reseñas de Google son públicas. ReviewBoost no publica la reseña por ti. Tu calificación para ${businessName} es privada.`,
   praiseHeading: "¿Quieres agradecerle a alguien?",
   praiseSupport: (businessName) => `Solo ${businessName} verá esto.`,
   firstNameLabel: "Su nombre",
@@ -169,6 +171,7 @@ const es: CustomerMessages = {
   doneBody: "Gracias por ayudar a mejorar un negocio local.",
   closePage: "Puedes cerrar esta página.",
   poweredBy: "Con tecnología de ReviewBoost",
+  footerPromise: "Negocios reales. Comentarios reales. Un mañana más brillante.",
   businessLogoAlt: (businessName) => `Logo de ${businessName}`,
 };
 
@@ -182,7 +185,7 @@ const ht: CustomerMessages = {
   loadErrorBody: "Verifye koneksyon ou epi eseye ankò.",
   tryAgain: "Eseye ankò",
   ratingHeading: "Kijan vizit ou te ye?",
-  ratingSupport: "Peze yon etwal pou fè nou konnen.",
+  ratingSupport: "Tape yon zetwal pou ale sou Google",
   ratingGroup: "Bay vizit ou ant 1 ak 5 etwal",
   ratingSpoken: {
     1: "1 etwal — Pa bon",
@@ -199,9 +202,9 @@ const ht: CustomerMessages = {
     5: "Ekselan",
   },
   noteLabel: "Ou vle ajoute yon nòt?",
-  optional: "opsyonèl",
+  optional: "opsyonnèl",
   notePlaceholder: "Di nou nenpòt bagay ou ta renmen nou konnen",
-  noteTrust: (businessName) => `Nòt ou ale dirèkteman bay ${businessName}.`,
+  noteTrust: (businessName) => `Nòt ou ale an prive bay ${businessName}.`,
   continue: "Kontinye",
   sending: "N ap voye…",
   submitErrorHeading: "Sa pa t pase.",
@@ -209,16 +212,16 @@ const ht: CustomerMessages = {
   offline: "Ou pa konekte. N ap eseye lè ou rekonekte.",
   thanksHeading: "Mèsi paske ou pataje.",
   feedbackSent: (businessName) => `Kòmantè ou te voye bay ${businessName}.`,
-  googlePrompt: "Ou vle pataje eksperyans ou sou Google tou?",
+  googlePrompt: "N ap ouvri Google…",
   googleAction: "Kite yon revi sou Google",
   googleContinue: "Kontinye san Google",
   googleTrust: (businessName) =>
-    `Revi Google yo piblik. Nòt ou pou ${businessName} prive.`,
+    `Revi Google yo piblik. ReviewBoost pa pibliye revi a pou ou. Nòt ou pou ${businessName} prive.`,
   praiseHeading: "Ou vle remèsye yon moun?",
   praiseSupport: (businessName) => `Se sèlman ${businessName} ki pral wè sa.`,
   firstNameLabel: "Prenon yo",
   praiseNoteLabel: "Kisa yo te fè byen?",
-  praiseNotePlaceholder: "Pataje kèk mo (opsyonèl)",
+  praiseNotePlaceholder: "Pataje kèk mo (opsyonnèl)",
   sendThanks: "Voye remèsiman",
   skip: "Sote",
   requiredFirstName: "Antre prenon yo pou voye remèsiman.",
@@ -228,8 +231,8 @@ const ht: CustomerMessages = {
   doneBody: "Mèsi paske ou ede yon biznis lokal amelyore.",
   closePage: "Ou ka fèmen paj sa a.",
   poweredBy: "ReviewBoost mache paj sa a",
+  footerPromise: "Biznis reyèl. Kòmantè reyèl. Yon demen pi klere.",
   businessLogoAlt: (businessName) => `Logo ${businessName}`,
 };
 
 export const customerMessages: Record<Locale, CustomerMessages> = { en, es, ht };
-

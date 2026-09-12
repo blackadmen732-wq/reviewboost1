@@ -118,7 +118,7 @@ export function EditableRow({
           <p
             className={cn(
               "break-words text-base font-medium",
-              isEmpty && warnWhenEmpty ? "text-[color:var(--rb-warning)]" : "text-ink",
+              isEmpty && warnWhenEmpty ? "text-muted" : "text-ink",
             )}
           >
             {value || emptyText}
@@ -177,7 +177,7 @@ export function EditableRow({
       ) : null}
 
       <div className="mt-3 flex gap-2">
-        <Button loading={busy} loadingLabel="Saving…" onClick={() => void save()}>
+        <Button variant="action" loading={busy} loadingLabel="Saving…" onClick={() => void save()}>
           Save
         </Button>
         <Button

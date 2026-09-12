@@ -69,20 +69,24 @@ describe.each(["light", "dark"] as const)("%s theme", (theme) => {
   const brandSoft = () => token("rb-brand-soft", theme);
   const brandText = () => token("rb-brand-text", theme);
   const onBrand = () => token("rb-on-brand", theme);
+  const action = () => token("rb-action", theme);
+  const onAction = () => token("rb-on-action", theme);
   const canvas = () => token("rb-canvas", theme);
   const surface = () => token("rb-surface", theme);
   const ink = () => token("rb-ink", theme);
   const muted = () => token("rb-muted", theme);
 
-  it("primary button label is readable on brand green", () => {
-    // The whole reason `--rb-on-brand` exists. White here is 3.08:1 in light
-    // mode, which is large-text only, and every primary button is normal size.
+  it("legacy brand button label is readable on brand green", () => {
     expect(contrast(onBrand(), brand())).toBeGreaterThanOrEqual(AA_TEXT);
   });
 
-  it("never uses white as the primary button label", () => {
+  it("brand green cannot carry a white label", () => {
     expect(contrast("#FFFFFF", brand())).toBeLessThan(AA_TEXT);
     expect(onBrand().toLowerCase()).not.toBe("#ffffff");
+  });
+
+  it("action button label is readable", () => {
+    expect(contrast(onAction(), action())).toBeGreaterThanOrEqual(AA_TEXT);
   });
 
   it("brand text token is readable on every surface it is used on", () => {
@@ -121,10 +125,48 @@ describe("brand migration", () => {
     expect(token("rb-brand", "light").toLowerCase()).toBe("#00a86b");
   });
 
-  it("defines every brand token in both themes", () => {
-    for (const name of ["rb-brand", "rb-brand-hover", "rb-brand-active", "rb-brand-soft", "rb-brand-text", "rb-on-brand"]) {
+  it("locks the constitution light palette", () => {
+    expect(token("rb-canvas", "light").toLowerCase()).toBe("#f8f5f0");
+    expect(token("rb-surface", "light").toLowerCase()).toBe("#ffffff");
+    expect(token("rb-quiet", "light").toLowerCase()).toBe("#f2efe9");
+    expect(token("rb-ink", "light").toLowerCase()).toBe("#171a18");
+    expect(token("rb-muted", "light").toLowerCase()).toBe("#5d655f");
+    expect(token("rb-border", "light").toLowerCase()).toBe("#d8ded9");
+    expect(token("rb-action", "light").toLowerCase()).toBe("#007a4d");
+    expect(token("rb-action-hover", "light").toLowerCase()).toBe("#006b43");
+    expect(token("rb-action-pressed", "light").toLowerCase()).toBe("#005b39");
+    expect(token("rb-on-action", "light").toLowerCase()).toBe("#ffffff");
+    expect(token("rb-brand-soft", "light").toLowerCase()).toBe("#ddf5ea");
+    expect(token("rb-star", "light").toLowerCase()).toBe("#bf7d00");
+    expect(token("rb-star-soft", "light").toLowerCase()).toBe("#fff3d0");
+    expect(token("rb-focus", "light").toLowerCase()).toBe("#005fcc");
+  });
+
+  it("uses action green for white-text buttons, not brand green", () => {
+    expect(contrast("#FFFFFF", token("rb-action", "light"))).toBeGreaterThanOrEqual(AA_TEXT);
+    expect(contrast("#FFFFFF", token("rb-brand", "light"))).toBeLessThan(AA_TEXT);
+  });
+
+  it("defines every brand and action token in both themes", () => {
+    for (const name of [
+      "rb-brand",
+      "rb-brand-hover",
+      "rb-brand-active",
+      "rb-brand-soft",
+      "rb-brand-text",
+      "rb-on-brand",
+      "rb-action",
+      "rb-action-hover",
+      "rb-action-pressed",
+      "rb-on-action",
+    ]) {
       expect(() => token(name, "light")).not.toThrow();
       expect(() => token(name, "dark")).not.toThrow();
     }
+  });
+
+  it("locks control and card radii", () => {
+    expect(CSS).toMatch(/--radius-control:\s*12px/);
+    expect(CSS).toMatch(/--radius-card:\s*16px/);
   });
 });

@@ -108,7 +108,6 @@ export function customerFlowReducer(
     case "google-click-started":
       return {
         ...state,
-        screen: "praise",
         googleClickKey: action.idempotencyKey,
         googleClickPending: true,
       };

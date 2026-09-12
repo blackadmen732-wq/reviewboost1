@@ -57,6 +57,8 @@ function allowed() {
 function happyPath(fn: string): { data: unknown; error: unknown } {
   if (fn === "rpc_consume_rate_limit") return allowed();
   if (fn === "rpc_public_resolve_stand") return { data: [ACTIVE_STAND], error: null };
+  if (fn === "rpc_public_customer_presentation") return { data: [], error: null };
+  if (fn === "rpc_public_customer_hero") return { data: [], error: null };
   return { data: [{ outcome: "created", response_status: null, response_body_encrypted: null }], error: null };
 }
 
@@ -153,11 +155,17 @@ describe("GET public context", () => {
       "defaultLocale",
       "googleReviewUrl",
       "location",
+      "presentation",
       "supportedLocales",
     ]);
     expect(body["googleReviewUrl"]).toBe(ACTIVE_STAND.google_review_url);
     expect(body["business"]).toEqual({ name: "The Corner Cafe", logoUrl: null });
     expect(body["location"]).toEqual({ name: "High Street" });
+    expect(body["presentation"]).toEqual({
+      heroUrl: null,
+      transform: { x: 0, y: 0, scale: 1 },
+      tagline: null,
+    });
     expect(body["supportedLocales"]).toEqual(["en", "es", "ht"]);
   });
 
