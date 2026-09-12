@@ -1,8 +1,9 @@
 "use client";
 
-import { CircleCheck, ExternalLink, LockKeyhole } from "lucide-react";
+import { ExternalLink, LockKeyhole } from "lucide-react";
+import { useEffect, useRef } from "react";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { CustomerActionBar } from "@/features/customer-flow/customer-action-bar";
 import { cn } from "@/lib/utils/cn";
 import type { CustomerMessages } from "@/lib/i18n/customer-messages";
@@ -12,7 +13,6 @@ interface GoogleOpportunityProps {
   googleReviewUrl: string;
   messages: CustomerMessages;
   onGoogleAction: () => void;
-  onContinue: () => void;
 }
 
 export function GoogleOpportunity({
@@ -20,27 +20,34 @@ export function GoogleOpportunity({
   googleReviewUrl,
   messages,
   onGoogleAction,
-  onContinue,
 }: GoogleOpportunityProps) {
+  const linkRef = useRef<HTMLAnchorElement>(null);
+  const opened = useRef(false);
+
+  useEffect(() => {
+    if (opened.current) return;
+    opened.current = true;
+    onGoogleAction();
+    const frame = window.requestAnimationFrame(() => {
+      linkRef.current?.click();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [onGoogleAction]);
+
   return (
     <section className="flow-screen" data-flow-screen="google-opportunity">
-      <div className="success-mark" aria-hidden="true">
-        <CircleCheck size={28} strokeWidth={2.1} />
-      </div>
       <div className="screen-heading-group">
         <h1 className="customer-question" data-screen-heading tabIndex={-1}>
           {messages.thanksHeading}
         </h1>
-        <p className="customer-support">
-          {messages.feedbackSent(businessName)}
-        </p>
+        <p className="customer-support">{messages.googlePrompt}</p>
       </div>
 
       <div className="google-opportunity">
-        <p className="google-prompt">{messages.googlePrompt}</p>
         <CustomerActionBar>
           <div className="action-stack">
             <a
+              ref={linkRef}
               className={cn(
                 buttonVariants({ variant: "primary", size: "lg" }),
                 "google-review-link",
@@ -48,14 +55,10 @@ export function GoogleOpportunity({
               href={googleReviewUrl}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={onGoogleAction}
             >
               <span>{messages.googleAction}</span>
               <ExternalLink aria-hidden="true" size={18} strokeWidth={2} />
             </a>
-            <Button variant="ghost" onClick={onContinue}>
-              {messages.googleContinue}
-            </Button>
           </div>
         </CustomerActionBar>
         <p className="trust-line google-trust">

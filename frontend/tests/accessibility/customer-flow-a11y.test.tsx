@@ -8,25 +8,31 @@ import { FinishedScreen } from "@/features/customer-flow/screens/finished-screen
 import { GoogleOpportunity } from "@/features/customer-flow/screens/google-opportunity";
 import { RatingScreen } from "@/features/customer-flow/screens/rating-screen";
 import { TeamPraiseScreen } from "@/features/customer-flow/screens/team-praise-screen";
+import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 
 const messages = customerMessages.en;
 
 describe("customer flow accessibility", () => {
-  it("has no Axe violations on the rating and note state", async () => {
+  it("has no Axe violations on the shared one-tap rating view", async () => {
     const { container } = render(
-      <CustomerFrame poweredBy={messages.poweredBy}>
+      <CustomerVisitView
+        heroUrl={null}
+        transform={{ x: 0, y: 0, scale: 1 }}
+        heading={messages.ratingHeading}
+        support={messages.ratingSupport}
+        footerLine={messages.footerPromise}
+      >
         <RatingScreen
           businessName="Mario’s Pizza"
           messages={messages}
           rating={3}
-          note="A private note"
           status="idle"
-          onRatingChange={vi.fn()}
-          onNoteChange={vi.fn()}
-          onSubmit={vi.fn()}
+          onRate={vi.fn()}
+          onRetry={vi.fn()}
+          embedInVisit
         />
-      </CustomerFrame>,
+      </CustomerVisitView>,
     );
     expect((await axe(container)).violations).toEqual([]);
   });
@@ -39,7 +45,6 @@ describe("customer flow accessibility", () => {
           googleReviewUrl="https://search.google.com/local/writereview?placeid=abc"
           messages={messages}
           onGoogleAction={vi.fn()}
-          onContinue={vi.fn()}
         />
       </CustomerFrame>,
     );

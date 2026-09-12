@@ -1,79 +1,67 @@
 import type { Metadata } from "next";
-import { QrCode } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
-import { AppShell } from "@/features/dashboard/app-shell";
-import { StandCard } from "@/features/dashboard/stand-card";
+import { PageHeader } from "@/components/ui/page-header";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { AddStandButton } from "@/features/dashboard/add-stand-button";
+import { TagsList } from "@/features/tags/tags-list";
+import { getEntitlementSnapshot } from "@/lib/server/entitlements-service";
 import { listStands, listLocations, requireOwner } from "@/lib/server/owner-data";
+import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Your codes — ReviewBoost",
+  title: "Tags — ReviewBoost",
   robots: { index: false, follow: false },
 };
 
 export const dynamic = "force-dynamic";
 
 export default async function StandsPage() {
-  const { organization } = await requireOwner("/stands");
-  const [stands, locations] = await Promise.all([
+  const { user, organization } = await requireOwner("/stands");
+  const supabase = await supabaseServer();
+  const [stands, locations, entitlements] = await Promise.all([
     listStands(organization.orgId),
     listLocations(organization.orgId),
+    getEntitlementSnapshot({ userId: user.id, db: supabase }, organization.orgId),
   ]);
 
-  const locationMap = new Map(locations.map((l) => [l.locationId, l.name]));
-  const grouped = new Map<string, typeof stands>();
-  for (const stand of stands) {
-    const key = stand.locationId;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(stand);
-  }
-
   return (
-    <AppShell>
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Your codes</h1>
-          <p className="mt-1 text-base text-muted">Put these where customers pay.</p>
-        </div>
-        {locations.length > 0 && (
-          <AddStandButton locations={locations.map((l) => ({ locationId: l.locationId, name: l.name }))} />
-        )}
-      </div>
+    <OwnerShell businessName={organization.name}>
+      <PageHeader
+        title="Tags"
+        description="Print a code or program a Tag. Put it where people pay."
+        action={
+          locations.length > 0 && entitlements.canCreateTag ? (
+            <AddStandButton
+              locations={locations.map((l) => ({ locationId: l.locationId, name: l.name }))}
+            />
+          ) : null
+        }
+      />
+
+      {!entitlements.canCreateTag && locations.length > 0 ? (
+        <p className="mb-6 text-base text-ink">
+          {entitlements.status === "cancelled"
+            ? "This plan is cancelled. Your Tags are still here."
+            : `This plan includes ${entitlements.tagLimit} Tags. You are at the limit.`}
+        </p>
+      ) : null}
 
       {stands.length === 0 ? (
         <EmptyState
-          icon={QrCode}
-          title="No codes yet"
-          description="Finish setting up and your first code appears here."
+          title="No tags yet"
+          description="Create a Tag, print the code, and put it on the counter."
+          action={
+            locations.length > 0 && entitlements.canCreateTag ? (
+              <AddStandButton
+                locations={locations.map((l) => ({ locationId: l.locationId, name: l.name }))}
+              />
+            ) : undefined
+          }
         />
       ) : (
-        <div className="flex flex-col gap-8">
-          {[...grouped.entries()].map(([locationId, locationStands]) => (
-            <div key={locationId}>
-              {grouped.size > 1 && (
-                <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
-                  {locationMap.get(locationId) ?? "Unknown location"}
-                </h2>
-              )}
-              <div className="flex flex-col gap-5">
-                {locationStands.map((stand) => (
-                  <StandCard
-                    key={stand.standId}
-                    standId={stand.standId}
-                    label={stand.label}
-                    standType={stand.standType}
-                    status={stand.status}
-                    tokenPrefix={stand.tokenPrefix}
-                    tokenRotatedAt={stand.tokenRotatedAt}
-                    nfcProvisionedAt={stand.nfcProvisionedAt}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <TagsList stands={stands} />
       )}
-    </AppShell>
+    </OwnerShell>
   );
 }

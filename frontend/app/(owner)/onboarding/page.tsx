@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { AuthFrame } from "@/features/auth/auth-frame";
 import { OnboardingFlow } from "@/features/onboarding/onboarding-flow";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Set up — ReviewBoost",
+  title: "Set up",
   robots: { index: false, follow: false },
 };
 
@@ -32,8 +33,8 @@ export default async function OnboardingPage() {
   if (existing && existing.length > 0) redirect("/home");
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
+    <AuthFrame align="start">
       <OnboardingFlow />
-    </main>
+    </AuthFrame>
   );
 }

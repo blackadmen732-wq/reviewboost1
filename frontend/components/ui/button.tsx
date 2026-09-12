@@ -17,10 +17,13 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          // Dark ink on brand green, never white. White on #00A86B is 3.08:1 —
-          // large-text only — so a white label on a normal-size button fails
-          // AA. The token flips with the theme; the hardcoded value did not.
+          // Customer flow still uses this variant. Brand green cannot carry a
+          // white label (3.08:1). Owner CTAs use `action` instead.
           "border-brand bg-brand text-on-brand shadow-[var(--shadow-button)] hover:border-brand-hover hover:bg-brand-hover hover:shadow-[var(--shadow-button-hover)] active:bg-brand-active",
+        action:
+          // Constitution Action green. White on #007A4D is ~5.4:1 — AA for
+          // normal text. Brand green (#00A86B) is never used here.
+          "border-action bg-action text-on-action shadow-[var(--shadow-button)] hover:border-action-hover hover:bg-action-hover hover:shadow-[var(--shadow-button-hover)] active:bg-action-pressed focus-visible:ring-[color:var(--rb-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
         secondary:
           "border-border bg-surface text-ink shadow-[var(--shadow-control)] hover:border-[color:var(--rb-border-strong)] hover:bg-quiet",
         outline:
@@ -32,7 +35,7 @@ export const buttonVariants = cva(
       size: {
         sm: "min-h-11 px-4 text-sm",
         default: "min-h-14 text-base",
-        lg: "min-h-16 rounded-[16px] px-6 text-[1.0625rem]",
+        lg: "min-h-16 rounded-[var(--radius-control)] px-6 text-[1.0625rem]",
         icon: "h-12 min-h-12 w-12 px-0",
       },
     },

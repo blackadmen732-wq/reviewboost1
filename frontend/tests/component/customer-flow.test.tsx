@@ -1,4 +1,4 @@
-import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -19,7 +19,6 @@ async function openRating(token = "fixture-valid") {
 
 async function reachGoogle(user: ReturnType<typeof userEvent.setup>, rating: RatingValue) {
   await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[rating] }));
-  await user.click(screen.getByRole("button", { name: customerMessages.en.continue }));
   await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
   return document.querySelector<HTMLElement>("[data-flow-screen='google-opportunity']");
 }
@@ -33,16 +32,11 @@ describe("complete customer flow", () => {
       const googleScreen = await reachGoogle(user, rating);
       expect(googleScreen).not.toBeNull();
       googleMarkup.push(googleScreen?.outerHTML ?? "");
-
-      await user.click(
-        within(googleScreen as HTMLElement).getByRole("button", {
-          name: customerMessages.en.googleContinue,
-        }),
-      );
       expect(
-        await screen.findByRole("heading", { name: customerMessages.en.praiseHeading }),
+        screen.getByRole("link", { name: customerMessages.en.googleAction }),
       ).toBeVisible();
-      expect(screen.queryByText(customerMessages.en.ratingLabels[rating])).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: customerMessages.en.continue })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: customerMessages.en.praiseHeading })).not.toBeInTheDocument();
       cleanup();
       window.sessionStorage.clear();
     }
@@ -50,30 +44,20 @@ describe("complete customer flow", () => {
     expect(new Set(googleMarkup).size).toBe(1);
   });
 
-  it("submits Unicode Team Praise and reaches the quiet finished state", async () => {
+  it("does not put Team Praise or a note field on the guest path", async () => {
     const user = await openRating();
-    const googleScreen = await reachGoogle(user, 4);
-    await user.click(
-      within(googleScreen as HTMLElement).getByRole("button", {
-        name: customerMessages.en.googleContinue,
-      }),
-    );
-    await user.type(screen.getByRole("textbox", { name: /their first name/i }), "Zoë");
-    await user.type(screen.getByRole("textbox", { name: /what did they do well/i }), "Très gentille");
-    await user.click(screen.getByRole("button", { name: customerMessages.en.sendThanks }));
-
-    const doneHeading = await screen.findByRole("heading", {
-      name: customerMessages.en.doneHeading,
-    });
-    await waitFor(() => expect(doneHeading).toBeVisible());
+    await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[4] }));
+    await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByText(customerMessages.en.praiseHeading)).not.toBeInTheDocument();
     expect(screen.queryByText(/sign up|newsletter|download/i)).not.toBeInTheDocument();
-    expect(window.sessionStorage.length).toBe(0);
   });
 
   it("blocks duplicate taps while preserving one logical response attempt", async () => {
     const user = await openRating();
-    await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[3] }));
-    await user.dblClick(screen.getByRole("button", { name: customerMessages.en.continue }));
+    const star = screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[3] });
+    await user.click(star);
+    await user.click(star);
     await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
 
     const responseCalls = window.__RB_FIXTURE_CALLS__?.filter(
@@ -82,16 +66,12 @@ describe("complete customer flow", () => {
     expect(responseCalls).toHaveLength(1);
   });
 
-  it("retains the rating, note, and idempotency key after a recoverable failure", async () => {
+  it("retains the rating and idempotency key after a recoverable failure", async () => {
     const user = await openRating("fixture-response-error");
     await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[2] }));
-    await user.type(screen.getByRole("textbox", { name: /want to add a note/i }), "Please keep this");
-    await user.click(screen.getByRole("button", { name: customerMessages.en.continue }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Your feedback is still here");
-    expect(screen.getByRole("textbox", { name: /want to add a note/i })).toHaveValue(
-      "Please keep this",
-    );
+    expect(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[2] })).toBeChecked();
     await user.click(screen.getByRole("button", { name: customerMessages.en.tryAgain }));
     await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
 
@@ -102,15 +82,13 @@ describe("complete customer flow", () => {
     expect(new Set(responseKeys).size).toBe(1);
   });
 
-  it("retains the draft offline and retries when connectivity returns", async () => {
+  it("retains the selected rating offline and retries when connectivity returns", async () => {
     const user = await openRating();
-    await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[1] }));
-    await user.type(screen.getByRole("textbox", { name: /want to add a note/i }), "Still here");
     Object.defineProperty(window.navigator, "onLine", { configurable: true, value: false });
-    await user.click(screen.getByRole("button", { name: customerMessages.en.continue }));
+    await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[1] }));
 
     expect(await screen.findByText(customerMessages.en.offline)).toBeVisible();
-    expect(screen.getByRole("textbox", { name: /want to add a note/i })).toHaveValue("Still here");
+    expect(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[1] })).toBeChecked();
 
     await act(async () => {
       Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });

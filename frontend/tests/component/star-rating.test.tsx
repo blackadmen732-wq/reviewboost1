@@ -33,64 +33,65 @@ describe("StarRating", () => {
 
 describe("RatingScreen", () => {
   it.each([1, 2, 3, 4, 5] as const)(
-    "reveals the same optional note and Continue action for rating %s",
+    "submits rating %s directly without a note or Continue action",
     async (rating) => {
       const user = userEvent.setup();
-      const onRatingChange = vi.fn();
+      const onRate = vi.fn();
       const { rerender } = render(
         <RatingScreen
           businessName="Mario’s Pizza"
           messages={customerMessages.en}
           rating={null}
-          note=""
           status="idle"
-          onRatingChange={onRatingChange}
-          onNoteChange={vi.fn()}
-          onSubmit={vi.fn()}
+          onRate={onRate}
+          onRetry={vi.fn()}
         />,
       );
 
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
       await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[rating] }));
-      expect(onRatingChange).toHaveBeenCalledWith(rating);
+      expect(onRate).toHaveBeenCalledExactlyOnceWith(rating);
 
       rerender(
         <RatingScreen
           businessName="Mario’s Pizza"
           messages={customerMessages.en}
           rating={rating}
-          note=""
           status="idle"
-          onRatingChange={onRatingChange}
-          onNoteChange={vi.fn()}
-          onSubmit={vi.fn()}
+          onRate={onRate}
+          onRetry={vi.fn()}
         />,
       );
 
-      expect(screen.getByRole("textbox", { name: /want to add a note/i })).toBeVisible();
-      expect(screen.getByRole("button", { name: "Continue" })).toBeVisible();
-      expect(screen.getByText(customerMessages.en.ratingLabels[rating])).toBeVisible();
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[rating] }),
+      ).toBeChecked();
+      expect(screen.queryByText(customerMessages.en.ratingLabels[rating])).not.toBeInTheDocument();
     },
   );
 
-  it("keeps the chosen rating and note visible during submission and error", () => {
+  it("locks the chosen rating during submission and exposes retry after error", async () => {
+    const user = userEvent.setup();
     const sharedProps = {
       businessName: "Mario’s Pizza",
       messages: customerMessages.en,
       rating: 1 as const,
-      note: "The wait was long",
-      onRatingChange: vi.fn(),
-      onNoteChange: vi.fn(),
-      onSubmit: vi.fn(),
+      onRate: vi.fn(),
+      onRetry: vi.fn(),
     };
     const { rerender } = render(<RatingScreen {...sharedProps} status="submitting" />);
-    expect(screen.getByRole("textbox")).toHaveValue("The wait was long");
-    expect(screen.getByRole("button", { name: "Sending…" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[1] })).toBeChecked();
+    expect(screen.getAllByRole("radio").every((radio) => (radio as HTMLInputElement).disabled)).toBe(true);
+    await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[2] }));
+    expect(sharedProps.onRate).not.toHaveBeenCalled();
 
     rerender(<RatingScreen {...sharedProps} status="error" />);
-    expect(screen.getByRole("textbox")).toHaveValue("The wait was long");
+    expect(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[1] })).toBeChecked();
     expect(screen.getByRole("alert")).toHaveTextContent("Your feedback is still here");
     expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(sharedProps.onRetry).toHaveBeenCalledOnce();
   });
 });
-
