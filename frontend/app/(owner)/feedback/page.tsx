@@ -62,12 +62,9 @@ export default async function FeedbackPage({
           <EmptyState
             icon={MessageSquare}
             title="Nothing yet"
-            // Explains the cause, not just the absence.
-            description="When a customer scans your code and writes something, it shows up here."
+            description="Customer messages show up here when they arrive."
           />
         ) : (
-          // A genuinely different state, and a good one. "Nothing needs you" is
-          // an answer worth giving, not an empty screen to apologise for.
           <EmptyState
             icon={MessageSquare}
             title="All caught up"

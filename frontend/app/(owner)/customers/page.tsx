@@ -58,10 +58,9 @@ export default async function CustomersPage() {
         />
       ) : (
         <>
-          <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Metric value={summary.visits} label="Scanned" icon={Users} />
             <Metric value={summary.wroteNote} label="Wrote to you" icon={MessageSquare} />
-            <Metric value={summary.wentToGoogle} label="Went to Google" icon={ExternalLink} />
             <Metric value={summary.thankedStaff} label="Named staff" icon={Sparkles} />
           </section>
 
