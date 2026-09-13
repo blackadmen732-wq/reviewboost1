@@ -58,7 +58,7 @@ export default function StandDetailScreen() {
         setStandUrl(res.data.standUrl);
         setStandLabel(res.data.label);
       } catch {
-        setError("Could not load stand details. Please try again.");
+        setError("Could not load tag details. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -204,7 +204,7 @@ export default function StandDetailScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
-        <Stack.Screen options={{ title: "Stand" }} />
+        <Stack.Screen options={{ title: "Tag" }} />
         <ActivityIndicator size="large" color={colors.brandText} />
       </SafeAreaView>
     );
@@ -212,7 +212,7 @@ export default function StandDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: standLabel || "Stand" }} />
+      <Stack.Screen options={{ title: standLabel || "Tag" }} />
       <ScrollView contentContainerStyle={styles.content}>
         {error ? (
           <View style={styles.errorBanner}>
@@ -225,7 +225,7 @@ export default function StandDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Write NFC Tag</Text>
             <Text style={styles.sectionDesc}>
-              Hold an NFC tag to the back of your phone to write this stand&apos;s URL.
+              Hold an NFC tag to the back of your phone to write this tag&apos;s URL.
               Use NTAG213 or NTAG215 tags.
             </Text>
 
@@ -355,18 +355,18 @@ export default function StandDetailScreen() {
           </View>
         )}
 
-        {/* Test Stand */}
+        {/* Test tag */}
         {standUrl && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Test Stand</Text>
+            <Text style={styles.sectionTitle}>Test this tag</Text>
             <Text style={styles.sectionDesc}>
-              Open the live customer page for this stand to verify it works correctly.
+              Open the live customer page to verify this tag works correctly.
             </Text>
             <Pressable
               style={styles.nfcButton}
               onPress={() => void Linking.openURL(standUrl)}
             >
-              <Text style={styles.nfcButtonText}>Open Stand Page</Text>
+              <Text style={styles.nfcButtonText}>Open tag page</Text>
             </Pressable>
           </View>
         )}
@@ -376,7 +376,7 @@ export default function StandDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Copy NFC Link</Text>
             <Text style={styles.sectionDesc}>
-              Share or copy this stand&apos;s link. It is the same link the QR code
+              Share or copy this tag&apos;s link. It is the same link the QR code
               and NFC tag use.
             </Text>
             <Pressable
@@ -408,12 +408,12 @@ export default function StandDetailScreen() {
             <Text style={styles.step}>1. Install NFC Tools from App Store or Play Store</Text>
             <Text style={styles.step}>2. Open the app → tap Write</Text>
             <Text style={styles.step}>3. Add a record → URL / URI</Text>
-            <Text style={styles.step}>4. Copy the stand link from the web dashboard and paste it</Text>
+            <Text style={styles.step}>4. Copy the tag link from the web dashboard and paste it</Text>
             <Text style={styles.step}>5. Tap Write and hold your phone to the tag</Text>
             <Text style={styles.step}>6. Verify: tap the tag to confirm it opens the correct page</Text>
           </View>
           <Text style={[styles.sectionDesc, { marginTop: 8, fontStyle: "italic" }]}>
-            Do not permanently write-lock tags. If the code is rotated, the tag must be rewritten.
+            Do not permanently write-lock tags. If the tag is rotated, the NFC tag must be rewritten.
           </Text>
         </View>
       </ScrollView>

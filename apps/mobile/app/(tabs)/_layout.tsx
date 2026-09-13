@@ -4,9 +4,10 @@ import { colors, fonts } from "@/theme";
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   const icons: Record<string, string> = {
-    Feed: "◉",
+    Home: "⌂",
     Feedback: "✉",
-    Stands: "⬡",
+    Tags: "⬡",
+    Settings: "⚙",
   };
   return (
     <Text style={{ fontSize: 20, color: focused ? colors.brandText : colors.inkFaint }}>
@@ -29,8 +30,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="feed"
         options={{
-          title: "Live Feed",
-          tabBarIcon: ({ focused }) => <TabIcon label="Feed" focused={focused} />,
+          title: "Home",
+          tabBarIcon: ({ focused }) => <TabIcon label="Home" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -43,8 +44,15 @@ export default function TabLayout() {
       <Tabs.Screen
         name="stands"
         options={{
-          title: "Stands",
-          tabBarIcon: ({ focused }) => <TabIcon label="Stands" focused={focused} />,
+          title: "Tags",
+          tabBarIcon: ({ focused }) => <TabIcon label="Tags" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ focused }) => <TabIcon label="Settings" focused={focused} />,
         }}
       />
     </Tabs>

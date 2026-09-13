@@ -49,7 +49,7 @@ function NfcStatus({ stand }: { stand: StandItem }) {
         ]}
       >
         {needsRewrite
-          ? "NFC tag needs rewriting — code was changed"
+          ? "NFC tag needs rewriting — tag was rotated"
           : "NFC tag written"}
       </Text>
     </View>
@@ -68,7 +68,7 @@ function StandCard({ item }: { item: StandItem }) {
             {item.label}
           </Text>
           <Text style={styles.tokenPrefix}>
-            Code {item.tokenPrefix}…
+            Tag {item.tokenPrefix}…
             {item.standType === "physical_nfc" ? " · NFC" : ""}
           </Text>
         </View>
@@ -87,7 +87,7 @@ function StandCard({ item }: { item: StandItem }) {
       {item.standType === "physical_nfc" && !item.nfcProvisionedAt && (
         <View style={[styles.nfcBanner, { backgroundColor: colors.infoBg }]}>
           <Text style={[styles.nfcText, { color: colors.info }]}>
-            NFC tag not yet written. Use the Write NFC feature to provision this stand.
+            NFC tag not yet written. Use the Write NFC feature to set up this tag.
           </Text>
         </View>
       )}
@@ -172,9 +172,9 @@ export default function StandsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.center}>
-            <Text style={styles.emptyTitle}>No stands yet</Text>
+            <Text style={styles.emptyTitle}>No tags yet</Text>
             <Text style={styles.emptyDesc}>
-              Create a stand from the web dashboard to get started.
+              Create a tag from the web dashboard to get started.
             </Text>
           </View>
         }
