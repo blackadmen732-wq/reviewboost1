@@ -8,7 +8,7 @@ import { AddStandButton } from "@/features/dashboard/add-stand-button";
 import { listStands, listLocations, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Your codes — ReviewBoost",
+  title: "Your tags — ReviewBoost",
   robots: { index: false, follow: false },
 };
 
@@ -33,7 +33,7 @@ export default async function StandsPage() {
     <AppShell>
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Your codes</h1>
+          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Your tags</h1>
           <p className="mt-1 text-base text-muted">Put these where customers pay.</p>
         </div>
         {locations.length > 0 && (
@@ -44,8 +44,8 @@ export default async function StandsPage() {
       {stands.length === 0 ? (
         <EmptyState
           icon={QrCode}
-          title="No codes yet"
-          description="Finish setting up and your first code appears here."
+          title="No tags yet"
+          description="Finish setting up and your first tag appears here."
         />
       ) : (
         <div className="flex flex-col gap-8">

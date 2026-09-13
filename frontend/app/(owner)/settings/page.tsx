@@ -114,7 +114,7 @@ export default async function SettingsPage() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-base font-medium text-ink">See what customers see</p>
-            <p className="text-sm text-muted">Scan your own code to try it.</p>
+            <p className="text-sm text-muted">Scan your own tag to try it.</p>
           </div>
         </Link>
 

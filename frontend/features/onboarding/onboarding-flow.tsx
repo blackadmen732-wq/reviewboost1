@@ -274,7 +274,7 @@ export function OnboardingFlow() {
           You are all set
         </h1>
         <p className="text-base text-muted">
-          Print your code and put it where customers pay.
+          Your tag is ready. Put it where customers pay.
         </p>
       </div>
 
@@ -314,7 +314,7 @@ export function OnboardingFlow() {
       <div className="flex w-full flex-col gap-3">
         <Button size="lg" onClick={() => window.print()}>
           <Printer className="size-5" aria-hidden="true" />
-          Print this code
+          Print this tag
         </Button>
         <Button
           variant="secondary"

@@ -48,10 +48,8 @@ export function StatusBanner({ status }: { status: Status }) {
   }
 
   const content = {
-    // The worst state, and the one an owner cannot see for themselves: their
-    // code is printed and it does not work.
     setup: {
-      title: "Your code is not working yet",
+      title: "Your tag is not working yet",
       body: "Add your Google link so customers can leave reviews.",
       action: "Finish setup",
       icon: AlertCircle,
@@ -65,12 +63,10 @@ export function StatusBanner({ status }: { status: Status }) {
       action: "Read now",
       icon: AlertCircle,
     },
-    // Not framed as a failure. A quiet week is usually a code nobody can see,
-    // and the fix is physical, not digital.
     quiet: {
       title: "No scans this week",
-      body: "Is your code somewhere customers will see it?",
-      action: "See my codes",
+      body: "Is your tag somewhere customers will see it?",
+      action: "See my tags",
       icon: QrCode,
     },
   }[status.kind];

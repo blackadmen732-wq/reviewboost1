@@ -49,13 +49,13 @@ export function AddStandButton({ locations }: AddStandButtonProps) {
     setBusy(false);
 
     if (!response.ok) {
-      notify.error("Could not create stand", "Please try again.");
+      notify.error("Could not create tag", "Please try again.");
       return;
     }
 
     setOpen(false);
     setLabel("");
-    notify.success("Stand created", "Print the new code and place it where customers pay.");
+    notify.success("Tag created", "Print the new tag and place it where customers pay.");
     router.refresh();
   }
 
@@ -63,11 +63,11 @@ export function AddStandButton({ locations }: AddStandButtonProps) {
     <>
       <Button variant="secondary" onClick={() => setOpen(true)}>
         <Plus className="size-5" aria-hidden="true" />
-        Add stand
+        Add tag
       </Button>
 
       <DialogRoot open={open} onOpenChange={setOpen}>
-        <DialogContent title="Add a new stand" description="Create a new QR code for customers to scan.">
+        <DialogContent title="Add a new tag" description="Create a new QR code for customers to scan.">
           <div className="flex flex-col gap-4 py-2">
             {locations.length > 1 && (
               <div>
@@ -106,7 +106,7 @@ export function AddStandButton({ locations }: AddStandButtonProps) {
 
           <div className="flex flex-col gap-2 sm:flex-row-reverse">
             <Button variant="primary" loading={busy} onClick={() => void handleCreate()} className="sm:flex-1">
-              Create stand
+              Create tag
             </Button>
             <Button variant="secondary" onClick={() => setOpen(false)} className="sm:flex-1">
               Cancel

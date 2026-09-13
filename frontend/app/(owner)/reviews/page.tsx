@@ -64,7 +64,7 @@ async function ReviewsBody({ orgId, timezone }: { orgId: string; timezone: strin
       <EmptyState
         icon={Star}
         title="No ratings yet"
-        description="When someone scans your code and taps a star, it appears here straight away."
+        description="When someone scans your tag and taps a star, it appears here straight away."
       />
     );
   }

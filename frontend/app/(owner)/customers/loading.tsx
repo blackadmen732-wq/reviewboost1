@@ -12,8 +12,8 @@ export default function CustomersLoading() {
       <Skeleton className="mb-2 h-8 w-44" />
       <Skeleton className="mb-6 h-5 w-52" />
 
-      <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[0, 1, 2, 3].map((tile) => (
+      <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {[0, 1, 2].map((tile) => (
           <div
             key={tile}
             className="rounded-[var(--radius-card)] border border-border bg-surface p-4"

@@ -48,13 +48,13 @@ export default async function CustomersPage() {
   return (
     <AppShell>
       <h1 className="mb-2 text-2xl font-semibold tracking-[-0.02em] text-ink">Customers</h1>
-      <p className="mb-6 text-base text-muted">Everyone who used your code.</p>
+      <p className="mb-6 text-base text-muted">Everyone who used your tag.</p>
 
       {summary.visits === 0 ? (
         <EmptyState
           icon={Users}
           title="Nobody yet"
-          description="Every customer who scans your code shows up here, so you can see how many are using it."
+          description="Every customer who scans your tag shows up here, so you can see how many are using it."
         />
       ) : (
         <>

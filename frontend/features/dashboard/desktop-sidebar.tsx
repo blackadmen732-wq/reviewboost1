@@ -1,6 +1,5 @@
 "use client";
 
-import { Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -8,29 +7,11 @@ import { Wordmark } from "@/components/brand/wordmark";
 import { DESKTOP_NAV, isActive } from "@/features/dashboard/nav-items";
 import { cn } from "@/lib/utils/cn";
 
-/**
- * Desktop navigation.
- *
- * Hidden below `lg`, where the bottom bar takes over. Both are always rendered
- * and CSS decides — no viewport detection in JavaScript, so there is no flash of
- * the wrong navigation on first paint.
- *
- * Carries every screen, unlike the phone bar. A sidebar has vertical room, and
- * scanning a list of six at rest costs nothing; four is a constraint of the
- * thumb, not of comprehension.
- *
- * Settings is not in the list. It lives in the account row at the bottom, where
- * every desktop product has trained people to look for it.
- */
-
 export function DesktopSidebar({
   unreadCount = 0,
   businessName,
 }: {
   unreadCount?: number | undefined;
-  // Explicitly `| undefined` rather than just optional: the project runs
-  // exactOptionalPropertyTypes, which distinguishes "absent" from "present
-  // and undefined", and callers pass the result of a lookup that may be either.
   businessName?: string | undefined;
 }) {
   const pathname = usePathname();
@@ -91,18 +72,8 @@ export function DesktopSidebar({
         </ul>
       </nav>
 
-      {/* The account row sits at the bottom, where every desktop product has
-          trained people to look for it. */}
       <div className="border-t border-border p-3">
-        <Link
-          href="/settings"
-          className={cn(
-            "flex min-h-14 items-center gap-3 rounded-[var(--radius-control)] px-3",
-            "transition-colors duration-150 hover:bg-quiet",
-            "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
-            pathname.startsWith("/settings") && "bg-quiet",
-          )}
-        >
+        <div className="flex min-h-14 items-center gap-3 px-3">
           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-semibold text-brand-text">
             {(businessName ?? "R").slice(0, 1).toUpperCase()}
           </span>
@@ -110,10 +81,8 @@ export function DesktopSidebar({
             <span className="block truncate text-sm font-medium text-ink">
               {businessName ?? "Your business"}
             </span>
-            <span className="block text-xs text-muted">Settings</span>
           </span>
-          <Settings className="size-4 shrink-0 text-muted" aria-hidden="true" />
-        </Link>
+        </div>
       </div>
     </aside>
   );

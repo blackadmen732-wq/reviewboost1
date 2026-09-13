@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     absolute: "ReviewBoost — More Google reviews, without the work",
   },
   description:
-    "Your customers scan a code on your counter. One tap, and they're leaving you a review on Google. Set up in two minutes, free to start.",
+    "Your customers scan a tag on your counter. One tap, and they're leaving you a review on Google. Set up in two minutes, free to start.",
 };
 
 export const dynamic = "force-dynamic";

@@ -76,13 +76,13 @@ export function StandCard({
     setConfirming(false);
 
     if (!response.ok) {
-      notify.error("Could not make a new code", "Please try again.");
+      notify.error("Could not rotate the tag", "Please try again.");
       return;
     }
 
     qr.reload();
     if (hasNfc) setRotatedLocally(true);
-    notify.success("New code ready", "Print it and replace the old one.");
+    notify.success("New tag ready", "Print it and replace the old one.");
   }
 
   function getEffectivePngSize(): number | null {
@@ -136,7 +136,7 @@ export function StandCard({
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      notify.error("Could not download the code", "Please try again.");
+      notify.error("Could not download the tag", "Please try again.");
     } finally {
       setDownloadingPng(false);
     }
@@ -191,7 +191,7 @@ export function StandCard({
       if (!url) throw new Error("no_url");
       window.open(url, "_blank", "noopener,noreferrer");
     } catch {
-      notify.error("Could not open stand page", "Please try again.");
+      notify.error("Could not open the tag page", "Please try again.");
     }
   }
 
@@ -201,7 +201,7 @@ export function StandCard({
         <div className="min-w-0">
           <p className="truncate text-lg font-semibold text-ink">{label}</p>
           <p className="text-sm text-muted">
-            Code {tokenPrefix}… · {status === "active" ? "Working" : status}
+            Tag {tokenPrefix}… · {status === "active" ? "Working" : status}
             {standType === "physical_nfc" && " · NFC"}
           </p>
         </div>
@@ -218,8 +218,8 @@ export function StandCard({
           <div>
             {tokenWasRotatedAfterNfc ? (
               <p>
-                <strong>NFC tag needs rewriting.</strong> The code was changed after this tag was
-                written. The physical tag still links to the old code.
+                <strong>NFC tag needs rewriting.</strong> The tag was rotated after this NFC tag was
+                written. The physical tag still links to the old URL.
               </p>
             ) : (
               <p>
@@ -265,7 +265,7 @@ export function StandCard({
       <div className="flex flex-col gap-3">
         <Button onClick={() => window.print()}>
           <Printer className="size-5" aria-hidden="true" />
-          Print this code
+          Print this tag
         </Button>
 
         <Button
@@ -353,7 +353,7 @@ export function StandCard({
           onClick={() => void testStand()}
         >
           <ExternalLink className="size-5" aria-hidden="true" />
-          Test Stand
+          Test this tag
         </Button>
       </div>
 
@@ -368,7 +368,7 @@ export function StandCard({
           <div className="mt-3 space-y-3 text-sm text-muted">
             <p>
               Use Android Chrome or the NFC Tools app on any phone to write
-              this stand&apos;s URL to an NFC tag. The tag will contain the same link as
+              this tag&apos;s URL to an NFC tag. The NFC tag will contain the same link as
               the QR code.
             </p>
             <WebNfcWriter standId={standId} />
@@ -391,7 +391,7 @@ export function StandCard({
               </ol>
             </div>
             <p className="text-xs">
-              Do not permanently write-lock tags. If the code is rotated, the tag
+              Do not permanently write-lock NFC tags. If the tag is rotated, the NFC tag
               must be rewritten.
             </p>
           </div>
@@ -405,7 +405,7 @@ export function StandCard({
           className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-2 text-sm font-medium text-muted transition-colors hover:text-danger focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
         >
           <RefreshCw className="size-4" aria-hidden="true" />
-          Make a new code
+          Rotate this tag
         </button>
         {hasNfc && (
           <p className="mt-1 pl-2 text-xs text-muted">
@@ -417,14 +417,14 @@ export function StandCard({
       <AlertDialog
         open={confirming}
         onOpenChange={setConfirming}
-        title="Your printed code will stop working"
+        title="Your current tag will stop working"
         description={
           hasNfc
-            ? "Anyone who scans the old QR code or taps the NFC tag will see nothing. You will have to print the new code and rewrite the NFC tag."
-            : "Anyone who scans the old one will see nothing. You will have to print the new code and replace it on every table."
+            ? "Anyone who scans the old QR code or taps the NFC tag will see nothing. You will need to print the new tag and rewrite the NFC tag."
+            : "Anyone who scans the old one will see nothing. You will need to print the new tag and replace it."
         }
-        confirmLabel="Yes, make a new code"
-        cancelLabel="Keep my code"
+        confirmLabel="Yes, rotate"
+        cancelLabel="Keep current tag"
         loading={busy}
         onConfirm={() => void rotate()}
       />

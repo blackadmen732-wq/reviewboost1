@@ -28,7 +28,7 @@ export function LandingPage() {
             More Google reviews, without the&nbsp;work
           </h1>
           <p className="mt-5 text-lg leading-relaxed text-muted sm:text-xl">
-            Your customers scan a code on your counter. One tap, and they are
+            Your customers scan a tag on your counter. One tap, and they are
             leaving you a review on Google. No app to download. No account to
             create.
           </p>
@@ -48,8 +48,8 @@ export function LandingPage() {
           <Step
             number={1}
             icon={QrCode}
-            title="Print your code"
-            description="Put a QR code by the register. Customers scan it with their phone camera — nothing to install."
+            title="Place your tag"
+            description="Put a tag by the register. Customers scan it with their phone camera — nothing to install."
           />
           <Step
             number={2}
@@ -74,7 +74,7 @@ export function LandingPage() {
           <ul className="flex flex-col gap-6">
             <Benefit
               title="Set up in two minutes"
-              description="Type your name, paste your Google link, print your code. No IT department needed."
+              description="Type your name, paste your Google link, get your tag. No IT department needed."
             />
             <Benefit
               title="Every rating goes to Google"
@@ -97,7 +97,7 @@ export function LandingPage() {
           Ready to see it work?
         </h2>
         <p className="mt-3 text-base text-muted">
-          Setup is free. Your first code prints in two minutes.
+          Setup is free. Your first tag is ready in two minutes.
         </p>
         <div className="mt-8 flex flex-col items-center gap-4">
           <Button asChild size="lg">
