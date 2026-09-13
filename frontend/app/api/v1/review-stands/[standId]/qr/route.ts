@@ -61,7 +61,7 @@ export async function GET(
       throw new ApiError(
         409,
         ERROR_CODE.responseConflict,
-        "This stand cannot be reprinted. Rotate its token to get a new code.",
+        "This tag cannot be reprinted. Rotate the tag to get a new one.",
       );
     }
 

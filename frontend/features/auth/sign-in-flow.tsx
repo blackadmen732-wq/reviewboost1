@@ -193,7 +193,7 @@ export function SignInFlow({ next }: { next: string }) {
         {/* One sentence, concrete, no adjectives. A busy owner reads exactly
             this much before deciding whether to continue. */}
         <p className="text-base leading-relaxed text-muted">
-          Customers scan a code on your counter. You get more reviews.
+          Customers scan a tag on your counter. You get more reviews.
         </p>
       </div>
 

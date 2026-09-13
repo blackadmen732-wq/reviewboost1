@@ -90,7 +90,7 @@ export function WebNfcWriter({ standId }: WebNfcWriterProps) {
     const url = await fetchStandUrl();
     if (!url) {
       setWriteState("error");
-      setErrorMessage("Could not load the stand URL. Please reload the page.");
+      setErrorMessage("Could not load the tag URL. Please reload the page.");
       return;
     }
     standUrlRef.current = url;

@@ -133,7 +133,7 @@ export function useAuthenticatedQr(standId: string | null): AuthenticatedQr {
         a.click();
         URL.revokeObjectURL(url);
       } catch {
-        notify.error("Could not download the code", "Please try again.");
+        notify.error("Could not download the tag", "Please try again.");
       } finally {
         setDownloading(false);
       }

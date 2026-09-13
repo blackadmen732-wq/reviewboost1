@@ -25,7 +25,7 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
  * pasted link is the right kind — before they submit, not after.
  *
  * It is also skippable. Trapping someone on the one step they cannot complete
- * is how you lose them permanently; they can add it later and their code still
+ * is how you lose them permanently; they can add it later and their tag still
  * prints today.
  */
 
