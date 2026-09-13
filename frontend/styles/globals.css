@@ -17,6 +17,7 @@
   --color-brand-text: var(--rb-brand-text);
   --color-on-brand: var(--rb-on-brand);
   --color-star: var(--rb-star);
+  --color-on-star: var(--rb-on-star);
   --color-danger: var(--rb-danger);
   --color-info: var(--rb-info);
   --font-sans: var(--font-geist-sans);
@@ -48,6 +49,7 @@
      unmistakably gold. Unfilled stars stay outline-only, so filled versus
      unfilled is a shape difference and never colour alone. */
   --rb-star: #bf7d00;
+  --rb-on-star: #2b1c00;
   --rb-warning: #9a6417;
   --rb-danger: #b33a3a;
   --rb-danger-soft: #faeaea;
@@ -85,6 +87,7 @@
     --rb-brand-text: #4fd69b;
     --rb-on-brand: #06231a;
     --rb-star: #f7b928;
+    --rb-on-star: #3d2a00;
     --rb-danger: #f08a8a;
     --rb-danger-soft: #452323;
     --rb-danger-bg: #452323;
@@ -130,6 +133,7 @@
      unmistakably gold. Unfilled stars stay outline-only, so filled versus
      unfilled is a shape difference and never colour alone. */
   --rb-star: #bf7d00;
+  --rb-on-star: #2b1c00;
   --rb-danger: #b33a3a;
   --rb-danger-soft: #faeaea;
   --rb-danger-bg: #faeaea;
@@ -156,6 +160,7 @@
   --rb-brand-text: #4fd69b;
   --rb-on-brand: #06231a;
   --rb-star: #f7b928;
+  --rb-on-star: #3d2a00;
   --rb-danger: #f08a8a;
   --rb-danger-soft: #452323;
   --rb-danger-bg: #452323;

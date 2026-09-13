@@ -59,7 +59,7 @@ export function DesktopSidebar({
 
                   {badge > 0 ? (
                     <span
-                      className="grid min-w-6 place-items-center rounded-full bg-[color:var(--rb-star)] px-1.5 text-xs font-bold text-[#2b1c00]"
+                      className="grid min-w-6 place-items-center rounded-full bg-[color:var(--rb-star)] px-1.5 text-xs font-bold text-on-star"
                       aria-label={`${badge} unread`}
                     >
                       {badge > 99 ? "99+" : badge}

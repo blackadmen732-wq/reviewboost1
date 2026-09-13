@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Eye, LifeBuoy, Mail, Shield } from "lucide-react";
+import { Eye, LifeBuoy, Mail, Palette, Shield } from "lucide-react";
 import Link from "next/link";
 
 import { AppShell } from "@/features/dashboard/app-shell";
@@ -87,6 +87,23 @@ export default async function SettingsPage() {
           barber deciding whether to put our code on their counter wants to know
           who is behind it — a faceless product is one they will not recommend to
           the shop next door. */}
+      <section className="mb-6 flex flex-col gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Appearance</h2>
+
+        <Link
+          href="/customer-page"
+          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft">
+            <Palette className="size-5 text-brand-text" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-medium text-ink">Customer page</p>
+            <p className="text-sm text-muted">Set your photo, tagline, and publish.</p>
+          </div>
+        </Link>
+      </section>
+
       <section className="mb-6 flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Help</h2>
 

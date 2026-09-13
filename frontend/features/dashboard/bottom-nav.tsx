@@ -68,7 +68,7 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
                   />
                   {badge > 0 ? (
                     <span
-                      className="absolute -right-2 -top-1 grid min-w-5 place-items-center rounded-full bg-[color:var(--rb-star)] px-1 text-[0.6875rem] font-bold text-[#3d2a00]"
+                      className="absolute -right-2 -top-1 grid min-w-5 place-items-center rounded-full bg-[color:var(--rb-star)] px-1 text-[0.6875rem] font-bold text-on-star"
                       aria-label={`${badge} unread`}
                     >
                       {badge > 9 ? "9+" : badge}
