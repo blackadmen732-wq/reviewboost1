@@ -17,7 +17,6 @@ import { CustomerHeader } from "@/features/customer-flow/customer-header";
 import { CustomerLoading } from "@/features/customer-flow/customer-loading";
 import {
   customerFlowReducer,
-  type CustomerFlowState,
 } from "@/features/customer-flow/customer-flow-state";
 import {
   clearCustomerDraft,
@@ -25,13 +24,9 @@ import {
   safeInitialCustomerState,
   saveCustomerDraft,
 } from "@/features/customer-flow/recovery-storage";
-import { FinishedScreen } from "@/features/customer-flow/screens/finished-screen";
-import { GoogleOpportunity } from "@/features/customer-flow/screens/google-opportunity";
 import { RatingScreen } from "@/features/customer-flow/screens/rating-screen";
-import { TeamPraiseScreen } from "@/features/customer-flow/screens/team-praise-screen";
 import {
   getCustomerFlowApi,
-  type CustomerFlowApi,
 } from "@/lib/api/customer-flow-api";
 import {
   CustomerApiError,
@@ -39,7 +34,6 @@ import {
 } from "@/lib/api/customer-api-error";
 import type {
   SubmitResponseRequest,
-  TeamPraiseRequest,
 } from "@/lib/api/customer-flow-types";
 import { createIdempotencyKey } from "@/lib/api/idempotency";
 import {
@@ -55,19 +49,10 @@ interface CustomerFlowProps {
 
 interface FeedbackAttempt {
   rating: RatingValue;
-  note: string;
   locale: Locale;
   sessionId: string | null;
   sessionKey: string;
   responseKey: string;
-}
-
-interface PraiseAttempt {
-  firstName: string;
-  note: string;
-  sessionId: string;
-  responseId: string;
-  idempotencyKey: string;
 }
 
 function isOfflineError(error: unknown): boolean {
@@ -95,8 +80,6 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   const hadRecoveredDraft = useRef(false);
   const localeChosen = useRef(false);
   const feedbackInFlight = useRef(false);
-  const praiseInFlight = useRef(false);
-  const googleClickInFlight = useRef(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const messages = customerMessages[state.locale];
@@ -187,11 +170,9 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
         dispatch({ type: "session-ready", sessionId });
       }
 
-      const trimmedNote = attempt.note.trim();
       const body: SubmitResponseRequest = {
         sessionId,
         rating: attempt.rating,
-        ...(trimmedNote ? { note: trimmedNote } : {}),
       };
       const response = await api.submitResponse(token, body, {
         idempotencyKey: attempt.responseKey,
@@ -200,8 +181,11 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     },
   });
 
-  const submitFeedback = useCallback(async () => {
-    if (!state.rating || feedbackInFlight.current) return;
+  const submitAndRedirect = useCallback(async (rating: RatingValue) => {
+    if (feedbackInFlight.current) return;
+
+    const googleReviewUrl = contextQuery.data?.googleReviewUrl;
+    if (!googleReviewUrl) return;
 
     const sessionKey = state.sessionKey ?? createIdempotencyKey("session");
     const responseKey = state.responseKey ?? createIdempotencyKey("response");
@@ -214,19 +198,16 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
 
     feedbackInFlight.current = true;
     try {
-      const result = await feedbackMutation.mutateAsync({
-        rating: state.rating,
-        note: state.note,
+      await feedbackMutation.mutateAsync({
+        rating,
         locale: state.locale,
         sessionId: state.sessionId,
         sessionKey,
         responseKey,
       });
-      dispatch({
-        type: "feedback-succeeded",
-        sessionId: result.sessionId,
-        responseId: result.responseId,
-      });
+      dispatch({ type: "feedback-succeeded" });
+      clearCustomerDraft(token);
+      window.location.assign(googleReviewUrl);
     } catch (error) {
       dispatch({
         type: isOfflineError(error) ? "feedback-offline" : "feedback-failed",
@@ -235,145 +216,30 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
       feedbackInFlight.current = false;
     }
   }, [
+    contextQuery.data?.googleReviewUrl,
     feedbackMutation,
     state.locale,
-    state.note,
-    state.rating,
     state.responseKey,
     state.sessionId,
     state.sessionKey,
+    token,
   ]);
 
-  const praiseMutation = useMutation({
-    networkMode: "always",
-    mutationFn: async (attempt: PraiseAttempt) => {
-      const api = await getCustomerFlowApi();
-      const trimmedNote = attempt.note.trim();
-      const body: TeamPraiseRequest = {
-        sessionId: attempt.sessionId,
-        responseId: attempt.responseId,
-        firstName: attempt.firstName.trim(),
-        ...(trimmedNote ? { note: trimmedNote } : {}),
-      };
-      return api.submitTeamPraise(token, body, {
-        idempotencyKey: attempt.idempotencyKey,
-      });
-    },
-  });
-
-  const submitPraise = useCallback(
-    async (firstName = state.praiseFirstName, note = state.praiseNote) => {
-      if (!state.sessionId || !state.responseId || praiseInFlight.current)
-        return;
-
-      const idempotencyKey =
-        state.praiseKey ?? createIdempotencyKey("team-praise");
-      dispatch({ type: "change-praise", firstName, note });
-      dispatch({ type: "praise-started", idempotencyKey });
-
-      if (!navigator.onLine) {
-        dispatch({ type: "praise-offline" });
-        return;
-      }
-
-      praiseInFlight.current = true;
-      try {
-        await praiseMutation.mutateAsync({
-          firstName,
-          note,
-          sessionId: state.sessionId,
-          responseId: state.responseId,
-          idempotencyKey,
-        });
-        dispatch({ type: "finish" });
-        clearCustomerDraft(token);
-      } catch (error) {
-        dispatch({
-          type: isOfflineError(error) ? "praise-offline" : "praise-failed",
-        });
-      } finally {
-        praiseInFlight.current = false;
-      }
-    },
-    [
-      praiseMutation,
-      state.praiseFirstName,
-      state.praiseKey,
-      state.praiseNote,
-      state.responseId,
-      state.sessionId,
-      token,
-    ],
-  );
-
-  const recordGoogleClick = useCallback(
-    async (
-      api: CustomerFlowApi,
-      idempotencyKey: string,
-      snapshot: CustomerFlowState,
-    ) => {
-      if (
-        !snapshot.sessionId ||
-        !snapshot.responseId ||
-        googleClickInFlight.current
-      )
-        return;
-      googleClickInFlight.current = true;
-      try {
-        await api.recordGoogleClick(
-          token,
-          { sessionId: snapshot.sessionId, responseId: snapshot.responseId },
-          { idempotencyKey },
-        );
-        dispatch({ type: "google-click-recorded" });
-      } catch {
-        // Tracking must never block or change the public Google opportunity.
-        // The pending key remains in same-tab recovery and retries on reconnect.
-      } finally {
-        googleClickInFlight.current = false;
-      }
-    },
-    [token],
-  );
-
-  const handleGoogleAction = useCallback(() => {
-    if (!state.sessionId || !state.responseId) return;
-    const idempotencyKey =
-      state.googleClickKey ?? createIdempotencyKey("google-click");
-    dispatch({ type: "google-click-started", idempotencyKey });
-    void getCustomerFlowApi().then((api) =>
-      recordGoogleClick(api, idempotencyKey, state),
-    );
-  }, [recordGoogleClick, state]);
+  const handleRatingChange = useCallback((rating: RatingValue) => {
+    dispatch({ type: "select-rating", rating });
+    void submitAndRedirect(rating);
+  }, [submitAndRedirect]);
 
   useEffect(() => {
     function retryWhenOnline() {
-      if (state.feedbackStatus === "offline") void submitFeedback();
-      if (state.praiseStatus === "offline") void submitPraise();
-      if (state.googleClickPending && state.googleClickKey) {
-        void getCustomerFlowApi().then((api) =>
-          recordGoogleClick(api, state.googleClickKey as string, state),
-        );
+      if (state.feedbackStatus === "offline" && state.rating) {
+        void submitAndRedirect(state.rating);
       }
     }
 
     window.addEventListener("online", retryWhenOnline);
     return () => window.removeEventListener("online", retryWhenOnline);
-  }, [recordGoogleClick, state, submitFeedback, submitPraise]);
-
-  useEffect(() => {
-    if (
-      recoveryReady &&
-      navigator.onLine &&
-      state.googleClickPending &&
-      state.googleClickKey &&
-      state.screen === "praise"
-    ) {
-      void getCustomerFlowApi().then((api) =>
-        recordGoogleClick(api, state.googleClickKey as string, state),
-      );
-    }
-  }, [recordGoogleClick, recoveryReady, state]);
+  }, [state.feedbackStatus, state.rating, submitAndRedirect]);
 
   const changeLocale = useCallback((locale: Locale) => {
     localeChosen.current = true;
@@ -427,51 +293,15 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
       <div ref={contentRef}>
         <LazyMotion features={domAnimation} strict>
           <m.div key={state.screen} {...motionProps}>
-            {state.screen === "rating" ? (
-              <RatingScreen
-                businessName={context.business.name}
-                messages={messages}
-                rating={state.rating}
-                note={state.note}
-                status={state.feedbackStatus}
-                onRatingChange={(rating) =>
-                  dispatch({ type: "select-rating", rating })
-                }
-                onNoteChange={(note) => dispatch({ type: "change-note", note })}
-                onSubmit={() => void submitFeedback()}
-              />
-            ) : null}
-            {state.screen === "google" ? (
-              <GoogleOpportunity
-                businessName={context.business.name}
-                googleReviewUrl={context.googleReviewUrl}
-                messages={messages}
-                onGoogleAction={handleGoogleAction}
-                onContinue={() => dispatch({ type: "show-praise" })}
-              />
-            ) : null}
-            {state.screen === "praise" ? (
-              <TeamPraiseScreen
-                businessName={context.business.name}
-                messages={messages}
-                firstName={state.praiseFirstName}
-                note={state.praiseNote}
-                status={state.praiseStatus}
-                onDraftChange={(firstName, note) =>
-                  dispatch({ type: "change-praise", firstName, note })
-                }
-                onSubmit={(firstName, note) =>
-                  void submitPraise(firstName, note)
-                }
-                onSkip={() => {
-                  dispatch({ type: "finish" });
-                  clearCustomerDraft(token);
-                }}
-              />
-            ) : null}
-            {state.screen === "finished" ? (
-              <FinishedScreen messages={messages} />
-            ) : null}
+            <RatingScreen
+              messages={messages}
+              rating={state.rating}
+              status={state.feedbackStatus}
+              onRatingChange={handleRatingChange}
+              onRetry={() => {
+                if (state.rating) void submitAndRedirect(state.rating);
+              }}
+            />
           </m.div>
         </LazyMotion>
       </div>

@@ -258,73 +258,6 @@
     transform: translateY(6px);
   }
 }
-.field-group {
-  gap: 8px;
-}
-.field-label {
-  color: var(--rb-ink);
-  font-size: 0.9375rem;
-  font-weight: 650;
-  line-height: 1.4;
-}
-.field-optional {
-  color: var(--rb-muted);
-  font-weight: 480;
-}
-.field-error {
-  margin: 0;
-  color: var(--rb-danger);
-  font-size: 0.875rem;
-  line-height: 1.4;
-}
-.trust-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 0;
-  color: var(--rb-muted);
-  font-size: 0.875rem;
-  line-height: 1.45;
-}
-.trust-line > svg {
-  flex: 0 0 auto;
-  margin-block-start: 1px;
-  color: var(--rb-brand-hover);
-}
-.customer-action-bar {
-  position: sticky;
-  z-index: 10;
-  bottom: 0;
-  margin: 10px -20px -24px;
-  padding: 14px 20px max(16px, env(safe-area-inset-bottom));
-  border-block-start: 1px solid var(--rb-border);
-  background: var(--rb-surface);
-  box-shadow: var(--shadow-float);
-}
-.google-opportunity {
-  gap: 22px;
-}
-.google-prompt {
-  margin: 0;
-  color: var(--rb-ink);
-  font-size: 1.1875rem;
-  font-weight: 650;
-  line-height: 1.4;
-  text-align: center;
-  text-wrap: balance;
-}
-.action-stack {
-  gap: 10px;
-}
-.google-review-link {
-  text-decoration: none;
-}
-.google-trust {
-  border-block-start: 1px solid var(--rb-border);
-  padding-block-start: 16px;
-}
-.success-mark,
-.finished-mark,
 .blocking-state-icon {
   display: grid;
   width: 58px;
@@ -336,23 +269,10 @@
   background: var(--rb-brand-soft);
   color: var(--rb-brand-hover);
 }
-.praise-form {
-  gap: 20px;
-}
-.praise-form .customer-action-bar {
-  margin-block-start: 4px;
-}
-.finished-screen,
 .blocking-state {
   align-items: center;
   padding-block: 28px 18px;
   text-align: center;
-}
-.close-page {
-  margin: 0;
-  color: var(--rb-muted);
-  font-size: 0.9375rem;
-  line-height: 1.4;
 }
 .loading-header {
   display: flex;
@@ -463,13 +383,6 @@
     border-start-start-radius: 24px;
     border-start-end-radius: 24px;
   }
-  .customer-action-bar {
-    position: static;
-    margin: 10px 0 0;
-    padding: 0;
-    border: 0;
-    box-shadow: none;
-  }
 }
 @media (max-width: 359px) {
   .customer-card {
@@ -492,10 +405,6 @@
   .language-select {
     font-size: 0.8125rem;
   }
-  .customer-action-bar {
-    margin-inline: -16px;
-    padding-inline: 16px;
-  }
 }
 @media (max-height: 700px) and (min-width: 560px) {
   .customer-page {
@@ -514,8 +423,6 @@
   .star-option__label[data-filled="true"] svg {
     fill: Highlight;
   }
-  .success-mark,
-  .finished-mark,
   .blocking-state-icon {
     border: 1px solid CanvasText;
   }

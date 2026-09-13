@@ -1,13 +1,23 @@
-import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CustomerFlow } from "@/features/customer-flow/customer-flow";
-import { customerMessages, type RatingValue } from "@/lib/i18n/customer-messages";
+import { customerMessages } from "@/lib/i18n/customer-messages";
 import { renderWithProviders } from "@/tests/helpers/render";
 
 beforeAll(() => {
   process.env.NEXT_PUBLIC_USE_CUSTOMER_FIXTURES = "true";
+});
+
+const locationAssign = vi.fn();
+
+beforeEach(() => {
+  locationAssign.mockReset();
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: { ...window.location, assign: locationAssign },
+  });
 });
 
 async function openRating(token = "fixture-valid") {
@@ -17,83 +27,36 @@ async function openRating(token = "fixture-valid") {
   return user;
 }
 
-async function reachGoogle(user: ReturnType<typeof userEvent.setup>, rating: RatingValue) {
-  await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[rating] }));
-  await user.click(screen.getByRole("button", { name: customerMessages.en.continue }));
-  await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
-  return document.querySelector<HTMLElement>("[data-flow-screen='google-opportunity']");
-}
-
-describe("complete customer flow", () => {
-  it("renders byte-identical Google opportunity markup after ratings 1–5", async () => {
-    const googleMarkup: string[] = [];
-
+describe("one-tap customer flow", () => {
+  it("tapping any star saves and redirects to Google", async () => {
     for (const rating of [1, 2, 3, 4, 5] as const) {
       const user = await openRating();
-      const googleScreen = await reachGoogle(user, rating);
-      expect(googleScreen).not.toBeNull();
-      googleMarkup.push(googleScreen?.outerHTML ?? "");
-
-      await user.click(
-        within(googleScreen as HTMLElement).getByRole("button", {
-          name: customerMessages.en.googleContinue,
-        }),
+      await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[rating] }));
+      await waitFor(() => expect(locationAssign).toHaveBeenCalledTimes(1));
+      expect(locationAssign).toHaveBeenCalledWith(
+        expect.stringMatching(/^https:\/\/(search\.google\.com|g\.page)\//),
       );
-      expect(
-        await screen.findByRole("heading", { name: customerMessages.en.praiseHeading }),
-      ).toBeVisible();
-      expect(screen.queryByText(customerMessages.en.ratingLabels[rating])).not.toBeInTheDocument();
+      locationAssign.mockReset();
       cleanup();
       window.sessionStorage.clear();
     }
-
-    expect(new Set(googleMarkup).size).toBe(1);
   });
 
-  it("submits Unicode Team Praise and reaches the quiet finished state", async () => {
-    const user = await openRating();
-    const googleScreen = await reachGoogle(user, 4);
-    await user.click(
-      within(googleScreen as HTMLElement).getByRole("button", {
-        name: customerMessages.en.googleContinue,
-      }),
-    );
-    await user.type(screen.getByRole("textbox", { name: /their first name/i }), "Zoë");
-    await user.type(screen.getByRole("textbox", { name: /what did they do well/i }), "Très gentille");
-    await user.click(screen.getByRole("button", { name: customerMessages.en.sendThanks }));
-
-    const doneHeading = await screen.findByRole("heading", {
-      name: customerMessages.en.doneHeading,
-    });
-    await waitFor(() => expect(doneHeading).toBeVisible());
-    expect(screen.queryByText(/sign up|newsletter|download/i)).not.toBeInTheDocument();
-    expect(window.sessionStorage.length).toBe(0);
-  });
-
-  it("blocks duplicate taps while preserving one logical response attempt", async () => {
+  it("disables stars while saving", async () => {
     const user = await openRating();
     await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[3] }));
-    await user.dblClick(screen.getByRole("button", { name: customerMessages.en.continue }));
-    await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
-
-    const responseCalls = window.__RB_FIXTURE_CALLS__?.filter(
-      ({ operation }) => operation === "response",
-    );
-    expect(responseCalls).toHaveLength(1);
+    await waitFor(() => expect(locationAssign).toHaveBeenCalled());
   });
 
-  it("retains the rating, note, and idempotency key after a recoverable failure", async () => {
+  it("shows retry on failure and retries with the same idempotency key", async () => {
     const user = await openRating("fixture-response-error");
     await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[2] }));
-    await user.type(screen.getByRole("textbox", { name: /want to add a note/i }), "Please keep this");
-    await user.click(screen.getByRole("button", { name: customerMessages.en.continue }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Your feedback is still here");
-    expect(screen.getByRole("textbox", { name: /want to add a note/i })).toHaveValue(
-      "Please keep this",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your rating is still here");
+    expect(locationAssign).not.toHaveBeenCalled();
+
     await user.click(screen.getByRole("button", { name: customerMessages.en.tryAgain }));
-    await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
+    await waitFor(() => expect(locationAssign).toHaveBeenCalledTimes(1));
 
     const responseKeys = window.__RB_FIXTURE_CALLS__
       ?.filter(({ operation }) => operation === "response")
@@ -102,21 +65,19 @@ describe("complete customer flow", () => {
     expect(new Set(responseKeys).size).toBe(1);
   });
 
-  it("retains the draft offline and retries when connectivity returns", async () => {
+  it("retries automatically when coming back online", async () => {
     const user = await openRating();
-    await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[1] }));
-    await user.type(screen.getByRole("textbox", { name: /want to add a note/i }), "Still here");
     Object.defineProperty(window.navigator, "onLine", { configurable: true, value: false });
-    await user.click(screen.getByRole("button", { name: customerMessages.en.continue }));
+    await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[1] }));
 
     expect(await screen.findByText(customerMessages.en.offline)).toBeVisible();
-    expect(screen.getByRole("textbox", { name: /want to add a note/i })).toHaveValue("Still here");
+    expect(locationAssign).not.toHaveBeenCalled();
 
     await act(async () => {
       Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
       window.dispatchEvent(new Event("online"));
     });
-    await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
+    await waitFor(() => expect(locationAssign).toHaveBeenCalledTimes(1));
   });
 
   it("shows indistinguishable UI for unknown and inactive links", async () => {
@@ -139,12 +100,9 @@ describe("complete customer flow", () => {
     expect(document.body).not.toHaveTextContent(/newsletter|create an account|download the app/i);
   });
 
-  it("moves focus to each new screen heading", async () => {
-    const user = await openRating();
-    const ratingHeading = screen.getByRole("heading", { name: customerMessages.en.ratingHeading });
-    await waitFor(() => expect(ratingHeading).toHaveFocus());
-    await reachGoogle(user, 3);
-    const googleHeading = screen.getByRole("heading", { name: customerMessages.en.thanksHeading });
-    await waitFor(() => expect(googleHeading).toHaveFocus());
+  it("has no note textarea, Continue button, or extra screens", async () => {
+    await openRating();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /continue/i })).not.toBeInTheDocument();
   });
 });
