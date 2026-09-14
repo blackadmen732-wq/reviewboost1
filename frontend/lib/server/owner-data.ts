@@ -676,6 +676,37 @@ export const getStand = cache(async (orgId: string, standId: string): Promise<St
   return stands.find((s) => s.standId === standId) ?? null;
 });
 
+export interface StandTokenOption {
+  standId: string;
+  label: string;
+  token: string;
+}
+
+export const listStandTokens = cache(async (orgId: string): Promise<StandTokenOption[]> => {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("review_stands")
+    .select("id, label, public_token_encrypted")
+    .eq("org_id", orgId)
+    .eq("status", "active")
+    .order("created_at", { ascending: true });
+
+  if (error) dataFailure("list_stand_tokens", error);
+
+  const results: StandTokenOption[] = [];
+  for (const row of data ?? []) {
+    const token = tryDecrypt(row.public_token_encrypted as string | null);
+    if (token) {
+      results.push({
+        standId: row.id as string,
+        label: (row.label as string) || "Front counter",
+        token,
+      });
+    }
+  }
+  return results;
+});
+
 export interface OwnerLocation {
   locationId: string;
   name: string;

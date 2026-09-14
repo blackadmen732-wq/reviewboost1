@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { BottomNav } from "@/features/dashboard/bottom-nav";
 import { DesktopSidebar } from "@/features/dashboard/desktop-sidebar";
+import { MobileHeader } from "@/features/dashboard/mobile-header";
 import { PageTransition } from "@/features/dashboard/page-transition";
 
 /**
@@ -33,9 +34,8 @@ export function AppShell({
     <div className="min-h-dvh bg-canvas">
       <DesktopSidebar unreadCount={unreadCount} businessName={businessName} />
 
-      {/* The sidebar is fixed, so the content is pushed by a matching margin
-          rather than sharing a flex row. That keeps the sidebar from scrolling
-          away on a long page. */}
+      <MobileHeader businessName={businessName} />
+
       <div className="lg:pl-[248px]">
         <main
           className={[

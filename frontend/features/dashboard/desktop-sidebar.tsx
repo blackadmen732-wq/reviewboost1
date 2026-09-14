@@ -1,5 +1,6 @@
 "use client";
 
+import { Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -73,7 +74,18 @@ export function DesktopSidebar({
       </nav>
 
       <div className="border-t border-border p-3">
-        <div className="flex min-h-14 items-center gap-3 px-3">
+        <Link
+          href="/settings"
+          aria-current={isActive(pathname, "/settings") ? "page" : undefined}
+          className={cn(
+            "flex min-h-14 items-center gap-3 rounded-[var(--radius-control)] px-3",
+            "transition-colors duration-150",
+            "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
+            isActive(pathname, "/settings")
+              ? "bg-brand-soft"
+              : "hover:bg-quiet",
+          )}
+        >
           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-semibold text-brand-text">
             {(businessName ?? "R").slice(0, 1).toUpperCase()}
           </span>
@@ -82,7 +94,8 @@ export function DesktopSidebar({
               {businessName ?? "Your business"}
             </span>
           </span>
-        </div>
+          <Settings className="size-4 shrink-0 text-muted" aria-hidden="true" />
+        </Link>
       </div>
     </aside>
   );

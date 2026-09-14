@@ -1,4 +1,4 @@
-import { Home, MessageSquare, QrCode, Settings } from "lucide-react";
+import { Home, MessageSquare, QrCode, Send } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export interface NavItem {
@@ -16,14 +16,14 @@ export const FEEDBACK: NavItem = {
   icon: MessageSquare,
   badge: "unread",
 };
+export const TEXT_REQUESTS: NavItem = { href: "/text-requests", label: "Texts", icon: Send };
 export const TAGS: NavItem = { href: "/stands", label: "Tags", icon: QrCode };
-export const SETTINGS: NavItem = { href: "/settings", label: "Settings", icon: Settings };
 
 /** Phone bottom bar: four items. */
-export const MOBILE_NAV: readonly NavItem[] = [HOME, FEEDBACK, TAGS, SETTINGS];
+export const MOBILE_NAV: readonly NavItem[] = [HOME, FEEDBACK, TEXT_REQUESTS, TAGS];
 
 /** Desktop sidebar. */
-export const DESKTOP_NAV: readonly NavItem[] = [HOME, FEEDBACK, TAGS, SETTINGS];
+export const DESKTOP_NAV: readonly NavItem[] = [HOME, FEEDBACK, TEXT_REQUESTS, TAGS];
 
 /** Whether a nav item should read as the current screen. */
 export function isActive(pathname: string, href: string): boolean {

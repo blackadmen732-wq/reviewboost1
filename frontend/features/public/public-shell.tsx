@@ -67,17 +67,25 @@ export function PublicShell({ children }: { children: ReactNode }) {
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-[1080px] flex-col gap-6 px-5 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <ReviewBoostLogo pose="full" size="footer" />
-          <nav className="flex flex-wrap gap-x-6 gap-y-3" aria-label="Legal">
-            {PUBLIC_FOOTER.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-sm text-muted transition-colors duration-150 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <div className="flex flex-col gap-3 sm:items-end">
+            <nav className="flex flex-wrap gap-x-6 gap-y-3" aria-label="Legal">
+              {PUBLIC_FOOTER.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="text-sm text-muted transition-colors duration-150 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+            <a
+              href="mailto:help@reviewboost.app"
+              className="text-sm text-muted transition-colors duration-150 hover:text-ink"
+            >
+              help@reviewboost.app
+            </a>
+          </div>
         </div>
       </footer>
     </div>

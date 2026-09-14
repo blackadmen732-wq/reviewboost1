@@ -15,6 +15,7 @@ export const PUBLIC_FOOTER = [
   { href: "/pricing", label: "Pricing" },
   { href: "/security", label: "Security" },
   { href: "/privacy", label: "Privacy" },
+  { href: "/terms", label: "Terms" },
 ] as const;
 
 export function isGetStartedNext(path: string): boolean {
@@ -66,8 +67,8 @@ export const INTEGRITY = {
 
 export const PRICING = {
   headline: "One subscription, per location.",
-  lede: "You will see the price before anything is charged.",
-  caveat: "Billing is not live yet. Starting now does not bill you.",
+  lede: "Starter $49, Growth $79, Pro $129 per month. 7-day free trial, cancel anytime.",
+  caveat: "Card required to start the trial. You will not be charged until the trial ends.",
 } as const;
 
 export const SECURITY = {

@@ -6,8 +6,8 @@ import { colors, fonts } from "@/theme";
 const TAB_ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
   Home: { active: "home", inactive: "home-outline" },
   Feedback: { active: "chatbubble-ellipses", inactive: "chatbubble-ellipses-outline" },
+  Texts: { active: "send", inactive: "send-outline" },
   Tags: { active: "pricetag", inactive: "pricetag-outline" },
-  Settings: { active: "settings", inactive: "settings-outline" },
 };
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
@@ -64,6 +64,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="texts"
+        options={{
+          title: "Texts",
+          tabBarIcon: ({ focused }) => <TabIcon label="Texts" focused={focused} />,
+          tabBarAccessibilityLabel: "Text Requests",
+        }}
+      />
+      <Tabs.Screen
         name="stands"
         options={{
           title: "Tags",
@@ -74,9 +82,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
+          href: null,
           title: "Settings",
-          tabBarIcon: ({ focused }) => <TabIcon label="Settings" focused={focused} />,
-          tabBarAccessibilityLabel: "Settings",
         }}
       />
     </Tabs>

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils/cn";
 interface InlineNoticeProps {
   title?: string;
   children: ReactNode;
-  kind?: "error" | "offline" | "info";
+  kind?: "error" | "offline" | "info" | "success" | "warning";
   blocking?: boolean;
   id?: string;
 }

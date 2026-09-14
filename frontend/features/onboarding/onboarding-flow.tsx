@@ -6,7 +6,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
+import { PlanPicker } from "@/features/billing/plan-picker";
 import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
+import { DEFAULT_PLAN_ID, type PlanId } from "@/lib/owner/plan-catalog";
 import { isValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
@@ -29,7 +31,7 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
  * prints today.
  */
 
-type Step = "name" | "google" | "done";
+type Step = "name" | "plan" | "google" | "done";
 
 interface Created {
   standUrl: string;
@@ -39,6 +41,7 @@ interface Created {
 export function OnboardingFlow() {
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState<PlanId>(DEFAULT_PLAN_ID);
   const [googleUrl, setGoogleUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,7 +118,7 @@ export function OnboardingFlow() {
   if (step === "name") {
     return (
       <div className="flex flex-col gap-8">
-        <Progress current={1} />
+        <Progress current={1} total={4} />
 
         <div className="flex flex-col gap-2">
           <div className="mb-2 grid size-14 place-items-center rounded-full bg-brand-soft">
@@ -149,7 +152,7 @@ export function OnboardingFlow() {
           disabled={name.trim().length < 2}
           onClick={() => {
             setError(null);
-            setStep("google");
+            setStep("plan");
           }}
         >
           Continue
@@ -160,11 +163,38 @@ export function OnboardingFlow() {
 
   // ------------------------------------------------------------ step 2 -----
 
-  if (step === "google") {
+  if (step === "plan") {
     return (
       <div className="flex flex-col gap-8">
         <BackButton onClick={() => setStep("name")} />
-        <Progress current={2} />
+        <Progress current={2} total={4} />
+
+        <div className="flex flex-col gap-2">
+          <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
+            Choose your plan
+          </h1>
+          <p className="text-base text-muted">
+            Start with a 7-day free trial. Your card will be charged when the trial ends.
+          </p>
+        </div>
+
+        <PlanPicker
+          selectedPlan={selectedPlan}
+          onSelect={setSelectedPlan}
+          onContinue={() => setStep("google")}
+          showTrialNote
+        />
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------------ step 3 -----
+
+  if (step === "google") {
+    return (
+      <div className="flex flex-col gap-8">
+        <BackButton onClick={() => setStep("plan")} />
+        <Progress current={3} total={4} />
 
         <div className="flex flex-col gap-2">
           <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
@@ -332,10 +362,10 @@ export function OnboardingFlow() {
   );
 }
 
-function Progress({ current }: { current: number }) {
+function Progress({ current, total = 4 }: { current: number; total?: number }) {
   return (
-    <div className="flex items-center gap-2" role="img" aria-label={`Step ${current} of 3`}>
-      {[1, 2, 3].map((step) => (
+    <div className="flex items-center gap-2" role="img" aria-label={`Step ${current} of ${total}`}>
+      {Array.from({ length: total }, (_, i) => i + 1).map((step) => (
         <span
           key={step}
           className={
