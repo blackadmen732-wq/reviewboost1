@@ -70,6 +70,46 @@ jobs:
       - name: Row level security and isolation tests
         run: supabase test db
 
+      - name: Tag entitlement limits, tokens, and NFC readiness
+        # Plain psql rather than pgTAP because these assert behaviour under
+        # concurrency: test-tag-limits.sql opens two real connections through
+        # dblink and proves the second is blocked at the entitlement lock. A
+        # single-session test framework cannot express that, and the bug it
+        # catches -- two simultaneous creates both passing the cap -- only
+        # exists between sessions.
+        env:
+          PGHARNESS_EXTERNAL: "1"
+          PGHOST: 127.0.0.1
+          PGPORT: "54322"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGHARNESS_SUFFIX: ci
+        run: |
+          for suite in scripts/db/test-tag-limits.sql scripts/db/test-tag-tokens.sql; do
+            echo "== $suite"
+            bash scripts/db/local-pg-harness.sh sql "$PWD/$suite"
+          done
+
+      - name: Migrating a populated database
+        # `supabase db reset` only ever proves an empty database. This applies
+        # the published chain into a scratch database, fills it with
+        # production-shaped rows, applies everything newer on top, and checks
+        # that no business lost its history. That is the upgrade every existing
+        # tenant actually performs, and the one CI never covered.
+        #
+        # Same script developers run locally, pointed at the server Supabase
+        # already started, so what CI proves is what they prove.
+        env:
+          PGHARNESS_EXTERNAL: "1"
+          PGHOST: 127.0.0.1
+          PGPORT: "54322"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGHARNESS_SUFFIX: ci
+        run: |
+          bash scripts/db/local-pg-harness.sh chain
+          bash scripts/db/local-pg-harness.sh upgrade
+
       - name: Supabase advisors
         # Surfaces missing RLS, exposed views, and mutable search_path on
         # functions. Non-blocking for now because the report includes advice

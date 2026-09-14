@@ -117,7 +117,7 @@ export interface OrganizationContext extends AuthenticatedContext {
 }
 
 /**
- * Resolve the caller and their active organization.
+ * Resolve the caller's active organization, or null if they have none yet.
  *
  * Priority: X-Organization-Id header (API/mobile) > rb-active-org cookie
  * (browser). Query-string org_id is accepted as a fallback but is not the
@@ -126,12 +126,20 @@ export interface OrganizationContext extends AuthenticatedContext {
  * The selected value is validated against the user's actual memberships
  * every time. It is selection only, never authorization — RLS is the
  * security boundary.
+ *
+ * Belonging to no organization is an answer here rather than an error, which
+ * is what onboarding needs: a user with nothing yet is the entire point of
+ * that screen, and a 404 would make the first run an error page.
+ *
+ * What it never does is pick the first membership. A user in two businesses
+ * who has selected one must be answered about that one -- being told about the
+ * business they joined first, silently, is how an owner ends up reading one
+ * business's numbers while believing they are the other's.
  */
-export async function requireOrganizationContext(
+export async function selectOrganization(
+  context: AuthenticatedContext,
   request: Request,
-): Promise<OrganizationContext> {
-  const context = await requireUser(request);
-
+): Promise<{ orgId: string; role: string } | null> {
   const headerOrgId = request.headers.get("x-organization-id");
   const cookieOrgId = parseCookieValue(request, ORG_COOKIE);
   const url = new URL(request.url);
@@ -146,9 +154,11 @@ export async function requireOrganizationContext(
     .eq("status", "active")
     .order("created_at", { ascending: true });
 
-  if (error || !memberships || memberships.length === 0) {
+  if (error) {
     throw new ApiError(404, ERROR_CODE.notFound, "You do not have a business set up yet.");
   }
+
+  if (!memberships || memberships.length === 0) return null;
 
   if (explicitOrgId) {
     if (!UUID_RE.test(explicitOrgId)) {
@@ -158,17 +168,42 @@ export async function requireOrganizationContext(
     if (!match) {
       throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
     }
-    return { ...context, orgId: match.org_id as string, role: match.role as string };
+    return { orgId: match.org_id as string, role: match.role as string };
   }
 
   if (memberships.length === 1) {
     const m = memberships[0]!;
-    return { ...context, orgId: m.org_id as string, role: m.role as string };
+    return { orgId: m.org_id as string, role: m.role as string };
   }
 
+  // Two or more memberships and no selection. The one thing that must not
+  // happen here is a guess. The ordering above exists to make the query
+  // deterministic, never to pick a winner.
   throw new ApiError(
     400,
     ERROR_CODE.organizationSelectionRequired,
     "You belong to multiple organizations. Select which one to use.",
   );
+}
+
+export async function resolveOrganizationContext(
+  request: Request,
+): Promise<OrganizationContext | null> {
+  const context = await requireUser(request);
+  const selected = await selectOrganization(context, request);
+  return selected ? { ...context, ...selected } : null;
+}
+
+/**
+ * The same, for every endpoint that has no meaning without a business.
+ */
+export async function requireOrganizationContext(
+  request: Request,
+): Promise<OrganizationContext> {
+  const context = await requireUser(request);
+  const selected = await selectOrganization(context, request);
+  if (!selected) {
+    throw new ApiError(404, ERROR_CODE.notFound, "You do not have a business set up yet.");
+  }
+  return { ...context, ...selected };
 }

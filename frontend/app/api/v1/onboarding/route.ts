@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/server/auth";
+import { requireUser, selectOrganization } from "@/lib/server/auth";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
 import { createOrganization, getOnboardingState } from "@/lib/server/owner-service";
 import { SUPPORTED_LOCALES, parseOrThrow } from "@/lib/server/validation";
@@ -12,7 +12,7 @@ import { SUPPORTED_LOCALES, parseOrThrow } from "@/lib/server/validation";
  * GET derives progress from real records rather than stored booleans — a
  * duplicate flag drifts from reality the moment anything changes outside the
  * wizard, and then the owner is trapped being told to do something they have
- * already done.
+ * already done. It reports on the *selected* business; see getOnboardingState.
  *
  * POST creates the organization, the owner membership, the first location, and
  * the first stand in one database transaction, so a failure cannot leave a user
@@ -52,8 +52,18 @@ const createSchema = z.strictObject({
 
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
+    // The selected business, not the first one the user ever joined. A user in
+    // two businesses with neither selected gets organization_selection_required
+    // here, the same as every other owner endpoint, rather than a confident
+    // answer about the wrong one.
     const context = await requireUser(request);
-    const state = await getOnboardingState(context, requestId);
+    const selected = await selectOrganization(context, request);
+    const state = await getOnboardingState(
+      context,
+      selected?.orgId ?? null,
+      selected?.role ?? null,
+      requestId,
+    );
     return json(request, requestId, 200, { data: state, requestId });
   });
 }

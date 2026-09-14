@@ -30,7 +30,7 @@ export PGUSER=postgres
 # there is, so re-exec the whole script as the unprivileged `postgres` account
 # the server package already creates.
 RUNAS="${PGHARNESS_USER:-postgres}"
-if [ "$(id -u)" -eq 0 ]; then
+if [ "$(id -u)" -eq 0 ] && [ "${PGHARNESS_EXTERNAL:-0}" != "1" ]; then
   mkdir -p "$WORK"
   chown -R "$RUNAS" "$WORK"
   exec setpriv --reuid="$RUNAS" --regid="$RUNAS" --init-groups \
@@ -41,7 +41,17 @@ fi
 
 log() { printf '\n== %s\n' "$*"; }
 
+# EXTERNAL=1 uses a server that is already running -- in CI, the one Supabase
+# started -- via the standard libpq variables (PGHOST, PGPORT, PGUSER,
+# PGPASSWORD). Same code path either way, so what CI proves is what this proves.
+EXTERNAL="${PGHARNESS_EXTERNAL:-0}"
+
 harness_start() {
+  if [ "$EXTERNAL" = "1" ]; then
+    mkdir -p "$WORK"
+    psql -d postgres -c 'select 1' >/dev/null
+    return
+  fi
   rm -rf "${WORK:?}"/data "${WORK:?}"/sock
   mkdir -p "$PGDATA" "$SOCK"
   initdb -D "$PGDATA" -U postgres --auth=trust --no-sync -E UTF8 >/dev/null
@@ -49,9 +59,22 @@ harness_start() {
 }
 
 harness_stop() {
+  [ "$EXTERNAL" = "1" ] && return 0
   pg_ctl -D "$PGDATA" -m immediate -w stop >/dev/null 2>&1 || true
 }
 trap harness_stop EXIT
+
+# Each run gets its own database so an external server keeps whatever else is
+# on it. Names are suffixed per invocation to survive repeated CI runs.
+SUFFIX="${PGHARNESS_SUFFIX:-$$}"
+db() { echo "rb_${1}_${SUFFIX}"; }
+
+fresh_db() {
+  local name="$1"
+  dropdb --if-exists "$name" >/dev/null 2>&1 || true
+  createdb "$name"
+  supabase_shim "$name" >/dev/null 2>&1
+}
 
 supabase_shim() {
   psql -v ON_ERROR_STOP=1 -q -d "$1" -f "$ROOT/scripts/db/supabase-shim.sql"
@@ -97,17 +120,20 @@ counts() {
 cmd_chain() {
   harness_start
 
+  local one two
+  one="$(db run1)"; two="$(db run2)"
+
   log "Run 1: fresh database, apply every migration in order"
-  createdb run1; supabase_shim run1
-  echo "applied $(apply_chain run1) migration files"
+  fresh_db "$one"
+  echo "applied $(apply_chain "$one") migration files"
 
   log "Run 2: second fresh database, identical chain (determinism)"
-  createdb run2; supabase_shim run2
-  echo "applied $(apply_chain run2) migration files"
+  fresh_db "$two"
+  echo "applied $(apply_chain "$two") migration files"
 
   log "Schema comparison run1 vs run2"
-  schema_dump run1 > "$WORK/run1.sql"
-  schema_dump run2 > "$WORK/run2.sql"
+  schema_dump "$one" > "$WORK/run1.sql"
+  schema_dump "$two" > "$WORK/run2.sql"
   if diff -u "$WORK/run1.sql" "$WORK/run2.sql" > "$WORK/drift.diff"; then
     echo "identical ($(wc -l < "$WORK/run1.sql") lines of schema)"
   else
@@ -117,33 +143,40 @@ cmd_chain() {
   fi
 
   log "Object counts"
-  counts run1
+  counts "$one"
+
+  dropdb --if-exists "$one" >/dev/null 2>&1 || true
+  dropdb --if-exists "$two" >/dev/null 2>&1 || true
 
   log "RESULT: chain applies cleanly and deterministically"
 }
 
 # The test CI does not do: migrate a database that already holds rows.
 cmd_upgrade() {
-  local cut="${UPGRADE_CUT:-20260902000700}"
+  local cut="${UPGRADE_CUT:-20260902000700}" up
+  cut="${cut:-20260902000700}"
+  up="$(db upgrade)"
   harness_start
 
   log "Base: apply chain through $cut"
-  createdb up; supabase_shim up
-  echo "applied $(apply_chain up "$cut") migration files"
+  fresh_db "$up"
+  echo "applied $(apply_chain "$up" "$cut") migration files"
 
   log "Seed production-shaped rows"
-  psql -v ON_ERROR_STOP=1 -q -d up -f "$ROOT/scripts/db/seed-populated.sql"
-  psql -d up -At -c "select 'orgs=' || (select count(*) from public.organizations)
+  psql -v ON_ERROR_STOP=1 -q -d "$up" -f "$ROOT/scripts/db/seed-populated.sql"
+  psql -d "$up" -At -c "select 'orgs=' || (select count(*) from public.organizations)
                           || ' members=' || (select count(*) from public.organization_members)
                           || ' locations=' || (select count(*) from public.locations)
                           || ' stands=' || (select count(*) from public.review_stands)
                           || ' responses=' || (select count(*) from public.customer_responses)"
 
   log "Apply every remaining migration on top of the populated database"
-  echo "applied $(apply_chain up "" "$cut") migration files"
+  echo "applied $(apply_chain "$up" "" "$cut") migration files"
 
   log "Assert nothing was lost and the new objects are usable"
-  psql -v ON_ERROR_STOP=1 -q -d up -f "$ROOT/scripts/db/assert-populated-upgrade.sql"
+  psql -v ON_ERROR_STOP=1 -q -d "$up" -f "$ROOT/scripts/db/assert-populated-upgrade.sql"
+
+  dropdb --if-exists "$up" >/dev/null 2>&1 || true
 
   log "RESULT: populated database upgrades cleanly"
 }
@@ -151,11 +184,15 @@ cmd_upgrade() {
 # Build a fresh migrated database and run an arbitrary SQL file against it.
 # This is how the RLS / isolation / limit tests below get a real server.
 cmd_sql() {
-  local file="${2:?usage: $0 sql <file.sql>}"
+  local file="${2:?usage: $0 sql <file.sql>}" t
+  t="$(db sql)"
   harness_start
-  createdb t >/dev/null; supabase_shim t >/dev/null 2>&1
-  apply_chain t >/dev/null
-  psql -v ON_ERROR_STOP=1 -q -d t -f "$file"
+  fresh_db "$t"
+  apply_chain "$t" >/dev/null
+  psql -v ON_ERROR_STOP=1 -q -d "$t" -f "$file"
+  local status=$?
+  dropdb --if-exists "$t" >/dev/null 2>&1 || true
+  return $status
 }
 
 case "${1:-chain}" in

@@ -152,18 +152,34 @@ export async function createOrganization(
  * then the owner is trapped in a wizard that insists they have not done
  * something they have.
  */
-export async function getOnboardingState(context: AuthenticatedContext, requestId: string) {
-  const { data: memberships, error: membershipError } = await context.db
-    .from("organization_members")
-    .select("org_id, role, organizations(id, name, slug)")
-    .eq("user_id", context.userId)
-    .eq("status", "active")
-    .order("created_at", { ascending: true });
-
-  if (membershipError) databaseFailure("onboarding_memberships", membershipError, requestId);
-
-  const organizations = memberships ?? [];
-  if (organizations.length === 0) {
+/**
+ * How far through setup this business is.
+ *
+ * Derived from real records rather than stored booleans: a duplicate flag
+ * drifts from reality the moment anything changes outside the wizard, and then
+ * the owner is trapped being told to do something they have already done.
+ *
+ * WHICH BUSINESS
+ * --------------
+ * The one that was selected, passed in by the caller after
+ * `resolveOrganizationContext` validated it against the user's memberships.
+ *
+ * This used to read `organizations[0]` -- the membership with the oldest
+ * created_at. For anyone in two businesses that answered about whichever they
+ * joined first, regardless of which one they had open. The wizard would then
+ * report the wrong business's missing Google link, and the owner would go and
+ * fix a business that was not broken.
+ *
+ * `orgId` of null means the user belongs to no organization at all, which is
+ * not an error: it is the first screen of onboarding.
+ */
+export async function getOnboardingState(
+  context: AuthenticatedContext,
+  orgId: string | null,
+  role: string | null,
+  requestId: string,
+) {
+  if (!orgId) {
     return {
       hasOrganization: false,
       hasLocation: false,
@@ -174,12 +190,10 @@ export async function getOnboardingState(context: AuthenticatedContext, requestI
     };
   }
 
-  const first = organizations[0] as { org_id: string; role: string };
-
   const [{ data: locations, error: locationError }, { data: stands, error: standError }] =
     await Promise.all([
-      context.db.from("locations").select("id, name, google_review_url").eq("org_id", first.org_id),
-      context.db.from("review_stands").select("id").eq("org_id", first.org_id).limit(1),
+      context.db.from("locations").select("id, name, google_review_url").eq("org_id", orgId),
+      context.db.from("review_stands").select("id").eq("org_id", orgId).limit(1),
     ]);
 
   if (locationError) databaseFailure("onboarding_locations", locationError, requestId);
@@ -197,7 +211,7 @@ export async function getOnboardingState(context: AuthenticatedContext, requestI
     // A stand cannot serve customers without a validated Google destination, so
     // that is what "complete" means here.
     isComplete: (locations ?? []).length > 0 && hasGoogle && (stands ?? []).length > 0,
-    organization: { id: first.org_id, role: first.role },
+    organization: { id: orgId, role: role ?? "viewer" },
   };
 }
 
@@ -310,13 +324,42 @@ export async function getStandTokenForReprint(
 
 // ------------------------------------------------- NFC provisioning --
 
+export interface NfcProvisionRecord {
+  recorded: true;
+  recordedAt: string;
+  /** Null until the stand's token has been rotated at least once. */
+  tokenRotatedAt: string | null;
+}
+
+/**
+ * Record that a physical NFC tag was written for this stand.
+ *
+ * WHAT THE SERVER CAN AND CANNOT KNOW
+ * -----------------------------------
+ * It cannot know whether the write succeeded -- that happened on the customer's
+ * phone, through Web NFC, out of reach. What it owns is narrower and still
+ * worth being exact about: whether a write was *recorded*, and whether the
+ * stand is ready after a token rotation.
+ *
+ * So this returns the recorded timestamp rather than void. A caller that gets
+ * an object knows a row changed. The previous signature returned nothing, which
+ * made "recorded" and "the call failed and something swallowed the error"
+ * indistinguishable -- and the route answered 204 either way.
+ *
+ * PARTIAL SUCCESS
+ * ---------------
+ * The physical write lands, then the network drops before the server hears
+ * about it. The recovery is to call this again: the RPC restamps and is
+ * idempotent, so a retry costs nothing and does not require the owner to
+ * rewrite a tag that is already correct.
+ */
 export async function recordNfcProvision(
   context: AuthenticatedContext,
   standId: string,
   orgId: string,
   requestId: string,
-): Promise<void> {
-  const { error } = await context.db.rpc("rpc_record_nfc_provision", {
+): Promise<NfcProvisionRecord> {
+  const { data, error } = await context.db.rpc("rpc_record_nfc_provision", {
     p_stand_id: standId,
     p_org_id: orgId,
     p_request_id: requestId,
@@ -324,10 +367,26 @@ export async function recordNfcProvision(
 
   if (error) {
     if (error.message?.includes("not_found_or_forbidden")) {
+      // Covers "no such stand", "another business's stand", and "retired".
+      // Telling them apart would confirm that another tenant's stand exists.
       throw new ApiError(404, ERROR_CODE.reviewLinkInactive, "Not found.");
     }
     databaseFailure("record_nfc_provision", error, requestId);
   }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row.recorded_at !== "string") {
+    // A "successful" call that recorded nothing is a failure. Answering 204
+    // here is how the owner comes to believe a tag is provisioned when the
+    // server has no record of it.
+    databaseFailure("record_nfc_provision", new Error("empty result"), requestId);
+  }
+
+  return {
+    recorded: true,
+    recordedAt: row.recorded_at as string,
+    tokenRotatedAt: (row.token_rotated_at as string | null) ?? null,
+  };
 }
 
 /**
