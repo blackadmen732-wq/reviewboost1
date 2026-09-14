@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { requireOrganizationContext, requireRole } from "@/lib/server/auth";
+import { assertCanCreateTag } from "@/lib/server/entitlements-service";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
 import { createStand, listStands } from "@/lib/server/owner-service";
@@ -10,6 +11,12 @@ import { createStand, listStands } from "@/lib/server/owner-service";
  *
  * GET returns a short non-secret token prefix, never the token.
  * POST creates a new stand under a specific location (owner/admin only).
+ *
+ * The plan cap is checked here so an owner at their limit gets a clear 403
+ * rather than a database error, but `rpc_create_stand` enforces it again under
+ * a row lock and that is the enforcement that counts: this function is granted
+ * to `authenticated` and can be called directly, and two requests can pass the
+ * check below at the same instant.
  */
 
 export const runtime = "nodejs";
@@ -53,6 +60,8 @@ export async function POST(request: NextRequest): Promise<Response> {
         details: [{ field: "label", message: "Must be 100 characters or fewer." }],
       });
     }
+
+    await assertCanCreateTag(context, context.orgId, requestId);
 
     const created = await createStand(context, context.orgId, locationId, trimmedLabel, requestId);
 

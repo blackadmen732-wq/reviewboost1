@@ -73,6 +73,47 @@ begin
 end
 $$;
 
+-- The entitlement backfill reached organizations that predate the table.
+do $$
+declare v_missing integer; v_bad integer;
+begin
+    select count(*) into v_missing
+      from public.organizations o
+      left join public.entitlement_snapshots e on e.org_id = o.id
+     where e.org_id is null;
+    if v_missing > 0 then
+        raise exception '% pre-existing organization(s) have no entitlement row', v_missing;
+    end if;
+
+    -- And it did not hand anyone a paid plan they never bought.
+    select count(*) into v_bad
+      from public.entitlement_snapshots
+     where source = 'backfill'
+       and (status <> 'trialing' or plan_id is not null);
+    if v_bad > 0 then
+        raise exception 'the backfill invented a paid plan for % organization(s)', v_bad;
+    end if;
+
+    raise notice 'entitlement backfill: every organization trialing, none on a paid plan';
+end
+$$;
+
+-- Tags that existed before the cap are never retired by it. An organization
+-- over its trial allowance keeps what it printed; it simply cannot add more.
+do $$
+declare v_live integer;
+begin
+    select count(*) into v_live
+      from public.review_stands
+     where org_id = 'aaaaaaaa-0000-0000-0000-000000000001'
+       and status = 'active';
+    if v_live <> 2 then
+        raise exception 'the Tag cap disturbed existing Tags: % active, expected 2', v_live;
+    end if;
+    raise notice 'existing Tags survive an upgrade that caps new ones';
+end
+$$;
+
 -- No index may reference a column that does not exist. A migration that adds
 -- one aborts the chain; this catches the same class of mistake if a later
 -- migration ever drops a column an index still names.

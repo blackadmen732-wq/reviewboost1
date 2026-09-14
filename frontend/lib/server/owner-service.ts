@@ -9,6 +9,10 @@ import {
   tokenPrefix,
   tryDecrypt,
 } from "@/lib/server/crypto";
+import {
+  getEntitlement,
+  tagLimitError,
+} from "@/lib/server/entitlements-service";
 import { publicFrontendUrl, tokenDigestKeyVersion } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { isValidGoogleReviewUrl, standUrl } from "@/lib/server/google-review-url";
@@ -350,23 +354,33 @@ export async function createStand(
     p_stand_token_prefix: tokenPrefix(token),
     p_token_key_version: tokenDigestKeyVersion(),
     p_request_id: requestId,
+    // In the same call as the digest, and not optional. This used to be a
+    // second RPC whose result was never checked -- and whose function had been
+    // dropped from the schema, so every Tag created this way was unreprintable
+    // and nothing said so. One transaction, or no Tag.
+    p_token_ciphertext: encrypt(token),
+    p_cipher_key_version: KEY_VERSION,
   });
 
   if (error) {
+    if (error.message?.includes("tag_limit_reached")) {
+      // The route's pre-check should already have answered this. Reaching here
+      // means two requests raced, and the database is the one that decided.
+      throw tagLimitError(await getEntitlement(context, orgId, requestId));
+    }
     if (error.message?.includes("not_found_or_forbidden")) {
       throw new ApiError(404, ERROR_CODE.reviewLinkInactive, "Location not found.");
     }
     databaseFailure("create_stand", error, requestId);
   }
 
-  const standId = typeof data === "string" ? data : String(data);
+  // An empty result after a "successful" RPC is not a Tag. Failing here leaves
+  // the owner able to retry; returning a made-up id does not.
+  if (data === null || data === undefined || data === false) {
+    databaseFailure("create_stand", new Error("empty result"), requestId);
+  }
 
-  // Store the encrypted token for reprinting
-  await context.db.rpc("rpc_set_stand_token_ciphertext", {
-    p_stand_id: standId,
-    p_ciphertext: encrypt(token),
-    p_key_version: KEY_VERSION,
-  });
+  const standId = typeof data === "string" ? data : String(data);
 
   return {
     standId,

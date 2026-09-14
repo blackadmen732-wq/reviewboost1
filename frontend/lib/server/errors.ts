@@ -39,6 +39,9 @@ export const ERROR_CODE = {
   // learn that the endpoint is gone for everyone, not retry against a token it
   // thinks is bad.
   endpointRetired: "endpoint_retired",
+  // The organization's plan does not allow another Tag. Client-actionable
+  // (upgrade, or retire a Tag), so distinct from a flat forbidden.
+  tagLimitReached: "tag_limit_reached",
   // Text Requests: the organization has no send credit left. Client-actionable
   // (buy more / wait), so distinct from a generic failure.
   quotaExhausted: "quota_exhausted",
