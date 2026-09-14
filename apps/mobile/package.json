@@ -4,7 +4,7 @@
   "main": "index.ts",
   "dependencies": {
     "@expo/metro-runtime": "^57.0.11",
-    "@expo/vector-icons": "^14.0.0",
+    "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@supabase/supabase-js": "^2.112.3",
     "aes-js": "^3.1.2",
