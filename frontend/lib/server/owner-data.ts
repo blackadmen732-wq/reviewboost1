@@ -624,6 +624,7 @@ export interface Stand {
   locationName: string | null;
   tokenRotatedAt: string | null;
   nfcProvisionedAt: string | null;
+  lastOpenedAt: string | null;
 }
 
 /**
@@ -640,7 +641,7 @@ export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
   const [standsResult, locationsResult] = await Promise.all([
     supabase
       .from("review_stands")
-      .select("id, location_id, label, stand_type, status, public_token_prefix, token_rotated_at, nfc_provisioned_at")
+      .select("id, location_id, label, stand_type, status, public_token_prefix, token_rotated_at, nfc_provisioned_at, last_opened_at")
       .eq("org_id", orgId)
       .order("created_at", { ascending: true }),
     supabase
@@ -666,7 +667,13 @@ export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
     locationName: locationMap.get(row.location_id as string) ?? null,
     tokenRotatedAt: (row.token_rotated_at as string | null) ?? null,
     nfcProvisionedAt: (row.nfc_provisioned_at as string | null) ?? null,
+    lastOpenedAt: (row.last_opened_at as string | null) ?? null,
   }));
+});
+
+export const getStand = cache(async (orgId: string, standId: string): Promise<Stand | null> => {
+  const stands = await listStands(orgId);
+  return stands.find((s) => s.standId === standId) ?? null;
 });
 
 export interface OwnerLocation {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { LandingPage } from "@/features/landing/landing-page";
+import { PublicHome } from "@/features/public/public-home";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -14,14 +14,13 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function RootPage() {
+async function resolveDestination(): Promise<string | null> {
   const supabase = await supabaseServer();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return <LandingPage />;
+  if (!user) return null;
 
   const { data: memberships } = await supabase
     .from("organization_members")
@@ -30,5 +29,11 @@ export default async function RootPage() {
     .eq("status", "active")
     .limit(1);
 
-  redirect(memberships && memberships.length > 0 ? "/home" : "/onboarding");
+  return memberships && memberships.length > 0 ? "/home" : "/onboarding";
+}
+
+export default async function RootPage() {
+  const destination = await resolveDestination();
+  if (destination) redirect(destination);
+  return <PublicHome />;
 }
