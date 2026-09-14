@@ -145,6 +145,17 @@ as $$
     end;
 $$;
 
+-- PostgreSQL grants EXECUTE on a new function to PUBLIC by default, and
+-- `authenticated` holds USAGE on the app schema so RLS policies can call the
+-- membership helpers. Without these revokes the limit functions would be the
+-- only reachable ones in the schema that nothing revoked -- harmless in
+-- themselves, since they map a plan name to an integer and touch no data, but
+-- the project's rule is that a grant is deliberate or it is not there.
+revoke all on function app.plan_tag_limit(text) from public, anon, authenticated;
+revoke all on function app.plan_location_limit(text) from public, anon, authenticated;
+revoke all on function app.entitlement_tag_limit(text, text) from public, anon, authenticated;
+revoke all on function app.entitlement_location_limit(text, text) from public, anon, authenticated;
+
 -- ------------------------------------------------------------ the lock ----
 
 -- Take the organization's entitlement row and hold it for the rest of the
@@ -197,6 +208,8 @@ end;
 $$;
 
 revoke all on function app.lock_entitlement(uuid) from public, anon, authenticated;
+
+-- Only the definer functions above call these, and they run as their owner.
 
 -- --------------------------------------------------------- create stand ----
 

@@ -70,7 +70,7 @@ jobs:
       - name: Row level security and isolation tests
         run: supabase test db
 
-      - name: Tag limits, tokens, NFC readiness, and the owner inbox
+      - name: Privilege lockdown, Tag limits, tokens, NFC, and the owner inbox
         # Plain psql rather than pgTAP because these assert behaviour under
         # concurrency: test-tag-limits.sql opens two real connections through
         # dblink and proves the second is blocked at the entitlement lock. A
@@ -85,7 +85,7 @@ jobs:
           PGPASSWORD: postgres
           PGHARNESS_SUFFIX: ci
         run: |
-          for suite in scripts/db/test-tag-limits.sql scripts/db/test-tag-tokens.sql scripts/db/test-owner-inbox.sql; do
+          for suite in scripts/db/test-privilege-lockdown.sql scripts/db/test-tag-limits.sql scripts/db/test-tag-tokens.sql scripts/db/test-owner-inbox.sql; do
             echo "== $suite"
             bash scripts/db/local-pg-harness.sh sql "$PWD/$suite"
           done
