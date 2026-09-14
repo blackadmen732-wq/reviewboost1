@@ -25,12 +25,11 @@ export function localHour(timezone: string, now: Date = new Date()): number {
  * London owner on a US-hosted server watches "ratings today" reset in the middle
  * of their afternoon — which looks exactly like data loss.
  *
- * The approach: read the zone's current calendar date, treat that wall-clock
- * reading as if it were UTC, then measure how far that fiction is from the truth
- * and shift by it. Formatting the same instant in both zones and subtracting
- * recovers the offset *at that moment*, so half-hour zones (Kolkata),
- * three-quarter-hour zones (Chatham) and daylight-saving transitions all fall
- * out of the arithmetic rather than needing cases.
+ * The approach: read the zone's current calendar date, then solve for the
+ * instant whose local wall clock is midnight on that date. Offsets are measured
+ * by formatting one instant in both zones and subtracting, so half-hour zones
+ * (Kolkata), three-quarter-hour zones (Chatham), and political offset changes
+ * all fall out of the arithmetic rather than needing cases.
  */
 export function startOfLocalDay(timezone: string, now: Date = new Date()): Date {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -41,11 +40,38 @@ export function startOfLocalDay(timezone: string, now: Date = new Date()): Date 
   }).formatToParts(now);
 
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "01";
-  const wallClockAsUtc = new Date(
-    Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day"))),
-  );
+  return localMidnight(timezone, Number(get("year")), Number(get("month")), Number(get("day")));
+}
 
-  return new Date(wallClockAsUtc.getTime() + offsetMs(timezone, wallClockAsUtc));
+/**
+ * The instant at which the local wall clock reads midnight on a given date.
+ *
+ * WHY THIS ITERATES
+ * -----------------
+ * Treating the wall clock as UTC and shifting once by the offset *at that
+ * fictional instant* is wrong on the two days a year it matters most. For
+ * Auckland, midnight-as-UTC is 13:00 local on the target day -- past the
+ * spring-forward transition -- so the offset comes back as +13 when the offset
+ * in force at local midnight is +12. The single-shift version returned 23:00 on
+ * the *previous* day, which means "ratings today" silently began an hour early
+ * and counted an hour of yesterday's.
+ *
+ * Re-measuring the offset at the candidate instant fixes it: the second
+ * measurement is taken on the correct side of the transition. The loop runs to
+ * a fixed point rather than a set number of times, and stops either way, so a
+ * zone with an unusual transition cannot make it spin.
+ */
+function localMidnight(timezone: string, year: number, month: number, day: number): Date {
+  const wallClockAsUtc = Date.UTC(year, month - 1, day);
+
+  let instant = wallClockAsUtc + offsetMs(timezone, new Date(wallClockAsUtc));
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const corrected = wallClockAsUtc + offsetMs(timezone, new Date(instant));
+    if (corrected === instant) break;
+    instant = corrected;
+  }
+
+  return new Date(instant);
 }
 
 /** Start of the current month in the business's zone. */
@@ -57,9 +83,8 @@ export function startOfLocalMonth(timezone: string, now: Date = new Date()): Dat
   }).formatToParts(now);
 
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "01";
-  const wallClockAsUtc = new Date(Date.UTC(Number(get("year")), Number(get("month")) - 1, 1));
-
-  return new Date(wallClockAsUtc.getTime() + offsetMs(timezone, wallClockAsUtc));
+  // Same correction as startOfLocalDay: a month can begin on a transition day.
+  return localMidnight(timezone, Number(get("year")), Number(get("month")), 1);
 }
 
 /**

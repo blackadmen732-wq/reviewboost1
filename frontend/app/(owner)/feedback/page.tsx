@@ -28,6 +28,11 @@ export const dynamic = "force-dynamic";
  * pretending a silent 5 is an unread task. An owner between customers needs the
  * first list short and true.
  *
+ * The badge on the nav item counts exactly what "Needs you" lists — one
+ * predicate, defined once in owner-data.ts as INBOX_PREDICATE. It used to count
+ * every response with read_at null, which included silent 5s that can never
+ * appear on this screen, so the badge said 7 over a list of two.
+ *
  * Notes are decrypted on the server and never logged. The rating appears here
  * because this is the private workspace — the one place an owner is meant to see
  * it. Team Praise deliberately does not.
@@ -43,7 +48,13 @@ export default async function FeedbackPage({
   const showAll = show === "all";
 
   const [{ items }, counts] = await Promise.all([
-    listReviews(organization.orgId, { withNotesOnly: true, limit: 50, ...(showAll ? {} : { openOnly: true }) }),
+    // "Needs you" is INBOX_PREDICATE, the same rule getOwnerCounts uses for the
+    // badge, so the number on the nav item and the length of this list are the
+    // same thing. "Everything" widens it to every message ever written.
+    listReviews(
+      organization.orgId,
+      showAll ? { withNotesOnly: true, limit: 50 } : { inboxOnly: true, limit: 50 },
+    ),
     getOwnerCounts(organization.orgId, organization.timezone),
   ]);
 

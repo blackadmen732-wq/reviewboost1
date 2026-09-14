@@ -189,7 +189,7 @@ cmd_sql() {
   harness_start
   fresh_db "$t"
   apply_chain "$t" >/dev/null
-  psql -v ON_ERROR_STOP=1 -q -d "$t" -f "$file"
+  psql -v ON_ERROR_STOP=1 -v seed="$ROOT/scripts/db/seed-populated.sql" -q -d "$t" -f "$file"
   local status=$?
   dropdb --if-exists "$t" >/dev/null 2>&1 || true
   return $status

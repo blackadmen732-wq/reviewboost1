@@ -231,12 +231,57 @@ export interface Review {
  * rendered for this one signed-in owner; decrypting in the browser would mean
  * shipping the key there.
  */
+/**
+ * What counts as waiting on the owner. One definition, used by the badge and
+ * by the list the badge points at.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * The Feedback badge counted every response with `read_at is null`, while the
+ * Feedback screen listed responses that had a note and were unresolved. Those
+ * are different sets, so the badge said "7" over a screen showing two items,
+ * and the missing five were silent 5-star ratings that can never appear there.
+ * A number that cannot be reconciled with the screen it labels teaches the
+ * owner to ignore it.
+ *
+ * WHICH DEFINITION
+ * ----------------
+ * The one the Feedback screen already used, because the screen's own reasoning
+ * is right: Feedback is the inbox -- things that may need doing -- and a silent
+ * five is not a task. A rating with no note has nothing for an owner to act on.
+ *
+ * Read state deliberately does not narrow it. Opening a message is not handling
+ * it, and an item that vanished from "Needs you" because it had been glanced at
+ * would be exactly the complaint that got lost. Resolving is the act that
+ * clears an item, and `resolved_at` is what records it.
+ */
+export const INBOX_PREDICATE = {
+  hasNote: true,
+  unresolved: true,
+} as const;
+
+interface InboxFilterable<T> {
+  filter(column: string, operator: string, value: unknown): T;
+}
+
+/**
+ * Apply INBOX_PREDICATE to a query, whether it selects rows or counts them.
+ *
+ * Mirrors the partial index `customer_responses_inbox_idx`. If this predicate
+ * changes, that index changes with it or the inbox falls back to a sort.
+ */
+function applyInboxPredicate<T extends InboxFilterable<T>>(query: T): T {
+  return query.filter("note_encrypted", "not.is", null).filter("resolved_at", "is", null);
+}
+
 export async function listReviews(
   orgId: string,
   options: {
     cursor?: string | undefined;
     limit?: number | undefined;
     rating?: number | undefined;
+    /** The shared inbox definition. Prefer this over the flags below. */
+    inboxOnly?: boolean | undefined;
     unreadOnly?: boolean | undefined;
     withNotesOnly?: boolean | undefined;
     openOnly?: boolean | undefined;
@@ -260,9 +305,13 @@ export async function listReviews(
     }
   }
   if (options.rating !== undefined) query = query.eq("rating", options.rating);
-  if (options.unreadOnly) query = query.is("read_at", null);
-  if (options.withNotesOnly) query = query.not("note_encrypted", "is", null);
-  if (options.openOnly) query = query.is("resolved_at", null);
+  if (options.inboxOnly) {
+    query = applyInboxPredicate(query);
+  } else {
+    if (options.unreadOnly) query = query.is("read_at", null);
+    if (options.withNotesOnly) query = query.not("note_encrypted", "is", null);
+    if (options.openOnly) query = query.is("resolved_at", null);
+  }
 
   const { data, error } = await query;
   if (error) dataFailure("list_reviews", error);
@@ -746,11 +795,15 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
       .gte("submitted_at", dayStart.toISOString()),
-    supabase
-      .from("customer_responses")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", orgId)
-      .is("read_at", null),
+    // The Feedback badge. Counted with INBOX_PREDICATE, the same rule the
+    // Feedback screen filters by, so the number and the list agree. See
+    // INBOX_PREDICATE for why read state is not part of it.
+    applyInboxPredicate(
+      supabase
+        .from("customer_responses")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId),
+    ),
     supabase
       .from("praise_safe_view")
       .select("id", { count: "exact", head: true })

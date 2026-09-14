@@ -84,16 +84,89 @@ describe("startOfLocalDay", () => {
     const duringDst = new Date("2026-03-08T15:00:00Z");
     const start = startOfLocalDay("America/New_York", duringDst);
 
-    expect(
-      new Intl.DateTimeFormat("en-GB", {
-        timeZone: "America/New_York",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).format(start),
-    ).toBe("00:00");
+    expect(localTime("America/New_York", start)).toBe("00:00");
+  });
+
+  // "Ratings today" is a count with a boundary, and the boundary moves twice a
+  // year. Getting it wrong shows the owner an hour of yesterday's ratings, or
+  // hides an hour of today's, on exactly the two days they are least likely to
+  // suspect the software.
+  describe("daylight-saving boundaries", () => {
+    const cases = [
+      // Northern spring forward: 02:00 local never happens.
+      { zone: "America/New_York", label: "NY spring forward", at: "2026-03-08T12:00:00Z" },
+      { zone: "Europe/London", label: "London spring forward", at: "2026-03-29T12:00:00Z" },
+      // Northern fall back: 01:00-02:00 local happens twice.
+      { zone: "America/New_York", label: "NY fall back", at: "2026-11-01T12:00:00Z" },
+      { zone: "Europe/London", label: "London fall back", at: "2026-10-25T12:00:00Z" },
+      // Southern hemisphere, where the transitions run the other way.
+      { zone: "Australia/Sydney", label: "Sydney fall back", at: "2026-04-05T06:00:00Z" },
+      { zone: "Pacific/Auckland", label: "Auckland spring forward", at: "2026-09-27T06:00:00Z" },
+      // A half-hour DST shift, which fixed-offset arithmetic gets wrong twice.
+      { zone: "Australia/Lord_Howe", label: "Lord Howe (30-minute shift)", at: "2026-04-05T06:00:00Z" },
+    ] as const;
+
+    it.each(cases)("starts the day at local midnight on $label", ({ zone, at }) => {
+      expect(localTime(zone, startOfLocalDay(zone, new Date(at)))).toBe("00:00");
+    });
+
+    it.each(cases)("stays on the right calendar date on $label", ({ zone, at }) => {
+      const now = new Date(at);
+      expect(localDate(zone, startOfLocalDay(zone, now))).toBe(localDate(zone, now));
+    });
+
+    it.each(cases)("never starts the day in the future on $label", ({ zone, at }) => {
+      const now = new Date(at);
+      // A start-of-day after "now" would make today's count zero all day.
+      expect(startOfLocalDay(zone, now).getTime()).toBeLessThanOrEqual(now.getTime());
+    });
+
+    it("keeps a transition day between 23 and 25 hours long", () => {
+      // The day that springs forward is 23 hours; the one that falls back is
+      // 25. A day of exactly 24 hours on those dates means the boundary was
+      // computed from a fixed offset.
+      for (const { zone, at, label } of cases) {
+        const now = new Date(at);
+        const todayStart = startOfLocalDay(zone, now);
+        const tomorrowStart = startOfLocalDay(zone, new Date(todayStart.getTime() + 36 * 3_600_000));
+        const hours = (tomorrowStart.getTime() - todayStart.getTime()) / 3_600_000;
+
+        expect(hours, label).toBeGreaterThanOrEqual(23);
+        expect(hours, label).toBeLessThanOrEqual(25);
+      }
+    });
+
+    it("puts an instant just before local midnight in the previous day", () => {
+      // The off-by-one that shows an owner one rating from yesterday as though
+      // it arrived today.
+      for (const { zone, at, label } of cases) {
+        const start = startOfLocalDay(zone, new Date(at));
+        const justBefore = new Date(start.getTime() - 1);
+
+        expect(startOfLocalDay(zone, justBefore).getTime(), label).toBeLessThan(start.getTime());
+        expect(localTime(zone, startOfLocalDay(zone, justBefore)), label).toBe("00:00");
+      }
+    });
   });
 });
+
+function localTime(timezone: string, at: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(at);
+}
+
+function localDate(timezone: string, at: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(at);
+}
 
 describe("startOfLocalMonth", () => {
   it("is midnight on the first of the month in the target zone", () => {
