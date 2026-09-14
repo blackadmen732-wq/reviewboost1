@@ -33,7 +33,7 @@ describe("StarRating", () => {
 
 describe("RatingScreen", () => {
   it.each([1, 2, 3, 4, 5] as const)(
-    "reveals the same optional note and Continue action for rating %s",
+    "reveals the same Continue action for rating %s",
     async (rating) => {
       const user = userEvent.setup();
       const onRatingChange = vi.fn();
@@ -42,10 +42,8 @@ describe("RatingScreen", () => {
           businessName="Mario’s Pizza"
           messages={customerMessages.en}
           rating={null}
-          note=""
           status="idle"
           onRatingChange={onRatingChange}
-          onNoteChange={vi.fn()}
           onSubmit={vi.fn()}
         />,
       );
@@ -59,36 +57,35 @@ describe("RatingScreen", () => {
           businessName="Mario’s Pizza"
           messages={customerMessages.en}
           rating={rating}
-          note=""
           status="idle"
           onRatingChange={onRatingChange}
-          onNoteChange={vi.fn()}
           onSubmit={vi.fn()}
         />,
       );
 
-      expect(screen.getByRole("textbox", { name: /want to add a note/i })).toBeVisible();
+      // V1 collects no free text. The rating is the whole submission, so the
+      // only thing a chosen rating reveals is the way to send it.
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Continue" })).toBeVisible();
       expect(screen.getByText(customerMessages.en.ratingLabels[rating])).toBeVisible();
     },
   );
 
-  it("keeps the chosen rating and note visible during submission and error", () => {
+  it("keeps the chosen rating visible during submission and error", () => {
     const sharedProps = {
       businessName: "Mario’s Pizza",
       messages: customerMessages.en,
       rating: 1 as const,
-      note: "The wait was long",
       onRatingChange: vi.fn(),
-      onNoteChange: vi.fn(),
       onSubmit: vi.fn(),
     };
     const { rerender } = render(<RatingScreen {...sharedProps} status="submitting" />);
-    expect(screen.getByRole("textbox")).toHaveValue("The wait was long");
     expect(screen.getByRole("button", { name: "Sending…" })).toBeDisabled();
 
     rerender(<RatingScreen {...sharedProps} status="error" />);
-    expect(screen.getByRole("textbox")).toHaveValue("The wait was long");
+    // The rating the customer chose survives the failure: a retry must not
+    // silently send a different number than the one still on screen.
+    expect(screen.getByText(customerMessages.en.ratingLabels[1])).toBeVisible();
     expect(screen.getByRole("alert")).toHaveTextContent("Your feedback is still here");
     expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
   });

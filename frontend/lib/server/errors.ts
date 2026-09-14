@@ -34,6 +34,11 @@ export const ERROR_CODE = {
   // work.
   forbidden: "forbidden",
   organizationSelectionRequired: "organization_selection_required",
+  // A public endpoint that existed in an earlier contract and no longer does.
+  // Distinct from not_found on purpose: a client holding an old build needs to
+  // learn that the endpoint is gone for everyone, not retry against a token it
+  // thinks is bad.
+  endpointRetired: "endpoint_retired",
   // Text Requests: the organization has no send credit left. Client-actionable
   // (buy more / wait), so distinct from a generic failure.
   quotaExhausted: "quota_exhausted",

@@ -56,10 +56,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Persist an honest rating and an optional private note
-         * @description Every rating from one to five is stored and handled identically. The note is optional for all five and is encrypted at rest. One response per session.
+         * Persist an honest rating
+         * @description Every rating from one to five is stored and handled identically. One response per session. The rating is the whole submission: V1 collects no free text from the customer.
          *
-         *     The request schema is strict: a phone number, email address, marketing consent flag, or tenant identifier is rejected, not ignored.
+         *     The request schema is strict: a note, phone number, email address, marketing consent flag, or tenant identifier is rejected, not ignored. A field that were quietly dropped would leave the customer believing they had written to the owner when nothing was stored.
          */
         post: operations["submitCustomerResponse"];
         delete?: never;
@@ -84,28 +84,6 @@ export interface paths {
          *     Never redirects: the client owns the navigation, so a tracking failure can never stand between a customer and the public review page. Deduplicated per response, so 204 is returned on a first record and on a replay alike.
          */
         post: operations["recordGoogleReviewClick"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/public/q/{token}/team-praise": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Persist private praise, with no rating data and no auto-matching
-         * @description Stored unmatched, with the name and note encrypted at rest. ReviewBoost never guesses which colleague the customer meant: matching is a human decision made later, with the rating deliberately out of view.
-         *
-         *     The response carries only the new id. `team_praise_records` has no rating column at all, so the barrier holds in the schema rather than in a query someone must remember to trim. Accepted after every rating, including a one — praise and a complaint are not mutually exclusive.
-         */
-        post: operations["submitTeamPraise"];
         delete?: never;
         options?: never;
         head?: never;
@@ -149,8 +127,6 @@ export interface components {
             sessionId: string;
             /** @description Stored exactly as chosen. Nothing downstream branches on it. */
             rating: number;
-            /** @description Optional for every rating, including four and five. Encrypted at rest. */
-            note?: string;
         };
         SubmitResponseResponse: {
             responseId: string;
@@ -158,17 +134,6 @@ export interface components {
         GoogleClickRequest: {
             sessionId: string;
             responseId: string;
-        };
-        TeamPraiseRequest: {
-            sessionId: string;
-            responseId: string;
-            /** @description Unicode, stored as written. Never transliterated. */
-            firstName: string;
-            note?: string;
-        };
-        /** @description Carries only the id. No rating, stars, Google state, bonus, payroll, phone, email, or marketing field is ever serialised here. */
-        TeamPraiseResponse: {
-            teamPraiseId: string;
         };
         FieldError: {
             field: string;
@@ -506,55 +471,6 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             404: components["responses"]["SessionInvalid"];
             409: components["responses"]["IdempotencyConflict"];
-            429: components["responses"]["RateLimited"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["ServiceUnavailable"];
-        };
-    };
-    submitTeamPraise: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response, praise record, or scan. The client must reuse the same key across an offline retry. */
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                /** @description Echoed back, so a trace survives the hop. */
-                "X-Request-Id"?: components["parameters"]["RequestId"];
-            };
-            path: {
-                /** @description The stand's public token. At least 256 bits of entropy, stored only as a keyed digest, and never sequential — it is the sole thing authorising a write into a business's data, so guessability is the whole security argument. */
-                token: components["parameters"]["ReviewToken"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TeamPraiseRequest"];
-            };
-        };
-        responses: {
-            /** @description Idempotent replay. Nothing was created on this call. */
-            200: {
-                headers: {
-                    "X-Request-Id": components["headers"]["RequestId"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TeamPraiseResponse"];
-                };
-            };
-            /** @description Praise persisted */
-            201: {
-                headers: {
-                    "X-Request-Id": components["headers"]["RequestId"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TeamPraiseResponse"];
-                };
-            };
-            400: components["responses"]["ValidationFailed"];
-            404: components["responses"]["SessionInvalid"];
-            409: components["responses"]["ResponseConflict"];
             429: components["responses"]["RateLimited"];
             500: components["responses"]["InternalError"];
             503: components["responses"]["ServiceUnavailable"];

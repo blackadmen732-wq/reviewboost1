@@ -11,16 +11,21 @@ import {
 } from "@/lib/server/validation";
 
 /**
- * POST /api/v1/public/q/{token}/responses — store the rating and optional note.
+ * POST /api/v1/public/q/{token}/responses — store the rating.
  *
  * REVIEW INTEGRITY: every rating from 1 to 5 is handled identically here. There
  * is no threshold, no branch on the value, and no rating-dependent action in
- * the response. The note is optional for all five. The Google opportunity was
- * already delivered by the context endpoint, before any rating existed.
+ * the response. The Google opportunity was already delivered by the context
+ * endpoint, before any rating existed.
  *
- * The request schema is strict, so a phone number, email address, or marketing
- * consent flag is rejected rather than ignored — an endpoint that quietly
- * discarded them would still be one someone could be told to start using.
+ * V1 CONTRACT: the rating is the whole submission. There is no note field —
+ * `submitResponseSchema` is strict, so a client that still sends one is told
+ * the request was rejected rather than having the text silently dropped.
+ *
+ * The strictness is the same protection against a phone number, email address,
+ * or marketing consent flag: rejected rather than ignored, because an endpoint
+ * that quietly discarded them would still be one someone could be told to
+ * start using.
  */
 
 export const runtime = "nodejs";
@@ -43,7 +48,6 @@ export async function POST(
       {
         sessionId: body.sessionId,
         rating: body.rating,
-        ...(body.note === undefined ? {} : { note: body.note }),
         idempotencyKey,
       },
       requestMetaOf(request, requestId),

@@ -7,23 +7,20 @@ import { CustomerFrame } from "@/features/customer-flow/customer-frame";
 import { FinishedScreen } from "@/features/customer-flow/screens/finished-screen";
 import { GoogleOpportunity } from "@/features/customer-flow/screens/google-opportunity";
 import { RatingScreen } from "@/features/customer-flow/screens/rating-screen";
-import { TeamPraiseScreen } from "@/features/customer-flow/screens/team-praise-screen";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 
 const messages = customerMessages.en;
 
 describe("customer flow accessibility", () => {
-  it("has no Axe violations on the rating and note state", async () => {
+  it("has no Axe violations on the rating state", async () => {
     const { container } = render(
       <CustomerFrame poweredBy={messages.poweredBy}>
         <RatingScreen
           businessName="Mario’s Pizza"
           messages={messages}
           rating={3}
-          note="A private note"
           status="idle"
           onRatingChange={vi.fn()}
-          onNoteChange={vi.fn()}
           onSubmit={vi.fn()}
         />
       </CustomerFrame>,
@@ -40,24 +37,6 @@ describe("customer flow accessibility", () => {
           messages={messages}
           onGoogleAction={vi.fn()}
           onContinue={vi.fn()}
-        />
-      </CustomerFrame>,
-    );
-    expect((await axe(container)).violations).toEqual([]);
-  });
-
-  it("has no Axe violations on Team Praise", async () => {
-    const { container } = render(
-      <CustomerFrame poweredBy={messages.poweredBy}>
-        <TeamPraiseScreen
-          businessName="Mario’s Pizza"
-          messages={messages}
-          firstName=""
-          note=""
-          status="idle"
-          onDraftChange={vi.fn()}
-          onSubmit={vi.fn()}
-          onSkip={vi.fn()}
         />
       </CustomerFrame>,
     );

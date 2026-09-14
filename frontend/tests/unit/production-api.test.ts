@@ -20,7 +20,7 @@ describe("production customer API client", () => {
     await expect(
       productionCustomerFlowApi.submitResponse(
         "fixture-valid",
-        { sessionId: "session-1", rating: 3, note: "Unicode: José" },
+        { sessionId: "session-1", rating: 3 },
         { idempotencyKey: "response-key-123456789" },
       ),
     ).resolves.toEqual({ responseId: "response-1" });
@@ -29,10 +29,11 @@ describe("production customer API client", () => {
     expect(request).toBeInstanceOf(Request);
     expect(request.credentials).toBe("omit");
     expect(request.headers.get("Idempotency-Key")).toBe("response-key-123456789");
+    // The rating and the session, and nothing else: the client cannot send a
+    // note because the V1 request type has no field for one.
     await expect(request.clone().json()).resolves.toEqual({
       sessionId: "session-1",
       rating: 3,
-      note: "Unicode: José",
     });
   });
 

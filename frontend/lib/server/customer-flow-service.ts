@@ -1,12 +1,9 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
-
 import type {
   CreateSessionResponse,
   CustomerReviewContext,
   SubmitResponseResponse,
-  TeamPraiseResponse,
 } from "@/lib/api/customer-flow-types";
 import {
   KEY_VERSION,
@@ -32,7 +29,6 @@ import {
   DEFAULT_LOCALE,
   SUPPORTED_LOCALES,
   canonicalJson,
-  normalizeCustomerText,
   type SupportedLocale,
 } from "@/lib/server/validation";
 
@@ -397,7 +393,7 @@ export async function createSession(
  */
 export async function submitResponse(
   token: string,
-  input: { sessionId: string; rating: number; note?: string; idempotencyKey: string },
+  input: { sessionId: string; rating: number; idempotencyKey: string },
   meta: RequestMeta,
 ): Promise<OperationResult<SubmitResponseResponse>> {
   const tokenHash = digestStandToken(token);
@@ -405,18 +401,19 @@ export async function submitResponse(
 
   const responseToken = generateToken();
   const body: SubmitResponseResponse = { responseId: responseToken };
-  const note = normalizeCustomerText(input.note);
 
   const { data, error } = await serviceRoleClient().rpc("rpc_public_submit_response", {
     p_token_hash: tokenHash,
     p_idempotency_key: digestIdempotencyKey(`response|${input.idempotencyKey}`),
     p_request_hash: digestRequestBody(
-      canonicalJson({ sessionId: input.sessionId, rating: input.rating, note: input.note }),
+      canonicalJson({ sessionId: input.sessionId, rating: input.rating }),
     ),
     p_session_token_hash: digestSessionToken(input.sessionId),
     p_response_token_hash: digestResponseToken(responseToken),
     p_rating: input.rating,
-    p_note_encrypted: note === "" ? null : encrypt(note),
+    // V1 never sends a note. The parameter stays on the RPC so rows written
+    // before V1 keep their ciphertext and the owner can still read them.
+    p_note_encrypted: null,
     p_note_key_version: KEY_VERSION,
     p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
     p_response_body_encrypted: encrypt(JSON.stringify(body)),
@@ -490,79 +487,18 @@ export async function recordGoogleClick(
 // ------------------------------------------------------------ team praise -
 
 /**
- * Store praise for a colleague.
+ * Team Praise is not part of the V1 public contract.
  *
- * Name and note are encrypted at rest and stored unmatched. ReviewBoost never
- * guesses which colleague the customer meant — matching is a decision a human
- * makes later, with the rating deliberately out of view. The response carries
- * only the new id: no rating, no Google state, no contact detail.
+ * The public flow is open the Tag, tap 1 to 5, rating saved, Google offered.
+ * There is no public write path for praise, so `submitTeamPraise` is gone from
+ * this service rather than left reachable and unused.
+ *
+ * What deliberately stays: `public.team_praise_records` and its rows, the
+ * encrypted name and note columns, `rpc_public_submit_team_praise` in the
+ * database, and every owner-side read, matching, and tally path. Historical
+ * praise a business already collected is its record, not scaffolding, and
+ * removing a customer-facing endpoint is not a reason to destroy it.
  */
-export async function submitTeamPraise(
-  token: string,
-  input: {
-    sessionId: string;
-    responseId: string;
-    firstName: string;
-    note?: string;
-    idempotencyKey: string;
-  },
-  meta: RequestMeta,
-): Promise<OperationResult<TeamPraiseResponse>> {
-  const tokenHash = digestStandToken(token);
-  await guardWrite(tokenHash, meta);
-
-  const firstName = normalizeCustomerText(input.firstName);
-  const note = normalizeCustomerText(input.note);
-  // Generated here, not in the database, so the replay body can be encrypted
-  // with it before the call. A retry with no stored body has nothing to return.
-  const praiseId = randomUUID();
-  const body: TeamPraiseResponse = { teamPraiseId: praiseId };
-
-  if (firstName === "") {
-    throw new ApiError(400, ERROR_CODE.validationFailed, "The request could not be accepted.", {
-      details: [{ field: "firstName", message: "A first name is required." }],
-    });
-  }
-
-  const { data, error } = await serviceRoleClient().rpc("rpc_public_submit_team_praise", {
-    p_token_hash: tokenHash,
-    p_idempotency_key: digestIdempotencyKey(`team-praise|${input.idempotencyKey}`),
-    p_request_hash: digestRequestBody(
-      canonicalJson({
-        sessionId: input.sessionId,
-        responseId: input.responseId,
-        firstName: input.firstName,
-        note: input.note,
-      }),
-    ),
-    p_session_token_hash: digestSessionToken(input.sessionId),
-    p_response_token_hash: digestResponseToken(input.responseId),
-    p_praise_id: praiseId,
-    p_first_name_encrypted: encrypt(firstName),
-    p_note_encrypted: note === "" ? null : encrypt(note),
-    p_key_version: KEY_VERSION,
-    p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
-    p_response_body_encrypted: encrypt(JSON.stringify(body)),
-    p_previous_token_hash: digestStandTokenWithPreviousKey(token),
-    p_previous_session_token_hash: digestSessionTokenWithPreviousKey(input.sessionId),
-    p_previous_response_token_hash: digestResponseTokenWithPreviousKey(input.responseId),
-  });
-
-  if (error) fail("team_praise", error, meta.requestId);
-
-  const result = firstRow(data);
-  if (!result) fail("team_praise", new Error("empty rpc result"), meta.requestId);
-
-  if (result.outcome === "replay") {
-    return {
-      status: replayStatus(result.response_status),
-      body: decodeBody<TeamPraiseResponse>(result.response_body_encrypted),
-    };
-  }
-  if (result.outcome !== "created") throwForOutcome(result.outcome);
-
-  return { status: 201, body };
-}
 
 /**
  * Coarse bot detection, used only to decide whether a scan counts.

@@ -3,7 +3,6 @@ import { CustomerApiError } from "@/lib/api/customer-api-error";
 import type {
   CreateSessionResponse,
   SubmitResponseResponse,
-  TeamPraiseResponse,
 } from "@/lib/api/customer-flow-types";
 
 type FixtureOperation = "context" | "session" | "response" | "google-click" | "team-praise";
@@ -134,18 +133,6 @@ export const developmentCustomerFlowApi: CustomerFlowApi = {
       transientFailure("google-click", token, options.idempotencyKey);
     }
     stableResult("google-click", options.idempotencyKey, () => true);
-  },
-
-  async submitTeamPraise(token, _body, options) {
-    logCall("team-praise", options.idempotencyKey);
-    assertOnline();
-    await delay(token);
-    if (token === "fixture-praise-error") {
-      transientFailure("team-praise", token, options.idempotencyKey);
-    }
-    return stableResult<TeamPraiseResponse>("team-praise", options.idempotencyKey, () => ({
-      teamPraiseId: `praise_${shortId(options.idempotencyKey)}`,
-    }));
   },
 };
 

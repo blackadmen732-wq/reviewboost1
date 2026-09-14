@@ -13,15 +13,11 @@ describe("customer flow state", () => {
   });
 
   it.each([1, 2, 3, 4, 5] satisfies RatingValue[])(
-    "erases rating %s and the note before the uniform Google screen",
+    "erases rating %s before the uniform Google screen",
     (rating) => {
       let state = customerFlowReducer(initialCustomerFlowState, {
         type: "select-rating",
         rating,
-      });
-      state = customerFlowReducer(state, {
-        type: "change-note",
-        note: "Private note",
       });
       state = customerFlowReducer(state, {
         type: "feedback-started",
@@ -37,7 +33,6 @@ describe("customer flow state", () => {
       expect(state).toMatchObject({
         screen: "google",
         rating: null,
-        note: "",
         sessionId: "session-1",
         responseId: "response-1",
       });
@@ -61,9 +56,9 @@ describe("customer flow state", () => {
     expect(retried.responseKey).toBe("response-key-123456");
   });
 
-  it("creates a fresh response attempt after the rating or note changes", () => {
+  it("creates a fresh response attempt after the rating changes", () => {
     const started = customerFlowReducer(
-      { ...initialCustomerFlowState, rating: 4, note: "Good service" },
+      { ...initialCustomerFlowState, rating: 4 },
       {
         type: "feedback-started",
         sessionKey: "session-key-123456",
@@ -75,42 +70,42 @@ describe("customer flow state", () => {
       type: "select-rating",
       rating: 3,
     });
+
+    // A new response key, because this is a different answer. Reusing the key
+    // would make the server treat the corrected rating as a replay of the
+    // first one and store the number the customer changed their mind about.
     expect(ratingChanged.responseKey).toBeNull();
     expect(ratingChanged.sessionKey).toBe("session-key-123456");
-
-    const noteChanged = customerFlowReducer(started, {
-      type: "change-note",
-      note: "The service was good, but slow.",
-    });
-    expect(noteChanged.responseKey).toBeNull();
-    expect(noteChanged.sessionKey).toBe("session-key-123456");
   });
 
-  it("creates a fresh Team Praise attempt after its draft changes", () => {
-    const started = customerFlowReducer(
+  it("goes to the finished screen when the customer leaves for Google", () => {
+    const state = customerFlowReducer(
       {
         ...initialCustomerFlowState,
-        praiseFirstName: "Sarah",
-        praiseNote: "Very kind",
+        screen: "google",
+        sessionId: "session-1",
+        responseId: "response-1",
       },
-      { type: "praise-started", idempotencyKey: "praise-key-123456" },
+      { type: "google-click-started", idempotencyKey: "google-key-123456" },
     );
-    const edited = customerFlowReducer(started, {
-      type: "change-praise",
-      firstName: "Sarah",
-      note: "Very kind and helpful",
-    });
 
-    expect(edited.praiseKey).toBeNull();
+    // V1 has no praise step, so Google is the last thing the flow offers.
+    expect(state.screen).toBe("finished");
+
+    // The click may not have reached the server yet. The key and the ids have
+    // to survive so the reconnect retry can still send it -- this is why the
+    // transition is not `finish`, which resets them.
+    expect(state.googleClickPending).toBe(true);
+    expect(state.googleClickKey).toBe("google-key-123456");
+    expect(state.sessionId).toBe("session-1");
   });
 
-  it("clears all private drafts on finish", () => {
+  it("clears the private draft on finish", () => {
     const completed = customerFlowReducer(
       {
         ...initialCustomerFlowState,
-        screen: "praise",
-        praiseFirstName: "Zoë",
-        praiseNote: "Très attentionnée",
+        screen: "google",
+        rating: 5,
         sessionId: "session-1",
         responseId: "response-1",
       },
@@ -120,11 +115,24 @@ describe("customer flow state", () => {
     expect(completed).toMatchObject({
       screen: "finished",
       rating: null,
-      note: "",
-      praiseFirstName: "",
-      praiseNote: "",
       sessionId: null,
       responseId: null,
     });
+  });
+
+  it("has no screen that collects free text", () => {
+    // The V1 public contract accepts a rating and nothing else. A screen that
+    // asked for more would be collecting something the API rejects.
+    const screens = new Set<string>();
+    screens.add(initialCustomerFlowState.screen);
+    screens.add(
+      customerFlowReducer(initialCustomerFlowState, {
+        type: "feedback-succeeded",
+        sessionId: "s",
+        responseId: "r",
+      }).screen,
+    );
+    screens.add(customerFlowReducer(initialCustomerFlowState, { type: "finish" }).screen);
+    expect([...screens].sort()).toEqual(["finished", "google", "rating"]);
   });
 });

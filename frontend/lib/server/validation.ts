@@ -64,38 +64,33 @@ const opaqueToken = z
   .max(160)
   .regex(/^[A-Za-z0-9_-]+$/, "Invalid token.");
 
-const customerNote = z
-  .string()
-  .max(MAX_NOTE_LENGTH)
-  .refine((value) => byteLength(value) <= MAX_NOTE_BYTES, "Note is too large.");
-
 export const createSessionSchema = z.strictObject({
   locale: z.enum(SUPPORTED_LOCALES),
 });
 
+/**
+ * The whole of what a customer sends in V1.
+ *
+ * The public flow is: open the Tag, tap 1 to 5, the rating is saved privately,
+ * Google is offered. There is no note field and no praise step, so there is no
+ * `note` here.
+ *
+ * The object is strict, so a client that still sends `note` is told its request
+ * was rejected rather than having the note silently dropped. A quietly ignored
+ * field is the worse failure: the customer believes they wrote to the owner,
+ * and nothing was stored. Historical notes captured before V1 keep their
+ * ciphertext and stay readable to the owner -- see
+ * 20260914000200_public_contract_v1.sql.
+ */
 export const submitResponseSchema = z.strictObject({
   sessionId: opaqueToken,
   // Every rating is accepted and stored. Nothing downstream branches on it.
   rating: z.number().int().min(1).max(5),
-  // Optional for every rating, including 4 and 5.
-  note: customerNote.optional(),
 });
 
 export const googleClickSchema = z.strictObject({
   sessionId: opaqueToken,
   responseId: opaqueToken,
-});
-
-export const teamPraiseSchema = z.strictObject({
-  sessionId: opaqueToken,
-  responseId: opaqueToken,
-  // Unicode accepted as written. Names are never transliterated.
-  firstName: z
-    .string()
-    .min(1)
-    .max(MAX_FIRST_NAME_LENGTH)
-    .refine((value) => byteLength(value) <= MAX_FIRST_NAME_BYTES, "Name is too large."),
-  note: customerNote.optional(),
 });
 
 function toFieldErrors(error: z.ZodError): FieldError[] {

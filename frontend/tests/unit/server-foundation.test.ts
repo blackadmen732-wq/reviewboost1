@@ -255,24 +255,34 @@ describe("request schemas", () => {
     }
   });
 
-  it("bounds a note by characters", async () => {
+  it("rejects a note of any length on the public submit", async () => {
     const { submitResponseSchema } = await import("@/lib/server/validation");
 
     const base = { sessionId: "a".repeat(43), rating: 3 };
-    expect(submitResponseSchema.safeParse({ ...base, note: "x".repeat(2000) }).success).toBe(true);
-    expect(submitResponseSchema.safeParse({ ...base, note: "x".repeat(2001) }).success).toBe(false);
+    expect(submitResponseSchema.safeParse(base).success).toBe(true);
+    // Not a length bound -- there is no note field at all in V1, so one
+    // character is refused exactly as firmly as two thousand.
+    for (const length of [1, 2000, 2001]) {
+      expect(
+        submitResponseSchema.safeParse({ ...base, note: "x".repeat(length) }).success,
+        `note of ${length} characters`,
+      ).toBe(false);
+    }
   });
 
-  it("accepts a full-length note in any script, emoji included", async () => {
-    const { submitResponseSchema, MAX_NOTE_LENGTH } = await import("@/lib/server/validation");
+  it("accepts a full-length owner note in any script, emoji included", async () => {
+    const { MAX_NOTE_LENGTH, MAX_NOTE_BYTES, byteLength } = await import(
+      "@/lib/server/validation"
+    );
 
-    const base = { sessionId: "a".repeat(43), rating: 3 };
-    // A 2,000-character Japanese note is 6,000 bytes and entirely legitimate.
-    // Setting the byte ceiling below that would reject real customers writing
-    // in their own language.
+    // Customers no longer write notes in V1, but owners and staff still do, on
+    // `response_notes`. A 2,000-character Japanese note is 6,000 bytes and
+    // entirely legitimate: a byte ceiling below that would reject real people
+    // writing in their own language, so the two limits have to stay in step.
     for (const filler of ["x", "é", "田", "🎉"]) {
       const note = filler.repeat(Math.floor(MAX_NOTE_LENGTH / filler.length));
-      expect(submitResponseSchema.safeParse({ ...base, note }).success, filler).toBe(true);
+      expect(note.length, filler).toBeLessThanOrEqual(MAX_NOTE_LENGTH);
+      expect(byteLength(note), filler).toBeLessThanOrEqual(MAX_NOTE_BYTES);
     }
   });
 
@@ -288,12 +298,18 @@ describe("request schemas", () => {
     expect(Buffer.byteLength("田".repeat(MAX_NOTE_LENGTH), "utf8")).toBeLessThanOrEqual(MAX_NOTE_BYTES);
   });
 
-  it("requires a first name on Team Praise", async () => {
-    const { teamPraiseSchema } = await import("@/lib/server/validation");
+  it("exposes no public schema that collects customer text", async () => {
+    const validation = await import("@/lib/server/validation");
 
-    const base = { sessionId: "a".repeat(43), responseId: "b".repeat(43) };
-    expect(teamPraiseSchema.safeParse(base).success).toBe(false);
-    expect(teamPraiseSchema.safeParse({ ...base, firstName: "Sarah" }).success).toBe(true);
+    // V1 takes a rating and nothing else from a customer. A schema for praise
+    // or a note is the first step back towards an endpoint that accepts one.
+    expect(validation).not.toHaveProperty("teamPraiseSchema");
+
+    const base = { sessionId: "a".repeat(43), rating: 5 };
+    expect(validation.submitResponseSchema.safeParse(base).success).toBe(true);
+    expect(
+      validation.submitResponseSchema.safeParse({ ...base, note: "hello" }).success,
+    ).toBe(false);
   });
 
   it("rejects an unsupported locale rather than guessing", async () => {
