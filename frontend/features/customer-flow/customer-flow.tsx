@@ -14,6 +14,7 @@ import {
 import { CustomerBlockingState } from "@/features/customer-flow/customer-blocking-state";
 import { CustomerFrame } from "@/features/customer-flow/customer-frame";
 import { CustomerHeader } from "@/features/customer-flow/customer-header";
+import { CustomerHeroHeader } from "@/features/customer-flow/customer-hero-header";
 import { CustomerLoading } from "@/features/customer-flow/customer-loading";
 import {
   customerFlowReducer,
@@ -281,14 +282,19 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   }
 
   const context = contextQuery.data;
+  const hasHero = Boolean(context.presentation?.heroUrl);
 
   return (
-    <CustomerFrame poweredBy={messages.poweredBy}>
+    <CustomerFrame poweredBy={messages.poweredBy} hasHero={hasHero}>
+      {hasHero ? (
+        <CustomerHeroHeader context={context} />
+      ) : null}
       <CustomerHeader
         context={context}
         locale={state.locale}
         messages={messages}
         onLocaleChange={changeLocale}
+        hideIdentity={hasHero}
       />
       <div ref={contentRef}>
         <LazyMotion features={domAnimation} strict>

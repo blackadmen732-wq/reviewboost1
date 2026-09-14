@@ -12,6 +12,7 @@ interface CustomerHeaderProps {
   locale: Locale;
   messages: CustomerMessages;
   onLocaleChange: (locale: Locale) => void;
+  hideIdentity?: boolean;
 }
 
 export function CustomerHeader({
@@ -19,6 +20,7 @@ export function CustomerHeader({
   locale,
   messages,
   onLocaleChange,
+  hideIdentity,
 }: CustomerHeaderProps) {
   const [logoFailed, setLogoFailed] = useState(false);
   const logoUrl = logoFailed ? null : context.business.logoUrl;
@@ -29,30 +31,32 @@ export function CustomerHeader({
 
   return (
     <header className="customer-header">
-      <div className="business-identity">
-        <div className="business-avatar">
-          {logoUrl ? (
-            // Business media origins are part of the missing backend contract;
-            // the backend is responsible for returning an optimized logo URL.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={logoUrl}
-              alt={messages.businessLogoAlt(context.business.name)}
-              width={56}
-              height={56}
-              onError={() => setLogoFailed(true)}
-            />
-          ) : (
-            <span aria-hidden="true">{initial}</span>
-          )}
+      {hideIdentity ? (
+        <div className="business-identity" />
+      ) : (
+        <div className="business-identity">
+          <div className="business-avatar">
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoUrl}
+                alt={messages.businessLogoAlt(context.business.name)}
+                width={56}
+                height={56}
+                onError={() => setLogoFailed(true)}
+              />
+            ) : (
+              <span aria-hidden="true">{initial}</span>
+            )}
+          </div>
+          <div className="business-identity__copy">
+            <p className="business-name">{context.business.name}</p>
+            {context.location.name ? (
+              <p className="location-name">{context.location.name}</p>
+            ) : null}
+          </div>
         </div>
-        <div className="business-identity__copy">
-          <p className="business-name">{context.business.name}</p>
-          {context.location.name ? (
-            <p className="location-name">{context.location.name}</p>
-          ) : null}
-        </div>
-      </div>
+      )}
       <LanguageSelector
         locale={locale}
         supported={context.supportedLocales}

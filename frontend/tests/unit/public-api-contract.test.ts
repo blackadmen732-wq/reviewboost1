@@ -153,6 +153,7 @@ describe("GET public context", () => {
       "defaultLocale",
       "googleReviewUrl",
       "location",
+      "presentation",
       "supportedLocales",
     ]);
     expect(body["googleReviewUrl"]).toBe(ACTIVE_STAND.google_review_url);

@@ -142,8 +142,8 @@ export default async function SettingsPage() {
           <div className="min-w-0 flex-1">
             <p className="text-base font-medium text-ink">Your customers stay private</p>
             <p className="text-sm leading-relaxed text-muted">
-              We never ask them for a name, phone number, or email. Private notes
-              are locked so only you can read them.
+              We never ask customers for a name, phone number, or email. Ratings
+              are saved privately and only you can see them.
             </p>
           </div>
         </div>

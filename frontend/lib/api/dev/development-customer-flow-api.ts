@@ -100,6 +100,7 @@ export const developmentCustomerFlowApi: CustomerFlowApi = {
         "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4",
       supportedLocales: ["en", "es", "ht"],
       defaultLocale: "en",
+      presentation: { heroUrl: null, transform: { x: 0, y: 0, scale: 1 }, tagline: null },
     };
   },
 

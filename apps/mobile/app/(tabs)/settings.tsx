@@ -4,7 +4,8 @@ import { useAuth } from "@/data/auth-context";
 import { colors, radii, fonts } from "@/theme";
 
 export default function SettingsScreen() {
-  const { activeOrg, email, logout } = useAuth();
+  const { activeOrg, email, logout, organizations, selectOrg } = useAuth();
+  const hasMultipleOrgs = organizations.length > 1;
 
   function confirmSignOut() {
     Alert.alert("Sign out", "Are you sure you want to sign out?", [
@@ -13,13 +14,29 @@ export default function SettingsScreen() {
     ]);
   }
 
+  function showOrgPicker() {
+    const buttons = organizations.map((org) => ({
+      text: org.orgId === activeOrg?.orgId ? `${org.name} ✓` : org.name,
+      onPress: () => selectOrg(org.orgId),
+    }));
+    buttons.push({ text: "Cancel", onPress: () => {} });
+    Alert.alert("Switch business", "Choose which business to manage.", buttons);
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.card}>
+        <Pressable
+          style={styles.card}
+          onPress={hasMultipleOrgs ? showOrgPicker : undefined}
+          disabled={!hasMultipleOrgs}
+        >
           <Text style={styles.label}>Business</Text>
           <Text style={styles.value}>{activeOrg?.name ?? "—"}</Text>
-        </View>
+          {hasMultipleOrgs ? (
+            <Text style={styles.switchHint}>Tap to switch</Text>
+          ) : null}
+        </Pressable>
 
         <View style={styles.card}>
           <Text style={styles.label}>Signed in as</Text>
@@ -36,8 +53,8 @@ export default function SettingsScreen() {
         <View style={styles.card}>
           <Text style={styles.label}>Privacy</Text>
           <Text style={styles.helpText}>
-            We never ask customers for a name, phone number, or email. Private
-            notes are locked so only you can read them.
+            We never ask customers for a name, phone number, or email. Ratings
+            are saved privately and only you can see them.
           </Text>
         </View>
 
@@ -74,6 +91,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.ink,
     lineHeight: 20,
+  },
+  switchHint: {
+    fontSize: 12,
+    color: colors.brandText,
+    marginTop: 4,
+    ...fonts.label,
   },
   signOutButton: {
     backgroundColor: colors.surface,
