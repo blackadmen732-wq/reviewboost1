@@ -53,8 +53,8 @@ export function CustomerPageEditor({
     };
   }, [localPreviewUrl]);
 
-  const displayUrl = uploadStatus === "failed" ? confirmedServerUrl : (localPreviewUrl ?? confirmedServerUrl);
-  const hasConfirmedArtwork = uploadStatus === "confirmed" || (uploadStatus === "idle" && confirmedServerUrl !== null);
+  const displayUrl = localPreviewUrl ?? confirmedServerUrl;
+  const hasConfirmedArtwork = confirmedServerUrl !== null && uploadStatus !== "uploading";
   const canPublish = hasConfirmedArtwork && busy === null;
 
   const authHeaders = useCallback(async () => {
@@ -92,12 +92,26 @@ export function CustomerPageEditor({
       });
       if (!response.ok) throw new Error("upload");
       const newServerUrl = `${initial.draftArtworkUrl}&t=${Date.now()}`;
+      await new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("artwork-verify"));
+        img.src = newServerUrl;
+      });
+      URL.revokeObjectURL(local);
+      setLocalPreviewUrl(null);
       setConfirmedServerUrl(newServerUrl);
       setUploadStatus("confirmed");
       notify.success("Photo added", "Move it until it looks right, then publish.");
     } catch {
-      setUploadStatus("failed");
-      setError("Could not add that photo. Use a JPG or PNG under 2 MB.");
+      URL.revokeObjectURL(local);
+      setLocalPreviewUrl(null);
+      setUploadStatus(confirmedServerUrl ? "failed" : "idle");
+      setError(
+        confirmedServerUrl
+          ? "Could not add that photo. Your previous photo is still saved."
+          : "Could not add that photo. Use a JPG or PNG under 2 MB.",
+      );
     }
   }
 
