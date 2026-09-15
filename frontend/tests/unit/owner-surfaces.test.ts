@@ -85,6 +85,27 @@ describe("the owner surfaces show real state", () => {
     expect(nav).toMatch(/label: "Text Requests"/);
   });
 
+  it("gives Home and Feedback one definition of unread", () => {
+    const layer = code("lib/server/owner-data.ts");
+
+    // Home counts unread and Feedback filters by it. Two definitions is how a
+    // badge says 3 and the list shows 5, and the owner stops believing either.
+    const predicates = layer.match(/\.is\("read_at", null\)/g) ?? [];
+    expect(predicates.length).toBeGreaterThanOrEqual(2);
+    // Nothing may reach for a second notion of "seen".
+    expect(layer).not.toMatch(/viewed_at|seen_at|opened_by_owner/);
+  });
+
+  it("measures the day where the business is, not where the server is", () => {
+    const layer = code("lib/server/owner-data.ts");
+
+    // A London owner on a US-hosted server watching "today" reset mid-afternoon
+    // looks exactly like data loss.
+    expect(layer).toMatch(/startOfLocalDay\(timezone\)/);
+    expect(layer).not.toMatch(/setHours\(0, ?0, ?0, ?0\)/);
+    expect(layer).not.toMatch(/toISOString\(\)\.slice\(0, ?10\)/);
+  });
+
   it("reads every owner surface through the shared data layer", () => {
     // `owner-data.test.ts` already guards the table names. This adds the two
     // screens built here, where a direct query would also bypass the
