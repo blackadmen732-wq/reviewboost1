@@ -213,6 +213,41 @@ begin
 end
 $$;
 
+-- ------- 5b. the concurrency test's own connection method is usable ---------
+
+-- Asserted before the race that depends on it, and reported with the role's
+-- superuser status on purpose.
+--
+-- dblink lets a superuser connect however it likes, so a superuser run proves
+-- nothing about anyone else. On Supabase the `postgres` role is NOT a
+-- superuser, and dblink there refuses any connection where a password was not
+-- actually exchanged -- which is every trusted local socket. A harness that
+-- only ever ran as a superuser reported the race as passing while it could not
+-- have run on the real server at all.
+do $probe$
+declare
+    v_conn text := format('dbname=%s host=127.0.0.1 port=%s user=%s%s',
+        current_database(), current_setting('port'), current_user,
+        case when coalesce(current_setting('rb.dbpassword', true), '') <> ''
+             then ' password=' || current_setting('rb.dbpassword', true) else '' end);
+    v_super boolean;
+    v_ok text;
+begin
+    select usesuper into v_super from pg_user where usename = current_user;
+
+    perform dblink_connect('probe', v_conn);
+    select * into v_ok from dblink('probe', $q$select 'reached'$q$) as t(x text);
+    perform dblink_disconnect('probe');
+
+    if v_ok is distinct from 'reached' then
+        raise exception 'dblink connected but could not query';
+    end if;
+
+    raise notice 'PASS dblink opens its own connection (user=%, superuser=%)',
+        current_user, coalesce(v_super, false);
+end
+$probe$;
+
 -- ------------------------------------ 6. two simultaneous creates ----------
 
 -- The real test. Two genuine sessions, both inside open transactions, and the
@@ -248,10 +283,20 @@ values ('cccccccc-0000-0000-0000-00000000000c', 'c10c0000-0000-0000-0000-0000000
 
 do $$
 declare
-    v_conn text := format('dbname=%s port=%s host=%s user=%s%s',
+    -- Loopback rather than the unix socket, deliberately.
+    --
+    -- dblink refuses a connection opened by a non-superuser unless a password
+    -- was actually *used* -- not merely supplied. A local socket configured
+    -- for trust never uses one, so the connection is rejected with "Non-
+    -- superusers may only connect using credentials they provide". On Supabase
+    -- the `postgres` role is not a superuser, so the socket path cannot work
+    -- there at all. Over TCP the password is really exchanged.
+    --
+    -- Port and database come from the server, because dblink dials from inside
+    -- it; only the password comes from the harness.
+    v_conn text := format('dbname=%s host=127.0.0.1 port=%s user=%s%s',
         current_database(),
         current_setting('port'),
-        split_part(current_setting('unix_socket_directories'), ',', 1),
         current_user,
         case
             when coalesce(current_setting('rb.dbpassword', true), '') <> ''

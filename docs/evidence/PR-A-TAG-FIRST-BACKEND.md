@@ -351,14 +351,38 @@ file previously failed outright -- which have no state to diverge from.
    host, port, database and user from the server's own settings, and only
    the password is passed in -- the one thing the server will not tell it.
 
+7. Even dialling the server's own address, dblink refused: on Supabase the
+   `postgres` role is **not a superuser**, and dblink rejects a
+   non-superuser connection unless a password was actually *exchanged* --
+   not merely supplied. A trusted unix socket never exchanges one. The
+   connection is now loopback TCP, where it is.
+
 Each was reproduced before being fixed, by building the configuration
 that exposed it rather than reasoning about whether a fix would work:
-pg_cron installed locally for 5, and for 6 a server reached through a
-port forwarder, so the client's port genuinely differs from the server's.
+pg_cron installed locally for 5; a server behind a port forwarder for 6,
+so the client's port genuinely differs from the server's; and for 7 a
+non-superuser role on a scram-authenticated server, which showed two
+things a superuser run can never show --
 
-All four SQL suites, the chain, the populated upgrade and pgTAP now pass
-in three configurations: the harness's own socket, a TCP server with md5
-auth, and a server whose client-facing port is not its own.
+    SOCKET-SETTING: NOT readable -- permission denied to examine
+                    "unix_socket_directories"
+    PORT-SETTING:   54329 (readable)
+    TCP:            connected as a non-superuser
+
+-- so the socket conninfo could not have worked on Supabase for two
+independent reasons, and the suite now carries a probe that reports the
+role's superuser status alongside its result. A passing run by a
+superuser is not evidence about anybody else, and now says so.
+
+The harness's own server was also changed to require a password on TCP
+(`--auth-host=scram-sha-256`) rather than trusting it. A harness whose
+authentication is weaker than the real thing passes locally and fails
+against every real server, which is how 6 and 7 both reached CI.
+
+All four SQL suites, the chain, the populated upgrade and pgTAP pass in
+four configurations: the harness's own socket, a TCP server with md5
+auth, a server whose client-facing port is not its own, and a
+non-superuser role over scram.
 
 ## What this branch does not claim
 

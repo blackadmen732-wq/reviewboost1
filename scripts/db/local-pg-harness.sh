@@ -27,10 +27,16 @@ export PATH="$BIN:$PATH"
 # standard libpq variables at it. Overwriting PGHOST here would send every psql
 # to a socket this script never created -- which is exactly what happened the
 # first time this ran in CI against Supabase's own PostgreSQL.
+# Not a credential: it is generated for a server this script creates, uses and
+# destroys, and never leaves the machine. It exists so TCP authentication is
+# exercised rather than trusted.
+LOCAL_PW="harness-local-$$"
+
 if [ "${PGHARNESS_EXTERNAL:-0}" != "1" ]; then
   export PGHOST="$SOCK"
   export PGPORT="$PORT"
   export PGUSER=postgres
+  export PGPASSWORD="$LOCAL_PW"
 fi
 
 # PostgreSQL refuses to run as root. In a container that is the only account
@@ -61,8 +67,21 @@ harness_start() {
   fi
   rm -rf "${WORK:?}"/data "${WORK:?}"/sock
   mkdir -p "$PGDATA" "$SOCK"
-  initdb -D "$PGDATA" -U postgres --auth=trust --no-sync -E UTF8 >/dev/null
-  pg_ctl -D "$PGDATA" -l "$WORK/pg.log" -o "-k $SOCK -p $PORT -c listen_addresses=" -w start >/dev/null
+  # Local connections trust; TCP requires a real password, matching how a
+  # hosted PostgreSQL is configured. That difference is not cosmetic: dblink
+  # refuses a non-superuser connection unless a password was actually used, so
+  # a harness that trusted TCP would pass here and fail against any real
+  # server -- which is exactly what happened before this line said so.
+  printf '%s\n' "$LOCAL_PW" > "$WORK/pw"
+  initdb -D "$PGDATA" -U postgres --auth-local=trust --auth-host=scram-sha-256 \
+    --pwfile="$WORK/pw" --no-sync -E UTF8 >/dev/null
+  rm -f "$WORK/pw"
+  # Listens on loopback as well as the socket: dblink refuses a non-superuser
+  # connection unless a password was actually used, and a trusted local socket
+  # never uses one. CI's server is reached over TCP for that reason, so this
+  # one must offer TCP too or the two diverge in the thing being tested.
+  pg_ctl -D "$PGDATA" -l "$WORK/pg.log" \
+    -o "-k $SOCK -p $PORT -c listen_addresses=127.0.0.1" -w start >/dev/null
 }
 
 harness_stop() {
