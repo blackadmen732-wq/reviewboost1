@@ -14,9 +14,10 @@ info:
     the review-integrity guarantee.
 
 
-    V1 FLOW: open Tag → tap 1–5 → rating saved → Google. Private notes and
-    Team Praise are not active in V1. Historical data in the database is
-    preserved; these endpoints are simply not exposed.
+    V1 FLOW: open Tag/QR/NFC → customer taps 1–5 → private rating saved →
+    same Google review destination for every rating. No public note. No active
+    public Team Praise. Historical note and Team Praise data in the database
+    is preserved; these endpoints are simply not exposed in the public V1 API.
 
 
     REVIEW INTEGRITY — binding, and a release blocker
@@ -25,10 +26,9 @@ info:
     Every rating from one to five receives the same neutral Google review
     opportunity. `googleReviewUrl` is returned by the context endpoint, which
     runs before any rating exists and is never re-fetched with one, so the
-    opportunity structurally cannot vary by rating. The private note and Team
-    Praise are additive: extra things a customer may do, never a substitute for
-    the public review. There is no rating threshold, no rating-dependent action,
-    and no metric describing a review as prevented or intercepted.
+    opportunity structurally cannot vary by rating. There is no rating threshold,
+    no rating-dependent action, and no metric describing a review as prevented or
+    intercepted.
 servers:
   - url: /
     description: Same origin as the customer page. No CORS preflight occurs.
@@ -115,15 +115,15 @@ paths:
     post:
       operationId: submitCustomerResponse
       tags: [public]
-      summary: Persist an honest rating and an optional private note
+      summary: Persist an honest rating (1–5)
       description: >-
-        Every rating from one to five is stored and handled identically. The
-        note is optional for all five and is encrypted at rest. One response per
-        session.
+        Every rating from one to five is stored and handled identically. One
+        response per session. Notes and Team Praise are not accepted in the V1
+        public API; the database columns exist for historical data only.
 
 
-        The request schema is strict: a phone number, email address, marketing
-        consent flag, or tenant identifier is rejected, not ignored.
+        The request schema is strict: a phone number, email address, note,
+        marketing consent flag, or tenant identifier is rejected, not ignored.
       parameters:
         - $ref: "#/components/parameters/ReviewToken"
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -216,7 +216,7 @@ components:
       description: >-
         Mandatory. The customer flow runs on a phone, so a request that times
         out is the normal case, not the exceptional one — a retry without a key
-        would write a second response, praise record, or scan. The client must
+        would write a second response or scan. The client must
         reuse the same key across an offline retry.
       schema:
         type: string
@@ -286,7 +286,7 @@ components:
               message: This session has expired. Please scan the code again.
             requestId: 6f9619ff-8b86-d011-b42d-00c04fc964ff
     ResponseConflict:
-      description: That session already has a response, or that response already has praise.
+      description: That session already has a response.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }

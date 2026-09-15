@@ -95,7 +95,7 @@ const en: CustomerMessages = {
   googleAction: "Leave a Google review",
   googleContinue: "Continue without Google",
   googleTrust: (businessName) =>
-    `Google reviews are public. Your note to ${businessName} is private.`,
+    `Google reviews are public. Your feedback to ${businessName} is private.`,
   praiseHeading: "Want to thank someone?",
   praiseSupport: (businessName) => `Only ${businessName} will see this.`,
   firstNameLabel: "Their first name",
@@ -154,7 +154,7 @@ const es: CustomerMessages = {
   googleAction: "Dejar una reseña en Google",
   googleContinue: "Continuar sin Google",
   googleTrust: (businessName) =>
-    `Las reseñas de Google son públicas. Tu nota para ${businessName} es privada.`,
+    `Las reseñas de Google son públicas. Tus comentarios para ${businessName} son privados.`,
   praiseHeading: "¿Quieres agradecerle a alguien?",
   praiseSupport: (businessName) => `Solo ${businessName} verá esto.`,
   firstNameLabel: "Su nombre",
@@ -213,7 +213,7 @@ const ht: CustomerMessages = {
   googleAction: "Kite yon revi sou Google",
   googleContinue: "Kontinye san Google",
   googleTrust: (businessName) =>
-    `Revi Google yo piblik. Nòt ou pou ${businessName} prive.`,
+    `Revi Google yo piblik. Kòmantè ou pou ${businessName} prive.`,
   praiseHeading: "Ou vle remèsye yon moun?",
   praiseSupport: (businessName) => `Se sèlman ${businessName} ki pral wè sa.`,
   firstNameLabel: "Prenon yo",
