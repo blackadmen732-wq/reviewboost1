@@ -29,11 +29,17 @@ function StandStatusBadge({ status }: { status: string }) {
 }
 
 function NfcStatus({ stand }: { stand: StandItem }) {
-  if (!stand.nfcProvisionedAt) return null;
-
+  // Rotation clears provisioning on the server, because a rotated token makes
+  // every chip already written for that Tag lead nowhere. So "was programmed,
+  // then rotated" arrives as no provisioning plus a rotation timestamp — and
+  // that is exactly the case an owner most needs told, not hidden.
   const needsRewrite =
-    stand.tokenRotatedAt !== null &&
-    new Date(stand.tokenRotatedAt) > new Date(stand.nfcProvisionedAt);
+    stand.nfcProvisionedAt === null
+      ? stand.tokenRotatedAt !== null
+      : stand.tokenRotatedAt !== null &&
+        new Date(stand.tokenRotatedAt) > new Date(stand.nfcProvisionedAt);
+
+  if (!stand.nfcProvisionedAt && !needsRewrite) return null;
 
   return (
     <View
