@@ -66,10 +66,17 @@ export interface Entitlement {
   currentPeriodEnd: string | null;
 }
 
+const NOTHING: PlanLimits = { locations: 0, tags: 0, monthlySmsSegments: 0, priceUsdCents: 0 };
+
 function limitsFor(planId: PlanId | null, status: EntitlementStatus): PlanLimits {
   if (status === "trialing") return TRIAL_LIMITS;
-  if (status !== "active") return { locations: 0, tags: 0, monthlySmsSegments: 0, priceUsdCents: 0 };
-  if (planId === null) return { locations: 0, tags: 0, monthlySmsSegments: 0, priceUsdCents: 0 };
+  // Never subscribed: the setup allowance. One location and one Tag, so a
+  // business can be set up and looked at before it is asked for a card — and
+  // no service at all, because `allowsService` still says no. A business
+  // suspended at the end of dunning has a plan, and gets none of this.
+  if (status === "suspended" && planId === null) return TRIAL_LIMITS;
+  if (status !== "active") return NOTHING;
+  if (planId === null) return NOTHING;
   return PLANS[planId];
 }
 

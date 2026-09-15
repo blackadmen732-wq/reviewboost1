@@ -150,6 +150,22 @@ describe("the locked V1 plans", () => {
     expect(allowsService("suspended")).toBe(false);
   });
 
+  it("lets a business that has not subscribed set itself up, and serve nobody", async () => {
+    const { tagLimit, locationLimit, allowsService } = await import("@/lib/server/entitlements");
+
+    // Onboarding gives a new business one Tag and one location before it is
+    // asked for a card. The Tag resolves to nothing until billing opens the
+    // door, so this is a product someone can look at — not a free plan.
+    expect(tagLimit(null, "suspended")).toBe(1);
+    expect(locationLimit(null, "suspended")).toBe(1);
+    expect(allowsService("suspended")).toBe(false);
+
+    // A business suspended at the end of dunning has a plan, and gets none of
+    // it: its Tags exist, and it does not make more while it owes money.
+    expect(tagLimit("starter", "suspended")).toBe(0);
+    expect(locationLimit("starter", "suspended")).toBe(0);
+  });
+
   it("stops honouring a trial whose end has passed", async () => {
     const { effectiveStatus } = await import("@/lib/server/entitlements");
     const now = new Date("2026-09-15T12:00:00Z");

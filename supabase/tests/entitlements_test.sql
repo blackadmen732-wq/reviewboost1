@@ -13,7 +13,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(48);
+select plan(51);
 
 -- ------------------------------------------------------------- helpers ------
 
@@ -162,6 +162,15 @@ select is(app.entitlement_monthly_sms(null), 0, 'a trial gets no SMS at all');
 select is(app.entitlement_tag_limit('enterprise', 'active'), 0, 'an unknown plan grants no Tags');
 select is(app.entitlement_tag_limit('starter', 'cancelled'), 0, 'a cancelled Starter grants no new Tags');
 select is(app.entitlement_tag_limit('starter', 'suspended'), 0, 'a suspended Starter grants no new Tags');
+-- Setting up is not being served. A business that has never subscribed may
+-- create the one Tag onboarding gives it — and that Tag opens nothing until
+-- billing says so, which the door tests below prove.
+select is(app.entitlement_tag_limit(null, 'suspended'), 1,
+    'a business that has never subscribed may still be set up');
+select is(app.entitlement_location_limit(null, 'suspended'), 1,
+    'and may have the one location it was set up with');
+select ok(not app.entitlement_allows_service('suspended'),
+    'while its Tags serve nobody at all');
 select is(app.entitlement_tag_limit('starter', 'past_due'), 0, 'a past-due Starter grants no new Tags');
 select is(app.entitlement_location_limit(null, null), 0, 'no entitlement grants nothing');
 
