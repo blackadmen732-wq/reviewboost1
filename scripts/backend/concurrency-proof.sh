@@ -125,3 +125,72 @@ if [ "$failures" -ne 0 ]; then
 fi
 
 echo "ok    $RACERS concurrent creates, 1 slot, 1 winner, cap held by the database."
+
+# ---------------------------------------------------------------- credit ----
+#
+# The other race that costs money: several sends reaching for the last
+# segments at once. Over-reserving here is a message a business is billed for
+# and did not buy.
+
+echo
+echo "Seeding 3 monthly and 2 purchased segments — 5 in total..."
+psql_db >/dev/null <<SQL
+select app.sms_grant_credits('$ORG', 'monthly', 3, 'invoice', 'race-invoice', now() + interval '30 days', null);
+select app.sms_grant_credits('$ORG', 'purchased', 2, 'purchase', 'race-purchase', null, null);
+SQL
+
+echo "Launching $RACERS concurrent 2-segment reservations against 5 segments..."
+outdir="$(mktemp -d)"
+for i in $(seq 1 "$RACERS"); do
+    (
+        set +e
+        psql -X -q -t -A -v ON_ERROR_STOP=1 -h 127.0.0.1 -p "$PGPORT" -U postgres -d "$PGDB" <<SQL >"$outdir/$i.out" 2>&1
+select case when reserved then 'reserved' else 'refused' end
+  from app.sms_quota_reserve('$ORG'::uuid, 2, 'race-reservation-key-$i', null);
+SQL
+        echo "$?" > "$outdir/$i.code"
+    ) &
+done
+wait
+
+reserved=0
+for i in $(seq 1 "$RACERS"); do
+    if grep -q 'reserved' "$outdir/$i.out" 2>/dev/null; then
+        reserved=$((reserved + 1))
+    fi
+done
+rm -rf "$outdir"
+
+read -r monthly purchased total < <(
+    psql_db -t -A -F' ' -c "select monthly, purchased, total from app.sms_balance('$ORG')"
+)
+held="$(psql_db -t -A -c "select coalesce(sum(segments), 0) from public.sms_reservation_slices where org_id = '$ORG' and status = 'held'")"
+overspent="$(psql_db -t -A -c "select count(*) from public.sms_credit_grants where org_id = '$ORG' and consumed + reserved > segments")"
+
+echo "reserved=$reserved held_segments=$held remaining monthly=$monthly purchased=$purchased total=$total"
+
+credit_failures=0
+# Five segments, two per reservation: exactly two can win.
+if [ "$reserved" -ne 2 ]; then
+    echo "FAIL: expected exactly 2 of $RACERS reservations to win 5 segments, got $reserved."
+    credit_failures=1
+fi
+if [ "$held" -ne 4 ]; then
+    echo "FAIL: expected 4 segments held, got $held."
+    credit_failures=1
+fi
+if [ "$overspent" -ne 0 ]; then
+    echo "FAIL: $overspent grant(s) were overspent."
+    credit_failures=1
+fi
+# Monthly is spent first: 4 taken from 3 monthly + 1 purchased leaves 0 and 1.
+if [ "$monthly" -ne 0 ] || [ "$purchased" -ne 1 ]; then
+    echo "FAIL: expected monthly=0 purchased=1 after spending monthly first; got $monthly and $purchased."
+    credit_failures=1
+fi
+
+if [ "$credit_failures" -ne 0 ]; then
+    exit 1
+fi
+
+echo "ok    $RACERS concurrent reservations, 5 segments, 2 winners, monthly spent first."

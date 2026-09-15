@@ -205,6 +205,62 @@ export function tokenDigestKeyVersion(): number {
  * Call from a health check or a deploy gate to surface a misconfiguration
  * before traffic arrives rather than on the first customer request.
  */
+// ------------------------------------------------------------- Stripe -----
+
+/**
+ * The Stripe secret key.
+ *
+ * Server-only, and never given a development fallback: a billing path that
+ * silently does nothing because a key was missing is worse than one that
+ * refuses, because the business believes it is subscribed.
+ */
+export function stripeSecretKey(): string {
+  return read("STRIPE_SECRET_KEY");
+}
+
+/**
+ * The webhook signing secret.
+ *
+ * Without it a webhook cannot be verified, and an unverified webhook is
+ * anyone on the internet writing a business's billing state. There is no
+ * "skip verification in development" branch, because that branch is the one
+ * that eventually ships.
+ */
+export function stripeWebhookSecret(): string {
+  return read("STRIPE_WEBHOOK_SECRET");
+}
+
+/**
+ * Stripe price ids for the three plans.
+ *
+ * A plan whose price id is missing cannot be sold — the checkout refuses
+ * rather than starting a subscription at whatever price happened to be
+ * configured somewhere else.
+ */
+export function stripePriceId(planId: "starter" | "growth" | "pro"): string {
+  switch (planId) {
+    case "starter":
+      return read("STRIPE_PRICE_STARTER");
+    case "growth":
+      return read("STRIPE_PRICE_GROWTH");
+    case "pro":
+      return read("STRIPE_PRICE_PRO");
+  }
+}
+
+/** Reverse of `stripePriceId`, for reading a subscription back. */
+export function planIdForPrice(priceId: string | null): "starter" | "growth" | "pro" | null {
+  if (!priceId) return null;
+  for (const plan of ["starter", "growth", "pro"] as const) {
+    try {
+      if (stripePriceId(plan) === priceId) return plan;
+    } catch {
+      // A plan that is not configured simply cannot match.
+    }
+  }
+  return null;
+}
+
 export function validateServerConfig(): { ok: true } | { ok: false; problems: string[] } {
   const problems: string[] = [];
 
