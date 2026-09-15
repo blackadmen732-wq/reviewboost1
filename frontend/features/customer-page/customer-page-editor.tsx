@@ -47,6 +47,7 @@ export function CustomerPageEditor({
           };
         };
         if (data.draft.tagline != null) setTagline(data.draft.tagline);
+        if (data.draft.heroAssetId) setHeroAssetId(data.draft.heroAssetId);
         if (data.published?.heroUrl) setHeroUrl(data.published.heroUrl);
         setIsPublished(data.published !== null);
       } catch {

@@ -15,6 +15,8 @@ export default async function CustomerPagePage() {
   const { organization } = await requireOwner("/customer-page");
   const counts = await getOwnerCounts(organization.orgId, organization.timezone);
 
+  const canEdit = organization.role === "owner" || organization.role === "admin";
+
   return (
     <AppShell unreadCount={counts.unread}>
       <h1 className="mb-1 text-2xl font-semibold tracking-[-0.02em] text-ink">Customer Page</h1>
@@ -22,21 +24,18 @@ export default async function CustomerPagePage() {
         What customers see when they scan one of your tags.
       </p>
 
-      <CustomerPageLoader businessName={organization.name} />
+      {canEdit ? (
+        <CustomerPageEditor
+          businessName={organization.name}
+          initialTagline={null}
+          initialHeroUrl={null}
+          isPublished={false}
+        />
+      ) : (
+        <p className="text-sm text-muted">
+          Only owners and admins can edit the customer page. Ask the account owner to make changes.
+        </p>
+      )}
     </AppShell>
-  );
-}
-
-// Thin server wrapper around the client-side editor.
-// The editor loads its own initial state via the API so we stay out of
-// the service-role path entirely from a page component.
-function CustomerPageLoader({ businessName }: { businessName: string }) {
-  return (
-    <CustomerPageEditor
-      businessName={businessName}
-      initialTagline={null}
-      initialHeroUrl={null}
-      isPublished={false}
-    />
   );
 }
