@@ -40,27 +40,26 @@ No sign-up. No form. No friction.
 FOR THE BUSINESS
 
 - One dashboard to see every rating as it comes in
-- Private notes from customers, visible only to you
+- Ratings and written feedback from customers, visible only to you
 - Text Requests: send a review reminder to a phone number with one tap
 - Multiple Tags and locations on paid plans
 - Works as a web app on any device, installs to the home screen like a native app
 
 TAGS AND NFC
 
-ReviewBoost ships physical NFC tags (optional). Tap the tag to your iPhone and
-it programmes itself from your dashboard. Every scan goes straight to your Google
-page.
+Bring your own blank NFC tags (NTAG213 or NTAG215). Tap a tag to your iPhone
+and the app programmes it with your review page URL in seconds. No extra
+hardware required — QR codes work on every smartphone too.
 
 PRIVACY
 
 We never ask customers for their name, phone number, or email. Ratings are
-anonymous. Private notes are encrypted at rest — only you can read them.
+anonymous. Customer feedback is encrypted at rest — only you can read it.
 
 PLANS
 
-A free setup mode lets you configure everything and see exactly what customers
-will see before you pay. Monthly plans unlock customer-facing Tags. Cancel
-any time; your data stays until you delete it.
+Monthly plans unlock customer-facing Tags and SMS sending. Cancel any time;
+your data stays until you delete it.
 
 ---
 Requires an internet connection for setup and to receive ratings in real time.
@@ -105,8 +104,9 @@ google reviews,review booster,NFC review,qr review,small business,customer revie
 ### App Review notes
 
 ```
-ReviewBoost is a web-based dashboard that installs to the home screen (PWA).
-The iOS app wraps this PWA and adds NFC Tag programming capability.
+ReviewBoost is a native iOS app that provides a business dashboard and NFC Tag
+programming. The customer-facing review flow runs in the browser — no customer
+download is required.
 
 TO TEST THE CORE FLOW
 1. Sign in with the demo credentials above.
