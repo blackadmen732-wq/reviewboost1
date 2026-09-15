@@ -181,11 +181,33 @@ interface Budget {
  * at exactly the busiest moment. Per client fingerprint stops one device
  * filling a business's feedback while everyone else at that stand carries on.
  */
+/** How long to ask a customer to wait when the limiter itself is unavailable. */
+const RETRY_WHEN_LIMITER_DOWN_SECONDS = 5;
+
 const CONTEXT_BUDGET: Budget = { bucket: "public-context", limit: 240, windowSeconds: 60 };
 const STAND_WRITE_BUDGET: Budget = { bucket: "public-write-stand", limit: 60, windowSeconds: 60 };
 const CLIENT_WRITE_BUDGET: Budget = { bucket: "public-write-client", limit: 30, windowSeconds: 300 };
 
-async function consume(budget: Budget, key: string, requestId: string): Promise<void> {
+/**
+ * Consume one unit of a budget.
+ *
+ * `onUnavailable` is the whole design decision. A read that cannot be
+ * rate-limited still serves a page: the worst case is a crawler reading a
+ * business name it could have read anyway, and turning a real customer away
+ * from the only screen they will ever see costs that business a rating.
+ *
+ * A *write* is the opposite. With the limiter down, failing open means anyone
+ * holding a token can fabricate unlimited feedback into a business's data —
+ * and unlike a read, that is not recoverable by retrying later. So a write
+ * whose budget cannot be enforced is refused, and the customer is asked to try
+ * again in a moment.
+ */
+async function consume(
+  budget: Budget,
+  key: string,
+  requestId: string,
+  onUnavailable: "allow" | "refuse",
+): Promise<void> {
   const { data, error } = await serviceRoleClient().rpc("rpc_consume_rate_limit", {
     p_bucket: budget.bucket,
     p_bucket_key: key,
@@ -194,27 +216,44 @@ async function consume(budget: Budget, key: string, requestId: string): Promise<
   });
 
   if (error) {
-    // Fails open. A customer standing at a counter must not be turned away
-    // because a limiter is unavailable; the abuse this bounds is a nuisance,
-    // not a breach. Authentication would fail closed — this is not that.
-    logger.warn("public.rate_limit_unavailable", { bucket: budget.bucket, requestId, error });
+    logger.warn("public.rate_limit_unavailable", {
+      bucket: budget.bucket,
+      requestId,
+      onUnavailable,
+      error,
+    });
+    if (onUnavailable === "refuse") throw rateLimited(RETRY_WHEN_LIMITER_DOWN_SECONDS);
     return;
   }
 
   const row = Array.isArray(data) ? (data[0] as { allowed: boolean; retry_after_seconds: number } | undefined) : undefined;
-  if (row && !row.allowed) {
+
+  // No row is not a pass. The function is meant to return a decision, and a
+  // missing one means it could not make it — which for a write is a refusal.
+  if (!row) {
+    logger.warn("public.rate_limit_no_decision", { bucket: budget.bucket, requestId });
+    if (onUnavailable === "refuse") throw rateLimited(RETRY_WHEN_LIMITER_DOWN_SECONDS);
+    return;
+  }
+
+  if (!row.allowed) {
     logger.warn("public.rate_limited", { bucket: budget.bucket, requestId });
     throw rateLimited(row.retry_after_seconds);
   }
 }
 
 async function guardRead(tokenHash: string, meta: RequestMeta): Promise<void> {
-  await consume(CONTEXT_BUDGET, tokenHash, meta.requestId);
+  await consume(CONTEXT_BUDGET, tokenHash, meta.requestId, "allow");
 }
 
 async function guardWrite(tokenHash: string, meta: RequestMeta): Promise<void> {
-  await consume(STAND_WRITE_BUDGET, tokenHash, meta.requestId);
-  await consume(CLIENT_WRITE_BUDGET, clientFingerprint(meta.address, meta.userAgent), meta.requestId);
+  await consume(STAND_WRITE_BUDGET, tokenHash, meta.requestId, "refuse");
+  await consume(
+    CLIENT_WRITE_BUDGET,
+    clientFingerprint(meta.address, meta.userAgent),
+    meta.requestId,
+    "refuse",
+  );
 }
 
 interface ResolvedStand {

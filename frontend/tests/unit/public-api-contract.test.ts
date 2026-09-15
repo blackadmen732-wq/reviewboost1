@@ -603,16 +603,41 @@ describe("rate limiting", () => {
     expect(response.headers.get("retry-after")).toBe("42");
   });
 
-  it("fails open when the limiter itself is unavailable", async () => {
-    // A customer at a counter must not be turned away because a limiter is
-    // down. The abuse this bounds is a nuisance, not a breach.
+  it("refuses a WRITE when the limiter itself is unavailable", async () => {
+    // Failing open on a write means anyone holding a token can fabricate
+    // unlimited feedback into a business's data while the limiter is down, and
+    // unlike a failed read that is not recoverable by trying again later.
     rpcHandler = (fn) =>
       fn === "rpc_consume_rate_limit"
         ? { data: null, error: { message: "connection refused" } }
         : happyPath(fn);
 
     const response = await postResponse({ sessionId: SESSION_ID, rating: 3 });
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("5");
+  });
+
+  it("refuses a write when the limiter returns no decision at all", async () => {
+    // An empty result is not a pass: the function is meant to return a
+    // decision, and a missing one means it could not make one.
+    rpcHandler = (fn) =>
+      fn === "rpc_consume_rate_limit" ? { data: [], error: null } : happyPath(fn);
+
+    const response = await postResponse({ sessionId: SESSION_ID, rating: 3 });
+    expect(response.status).toBe(429);
+  });
+
+  it("still serves a READ when the limiter is unavailable", async () => {
+    // The worst case for a read is a crawler seeing a business name it could
+    // have seen anyway. Turning a real customer away from the only screen they
+    // will ever see costs that business a rating.
+    rpcHandler = (fn) =>
+      fn === "rpc_consume_rate_limit"
+        ? { data: null, error: { message: "connection refused" } }
+        : happyPath(fn);
+
+    const response = await getContext();
+    expect(response.status).toBe(200);
   });
 });
 
