@@ -22,9 +22,16 @@ PORT="${PGHARNESS_PORT:-54329}"
 BIN="$(find /usr/lib/postgresql -mindepth 2 -maxdepth 2 -type d -name bin 2>/dev/null | sort -V | tail -1)"
 
 export PATH="$BIN:$PATH"
-export PGHOST="$SOCK"
-export PGPORT="$PORT"
-export PGUSER=postgres
+
+# EXTERNAL=1 means a server is already running and the caller has pointed the
+# standard libpq variables at it. Overwriting PGHOST here would send every psql
+# to a socket this script never created -- which is exactly what happened the
+# first time this ran in CI against Supabase's own PostgreSQL.
+if [ "${PGHARNESS_EXTERNAL:-0}" != "1" ]; then
+  export PGHOST="$SOCK"
+  export PGPORT="$PORT"
+  export PGUSER=postgres
+fi
 
 # PostgreSQL refuses to run as root. In a container that is the only account
 # there is, so re-exec the whole script as the unprivileged `postgres` account
@@ -188,7 +195,20 @@ cmd_sql() {
   harness_start
   fresh_db "$t"
   apply_chain "$t" >/dev/null
-  psql -v ON_ERROR_STOP=1 -v seed="$ROOT/scripts/db/seed-populated.sql" -q -d "$t" -f "$file"
+  # Suites that open their own connections (the concurrency test uses dblink)
+  # cannot rebuild a working conninfo from server settings: the server may want
+  # a password, and `unix_socket_directories` is not where the client came in.
+  # Hand it the one that is known to work.
+  local conninfo="dbname=$t"
+  [ -n "${PGHOST:-}" ]     && conninfo="$conninfo host=$PGHOST"
+  [ -n "${PGPORT:-}" ]     && conninfo="$conninfo port=$PGPORT"
+  [ -n "${PGUSER:-}" ]     && conninfo="$conninfo user=$PGUSER"
+  [ -n "${PGPASSWORD:-}" ] && conninfo="$conninfo password=$PGPASSWORD"
+
+  psql -v ON_ERROR_STOP=1 \
+       -v seed="$ROOT/scripts/db/seed-populated.sql" \
+       -v conninfo="$conninfo" \
+       -q -d "$t" -f "$file"
   local status=$?
   dropdb --if-exists "$t" >/dev/null 2>&1 || true
   return $status

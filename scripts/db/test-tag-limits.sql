@@ -10,6 +10,18 @@
 
 create extension if not exists dblink;
 
+-- The harness passes a connection string that is known to reach this server.
+-- Running this file through plain psql instead falls back to rebuilding one
+-- from server settings, which works only for a passwordless local socket.
+\if :{?conninfo}
+\else
+\set conninfo ''
+\endif
+
+-- Carried through a GUC rather than read directly: psql does not interpolate
+-- its variables inside a dollar-quoted block, which is where dblink_connect is.
+select set_config('rb.conninfo', :'conninfo', false);
+
 -- ------------------------------------------------------------- fixtures ----
 
 insert into auth.users (id, email) values
@@ -232,11 +244,13 @@ values ('cccccccc-0000-0000-0000-00000000000c', 'c10c0000-0000-0000-0000-0000000
 
 do $$
 declare
-    v_conn text := format('dbname=%s port=%s host=%s user=%s',
-                          current_database(),
-                          current_setting('port'),
-                          current_setting('unix_socket_directories'),
-                          current_user);
+    v_conn text := coalesce(
+        nullif(current_setting('rb.conninfo', true), ''),
+        format('dbname=%s port=%s host=%s user=%s',
+               current_database(),
+               current_setting('port'),
+               split_part(current_setting('unix_socket_directories'), ',', 1),
+               current_user));
     v_org  uuid := 'cccccccc-0000-0000-0000-00000000000c';
     v_loc  uuid := 'c10c0000-0000-0000-0000-00000000000c';
     v_user uuid := '33333333-3333-3333-3333-333333333333';
