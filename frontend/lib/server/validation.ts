@@ -80,7 +80,7 @@ export const createSessionSchema = z.strictObject({
  * field is the worse failure: the customer believes they wrote to the owner,
  * and nothing was stored. Historical notes captured before V1 keep their
  * ciphertext and stay readable to the owner -- see
- * 20260914000200_public_contract_v1.sql.
+ * 20260914000200_public_contract_rating_only.sql.
  */
 export const submitResponseSchema = z.strictObject({
   sessionId: opaqueToken,

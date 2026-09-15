@@ -33,6 +33,7 @@ code path.
 ```
 scripts/db/local-pg-harness.sh chain     # two fresh applies + schema diff
 scripts/db/local-pg-harness.sh upgrade   # populated-database upgrade
+scripts/db/local-pg-harness.sh pgtap     # the 7 pgTAP suites, 326 assertions
 scripts/db/local-pg-harness.sh sql FILE  # run a suite on a migrated database
 scripts/dev/secret-scan.sh               # both CI secret scanners, locally
 ```
@@ -48,7 +49,7 @@ scripts/dev/secret-scan.sh               # both CI secret scanners, locally
 | Both tenants' totals stay separate through the upgrade | **CI-TESTED** | A=5, B=1 asserted after |
 | No index references a non-existent column | **CI-TESTED** | asserted by name against `pg_indexes` |
 | Schema drift check | **CI-TESTED** | pre-existing `supabase db diff` step |
-| pgTAP suite (`supabase test db`) | **CI-TESTED** | pre-existing step; not runnable here (needs Docker) |
+| pgTAP suites, all 7 | **CI-TESTED** | 326 assertions; `local-pg-harness.sh pgtap` runs them without Docker |
 | Generated database types | **STILL MISSING** | no `gen-db-types` step on this branch |
 | Supabase advisors | **IMPLEMENTED** | pre-existing step, `continue-on-error: true` — it does not gate |
 
@@ -101,7 +102,8 @@ The only active flow: open Tag → tap 1–5 → private rating saved → Google
 | No customer-facing screen collects text | **CI-TESTED** | screen directory asserted exactly |
 | `team_praise_records` and its rows kept | **CI-TESTED** | preserved across the populated upgrade |
 | Encrypted notes kept and owner-readable | **CI-TESTED** | ciphertext asserted intact after upgrade |
-| Public praise RPC ungranted, not dropped | **IMPLEMENTED** | `20260914000200`; behaviour kept for a future V2 |
+| Public praise RPC ungranted, not dropped | **CI-TESTED** | pgTAP asserts both halves: no role can execute it, and the function still exists |
+| A full V1 journey writes no praise row | **CI-TESTED** | pgTAP lifecycle assertion |
 | Owner `response_notes` untouched | **IMPLEMENTED** | staff action notes, not the customer contract |
 
 ## 3. Tag entitlement limits
@@ -276,6 +278,9 @@ a real `authenticated` role to prove the revoke is safe.
 | Typecheck | **CI-TESTED** | clean |
 | Lint | **CI-TESTED** | clean, `--max-warnings=0` |
 | Unit/component tests | **CI-TESTED** | 440 passing |
+| pgTAP database suites | **CI-TESTED** | 326 assertions across 7 files |
+| Migration filename convention | **CI-TESTED** | all 48 pass `migration-lint` |
+| shellcheck on shell scripts | **CI-TESTED** | clean, including the new `scripts/db/*.sh` |
 | Production build | **CI-TESTED** | succeeds |
 | Secret scan (both scanners) | **CI-TESTED** | clean |
 | Migration chain + populated upgrade | **CI-TESTED** | see §1 |

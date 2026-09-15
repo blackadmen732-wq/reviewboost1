@@ -19,7 +19,7 @@
 # rule as above: change the string, not the scanner. So every credential shape
 # below is concatenated from pieces that are individually harmless.
 set -uo pipefail
-cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)" || exit 1
 
 found=0
 report() { echo "::error::$1"; found=1; }

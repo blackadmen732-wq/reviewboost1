@@ -76,14 +76,23 @@ select is(
     'created',
     'service_role executes rpc_public_record_google_click through the full chain');
 
--- 4. submit_team_praise: wrapper → app function chain works as service_role
-select is(
-    (select outcome from public.rpc_public_submit_team_praise(
+-- 4. submit_team_praise: retired from the V1 public contract
+--
+-- This used to assert that service_role could run the praise chain. V1 does not
+-- collect praise from customers, so 20260914000200 revokes the grant and the
+-- property worth asserting is the opposite one: that the write path is closed
+-- in the database, where a refactor cannot reopen it.
+--
+-- The function and every row it ever wrote are deliberately kept. Only the
+-- grant is gone.
+select throws_ok(
+    $praise$select public.rpc_public_submit_team_praise(
         'rot-current-hash', 'rot-idem-tp-1', 'rot-req-tp-1', 'rot-sess-hash-1',
         'rot-resp-hash-1', '00000000-a010-0000-0000-000000000099'::uuid,
-        'v1:enc-name', null, 1::smallint, 86400, null, null, null, null)),
-    'created',
-    'service_role executes rpc_public_submit_team_praise through the full chain');
+        'v1:enc-name', null, 1::smallint, 86400, null, null, null, null)$praise$,
+    '42501',
+    null,
+    'service_role cannot execute the retired Team Praise path');
 
 -- ============================================================
 -- TASK 1: PRIVILEGE — anon cannot execute wrappers
@@ -165,18 +174,21 @@ select is(
     'created',
     'record_google_click finds response via previous session+response hashes');
 
--- 8. submit_team_praise finds response via previous hashes
-select is(
-    (select outcome from public.rpc_public_submit_team_praise(
-        'rot-current-hash', 'rot-idem-tp-prev', 'rot-req-tp-prev',
-        'new-key-sess-hash-2', 'new-key-resp-hash',
-        '00000000-a010-0000-0000-000000000098'::uuid,
-        'v1:enc-prev-name', null, 1::smallint, 86400, null,
-        null,
-        'old-key-sess-hash-2',
-        'old-key-resp-hash')),
-    'created',
-    'submit_team_praise finds response via previous session+response hashes');
+-- 8. The retired praise path is ungranted, not dropped.
+--
+-- This used to assert that the praise chain resolved a response through its
+-- previous session and response hashes during a key rotation. V1 has no public
+-- praise path for that to matter to, but the rotation continuity encoded in the
+-- function is worth keeping rather than deleting: dropping the function would
+-- throw it away with no way back, while a revoke is one line to reverse if a
+-- later version wants the feature again.
+--
+-- So what is asserted now is that retiring the endpoint did not destroy it.
+-- Test 4 covers the other half: that no role can reach it.
+select has_function(
+    'public'::name,
+    'rpc_public_submit_team_praise'::name,
+    'the retired Team Praise function is kept, not dropped -- only its grant is gone');
 
 -- ============================================================
 -- TASK 3: IDEMPOTENCY SCOPE — stable across rotation
@@ -340,18 +352,20 @@ select is(
     'created',
     'lifecycle: Google click recorded using previous hashes');
 
--- 16. Step 4: submit team praise with previous-key lookups
+-- 16. Step 4: the V1 journey writes no praise row
+--
+-- This step used to submit Team Praise through the rotated token. V1 does not
+-- collect praise from customers at all, so the property that replaces it is the
+-- one that now has to hold: a complete customer journey -- open the Tag, rate,
+-- go to Google -- creates no praise record, on a rotated token or any other.
+-- Read as postgres: service_role cannot select this table directly, which is
+-- the Data API lockdown working and not something to weaken for a test.
+select tests.reset_role();
 select is(
-    (select outcome from public.rpc_public_submit_team_praise(
-        'lifecycle-new-hash', 'lifecycle-tp', 'lifecycle-req-tp',
-        'lifecycle-sess-newkey', 'lifecycle-resp-newkey',
-        '00000000-a010-0000-0000-000000000097'::uuid,
-        'v1:enc-lifecycle-name', null, 1::smallint, 86400, null,
-        'lifecycle-old-hash',
-        'lifecycle-sess',
-        'lifecycle-resp')),
-    'created',
-    'lifecycle: team praise submitted using previous hashes');
+    (select count(*) from public.team_praise_records),
+    0::bigint,
+    'lifecycle: a V1 customer journey writes no Team Praise row');
+select tests.set_service_role();
 
 -- 17. Step 5: retry create session → replay (same stand_id scope)
 select is(

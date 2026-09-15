@@ -19,7 +19,7 @@ WORK="${PGHARNESS_DIR:-${TMPDIR:-/tmp}/rb-pg-harness}"
 PGDATA="$WORK/data"
 SOCK="$WORK/sock"
 PORT="${PGHARNESS_PORT:-54329}"
-BIN="$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1)"
+BIN="$(find /usr/lib/postgresql -mindepth 2 -maxdepth 2 -type d -name bin 2>/dev/null | sort -V | tail -1)"
 
 export PATH="$BIN:$PATH"
 export PGHOST="$SOCK"
@@ -82,10 +82,9 @@ supabase_shim() {
 
 # apply_chain <db> [stop_after_version] [start_after_version]
 apply_chain() {
-  local db="$1" stop_after="${2:-}" start_after="${3:-}" applied=0 started=1
+  local db="$1" stop_after="${2:-}" start_after="${3:-}" applied=0 started=1 f version
   [ -n "$start_after" ] && started=0
   for f in "$ROOT"/supabase/migrations/*.sql; do
-    local version
     version="$(basename "$f" | cut -d_ -f1)"
     if [ "$started" -eq 0 ]; then
       [ "$version" = "$start_after" ] && started=1
@@ -195,8 +194,40 @@ cmd_sql() {
   return $status
 }
 
+# Run the repository's pgTAP suites, the way `supabase test db` does: each file
+# on its own freshly migrated database, and the TAP output judged on its own
+# terms rather than on psql's exit code.
+cmd_pgtap() {
+  local t suite out bad; t="$(db pgtap)"; local failed=0
+  harness_start
+
+  for suite in "$ROOT"/supabase/tests/*.sql; do
+    fresh_db "$t"
+    apply_chain "$t" >/dev/null
+    psql -q -d "$t" -c 'create extension if not exists pgtap;' >/dev/null 2>&1
+
+    out="$(psql -X -q -t -A -d "$t" -f "$suite" 2>&1)"
+
+    bad="$(printf '%s\n' "$out" | grep -E '^not ok|^# Looks like|Bad plan|^psql:.*ERROR' || true)"
+    if [ -n "$bad" ]; then
+      failed=1
+      printf '\n== %s FAILED\n' "$(basename "$suite")"
+      printf '%s\n' "$bad" | head -12
+      # The assertion name usually sits on the failing line; show context.
+      printf '%s\n' "$out" | grep -B2 -A6 '^not ok' | head -30
+    else
+      printf '== %-34s %s assertions\n' "$(basename "$suite")" \
+        "$(printf '%s\n' "$out" | grep -c '^ok ')"
+    fi
+  done
+
+  dropdb --if-exists "$t" >/dev/null 2>&1 || true
+  if [ "$failed" -eq 0 ]; then log "RESULT: pgTAP suites pass"; else log "RESULT: pgTAP FAILURES"; return 1; fi
+}
+
 case "${1:-chain}" in
   chain)   cmd_chain ;;
+  pgtap)   cmd_pgtap ;;
   upgrade) cmd_upgrade ;;
   sql)     cmd_sql "$@" ;;
   *) echo "usage: $0 [chain|upgrade]" >&2; exit 2 ;;
