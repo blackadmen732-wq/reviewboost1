@@ -12,7 +12,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(52);
+select plan(59);
 
 create or replace function tests.reset_role() returns void
 language plpgsql as $$
@@ -251,6 +251,43 @@ select is(
     (select purchased from app.sms_balance('00000000-b101-0000-0000-000000000002')),
     99::bigint,
     'the purchased part comes back as purchased');
+
+-- ============================================================
+-- 6b. SO DOES A REFUND
+-- ============================================================
+
+-- A message that was submitted and then rejected by the provider is money the
+-- business must get back. Consumption moved to the grants; a refund that only
+-- decremented the old projection would take the credit twice — once for a
+-- message that never arrived, and once more because nothing gave it back.
+select is(
+    (select reserved from app.sms_quota_reserve('00000000-b101-0000-0000-000000000002', 4, 'reservation-refund-1', null)),
+    true,
+    'a four-segment message reserves out of monthly');
+select ok(
+    app.sms_quota_consume('00000000-b101-0000-0000-000000000002', 4, 'reservation-refund-1', null),
+    'it is handed to the provider and the reservation settles');
+select ok(
+    app.sms_quota_refund('00000000-b101-0000-0000-000000000002', 4, 'reservation-refund-1', null),
+    'the provider rejects it and the credit is refunded');
+
+select is(
+    (select monthly from app.sms_balance('00000000-b101-0000-0000-000000000002')),
+    5::bigint,
+    'the refund returns the credit to the monthly grant it came from');
+select is(
+    (select purchased from app.sms_balance('00000000-b101-0000-0000-000000000002')),
+    99::bigint,
+    'and turns none of it into permanent credit');
+
+select is(
+    app.sms_quota_refund('00000000-b101-0000-0000-000000000002', 4, 'reservation-refund-1', null),
+    false,
+    'the same refund applied twice is not two refunds');
+select is(
+    (select monthly from app.sms_balance('00000000-b101-0000-0000-000000000002')),
+    5::bigint,
+    'and the balance says so');
 
 -- ============================================================
 -- 7. MONTHLY EXPIRES, PURCHASED DOES NOT

@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(20);
+select plan(30);
 
 -- ============================================================
 -- 1. NOTHING WAS LOST
@@ -118,6 +118,61 @@ select is((select destination_provider from public.locations
 select is((select destination_url from app.resolve_public_stand('legacy-token-hash-1')),
           'https://g.page/r/legacy-main/review',
           'a Tag printed before the upgrade resolves to its own destination afterwards');
+
+-- ============================================================
+-- 5. THE CREDIT A BUSINESS ALREADY PAID FOR
+-- ============================================================
+
+-- Before the upgrade Legacy Diner could send 105 segments: 200 allocated, 5
+-- held for a message in flight, 30 already sent, and 60 that had lapsed. A
+-- change of ledger is not a reason for any of that to be different.
+select is((select total from app.sms_balance('00000000-0e10-0000-0000-000000000001')),
+          105::bigint,
+          'a business can send exactly what it could send before the ledger changed');
+
+select is((select monthly from app.sms_balance('00000000-0e10-0000-0000-000000000001')),
+          65::bigint,
+          'allowance that was going to expire is still allowance that expires');
+
+select is((select purchased from app.sms_balance('00000000-0e10-0000-0000-000000000001')),
+          40::bigint,
+          'credit that was bought outright is still permanent');
+
+-- The lapsed allocation was not spendable the day before the upgrade. An
+-- upgrade that handed it back would be minting money.
+select is((select count(*)::int from public.sms_credit_grants
+            where origin_id = 'legacy-allocation:00000000-0e10-0000-0000-000000000073'),
+          0, 'an allocation that had already lapsed is not resurrected');
+
+-- A message was in flight when the ledger changed. Its reservation has to
+-- still be settleable, and settling it has to move real credit.
+select is((select coalesce(sum(segments), 0)::int from public.sms_reservation_slices
+            where org_id = '00000000-0e10-0000-0000-000000000001'
+              and correlation_key = 'req:legacy-in-flight-1'
+              and status = 'held'),
+          5, 'a reservation in flight across the upgrade still knows what it is holding');
+
+select ok(app.sms_quota_consume('00000000-0e10-0000-0000-000000000001', 5,
+                                'req:legacy-in-flight-1'),
+          'the message that was in flight can be settled after the upgrade');
+
+select is((select total from app.sms_balance('00000000-0e10-0000-0000-000000000001')),
+          105::bigint,
+          'settling a held reservation spends what was already held, not more');
+
+-- And the provider rejected it after all. The old refund only decremented a
+-- projection nobody reads any more, so the business lost the credit twice.
+select ok(app.sms_quota_refund('00000000-0e10-0000-0000-000000000001', 5,
+                               'req:legacy-in-flight-1'),
+          'a message the provider rejected can be refunded');
+
+select is((select total from app.sms_balance('00000000-0e10-0000-0000-000000000001')),
+          110::bigint,
+          'a refund gives the credit back to the business, not to nobody');
+
+select is((select total from app.sms_balance('00000000-0e10-0000-0000-000000000002')),
+          20::bigint,
+          'the other tenant''s credit is its own, before and after');
 
 select * from finish();
 rollback;
