@@ -288,7 +288,8 @@ a real `authenticated` role to prove the revoke is safe.
 | No service-role key in browser/mobile | **ALREADY PRESENT** | pre-existing scanners |
 | Dependency audit | **STILL MISSING** | see below |
 | Sentry, health/readiness, rate limits, redirects | **NOT ASSESSED** | out of this branch's scope |
-| Exact-head GitHub Actions green | **NOT YET** | first CI run on this branch has not completed |
+| Exact-head GitHub Actions: CI workflow | **CI-TESTED** | green on 86a8c05 (run 594) and after |
+| Exact-head GitHub Actions: Backend database | **PENDING** | see the note below |
 
 ### Dependency audit — 3 production vulnerabilities
 
@@ -304,6 +305,32 @@ the framework is a lockfile change that deserves its own build-and-test run
 rather than riding along with backend correctness work, and it is one command
 once someone wants it. Flagging rather than fixing is a deliberate choice —
 please overrule it if you would rather it landed in this branch.
+
+### The database workflow took three pushes to actually run
+
+Worth recording, because the failures were mine and the last one was a
+gap rather than a bug:
+
+1. Migration filename convention, and two shellcheck findings. Fixed.
+2. Two pgTAP assertions that asserted the Team Praise path still worked.
+   Replaced with the properties that hold now -- no role can reach it, and
+   the function is kept rather than dropped.
+3. The harness overwrote `PGHOST` before checking whether a caller had
+   already pointed libpq at a server, so in CI every `psql` went to a
+   socket it had never created. And the concurrency test rebuilt its own
+   dblink conninfo from server settings with no password, which cannot
+   reach an authenticating server -- it would have silently lost the one
+   test that proves two simultaneous creates cannot both win.
+
+The third only surfaced after standing up a PostgreSQL configured the way
+CI's is (TCP, md5 auth) and running the harness against it, rather than
+reasoning about whether it would work. Every mode is now verified in both
+configurations.
+
+And `scripts/db/**` was not in this workflow's path filter, so the change
+that fixed the harness did not re-run the job that uses it. Added to both
+the push and pull_request filters: a CI-critical file that does not
+trigger its own job is a test that reports success by not running.
 
 ## What this branch does not claim
 

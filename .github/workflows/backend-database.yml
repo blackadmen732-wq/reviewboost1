@@ -16,12 +16,20 @@ on:
       - "supabase/**"
       - "frontend/lib/server/**"
       - "frontend/app/api/**"
+      # The migration harness and the SQL suites this job runs. Without them
+      # here, a change that breaks a database test does not re-run the database
+      # job, and the break is discovered by whoever touches supabase/ next.
+      - "scripts/db/**"
       - ".github/workflows/backend-database.yml"
   pull_request:
     paths:
       - "supabase/**"
       - "frontend/lib/server/**"
       - "frontend/app/api/**"
+      # The migration harness and the SQL suites this job runs. Without them
+      # here, a change that breaks a database test does not re-run the database
+      # job, and the break is discovered by whoever touches supabase/ next.
+      - "scripts/db/**"
       - ".github/workflows/backend-database.yml"
 
 concurrency:
