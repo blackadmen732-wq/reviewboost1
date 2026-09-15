@@ -195,19 +195,17 @@ cmd_sql() {
   harness_start
   fresh_db "$t"
   apply_chain "$t" >/dev/null
-  # Suites that open their own connections (the concurrency test uses dblink)
-  # cannot rebuild a working conninfo from server settings: the server may want
-  # a password, and `unix_socket_directories` is not where the client came in.
-  # Hand it the one that is known to work.
-  local conninfo="dbname=$t"
-  [ -n "${PGHOST:-}" ]     && conninfo="$conninfo host=$PGHOST"
-  [ -n "${PGPORT:-}" ]     && conninfo="$conninfo port=$PGPORT"
-  [ -n "${PGUSER:-}" ]     && conninfo="$conninfo user=$PGUSER"
-  [ -n "${PGPASSWORD:-}" ] && conninfo="$conninfo password=$PGPASSWORD"
-
+  # The concurrency test opens its own connections with dblink, which runs
+  # *inside* the server. So the address must be the server's view of itself,
+  # not the client's: in CI the server is in a container, where the published
+  # 127.0.0.1:54322 the runner connects to does not exist. The suite derives
+  # host, port, database and user from the server's own settings.
+  #
+  # The one thing the server cannot tell it is the password, so that is the
+  # only thing passed in.
   psql -v ON_ERROR_STOP=1 \
        -v seed="$ROOT/scripts/db/seed-populated.sql" \
-       -v conninfo="$conninfo" \
+       -v dbpassword="${PGPASSWORD:-}" \
        -q -d "$t" -f "$file"
   local status=$?
   dropdb --if-exists "$t" >/dev/null 2>&1 || true

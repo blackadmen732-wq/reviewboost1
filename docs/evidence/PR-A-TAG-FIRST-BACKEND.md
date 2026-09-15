@@ -345,9 +345,20 @@ that does not diverge anything: where the extension is created today,
 identical, and the only behaviour that changes is in databases where the
 file previously failed outright -- which have no state to diverge from.
 
-Reproduced and verified by installing pg_cron locally, so the guard was
-exercised on a server that actually has it rather than one where the
-first clause short-circuits.
+6. The concurrency test dialled the address the *client* used. dblink runs
+   inside the server, and in CI the server is in a container where the
+   published port the runner connects to does not exist. It now derives
+   host, port, database and user from the server's own settings, and only
+   the password is passed in -- the one thing the server will not tell it.
+
+Each was reproduced before being fixed, by building the configuration
+that exposed it rather than reasoning about whether a fix would work:
+pg_cron installed locally for 5, and for 6 a server reached through a
+port forwarder, so the client's port genuinely differs from the server's.
+
+All four SQL suites, the chain, the populated upgrade and pgTAP now pass
+in three configurations: the harness's own socket, a TCP server with md5
+auth, and a server whose client-facing port is not its own.
 
 ## What this branch does not claim
 

@@ -10,17 +10,21 @@
 
 create extension if not exists dblink;
 
--- The harness passes a connection string that is known to reach this server.
--- Running this file through plain psql instead falls back to rebuilding one
--- from server settings, which works only for a passwordless local socket.
-\if :{?conninfo}
+-- dblink runs inside the server, so the address it dials has to be the
+-- server's view of itself. Deriving host and port from the client's
+-- connection is wrong wherever the two differ -- in CI the server is in a
+-- container, and the published port the runner uses does not exist inside it.
+--
+-- Only the password comes from outside, because it is the one thing the server
+-- will not tell us. Carried through a GUC rather than read directly: psql does
+-- not interpolate its variables inside a dollar-quoted block, which is where
+-- dblink_connect lives.
+\if :{?dbpassword}
 \else
-\set conninfo ''
+\set dbpassword ''
 \endif
 
--- Carried through a GUC rather than read directly: psql does not interpolate
--- its variables inside a dollar-quoted block, which is where dblink_connect is.
-select set_config('rb.conninfo', :'conninfo', false);
+select set_config('rb.dbpassword', :'dbpassword', false);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -244,13 +248,16 @@ values ('cccccccc-0000-0000-0000-00000000000c', 'c10c0000-0000-0000-0000-0000000
 
 do $$
 declare
-    v_conn text := coalesce(
-        nullif(current_setting('rb.conninfo', true), ''),
-        format('dbname=%s port=%s host=%s user=%s',
-               current_database(),
-               current_setting('port'),
-               split_part(current_setting('unix_socket_directories'), ',', 1),
-               current_user));
+    v_conn text := format('dbname=%s port=%s host=%s user=%s%s',
+        current_database(),
+        current_setting('port'),
+        split_part(current_setting('unix_socket_directories'), ',', 1),
+        current_user,
+        case
+            when coalesce(current_setting('rb.dbpassword', true), '') <> ''
+            then ' password=' || current_setting('rb.dbpassword', true)
+            else ''
+        end);
     v_org  uuid := 'cccccccc-0000-0000-0000-00000000000c';
     v_loc  uuid := 'c10c0000-0000-0000-0000-00000000000c';
     v_user uuid := '33333333-3333-3333-3333-333333333333';
