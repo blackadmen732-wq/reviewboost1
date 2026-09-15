@@ -4,10 +4,14 @@ Living document. Updated at every meaningful stage, not at the end.
 
 **Last updated:** 2026-09-15
 **Integration branch:** `claude/reviewboost-v1-recovery-cokccs`
-**Branch head:** `5fc6b67`
+**Branch head:** `e6e56e5`
 **`main` at start of this program:** `6b8adc5`
-**Current stage:** destination layer landed on the integration branch; Tags and
-entitlements next.
+**Current stage:** billing and the SMS credit ledger landed. Text Requests
+owner surface, workers, and the unified frontend next.
+
+Every stage below has been through GitHub Actions on its exact SHA, including
+the **Backend database** workflow — a real `supabase db reset` followed by
+`supabase test db`. The local harness and CI agree.
 
 ## How to read the statuses
 
@@ -49,10 +53,10 @@ is correct. It cannot prove Supabase's own platform pieces agree with it —
 | Public V1 customer contract | **DONE** | No public note, no active Team Praise, strict request schemas, dashboard indexes. 412 vitest cases, 26 Playwright cases |
 | One-tap customer flow | **DONE** | Star tap → rating saved → destination. Byte-identical handoff and one identical destination asserted for ratings 1–5 in jsdom and in a real browser |
 | Destination / ReviewBoost owns the door | **DONE** | `destination_provider` + `destination_url`, provider allowlist, backfill, resolver reshaped by drop/recreate, owner write with explicit org + audit. 37-assertion pgTAP suite; 20-assertion populated-upgrade proof |
-| Tags + entitlements | **NOT STARTED** | Next. Caps enforced atomically in the database; missing entitlement fails closed |
-| Customer Page | **NOT STARTED** | Build clean from the integration branch; #67 is reference only |
-| Billing / Stripe | **NOT STARTED** | Code is buildable here; live verification is BLOCKED — EXTERNAL |
-| SMS money ledger | **NOT STARTED** | Monthly-first, purchased-second. #59/#64 are read-only references |
+| Tags + entitlements | **DONE** | Caps counted under a lock inside the create transaction; ciphertext stored in the same statement as the Tag; no free plan, missing entitlement fails closed. 44-assertion pgTAP suite plus a real 8-way race at one free slot |
+| Customer Page | **DONE** (live upload BLOCKED — EXTERNAL) | Draft/published, location override, uploads confirmed against storage, publish refuses a pending asset. 29-assertion suite. A real Supabase project is needed to exercise an actual upload |
+| Billing / Stripe | **DONE** in code (live BLOCKED — EXTERNAL) | Signed webhooks, durable inbox keyed by Stripe's event id, out-of-order protection, entitlement written in the same transaction. Checkout, portal, trial with card required. No credentials here for a real charge |
+| SMS money ledger | **DONE** | Two sources, monthly spent first, per-source reservation slices, monthly expires with no rollover, purchased survives cancellation. 50-assertion money suite plus an 8-way race for the last five segments |
 | Text Requests / Twilio | Partially built on `main` | Backend exists and is CI-tested; owner UI not built; live send BLOCKED — EXTERNAL |
 | Unified web frontend | **NOT STARTED** | #68 is the design source; port selectively from the integration branch |
 | Mobile | Partially built on `main` | Expo app exists; parity work not started; physical NFC BLOCKED — EXTERNAL |
@@ -100,6 +104,20 @@ work is either landed canonically or explicitly rejected.
   refuses one — an owner-visible 503 with no explanation.
 - Zod 4's `.uuid()` rejects this repository's own fixture ids.
 
+## Verification totals on the current head
+
+| Gate | Result |
+|---|---|
+| Migrations from empty | 52 applied |
+| pgTAP | 11 suites, 486 assertions |
+| Populated upgrade | 20 assertions |
+| Concurrency races | Tag cap (8→1 winner); last-credit (8→2 winners, monthly first) |
+| Vitest | 447 cases |
+| Playwright | 26 cases (customer flow + Axe, both colour schemes, mobile and desktop) |
+| tsc / eslint / production build | clean |
+| GitHub Actions | CI and Backend database green on every stage SHA |
+
 ## Next dependency
 
-Tags and entitlements, on top of the landed destination layer.
+The Text Requests owner surface — which is the first thing that spends the
+credit ledger — then workers, then the unified frontend.
