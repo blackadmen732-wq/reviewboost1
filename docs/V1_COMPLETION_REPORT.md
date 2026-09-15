@@ -53,7 +53,7 @@ every stage.
 | Billing / Stripe | **DONE** in code (live BLOCKED — EXTERNAL) | Signed webhooks, durable inbox keyed by Stripe's event id, out-of-order protection, entitlement written in the same transaction, checkout + portal, trial with card required |
 | SMS money ledger | **DONE** | Two sources, monthly first, per-source reservation slices, monthly expires with no rollover, purchased survives cancellation. 50-assertion suite + an 8-way race for the last five segments |
 | Text Requests | **DONE** in code (live send BLOCKED — EXTERNAL) | Owner screen on real balances, server-side segment counting, Tags addressable by id, suppression and consent already enforced in the database |
-| Workers / schedulers | **DONE** | Dispatch every minute, maintenance every 15; reconciliation and dead-letter release, which never existed; health endpoint |
+| Workers / schedulers | **DONE** | Reconciliation and dead-letter release (which never existed before) and health endpoint are live. Deployed cadence is once-daily (Vercel Hobby limit); production cadence (every minute / every 15 min) is documented in `docs/SCHEDULING.md` and restored by upgrading to Vercel Pro |
 | Unified web frontend | **PARTIAL** | Canonical navigation, Text Requests and Billing built from scratch on real state. Home, Feedback, Tags and onboarding are the pre-existing screens, not rebuilt |
 | Mobile | **PARTIAL** (physical NFC BLOCKED — EXTERNAL) | Text Requests, Account, Tags naming, NFC-rewrite defect fixed. Not rebuilt beyond that |
 | Security | **DONE** for what was built | Cross-tenant isolation attacked from three directions in pgTAP; public writes fail closed; RLS on all nine new tables; no secret carries a `NEXT_PUBLIC_` prefix |

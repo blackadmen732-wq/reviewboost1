@@ -1,4 +1,4 @@
-import { Home, MessageSquare, QrCode, Send, Settings, Sparkles, Star, Users } from "lucide-react";
+import { Home, MessageSquare, QrCode, Send, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 /**
@@ -19,11 +19,8 @@ import type { LucideIcon } from "lucide-react";
  * and start hunting — and a user who is hunting has decided the app is
  * complicated.
  *
- * Reviews, Praise and Customers are not in the bar. They are historical views
- * of data the V1 public contract no longer collects, and they stay reachable
- * from Home and Settings so nothing a business already has becomes
- * unreachable — but they are not part of the daily loop, and giving them a
- * permanent slot would say they were.
+ * Reviews, Praise and Customers are historical views of data the V1 public
+ * contract no longer collects. They remain as pages but are not in the nav.
  */
 
 export interface NavItem {
@@ -41,9 +38,6 @@ export const FEEDBACK: NavItem = {
   icon: MessageSquare,
   badge: "unread",
 };
-export const REVIEWS: NavItem = { href: "/reviews", label: "Reviews", icon: Star };
-export const CUSTOMERS: NavItem = { href: "/customers", label: "Customers", icon: Users };
-export const PRAISE: NavItem = { href: "/praise", label: "Praise", icon: Sparkles };
 /** The physical thing on the counter. "Tags" is what the product calls it. */
 export const TAGS: NavItem = { href: "/stands", label: "Tags", icon: QrCode };
 /** Text Requests. Never "campaigns": V1 sends review requests and nothing else. */
@@ -65,9 +59,6 @@ export const DESKTOP_NAV: readonly NavItem[] = [
   TAGS,
   SETTINGS,
 ];
-
-/** Historical views, reachable from Home rather than from the bar. */
-export const HOME_SHORTCUTS: readonly NavItem[] = [REVIEWS, PRAISE, CUSTOMERS];
 
 /** Whether a nav item should read as the current screen. */
 export function isActive(pathname: string, href: string): boolean {
