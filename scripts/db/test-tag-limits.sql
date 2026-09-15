@@ -8,24 +8,6 @@
 \set ON_ERROR_STOP on
 \set QUIET on
 
-create extension if not exists dblink;
-
--- dblink runs inside the server, so the address it dials has to be the
--- server's view of itself. Deriving host and port from the client's
--- connection is wrong wherever the two differ -- in CI the server is in a
--- container, and the published port the runner uses does not exist inside it.
---
--- Only the password comes from outside, because it is the one thing the server
--- will not tell us. Carried through a GUC rather than read directly: psql does
--- not interpolate its variables inside a dollar-quoted block, which is where
--- dblink_connect lives.
-\if :{?dbpassword}
-\else
-\set dbpassword ''
-\endif
-
-select set_config('rb.dbpassword', :'dbpassword', false);
-
 -- ------------------------------------------------------------- fixtures ----
 
 insert into auth.users (id, email) values
@@ -213,173 +195,21 @@ begin
 end
 $$;
 
--- ------- 5b. the concurrency test's own connection method is usable ---------
-
--- Asserted before the race that depends on it, and reported with the role's
--- superuser status on purpose.
---
--- dblink lets a superuser connect however it likes, so a superuser run proves
--- nothing about anyone else. On Supabase the `postgres` role is NOT a
--- superuser, and dblink there refuses any connection where a password was not
--- actually exchanged -- which is every trusted local socket. A harness that
--- only ever ran as a superuser reported the race as passing while it could not
--- have run on the real server at all.
-do $probe$
-declare
-    v_conn text := format('dbname=%s host=127.0.0.1 port=%s user=%s%s',
-        current_database(), current_setting('port'), current_user,
-        case when coalesce(current_setting('rb.dbpassword', true), '') <> ''
-             then ' password=' || current_setting('rb.dbpassword', true) else '' end);
-    v_super boolean;
-    v_ok text;
-begin
-    select usesuper into v_super from pg_user where usename = current_user;
-
-    perform dblink_connect('probe', v_conn);
-    select * into v_ok from dblink('probe', $q$select 'reached'$q$) as t(x text);
-    perform dblink_disconnect('probe');
-
-    if v_ok is distinct from 'reached' then
-        raise exception 'dblink connected but could not query';
-    end if;
-
-    raise notice 'PASS dblink opens its own connection (user=%, superuser=%)',
-        current_user, coalesce(v_super, false);
-end
-$probe$;
-
 -- ------------------------------------ 6. two simultaneous creates ----------
 
--- The real test. Two genuine sessions, both inside open transactions, and the
--- second one is proven to be *blocked inside* rpc_create_stand -- past the auth
--- and location checks, at the entitlement lock -- while the first still holds
--- the row. That is exactly the interleaving a count-then-insert implementation
--- loses: both sessions read "2 of 3 used" and both insert.
--- These fixtures are committed at the top level on purpose. The racers are
--- separate sessions and cannot see rows held in an uncommitted transaction, so
--- creating them inside the DO block below would make both racers fail the
--- membership check instead of racing.
-insert into auth.users (id, email)
-    values ('33333333-3333-3333-3333-333333333333', 'owner-c@example.test');
-insert into public.organizations (id, name, slug)
-    values ('cccccccc-0000-0000-0000-00000000000c', 'Org C', 'org-c');
-insert into public.organization_members (org_id, user_id, role, status, joined_at)
-    values ('cccccccc-0000-0000-0000-00000000000c', '33333333-3333-3333-3333-333333333333',
-            'owner', 'active', now());
-insert into public.locations (id, org_id, name)
-    values ('c10c0000-0000-0000-0000-00000000000c', 'cccccccc-0000-0000-0000-00000000000c', 'Main');
-
--- Starter: 3 Tags. Two already used, so exactly one slot is left and two
--- sessions are about to race for it.
-select public.rpc_set_entitlement(
-    'cccccccc-0000-0000-0000-00000000000c', 'starter', 'active', 'manual', null, null);
-
-insert into public.review_stands
-    (org_id, location_id, public_token_hash, public_token_prefix, label, status)
-values ('cccccccc-0000-0000-0000-00000000000c', 'c10c0000-0000-0000-0000-00000000000c',
-        'c-hash-1', 'cccc01', 'existing one', 'active'),
-       ('cccccccc-0000-0000-0000-00000000000c', 'c10c0000-0000-0000-0000-00000000000c',
-        'c-hash-2', 'cccc02', 'existing two', 'active');
-
-do $$
-declare
-    -- Loopback rather than the unix socket, deliberately.
-    --
-    -- dblink refuses a connection opened by a non-superuser unless a password
-    -- was actually *used* -- not merely supplied. A local socket configured
-    -- for trust never uses one, so the connection is rejected with "Non-
-    -- superusers may only connect using credentials they provide". On Supabase
-    -- the `postgres` role is not a superuser, so the socket path cannot work
-    -- there at all. Over TCP the password is really exchanged.
-    --
-    -- Port and database come from the server, because dblink dials from inside
-    -- it; only the password comes from the harness.
-    v_conn text := format('dbname=%s host=127.0.0.1 port=%s user=%s%s',
-        current_database(),
-        current_setting('port'),
-        current_user,
-        case
-            when coalesce(current_setting('rb.dbpassword', true), '') <> ''
-            then ' password=' || current_setting('rb.dbpassword', true)
-            else ''
-        end);
-    v_org  uuid := 'cccccccc-0000-0000-0000-00000000000c';
-    v_loc  uuid := 'c10c0000-0000-0000-0000-00000000000c';
-    v_user uuid := '33333333-3333-3333-3333-333333333333';
-    v_ok   integer := 0;
-    v_fail integer := 0;
-    v_live integer;
-    v_blocked boolean := false;
-    v_waited integer := 0;
-begin
-    perform dblink_connect('racer1', v_conn);
-    perform dblink_connect('racer2', v_conn);
-    perform dblink_exec('racer1', 'begin');
-    perform dblink_exec('racer2', 'begin');
-    -- dblink_exec refuses a statement that returns rows, so SET rather than
-    -- select set_config(...). Plain SET is session-scoped, which is what an
-    -- impersonated request needs.
-    perform dblink_exec('racer1', format('set request.jwt.claim.sub = %L', v_user::text));
-    perform dblink_exec('racer2', format('set request.jwt.claim.sub = %L', v_user::text));
-
-    -- Racer 1 goes in and stops, holding the entitlement row, transaction open.
-    perform dblink_send_query('racer1', format(
-        'select public.rpc_create_stand(%L, %L, ''racer one'', ''c-hash-r1'', ''ccr001'', 1::smallint, null, ''cipher-r1'', 1::smallint)',
-        v_org, v_loc));
-    perform * from dblink_get_result('racer1') as t(id uuid);
-    perform * from dblink_get_result('racer1') as t(id uuid);
-
-    -- Racer 2 now enters the same function while racer 1 still holds the lock.
-    perform dblink_send_query('racer2', format(
-        'select public.rpc_create_stand(%L, %L, ''racer two'', ''c-hash-r2'', ''ccr002'', 1::smallint, null, ''cipher-r2'', 1::smallint)',
-        v_org, v_loc));
-
-    -- It must not be able to finish. If the cap were advisory, racer 2 would
-    -- sail past and insert a fourth Tag.
-    while v_waited < 200 loop
-        if dblink_is_busy('racer2') = 1 then
-            v_blocked := true;
-            exit;
-        end if;
-        perform pg_sleep(0.01);
-        v_waited := v_waited + 1;
-    end loop;
-
-    if not v_blocked then
-        raise exception 'second create was never blocked: the cap is not serialised';
-    end if;
-
-    -- Release racer 1. Racer 2 wakes, re-counts, and must now see three.
-    perform dblink_exec('racer1', 'commit');
-    v_ok := v_ok + 1;
-
-    begin
-        perform * from dblink_get_result('racer2') as t(id uuid);
-        perform * from dblink_get_result('racer2') as t(id uuid);
-        perform dblink_exec('racer2', 'commit');
-        v_ok := v_ok + 1;
-    exception when others then
-        v_fail := v_fail + 1;
-        begin perform dblink_exec('racer2', 'rollback'); exception when others then null; end;
-    end;
-
-    perform dblink_disconnect('racer1');
-    perform dblink_disconnect('racer2');
-
-    select count(*) into v_live from public.review_stands
-     where org_id = v_org and status <> 'retired';
-
-    if v_live <> 3 then
-        raise exception 'RACE LOST: starter limit is 3, org holds % Tags (% succeeded, % refused)',
-            v_live, v_ok, v_fail;
-    end if;
-    if v_ok <> 1 or v_fail <> 1 then
-        raise exception 'expected exactly one winner, got % ok / % refused', v_ok, v_fail;
-    end if;
-
-    raise notice 'PASS concurrency: second create blocked at the lock, then refused; cap held at 3';
-end
-$$;
+-- Lives in scripts/db/test-tag-race.sh, not here.
+--
+-- This file ran the race through dblink, which opens its connections from
+-- inside the server. That cannot work on Supabase: `postgres` is not a
+-- superuser there, dblink refuses a non-superuser connection unless a password
+-- was actually exchanged, and every route into that server from within it --
+-- unix socket and in-container TCP alike -- is trust. A non-superuser cannot
+-- even read `unix_socket_directories` to build the conninfo.
+--
+-- Two concurrent sessions are a client-side thing. The harness already holds
+-- credentials that work, so the race is driven by two real psql processes
+-- instead, which removes the whole class of problem rather than routing around
+-- one instance of it.
 
 -- --------------------------------- 7. every Tag is reprintable ------------
 

@@ -214,17 +214,8 @@ cmd_sql() {
   harness_start
   fresh_db "$t"
   apply_chain "$t" >/dev/null
-  # The concurrency test opens its own connections with dblink, which runs
-  # *inside* the server. So the address must be the server's view of itself,
-  # not the client's: in CI the server is in a container, where the published
-  # 127.0.0.1:54322 the runner connects to does not exist. The suite derives
-  # host, port, database and user from the server's own settings.
-  #
-  # The one thing the server cannot tell it is the password, so that is the
-  # only thing passed in.
   psql -v ON_ERROR_STOP=1 \
        -v seed="$ROOT/scripts/db/seed-populated.sql" \
-       -v dbpassword="${PGPASSWORD:-}" \
        -q -d "$t" -f "$file"
   local status=$?
   dropdb --if-exists "$t" >/dev/null 2>&1 || true
@@ -262,8 +253,22 @@ cmd_pgtap() {
   if [ "$failed" -eq 0 ]; then log "RESULT: pgTAP suites pass"; else log "RESULT: pgTAP FAILURES"; return 1; fi
 }
 
+# The concurrency test needs two client sessions, so it is a script rather than
+# a SQL file. Same fresh migrated database as the suites.
+cmd_race() {
+  local t; t="$(db race)"
+  harness_start
+  fresh_db "$t"
+  apply_chain "$t" >/dev/null
+  bash "$ROOT/scripts/db/test-tag-race.sh" "$t"
+  local status=$?
+  dropdb --if-exists "$t" >/dev/null 2>&1 || true
+  return $status
+}
+
 case "${1:-chain}" in
   chain)   cmd_chain ;;
+  race)    cmd_race ;;
   pgtap)   cmd_pgtap ;;
   upgrade) cmd_upgrade ;;
   sql)     cmd_sql "$@" ;;

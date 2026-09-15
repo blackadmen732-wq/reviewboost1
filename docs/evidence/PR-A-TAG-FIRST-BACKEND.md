@@ -112,7 +112,8 @@ The only active flow: open Tag → tap 1–5 → private rating saved → Google
 |---|---|---|
 | Cap enforced inside `rpc_create_stand` | **CI-TESTED** | `test-tag-limits.sql` |
 | Lock taken **before** counting | **CI-TESTED** | asserted in SQL and in `entitlements.test.ts` |
-| Two simultaneous creates: one wins | **CI-TESTED** | dblink; second proven *blocked at the lock*, then refused |
+| Two simultaneous creates: one wins | **CI-TESTED** | two real psql sessions; second proven *blocked at the lock*, then refused |
+| That race actually detects the bug | **CI-TESTED** | with the lock moved after the count, both racers win and the org ends on 4 Tags |
 | Plan N allows N, N+1 fails | **CI-TESTED** | trial=1, starter=3 |
 | Upgrade raises the cap | **CI-TESTED** | trial → starter |
 | Downgrade / failed payment mints nothing | **CI-TESTED** | `past_due` → 0 |
@@ -354,8 +355,16 @@ file previously failed outright -- which have no state to diverge from.
 7. Even dialling the server's own address, dblink refused: on Supabase the
    `postgres` role is **not a superuser**, and dblink rejects a
    non-superuser connection unless a password was actually *exchanged* --
-   not merely supplied. A trusted unix socket never exchanges one. The
-   connection is now loopback TCP, where it is.
+   not merely supplied.
+8. And there is no route that exchanges one. Every way into that server
+   from inside it -- unix socket and in-container TCP alike -- is trust
+   authentication, so no conninfo could have satisfied dblink there.
+
+dblink was the wrong tool. Two concurrent sessions are a client-side
+concern, and the caller already holds credentials that work, so the race
+now runs as two real psql processes in `scripts/db/test-tag-race.sh`.
+That removes the class of problem rather than routing around one instance
+of it, and it is why 6, 7 and 8 are one mistake made three times.
 
 Each was reproduced before being fixed, by building the configuration
 that exposed it rather than reasoning about whether a fix would work:

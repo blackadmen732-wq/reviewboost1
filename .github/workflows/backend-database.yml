@@ -81,12 +81,11 @@ jobs:
         # Docker, for anywhere `supabase start` cannot run.
 
       - name: Privilege lockdown, Tag limits, tokens, NFC, and the owner inbox
-        # Plain psql rather than pgTAP because these assert behaviour under
-        # concurrency: test-tag-limits.sql opens two real connections through
-        # dblink and proves the second is blocked at the entitlement lock. A
-        # single-session test framework cannot express that, and the bug it
-        # catches -- two simultaneous creates both passing the cap -- only
-        # exists between sessions.
+        # Plain psql rather than pgTAP because these assert behaviour a single
+        # session cannot express. The concurrency case runs two real psql
+        # processes and proves the second is blocked at the entitlement lock:
+        # the bug it catches -- two simultaneous creates both passing the cap --
+        # exists only between sessions.
         env:
           PGHARNESS_EXTERNAL: "1"
           PGHOST: 127.0.0.1
@@ -99,6 +98,8 @@ jobs:
             echo "== $suite"
             bash scripts/db/local-pg-harness.sh sql "$PWD/$suite"
           done
+          echo "== concurrency"
+          bash scripts/db/local-pg-harness.sh race
 
       - name: Migrating a populated database
         # `supabase db reset` only ever proves an empty database. This applies
