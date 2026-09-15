@@ -3,7 +3,9 @@ const exactShortLinkHosts = new Set(["g.page", "maps.app.goo.gl"]);
 export function isValidatedGoogleReviewUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || url.username || url.password) return false;
+    // Port refused for the same reason the server and the database refuse one:
+    // three validators that disagree mean the loosest is the real policy.
+    if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
 
     const host = url.hostname.toLowerCase().replace(/\.$/, "");
     if (exactShortLinkHosts.has(host)) return true;

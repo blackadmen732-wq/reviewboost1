@@ -672,7 +672,21 @@ export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
 export interface OwnerLocation {
   locationId: string;
   name: string;
-  googleReviewUrl: string | null;
+  /**
+   * Where this location's Tags lead. Null means the door is closed: the Tags
+   * exist and resolve, but a customer reaching one sees a dead link.
+   */
+  destination: { provider: string; url: string } | null;
+}
+
+function locationDestination(row: {
+  destination_provider: unknown;
+  destination_url: unknown;
+}): OwnerLocation["destination"] {
+  const provider = row.destination_provider;
+  const url = row.destination_url;
+  if (typeof provider !== "string" || typeof url !== "string") return null;
+  return { provider, url };
 }
 
 export const getPrimaryLocation = cache(async (orgId: string): Promise<OwnerLocation | null> => {
@@ -680,7 +694,7 @@ export const getPrimaryLocation = cache(async (orgId: string): Promise<OwnerLoca
 
   const { data, error } = await supabase
     .from("locations")
-    .select("id, name, google_review_url")
+    .select("id, name, destination_provider, destination_url")
     .eq("org_id", orgId)
     .order("created_at", { ascending: true })
     .limit(1);
@@ -693,7 +707,7 @@ export const getPrimaryLocation = cache(async (orgId: string): Promise<OwnerLoca
   return {
     locationId: row.id as string,
     name: row.name as string,
-    googleReviewUrl: (row.google_review_url as string | null) ?? null,
+    destination: locationDestination(row),
   };
 });
 
@@ -702,7 +716,7 @@ export const listLocations = cache(async (orgId: string): Promise<OwnerLocation[
 
   const { data, error } = await supabase
     .from("locations")
-    .select("id, name, google_review_url")
+    .select("id, name, destination_provider, destination_url")
     .eq("org_id", orgId)
     .order("created_at", { ascending: true });
 
@@ -711,7 +725,7 @@ export const listLocations = cache(async (orgId: string): Promise<OwnerLocation[
   return (data ?? []).map((row) => ({
     locationId: row.id as string,
     name: row.name as string,
-    googleReviewUrl: (row.google_review_url as string | null) ?? null,
+    destination: locationDestination(row),
   }));
 });
 
@@ -785,7 +799,7 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
         ? ratings.reduce((total, rating) => total + rating, 0) / ratings.length
         : null,
     recentCount: ratings.length,
-    hasGoogleLink: Boolean(location?.googleReviewUrl),
+    hasGoogleLink: location?.destination != null,
   };
 });
 
@@ -848,7 +862,11 @@ export async function listVisits(
 
   const [clicksResult, stands] = await Promise.all([
     ids.length > 0
-      ? supabase.from("google_review_clicks").select("response_id").eq("org_id", orgId).in("response_id", ids)
+      ? supabase
+          .from("destination_selections")
+          .select("response_id")
+          .eq("org_id", orgId)
+          .in("response_id", ids)
       : Promise.resolve({ data: [] as Array<{ response_id: string }>, error: null }),
     listStands(orgId),
   ]);
@@ -897,7 +915,10 @@ export async function getVisitSummary(orgId: string): Promise<{
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
       .not("note_encrypted", "is", null),
-    supabase.from("google_review_clicks").select("id", { count: "exact", head: true }).eq("org_id", orgId),
+    supabase
+      .from("destination_selections")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId),
     supabase.rpc("rpc_praise_count", { p_org_id: orgId }),
   ]);
 

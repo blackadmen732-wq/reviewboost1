@@ -68,7 +68,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/public/q/{token}/google-click": {
+    "/api/v1/public/q/{token}/destination-selection": {
         parameters: {
             query?: never;
             header?: never;
@@ -78,12 +78,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Record that the Google action was selected
-         * @description Records the selection and nothing more. It does not mean a review was written, submitted, or published, or that a rating changed on Google — ReviewBoost cannot observe any of that, and no metric built on it may imply otherwise.
+         * Record that the customer was handed to the review destination
+         * @description Records the selection and the provider in force at that moment, and nothing more. It does not mean a review was written, submitted, or published, or that a rating changed anywhere — ReviewBoost cannot observe any of that, and no metric built on it may imply otherwise.
          *
          *     Never redirects: the client owns the navigation, so a tracking failure can never stand between a customer and the public review page. Deduplicated per response, so 204 is returned on a first record and on a replay alike.
          */
-        post: operations["recordGoogleReviewClick"];
+        post: operations["recordDestinationSelection"];
         delete?: never;
         options?: never;
         head?: never;
@@ -109,9 +109,23 @@ export interface components {
             location: {
                 name: string | null;
             };
+            /** @description Where this Tag's door leads. Server state, not something the Tag carries: an owner can change it and the next scan of the same QR or NFC chip arrives at the new destination. */
+            destination: {
+                /**
+                 * @description The enabled provider. Unknown providers are refused at write time, so this is always one the client knows how to open.
+                 * @enum {string}
+                 */
+                provider: "google";
+                /**
+                 * Format: uri
+                 * @description Validated server-side against that provider's host allowlist — HTTPS only, no credentials, no ports — and re-validated by the client. A stand whose destination does not validate cannot serve the flow and returns review_link_inactive.
+                 */
+                url: string;
+            };
             /**
              * Format: uri
-             * @description Validated server-side against an allowlist of Google hosts, and re-validated by the client. A stand whose destination does not validate cannot serve the flow and returns review_link_inactive.
+             * @deprecated
+             * @description Compatibility alias of `destination.url`, kept while clients migrate. Always equal to it. New code reads `destination`.
              */
             googleReviewUrl: string;
             supportedLocales: components["schemas"]["Locale"][];
@@ -131,7 +145,7 @@ export interface components {
         SubmitResponseResponse: {
             responseId: string;
         };
-        GoogleClickRequest: {
+        DestinationSelectionRequest: {
             sessionId: string;
             responseId: string;
         };
@@ -439,7 +453,7 @@ export interface operations {
             503: components["responses"]["ServiceUnavailable"];
         };
     };
-    recordGoogleReviewClick: {
+    recordDestinationSelection: {
         parameters: {
             query?: never;
             header: {
@@ -456,7 +470,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["GoogleClickRequest"];
+                "application/json": components["schemas"]["DestinationSelectionRequest"];
             };
         };
         responses: {

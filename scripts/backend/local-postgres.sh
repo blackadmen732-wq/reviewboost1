@@ -146,22 +146,52 @@ reset_db() {
     PGPASSWORD="" psql -X -q -v ON_ERROR_STOP=1 -h 127.0.0.1 -p "$PGPORT" -U postgres -d postgres \
         -c "alter database $PGDB set search_path to \"\$user\", public, extensions"
     bootstrap_sql | psql_db -q
-    apply_migrations "$@"
+    apply_migrations until "${1:-}"
 }
 
+# `until` stops after that migration; `after` skips everything up to and
+# including it. The upgrade proof needs both halves of the same list.
 apply_migrations() {
-    local until="${1:-}"
+    local mode="${1:-until}"
+    local marker="${2:-}"
     local applied=0
     for file in "$REPO_ROOT"/supabase/migrations/*.sql; do
         local name
         name="$(basename "$file")"
-        if [ -n "$until" ] && [[ "$name" > "$until" ]]; then
-            continue
+        if [ -n "$marker" ]; then
+            if [ "$mode" = "until" ] && [[ "$name" > "$marker" ]]; then
+                continue
+            fi
+            if [ "$mode" = "after" ] && [[ ! "$name" > "$marker" ]]; then
+                continue
+            fi
         fi
         psql_db -q -f "$file" >/dev/null
         applied=$((applied + 1))
     done
-    echo "Applied $applied migration(s)${until:+ up to $until}."
+    echo "Applied $applied migration(s)${marker:+ $mode $marker}."
+}
+
+# The populated-upgrade proof: a realistic old database, migrated forward, then
+# asked whether it still holds everything it held before. A fresh-database
+# reset can never answer that question.
+upgrade_proof() {
+    local baseline="${1:?baseline migration required}"
+    start_cluster >/dev/null
+    reset_db "$baseline"
+    echo "Loading the pre-upgrade database..."
+    psql_db -q -f "$REPO_ROOT/supabase/upgrade/populated_baseline.sql" >/dev/null
+    apply_migrations after "$baseline"
+    local output
+    output="$(psql_db -q --no-align --tuples-only -f "$REPO_ROOT/supabase/upgrade/populated_upgrade_test.sql" 2>&1)" || {
+        echo "$output" | tail -30
+        return 1
+    }
+    if echo "$output" | grep -qE '^not ok|^# Looks like'; then
+        echo "$output" | grep -E '^not ok|^# ' | head -40
+        return 1
+    fi
+    echo "ok    populated upgrade ($(echo "$output" | grep -cE '^ok [0-9]+') assertions)"
 }
 
 run_tests() {
@@ -179,7 +209,10 @@ run_tests() {
         fi
         local assertions
         assertions="$(echo "$output" | grep -cE '^ok [0-9]+' || true)"
-        if echo "$output" | grep -qE '^not ok' || [ "$assertions" -eq 0 ]; then
+        # `# Looks like you planned N but ran M` is how pgTAP reports a plan
+        # mismatch, and it is not a `not ok` line: a suite that quietly runs
+        # more or fewer assertions than it planned would otherwise pass.
+        if echo "$output" | grep -qE '^not ok|^# Looks like' || [ "$assertions" -eq 0 ]; then
             echo "FAIL  $name"
             echo "$output" | grep -E '^not ok|^# |ERROR' | head -30
             failures=$((failures + 1))
@@ -198,11 +231,12 @@ case "${1:-}" in
     start) start_cluster ;;
     stop) stop_cluster ;;
     reset) start_cluster >/dev/null; reset_db "${2:-}" ;;
-    migrate) apply_migrations "${2:-}" ;;
+    migrate) apply_migrations "${2:-until}" "${3:-}" ;;
+    upgrade) upgrade_proof "${2:-}" ;;
     test) run_tests ;;
     psql) shift; psql_db "$@" ;;
     *)
-        echo "usage: $0 {start|stop|reset [until-migration]|migrate [until-migration]|test|psql}" >&2
+        echo "usage: $0 {start|stop|reset [until-migration]|migrate [until|after] [migration]|upgrade <baseline-migration>|test|psql}" >&2
         exit 64
         ;;
 esac

@@ -105,9 +105,9 @@ export const productionCustomerFlowApi: CustomerFlowApi = {
     });
   },
 
-  recordGoogleClick(token, body, options) {
+  recordDestinationSelection(token, body, options) {
     return safely(async () => {
-      const result = await client.POST("/api/v1/public/q/{token}/google-click", {
+      const result = await client.POST("/api/v1/public/q/{token}/destination-selection", {
         params: {
           path: { token },
           header: { "Idempotency-Key": options.idempotencyKey },

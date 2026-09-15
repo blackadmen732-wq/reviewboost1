@@ -68,13 +68,13 @@ select is(
     'created',
     'service_role executes rpc_public_submit_response through the full chain');
 
--- 3. record_google_click: wrapper → app function chain works as service_role
+-- 3. record_destination_selection: wrapper → app function chain works as service_role
 select is(
-    (select outcome from public.rpc_public_record_google_click(
+    (select outcome from public.rpc_public_record_destination_selection(
         'rot-current-hash', 'rot-idem-gc-1', 'rot-req-gc-1', 'rot-sess-hash-1',
         'rot-resp-hash-1', 86400, null, null, null)),
     'created',
-    'service_role executes rpc_public_record_google_click through the full chain');
+    'service_role executes rpc_public_record_destination_selection through the full chain');
 
 -- 4. submit_team_praise: wrapper → app function chain works as service_role
 select is(
@@ -154,16 +154,16 @@ values ('00000000-a010-0000-0000-000000000012',
 
 select tests.set_service_role();
 
--- 7. record_google_click finds response via previous hashes
+-- 7. record_destination_selection finds response via previous hashes
 select is(
-    (select outcome from public.rpc_public_record_google_click(
+    (select outcome from public.rpc_public_record_destination_selection(
         'rot-current-hash', 'rot-idem-gc-prev', 'rot-req-gc-prev',
         'new-key-sess-hash-2', 'new-key-resp-hash', 86400,
         null,
         'old-key-sess-hash-2',
         'old-key-resp-hash')),
     'created',
-    'record_google_click finds response via previous session+response hashes');
+    'record_destination_selection finds response via previous session+response hashes');
 
 -- 8. submit_team_praise finds response via previous hashes
 select is(
@@ -331,7 +331,7 @@ select is(
 
 -- 15. Step 3: record Google click with previous-key lookups
 select is(
-    (select outcome from public.rpc_public_record_google_click(
+    (select outcome from public.rpc_public_record_destination_selection(
         'lifecycle-new-hash', 'lifecycle-gc', 'lifecycle-req-gc',
         'lifecycle-sess-newkey', 'lifecycle-resp-newkey', 86400,
         'lifecycle-old-hash',

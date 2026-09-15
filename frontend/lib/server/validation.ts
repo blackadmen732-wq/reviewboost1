@@ -66,7 +66,20 @@ export const submitResponseSchema = z.strictObject({
   rating: z.number().int().min(1).max(5),
 });
 
-export const googleClickSchema = z.strictObject({
+/**
+ * The UUID shape this codebase accepts, which is every UUID PostgreSQL will
+ * produce or store — not only RFC-9562 version 1-8 with a variant nibble, which
+ * is what Zod's own `.uuid()` demands and what would reject this repository's
+ * own fixture ids. `lib/server/auth.ts` enforces the same shape for the
+ * organization header; this is that rule, once.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function uuidSchema(message: string) {
+  return z.string().regex(UUID_RE, message);
+}
+
+export const destinationSelectionSchema = z.strictObject({
   sessionId: opaqueToken,
   responseId: opaqueToken,
 });

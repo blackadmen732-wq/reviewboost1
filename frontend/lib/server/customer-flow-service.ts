@@ -22,7 +22,7 @@ import {
 } from "@/lib/server/crypto";
 import { tokenDigestKeyVersion } from "@/lib/server/env";
 import { ApiError, ERROR_CODE, rateLimited, reviewLinkInactive } from "@/lib/server/errors";
-import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
+import { resolveDestination } from "@/lib/server/destination";
 import { logger } from "@/lib/server/logger";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import {
@@ -38,14 +38,14 @@ import {
  * REVIEW INTEGRITY — the rule this module exists to keep
  * ------------------------------------------------------
  * Nothing here branches on the rating. A 1 and a 5 take the same path, produce
- * the same response shape, and receive the same Google opportunity. The
- * opportunity itself comes from `getContext`, which runs *before any rating
- * exists* and is never re-fetched with one — that is the structural reason it
- * cannot vary by rating, rather than a rule someone has to remember.
+ * the same response shape, and receive the same destination. The destination
+ * itself comes from `getContext`, which runs *before any rating exists* and is
+ * never re-fetched with one — that is the structural reason it cannot vary by
+ * rating, rather than a rule someone has to remember.
  *
- * V1 contract: Tag/QR/NFC → rating 1–5 → private rating saved → Google review
- * opportunity. No public note. No Team Praise in the customer path. The same
- * Google opportunity is shown for every rating, 1 through 5.
+ * V1 contract: Tag/QR/NFC → rating 1–5 → private rating saved → the business's
+ * public review destination. No public note. No Team Praise in the customer
+ * path. The same destination is served for every rating, 1 through 5.
  *
  * If a change ever makes a customer-facing value depend on `rating`, that
  * change is wrong.
@@ -220,6 +220,9 @@ async function guardWrite(tokenHash: string, meta: RequestMeta): Promise<void> {
 interface ResolvedStand {
   business_name: string;
   location_name: string | null;
+  destination_provider: string | null;
+  destination_url: string | null;
+  /** Compatibility storage. Read only as a fallback; never written from here. */
   google_review_url: string | null;
   default_locale: string | null;
   matched_key_version: number;
@@ -304,13 +307,12 @@ export async function getContext(token: string, meta: RequestMeta): Promise<Cust
   const stand = await resolveStand(token, tokenHash, meta);
   if (!stand) throw reviewLinkInactive();
 
-  // The contract makes googleReviewUrl required and non-nullable, and the
-  // client re-validates it. A stand without a validated destination cannot
-  // produce a usable page, so it fails identically to an unknown token rather
-  // than serving a context the client will reject with no explanation.
-  if (!stand.google_review_url || !isValidGoogleReviewUrl(stand.google_review_url)) {
-    throw reviewLinkInactive();
-  }
+  // A door with no valid destination is a closed door, and a closed door is
+  // the same neutral dead link as an unknown token. Never "this business has
+  // not finished setting up": the customer is not who that message is for, and
+  // a caller holding a guessed token learns nothing either way.
+  const destination = resolveDestination(stand);
+  if (!destination) throw reviewLinkInactive();
 
   const locale = stand.default_locale;
   const defaultLocale: SupportedLocale =
@@ -321,7 +323,10 @@ export async function getContext(token: string, meta: RequestMeta): Promise<Cust
   return {
     business: { name: stand.business_name, logoUrl: null },
     location: { name: stand.location_name },
-    googleReviewUrl: stand.google_review_url,
+    destination,
+    // Compatibility alias of destination.url while clients migrate. It is the
+    // same value, never a second source of truth.
+    googleReviewUrl: destination.url,
     supportedLocales: [...SUPPORTED_LOCALES],
     defaultLocale,
   };
@@ -430,18 +435,21 @@ export async function submitResponse(
   return { status: 201, body };
 }
 
-// ---------------------------------------------------------- google click --
+// --------------------------------------------------- destination handoff --
 
 /**
- * Record that the customer selected the Google action.
+ * Record that the customer was handed to the configured review destination.
  *
  * That is the entire claim. It does not mean a review was written, submitted,
  * or published — ReviewBoost cannot observe any of that, and no metric built on
- * it may imply otherwise. The API never redirects: the client owns the
- * navigation, so a tracking failure can never stand between a customer and the
- * public review page.
+ * it may imply otherwise. The provider is recorded by the database from the
+ * location it resolves, not taken from the request, so the stored history says
+ * which door was open at that moment rather than what a client asserted.
+ *
+ * The API never redirects: the client owns the navigation, so a tracking
+ * failure can never stand between a customer and the public review page.
  */
-export async function recordGoogleClick(
+export async function recordDestinationSelection(
   token: string,
   input: { sessionId: string; responseId: string; idempotencyKey: string },
   meta: RequestMeta,
@@ -449,9 +457,9 @@ export async function recordGoogleClick(
   const tokenHash = digestStandToken(token);
   await guardWrite(tokenHash, meta);
 
-  const { data, error } = await serviceRoleClient().rpc("rpc_public_record_google_click", {
+  const { data, error } = await serviceRoleClient().rpc("rpc_public_record_destination_selection", {
     p_token_hash: tokenHash,
-    p_idempotency_key: digestIdempotencyKey(`google-click|${input.idempotencyKey}`),
+    p_idempotency_key: digestIdempotencyKey(`destination-selection|${input.idempotencyKey}`),
     p_request_hash: digestRequestBody(
       canonicalJson({ sessionId: input.sessionId, responseId: input.responseId }),
     ),
@@ -463,10 +471,10 @@ export async function recordGoogleClick(
     p_previous_response_token_hash: digestResponseTokenWithPreviousKey(input.responseId),
   });
 
-  if (error) fail("google_click", error, meta.requestId);
+  if (error) fail("destination_selection", error, meta.requestId);
 
   const result = firstRow(data);
-  if (!result) fail("google_click", new Error("empty rpc result"), meta.requestId);
+  if (!result) fail("destination_selection", new Error("empty rpc result"), meta.requestId);
 
   // 204 on a first record and on a replay alike: the contract documents one
   // success status for this operation.

@@ -28,8 +28,10 @@ export function isValidGoogleReviewUrl(value: string): boolean {
 
   // Credentials in the authority are a phishing primitive:
   // https://www.google.com@evil.example is not Google, and a hostname check
-  // alone would not catch it.
-  if (url.protocol !== "https:" || url.username || url.password) return false;
+  // alone would not catch it. A port is refused because the database validator
+  // refuses one, and a URL the server accepts but the database rejects becomes
+  // a 503 an owner cannot act on.
+  if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
 
   const host = url.hostname.toLowerCase().replace(/\.$/, "");
 

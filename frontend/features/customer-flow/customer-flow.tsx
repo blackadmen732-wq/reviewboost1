@@ -42,7 +42,7 @@ import {
   type RatingValue,
 } from "@/lib/i18n/customer-messages";
 import { type Locale } from "@/lib/i18n/config";
-import { requireValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
+import { requireValidatedDestination } from "@/lib/security/destination";
 
 interface CustomerFlowProps {
   token: string;
@@ -108,9 +108,9 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
       const context = await api.getContext(token, { signal });
       return {
         ...context,
-        googleReviewUrl: requireValidatedGoogleReviewUrl(
-          context.googleReviewUrl,
-        ),
+        // Re-validated here, not trusted: this is the value the page is about
+        // to send a customer to.
+        destination: requireValidatedDestination(context.destination),
         supportedLocales: normalizedContextLocales(context.supportedLocales),
       };
     },
@@ -118,7 +118,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
       !isUnavailableReviewLink(error) && failureCount < 1,
   });
 
-  const destinationUrl = contextQuery.data?.googleReviewUrl ?? null;
+  const destinationUrl = contextQuery.data?.destination.url ?? null;
 
   useEffect(() => {
     const animationFrame = window.requestAnimationFrame(() => {
@@ -217,7 +217,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
       if (destinationInFlight.current) return;
       destinationInFlight.current = true;
       try {
-        await api.recordGoogleClick(
+        await api.recordDestinationSelection(
           token,
           { sessionId, responseId },
           { idempotencyKey },
@@ -397,7 +397,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
             ) : (
               <HandoffScreen
                 businessName={context.business.name}
-                destinationUrl={context.googleReviewUrl}
+                destinationUrl={context.destination.url}
                 messages={messages}
               />
             )}

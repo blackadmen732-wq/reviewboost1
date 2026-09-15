@@ -5,7 +5,7 @@ import type {
   SubmitResponseResponse,
 } from "@/lib/api/customer-flow-types";
 
-type FixtureOperation = "context" | "session" | "response" | "google-click";
+type FixtureOperation = "context" | "session" | "response" | "destination-selection";
 
 declare global {
   interface Window {
@@ -95,6 +95,10 @@ export const developmentCustomerFlowApi: CustomerFlowApi = {
     return {
       business: { name: "Mario’s Pizza", logoUrl: null },
       location: { name: "Downtown" },
+      destination: {
+        provider: "google",
+        url: "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4",
+      },
       googleReviewUrl:
         "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4",
       supportedLocales: ["en", "es", "ht"],
@@ -126,13 +130,13 @@ export const developmentCustomerFlowApi: CustomerFlowApi = {
     }));
   },
 
-  async recordGoogleClick(token, _body, options) {
-    logCall("google-click", options.idempotencyKey);
+  async recordDestinationSelection(token, _body, options) {
+    logCall("destination-selection", options.idempotencyKey);
     assertOnline();
-    if (token === "fixture-google-error") {
-      transientFailure("google-click", token, options.idempotencyKey);
+    if (token === "fixture-destination-error") {
+      transientFailure("destination-selection", token, options.idempotencyKey);
     }
-    stableResult("google-click", options.idempotencyKey, () => true);
+    stableResult("destination-selection", options.idempotencyKey, () => true);
   },
 
 };

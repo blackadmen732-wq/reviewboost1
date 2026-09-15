@@ -14,21 +14,33 @@ info:
     the review-integrity guarantee.
 
 
-    V1 FLOW: open Tag/QR/NFC → customer taps 1–5 → private rating saved →
-    same Google review destination for every rating. No public note. No active
-    public Team Praise. Historical note and Team Praise data in the database
-    is preserved; these endpoints are simply not exposed in the public V1 API.
+    V1 FLOW: open Tag/QR/NFC → customer taps one star → private rating saved →
+    the business's public review destination opens. One tap, no screen in
+    between. No public note. No active public Team Praise. Historical note and
+    Team Praise data in the database is preserved; these endpoints are simply
+    not exposed in the public V1 API.
+
+
+    REVIEWBOOST OWNS THE DOOR
+
+
+    A Tag's QR and NFC carry one ReviewBoost URL, `/q/{token}`, and never a
+    provider's URL. The destination behind it is server state: `destination`
+    names the provider and the URL, and an owner can repoint it without
+    reprinting a sticker or reprogramming a chip. Google is the provider V1
+    enables, not the architecture. `googleReviewUrl` remains as a compatibility
+    alias of `destination.url` while clients migrate; new code reads
+    `destination`.
 
 
     REVIEW INTEGRITY — binding, and a release blocker
 
 
-    Every rating from one to five receives the same neutral Google review
-    opportunity. `googleReviewUrl` is returned by the context endpoint, which
-    runs before any rating exists and is never re-fetched with one, so the
-    opportunity structurally cannot vary by rating. There is no rating threshold,
-    no rating-dependent action, and no metric describing a review as prevented or
-    intercepted.
+    Every rating from one to five receives the same destination. It is returned
+    by the context endpoint, which runs before any rating exists and is never
+    re-fetched with one, so it structurally cannot vary by rating. There is no
+    rating threshold, no rating-dependent action, and no metric describing a
+    review as prevented or intercepted.
 servers:
   - url: /
     description: Same origin as the customer page. No CORS preflight occurs.
@@ -156,16 +168,16 @@ paths:
         "500": { $ref: "#/components/responses/InternalError" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
-  /api/v1/public/q/{token}/google-click:
+  /api/v1/public/q/{token}/destination-selection:
     post:
-      operationId: recordGoogleReviewClick
+      operationId: recordDestinationSelection
       tags: [public]
-      summary: Record that the Google action was selected
+      summary: Record that the customer was handed to the review destination
       description: >-
-        Records the selection and nothing more. It does not mean a review was
-        written, submitted, or published, or that a rating changed on Google —
-        ReviewBoost cannot observe any of that, and no metric built on it may
-        imply otherwise.
+        Records the selection and the provider in force at that moment, and
+        nothing more. It does not mean a review was written, submitted, or
+        published, or that a rating changed anywhere — ReviewBoost cannot
+        observe any of that, and no metric built on it may imply otherwise.
 
 
         Never redirects: the client owns the navigation, so a tracking failure
@@ -180,7 +192,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/GoogleClickRequest" }
+            schema: { $ref: "#/components/schemas/DestinationSelectionRequest" }
       responses:
         "204":
           description: Selection recorded
@@ -333,7 +345,7 @@ components:
     CustomerReviewContext:
       type: object
       additionalProperties: false
-      required: [business, location, googleReviewUrl, supportedLocales, defaultLocale]
+      required: [business, location, destination, googleReviewUrl, supportedLocales, defaultLocale]
       description: >-
         Contains no organization id, location id, stand id, or subscription
         state. A caller who learned the tenant could write unlimited fabricated
@@ -355,13 +367,36 @@ components:
           required: [name]
           properties:
             name: { type: [string, "null"], maxLength: 160 }
+        destination:
+          type: object
+          additionalProperties: false
+          required: [provider, url]
+          description: >-
+            Where this Tag's door leads. Server state, not something the Tag
+            carries: an owner can change it and the next scan of the same QR or
+            NFC chip arrives at the new destination.
+          properties:
+            provider:
+              type: string
+              enum: [google]
+              description: >-
+                The enabled provider. Unknown providers are refused at write
+                time, so this is always one the client knows how to open.
+            url:
+              type: string
+              format: uri
+              description: >-
+                Validated server-side against that provider's host allowlist —
+                HTTPS only, no credentials, no ports — and re-validated by the
+                client. A stand whose destination does not validate cannot serve
+                the flow and returns review_link_inactive.
         googleReviewUrl:
           type: string
           format: uri
+          deprecated: true
           description: >-
-            Validated server-side against an allowlist of Google hosts, and
-            re-validated by the client. A stand whose destination does not
-            validate cannot serve the flow and returns review_link_inactive.
+            Compatibility alias of `destination.url`, kept while clients
+            migrate. Always equal to it. New code reads `destination`.
         supportedLocales:
           type: array
           minItems: 1
@@ -402,7 +437,7 @@ components:
       properties:
         responseId: { type: string, minLength: 1, maxLength: 160 }
 
-    GoogleClickRequest:
+    DestinationSelectionRequest:
       type: object
       additionalProperties: false
       required: [sessionId, responseId]

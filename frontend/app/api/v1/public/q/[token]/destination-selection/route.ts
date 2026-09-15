@@ -1,22 +1,23 @@
 import type { NextRequest } from "next/server";
 
-import { recordGoogleClick } from "@/lib/server/customer-flow-service";
+import { recordDestinationSelection } from "@/lib/server/customer-flow-service";
 import { handle, noContent, preflight, readJsonBody } from "@/lib/server/http";
 import { requestMetaOf } from "@/lib/server/request-meta";
 import {
-  googleClickSchema,
+  destinationSelectionSchema,
   parseIdempotencyKeyOrThrow,
   parseOrThrow,
   parseTokenOrThrow,
 } from "@/lib/server/validation";
 
 /**
- * POST /api/v1/public/q/{token}/google-click — record the selection.
+ * POST /api/v1/public/q/{token}/destination-selection — record the handoff.
  *
- * Records that the customer *selected* the Google action. That is the entire
- * claim. It does not mean a review was written, submitted, or published, and no
- * metric built on it may imply otherwise — ReviewBoost cannot see what a
- * customer does once they reach Google.
+ * Records that the customer was handed to the business's configured public
+ * review destination, and which provider that was. That is the entire claim. It
+ * does not mean a review was written, submitted, or published, and no metric
+ * built on it may imply otherwise — ReviewBoost cannot see what a customer does
+ * once they arrive.
  *
  * Never redirects. The client owns the navigation, so a failure here can never
  * stand between a customer and the public review page.
@@ -28,7 +29,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ROUTE = "/api/v1/public/q/[token]/google-click";
+const ROUTE = "/api/v1/public/q/[token]/destination-selection";
 
 export async function POST(
   request: NextRequest,
@@ -38,9 +39,9 @@ export async function POST(
     const { token } = await params;
     const validToken = parseTokenOrThrow(token);
     const idempotencyKey = parseIdempotencyKeyOrThrow(request);
-    const body = parseOrThrow(googleClickSchema, await readJsonBody(request));
+    const body = parseOrThrow(destinationSelectionSchema, await readJsonBody(request));
 
-    await recordGoogleClick(
+    await recordDestinationSelection(
       validToken,
       { sessionId: body.sessionId, responseId: body.responseId, idempotencyKey },
       requestMetaOf(request, requestId),

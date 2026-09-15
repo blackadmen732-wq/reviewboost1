@@ -44,6 +44,8 @@ const ACTIVE_STAND = {
   stand_id: "33333333-3333-3333-3333-333333333333",
   business_name: "The Corner Cafe",
   location_name: "High Street",
+  destination_provider: "google",
+  destination_url: "https://g.page/r/CdSAMPLE/review",
   google_review_url: "https://g.page/r/CdSAMPLE/review",
   default_locale: "en",
   matched_key_version: 1,
@@ -121,11 +123,11 @@ async function postResponse(body: unknown, headers?: Record<string, string>) {
 }
 
 async function postGoogleClick(body: unknown, headers?: Record<string, string>) {
-  const { POST } = await import("@/app/api/v1/public/q/[token]/google-click/route");
+  const { POST } = await import("@/app/api/v1/public/q/[token]/destination-selection/route");
   return POST(
-    request("POST", `/api/v1/public/q/${TOKEN}/google-click`, {
+    request("POST", `/api/v1/public/q/${TOKEN}/destination-selection`, {
       body,
-      ...(headers ? { headers } : { headers: { "idempotency-key": key("google-click") } }),
+      ...(headers ? { headers } : { headers: { "idempotency-key": key("destination-selection") } }),
     }),
     params(TOKEN),
   );
@@ -141,11 +143,17 @@ describe("GET public context", () => {
     expect(Object.keys(body).sort()).toEqual([
       "business",
       "defaultLocale",
+      "destination",
       "googleReviewUrl",
       "location",
       "supportedLocales",
     ]);
-    expect(body["googleReviewUrl"]).toBe(ACTIVE_STAND.google_review_url);
+    expect(body["destination"]).toEqual({
+      provider: "google",
+      url: ACTIVE_STAND.destination_url,
+    });
+    // The compatibility alias is the same value, never a second source of truth.
+    expect(body["googleReviewUrl"]).toBe(ACTIVE_STAND.destination_url);
     expect(body["business"]).toEqual({ name: "The Corner Cafe", logoUrl: null });
     expect(body["location"]).toEqual({ name: "High Street" });
     expect(body["supportedLocales"]).toEqual(["en", "es", "ht"]);
@@ -206,7 +214,16 @@ describe("GET public context", () => {
     rpcHandler = (fn) =>
       fn === "rpc_consume_rate_limit"
         ? allowed()
-        : { data: [{ ...ACTIVE_STAND, google_review_url: "https://evil.example/review" }], error: null };
+        : {
+            data: [
+              {
+                ...ACTIVE_STAND,
+                destination_url: "https://evil.example/review",
+                google_review_url: "https://evil.example/review",
+              },
+            ],
+            error: null,
+          };
     response = await getContext();
     outcomes.push({ status: response.status, body: await response.json() });
 
@@ -214,7 +231,17 @@ describe("GET public context", () => {
     rpcHandler = (fn) =>
       fn === "rpc_consume_rate_limit"
         ? allowed()
-        : { data: [{ ...ACTIVE_STAND, google_review_url: null }], error: null };
+        : {
+            data: [
+              {
+                ...ACTIVE_STAND,
+                destination_provider: null,
+                destination_url: null,
+                google_review_url: null,
+              },
+            ],
+            error: null,
+          };
     response = await getContext();
     outcomes.push({ status: response.status, body: await response.json() });
 

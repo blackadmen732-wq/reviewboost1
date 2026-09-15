@@ -51,20 +51,22 @@ export default async function SettingsPage() {
           label="Place"
           value={location?.name ?? null}
           placeholder="High Street"
+          {...(location ? { context: { locationId: location.locationId } } : {})}
         />
 
         <div>
           <EditableRow
-            field="googleReviewUrl"
+            field="destinationUrl"
             label="Google link"
-            value={location?.googleReviewUrl ?? null}
+            value={location?.destination?.url ?? null}
             type="url"
             placeholder="https://g.page/..."
-            help="Paste the link customers use to review you on Google. Leave it empty to remove it."
+            help="Paste the link customers use to review you on Google. Changing it takes effect on the next scan — your printed codes and NFC tags stay exactly as they are. Leave it empty to remove it."
             emptyText="Not set yet"
             // The one field where absence is a real problem: without it a code
             // cannot serve customers at all.
             warnWhenEmpty
+            {...(location ? { context: { locationId: location.locationId } } : {})}
           />
           <GoogleLinkHelp />
         </div>

@@ -144,16 +144,16 @@ describe("token rotation — previous stand hash forwarding", () => {
     expect(call!.params.p_previous_token_hash).toBe(PREVIOUS_HASH);
   });
 
-  it("recordGoogleClick passes p_previous_token_hash", async () => {
+  it("recordDestinationSelection passes p_previous_token_hash", async () => {
     rpcResult = [{ outcome: "created", response_status: 204, response_body_encrypted: null }];
-    const { recordGoogleClick } = await import("@/lib/server/customer-flow-service");
-    await recordGoogleClick(
+    const { recordDestinationSelection } = await import("@/lib/server/customer-flow-service");
+    await recordDestinationSelection(
       "raw-token",
       { sessionId: "s", responseId: "r", idempotencyKey: "k3" },
       meta,
     );
 
-    const call = rpcCalls.find((c) => c.name === "rpc_public_record_google_click");
+    const call = rpcCalls.find((c) => c.name === "rpc_public_record_destination_selection");
     expect(call).toBeDefined();
     expect(call!.params.p_token_hash).toBe(CURRENT_HASH);
     expect(call!.params.p_previous_token_hash).toBe(PREVIOUS_HASH);
@@ -180,16 +180,16 @@ describe("token rotation — previous session/response hash forwarding", () => {
     expect(call!.params.p_previous_session_token_hash).toBe(PREVIOUS_SESSION_HASH);
   });
 
-  it("recordGoogleClick passes p_previous_session_token_hash and p_previous_response_token_hash", async () => {
+  it("recordDestinationSelection passes p_previous_session_token_hash and p_previous_response_token_hash", async () => {
     rpcResult = [{ outcome: "created", response_status: 204, response_body_encrypted: null }];
-    const { recordGoogleClick } = await import("@/lib/server/customer-flow-service");
-    await recordGoogleClick(
+    const { recordDestinationSelection } = await import("@/lib/server/customer-flow-service");
+    await recordDestinationSelection(
       "raw-token",
       { sessionId: "s", responseId: "r", idempotencyKey: "k11" },
       meta,
     );
 
-    const call = rpcCalls.find((c) => c.name === "rpc_public_record_google_click");
+    const call = rpcCalls.find((c) => c.name === "rpc_public_record_destination_selection");
     expect(call).toBeDefined();
     expect(call!.params.p_previous_session_token_hash).toBe(PREVIOUS_SESSION_HASH);
     expect(call!.params.p_previous_response_token_hash).toBe(PREVIOUS_RESPONSE_HASH);
@@ -226,14 +226,14 @@ describe("token rotation — null previous hash when no rotation", () => {
     const respSpy = vi.spyOn(cryptoMock, "digestResponseTokenWithPreviousKey" as never).mockReturnValue(null as never);
 
     rpcResult = [{ outcome: "created", response_status: 204, response_body_encrypted: null }];
-    const { recordGoogleClick } = await import("@/lib/server/customer-flow-service");
-    await recordGoogleClick(
+    const { recordDestinationSelection } = await import("@/lib/server/customer-flow-service");
+    await recordDestinationSelection(
       "raw-token",
       { sessionId: "s", responseId: "r", idempotencyKey: "k13" },
       meta,
     );
 
-    const call = rpcCalls.find((c) => c.name === "rpc_public_record_google_click");
+    const call = rpcCalls.find((c) => c.name === "rpc_public_record_destination_selection");
     expect(call!.params.p_previous_session_token_hash).toBeNull();
     expect(call!.params.p_previous_response_token_hash).toBeNull();
 
