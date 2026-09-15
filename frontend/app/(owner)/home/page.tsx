@@ -43,7 +43,7 @@ export default async function HomePage() {
   // unread messages, which beat silence. Showing two problems at once turns the
   // screen into a list, and a list is homework.
   const status =
-    !counts.hasGoogleLink || !hasStand
+    !counts.hasDestination || !hasStand
       ? ({ kind: "setup", href: "/onboarding" } as const)
       : counts.unread > 0
         ? ({ kind: "unread", count: counts.unread, href: "/feedback" } as const)

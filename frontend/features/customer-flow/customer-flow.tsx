@@ -47,7 +47,7 @@ import {
   type RatingValue,
 } from "@/lib/i18n/customer-messages";
 import { type Locale } from "@/lib/i18n/config";
-import { requireValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
+import { requireValidatedDestinationUrl } from "@/lib/security/destination";
 
 interface CustomerFlowProps {
   token: string;
@@ -107,11 +107,16 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     queryFn: async ({ signal }) => {
       const api = await getCustomerFlowApi();
       const context = await api.getContext(token, { signal });
+      // Validate the destination URL before trusting it for navigation.
+      const destinationUrl = requireValidatedDestinationUrl(
+        context.destination.provider,
+        context.destination.url,
+      );
       return {
         ...context,
-        googleReviewUrl: requireValidatedGoogleReviewUrl(
-          context.googleReviewUrl,
-        ),
+        destination: { ...context.destination, url: destinationUrl },
+        // Keep the alias in sync.
+        googleReviewUrl: destinationUrl,
         supportedLocales: normalizedContextLocales(context.supportedLocales),
       };
     },
@@ -444,7 +449,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
             {state.screen === "google" ? (
               <GoogleOpportunity
                 businessName={context.business.name}
-                googleReviewUrl={context.googleReviewUrl}
+                destinationUrl={context.destination.url}
                 messages={messages}
                 onGoogleAction={handleGoogleAction}
                 onContinue={() => dispatch({ type: "show-praise" })}

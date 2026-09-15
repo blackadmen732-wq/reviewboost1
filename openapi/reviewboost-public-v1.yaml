@@ -20,12 +20,13 @@ info:
 
 
     Every rating from one to five receives the same neutral Google review
-    opportunity. `googleReviewUrl` is returned by the context endpoint, which
-    runs before any rating exists and is never re-fetched with one, so the
-    opportunity structurally cannot vary by rating. The private note and Team
-    Praise are additive: extra things a customer may do, never a substitute for
-    the public review. There is no rating threshold, no rating-dependent action,
-    and no metric describing a review as prevented or intercepted.
+    opportunity. `destination` (and its alias `googleReviewUrl`) is returned by
+    the context endpoint, which runs before any rating exists and is never
+    re-fetched with one, so the destination structurally cannot vary by rating.
+    The private note and Team Praise are additive: extra things a customer may
+    do, never a substitute for the public review. There is no rating threshold,
+    no rating-dependent action, and no metric describing a review as prevented
+    or intercepted.
 servers:
   - url: /
     description: Same origin as the customer page. No CORS preflight occurs.
@@ -373,10 +374,34 @@ components:
       type: string
       enum: [en, es, ht]
 
+    ReviewDestination:
+      type: object
+      additionalProperties: false
+      required: [provider, url]
+      description: >-
+        The review destination the owner configured. The provider identifies
+        which review network receives the customer. Google is the first supported
+        provider; Apple, Yelp, or a new network can be added later as an
+        allowlist change plus an owner paste — no new product required.
+      properties:
+        provider:
+          type: string
+          description: >-
+            The review network identifier. "google" is the only supported
+            provider today. Unknown values must be treated as inactive by
+            clients.
+        url:
+          type: string
+          format: uri
+          description: >-
+            The validated destination URL for the provider. Validated
+            server-side against the provider allowlist and re-validated by the
+            client.
+
     CustomerReviewContext:
       type: object
       additionalProperties: false
-      required: [business, location, googleReviewUrl, supportedLocales, defaultLocale]
+      required: [business, location, destination, googleReviewUrl, supportedLocales, defaultLocale]
       description: >-
         Contains no organization id, location id, stand id, or subscription
         state. A caller who learned the tenant could write unlimited fabricated
@@ -398,13 +423,16 @@ components:
           required: [name]
           properties:
             name: { type: [string, "null"], maxLength: 160 }
+        destination:
+          $ref: "#/components/schemas/ReviewDestination"
         googleReviewUrl:
           type: string
           format: uri
           description: >-
-            Validated server-side against an allowlist of Google hosts, and
-            re-validated by the client. A stand whose destination does not
-            validate cannot serve the flow and returns review_link_inactive.
+            Alias for destination.url when destination.provider is "google".
+            Preserved so clients that predate the destination abstraction
+            continue to work without modification. New clients should read
+            destination instead.
         supportedLocales:
           type: array
           minItems: 1

@@ -36,7 +36,7 @@ describe("customer flow accessibility", () => {
       <CustomerFrame poweredBy={messages.poweredBy}>
         <GoogleOpportunity
           businessName="Mario’s Pizza"
-          googleReviewUrl="https://search.google.com/local/writereview?placeid=abc"
+          destinationUrl="https://search.google.com/local/writereview?placeid=abc"
           messages={messages}
           onGoogleAction={vi.fn()}
           onContinue={vi.fn()}

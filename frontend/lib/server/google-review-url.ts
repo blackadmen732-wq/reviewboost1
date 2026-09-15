@@ -8,43 +8,15 @@ import "server-only";
  * or a compromised dashboard field, and every scanner goes wherever the
  * attacker chose.
  *
- * The allowlist matches `lib/security/google-review-url.ts` on the client
- * exactly, and that is deliberate. If the server were the looser of the two, it
- * would serve a URL the client then rejects, and the customer would see a dead
- * flow for a reason no log explains. A test asserts the two agree.
+ * The allowlist matches `lib/security/destination.ts` on the client exactly,
+ * and that is deliberate. If the server were the looser of the two, it would
+ * serve a URL the client then rejects, and the customer would see a dead flow
+ * for a reason no log explains. A test asserts the two agree.
+ *
+ * @deprecated Import from `lib/server/destination.ts` for new code.
  */
 
-const SHORT_LINK_HOSTS = new Set(["g.page", "maps.app.goo.gl"]);
-
-export function isValidGoogleReviewUrl(value: string): boolean {
-  if (value.length === 0 || value.length > 2048) return false;
-
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return false;
-  }
-
-  // Credentials in the authority are a phishing primitive:
-  // https://www.google.com@evil.example is not Google, and a hostname check
-  // alone would not catch it.
-  if (url.protocol !== "https:" || url.username || url.password) return false;
-
-  const host = url.hostname.toLowerCase().replace(/\.$/, "");
-
-  if (SHORT_LINK_HOSTS.has(host)) return true;
-
-  if (host === "search.google.com") {
-    return url.pathname === "/local/writereview" && Boolean(url.searchParams.get("placeid"));
-  }
-
-  if (host === "www.google.com" || host === "maps.google.com") {
-    return url.pathname.startsWith("/maps/");
-  }
-
-  return false;
-}
+export { isValidGoogleReviewUrl } from "@/lib/server/destination";
 
 /**
  * The URL a printed code or an NFC tag resolves to.

@@ -118,6 +118,16 @@ export interface components {
     schemas: {
         /** @enum {string} */
         Locale: "en" | "es" | "ht";
+        /** @description The review destination the owner configured. The provider identifies which review network receives the customer. Google is the first supported provider; Apple, Yelp, or a new network can be added later as an allowlist change plus an owner paste — no new product required. */
+        ReviewDestination: {
+            /** @description The review network identifier. "google" is the only supported provider today. Unknown values must be treated as inactive by clients. */
+            provider: string;
+            /**
+             * Format: uri
+             * @description The validated destination URL for the provider. Validated server-side against the provider allowlist and re-validated by the client.
+             */
+            url: string;
+        };
         /** @description Contains no organization id, location id, stand id, or subscription state. A caller who learned the tenant could write unlimited fabricated feedback into it. */
         CustomerReviewContext: {
             business: {
@@ -131,9 +141,10 @@ export interface components {
             location: {
                 name: string | null;
             };
+            destination: components["schemas"]["ReviewDestination"];
             /**
              * Format: uri
-             * @description Validated server-side against an allowlist of Google hosts, and re-validated by the client. A stand whose destination does not validate cannot serve the flow and returns review_link_inactive.
+             * @description Alias for destination.url when destination.provider is "google". Preserved so clients that predate the destination abstraction continue to work without modification. New clients should read destination instead.
              */
             googleReviewUrl: string;
             supportedLocales: components["schemas"]["Locale"][];

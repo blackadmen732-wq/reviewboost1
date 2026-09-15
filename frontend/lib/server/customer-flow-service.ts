@@ -25,7 +25,7 @@ import {
 } from "@/lib/server/crypto";
 import { tokenDigestKeyVersion } from "@/lib/server/env";
 import { ApiError, ERROR_CODE, rateLimited, reviewLinkInactive } from "@/lib/server/errors";
-import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
+import { destinationFromGoogleUrl } from "@/lib/server/destination";
 import { logger } from "@/lib/server/logger";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import {
@@ -314,11 +314,11 @@ export async function getContext(token: string, meta: RequestMeta): Promise<Cust
   const stand = await resolveStand(token, tokenHash, meta);
   if (!stand) throw reviewLinkInactive();
 
-  // The contract makes googleReviewUrl required and non-nullable, and the
-  // client re-validates it. A stand without a validated destination cannot
-  // produce a usable page, so it fails identically to an unknown token rather
-  // than serving a context the client will reject with no explanation.
-  if (!stand.google_review_url || !isValidGoogleReviewUrl(stand.google_review_url)) {
+  // A stand without a validated destination cannot open the door — it fails
+  // identically to an unknown token so callers cannot distinguish an unconfigured
+  // stand from a paused or retired one.
+  const destination = destinationFromGoogleUrl(stand.google_review_url);
+  if (!destination) {
     throw reviewLinkInactive();
   }
 
@@ -331,7 +331,11 @@ export async function getContext(token: string, meta: RequestMeta): Promise<Cust
   return {
     business: { name: stand.business_name, logoUrl: null },
     location: { name: stand.location_name },
-    googleReviewUrl: stand.google_review_url,
+    destination,
+    // Backward-compatibility alias: googleReviewUrl equals destination.url
+    // when destination.provider is "google". Clients that predate the
+    // destination abstraction continue to work without modification.
+    googleReviewUrl: destination.url,
     supportedLocales: [...SUPPORTED_LOCALES],
     defaultLocale,
   };

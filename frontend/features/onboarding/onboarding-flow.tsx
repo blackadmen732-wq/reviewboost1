@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
 import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
-import { isValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
+import { isValidatedGoogleReviewUrl } from "@/lib/security/destination";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -168,10 +168,10 @@ export function OnboardingFlow() {
 
         <div className="flex flex-col gap-2">
           <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
-            Your Google link
+            Where should customers review you?
           </h1>
           <p className="text-base text-muted">
-            This is where customers go to leave you a review.
+            This is where customers go after they tap a star.
           </p>
         </div>
 
@@ -211,8 +211,8 @@ export function OnboardingFlow() {
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}
-            placeholder="Paste your link here"
-            aria-label="Google review link"
+            placeholder="Paste your review link here"
+            aria-label="Review destination link"
             onChange={(event) => {
               setGoogleUrl(event.target.value);
               setError(null);
@@ -232,8 +232,8 @@ export function OnboardingFlow() {
 
           {trimmedUrl !== "" && !urlLooksRight ? (
             <InlineNotice kind="error">
-              That does not look like a Google link. It should start with
-              g.page or google.com.
+              That does not look like a review link. Paste the link from Google
+              Business Profile (it should start with g.page or google.com).
             </InlineNotice>
           ) : null}
 

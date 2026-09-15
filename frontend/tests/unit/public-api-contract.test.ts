@@ -151,10 +151,15 @@ describe("GET public context", () => {
     expect(Object.keys(body).sort()).toEqual([
       "business",
       "defaultLocale",
+      "destination",
       "googleReviewUrl",
       "location",
       "supportedLocales",
     ]);
+    expect(body["destination"]).toEqual({
+      provider: "google",
+      url: ACTIVE_STAND.google_review_url,
+    });
     expect(body["googleReviewUrl"]).toBe(ACTIVE_STAND.google_review_url);
     expect(body["business"]).toEqual({ name: "The Corner Cafe", logoUrl: null });
     expect(body["location"]).toEqual({ name: "High Street" });

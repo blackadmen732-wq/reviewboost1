@@ -56,14 +56,14 @@ export default async function SettingsPage() {
         <div>
           <EditableRow
             field="googleReviewUrl"
-            label="Google link"
+            label="Review link"
             value={location?.googleReviewUrl ?? null}
             type="url"
             placeholder="https://g.page/..."
-            help="Paste the link customers use to review you on Google. Leave it empty to remove it."
-            emptyText="Not set yet"
-            // The one field where absence is a real problem: without it a code
-            // cannot serve customers at all.
+            help="Paste the link customers use to review you online. Leave it empty to remove it."
+            emptyText="Not set — customers cannot be sent to a review site"
+            // Without a destination the door cannot open: a Tag cannot serve
+            // customers at all.
             warnWhenEmpty
           />
           <GoogleLinkHelp />

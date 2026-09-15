@@ -724,6 +724,8 @@ export interface OwnerCounts {
   activeStands: number;
   recentAverage: number | null;
   recentCount: number;
+  hasDestination: boolean;
+  /** @deprecated Use hasDestination. */
   hasGoogleLink: boolean;
 }
 
@@ -785,7 +787,8 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
         ? ratings.reduce((total, rating) => total + rating, 0) / ratings.length
         : null,
     recentCount: ratings.length,
-    hasGoogleLink: Boolean(location?.googleReviewUrl),
+    hasDestination: Boolean(location?.googleReviewUrl),
+    hasGoogleLink: Boolean(location?.googleReviewUrl), // backward-compat alias
   };
 });
 

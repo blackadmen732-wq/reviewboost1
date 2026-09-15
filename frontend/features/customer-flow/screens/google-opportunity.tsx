@@ -9,7 +9,10 @@ import type { CustomerMessages } from "@/lib/i18n/customer-messages";
 
 interface GoogleOpportunityProps {
   businessName: string;
-  googleReviewUrl: string;
+  /** The validated destination URL the customer will be sent to. */
+  destinationUrl: string;
+  /** @deprecated Use destinationUrl. */
+  googleReviewUrl?: string;
   messages: CustomerMessages;
   onGoogleAction: () => void;
   onContinue: () => void;
@@ -17,11 +20,16 @@ interface GoogleOpportunityProps {
 
 export function GoogleOpportunity({
   businessName,
+  destinationUrl,
   googleReviewUrl,
   messages,
   onGoogleAction,
   onContinue,
 }: GoogleOpportunityProps) {
+  // Prefer the explicit destinationUrl; fall back to legacy alias so callers
+  // that have not yet been updated continue to work.
+  const href = destinationUrl || googleReviewUrl || "";
+
   return (
     <section className="flow-screen" data-flow-screen="google-opportunity">
       <div className="success-mark" aria-hidden="true">
@@ -45,7 +53,7 @@ export function GoogleOpportunity({
                 buttonVariants({ variant: "primary", size: "lg" }),
                 "google-review-link",
               )}
-              href={googleReviewUrl}
+              href={href}
               target="_blank"
               rel="noopener noreferrer"
               onClick={onGoogleAction}

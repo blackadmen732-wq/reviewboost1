@@ -11,7 +11,8 @@ import {
 } from "@/lib/server/crypto";
 import { publicFrontendUrl, tokenDigestKeyVersion } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
-import { isValidGoogleReviewUrl, standUrl } from "@/lib/server/google-review-url";
+import { isValidGoogleReviewUrl } from "@/lib/server/destination";
+import { standUrl } from "@/lib/server/google-review-url";
 import { logger } from "@/lib/server/logger";
 
 /**
@@ -163,7 +164,8 @@ export async function getOnboardingState(context: AuthenticatedContext, requestI
     return {
       hasOrganization: false,
       hasLocation: false,
-      hasGoogleReviewUrl: false,
+      hasDestination: false,
+      hasGoogleReviewUrl: false, // backward-compat alias
       hasStand: false,
       isComplete: false,
       organization: null,
@@ -181,18 +183,19 @@ export async function getOnboardingState(context: AuthenticatedContext, requestI
   if (locationError) databaseFailure("onboarding_locations", locationError, requestId);
   if (standError) databaseFailure("onboarding_stands", standError, requestId);
 
-  const hasGoogle = (locations ?? []).some(
+  const hasDestination = (locations ?? []).some(
     (location) => typeof location.google_review_url === "string" && location.google_review_url !== "",
   );
 
   return {
     hasOrganization: true,
     hasLocation: (locations ?? []).length > 0,
-    hasGoogleReviewUrl: hasGoogle,
+    hasDestination,
+    hasGoogleReviewUrl: hasDestination, // backward-compat alias
     hasStand: (stands ?? []).length > 0,
-    // A stand cannot serve customers without a validated Google destination, so
+    // A stand cannot serve customers without a validated destination, so
     // that is what "complete" means here.
-    isComplete: (locations ?? []).length > 0 && hasGoogle && (stands ?? []).length > 0,
+    isComplete: (locations ?? []).length > 0 && hasDestination && (stands ?? []).length > 0,
     organization: { id: first.org_id, role: first.role },
   };
 }

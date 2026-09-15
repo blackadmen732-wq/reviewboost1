@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { requireOrganizationContext } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
-import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
+import { isValidGoogleReviewUrl } from "@/lib/server/destination";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
 import { parseOrThrow } from "@/lib/server/validation";
 

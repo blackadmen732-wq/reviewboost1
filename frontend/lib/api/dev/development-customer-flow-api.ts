@@ -96,6 +96,11 @@ export const developmentCustomerFlowApi: CustomerFlowApi = {
     return {
       business: { name: "Mario’s Pizza", logoUrl: null },
       location: { name: "Downtown" },
+      destination: {
+        provider: "google",
+        url: "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4",
+      },
+      // Alias for backward compatibility.
       googleReviewUrl:
         "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4",
       supportedLocales: ["en", "es", "ht"],
