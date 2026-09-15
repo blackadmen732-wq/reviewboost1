@@ -135,7 +135,6 @@ enabled = false
 public = true
 file_size_limit = "5MiB"
 allowed_mime_types = ["image/png", "image/jpeg", "image/webp"]
-objects_path = "./storage/customer-page"
 
 # Uncomment to configure local storage buckets
 # [storage.buckets.images]
