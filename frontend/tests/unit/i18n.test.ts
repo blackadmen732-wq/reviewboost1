@@ -11,7 +11,7 @@ describe("customer translations", () => {
 
   it("preserves business names and Unicode in interpolated copy", () => {
     const business = "Café Zoë & Frères";
-    expect(customerMessages.es.googleTrust(business)).toContain(business);
+    expect(customerMessages.es.businessLogoAlt(business)).toContain(business);
     expect(customerMessages.ht.feedbackSent(business)).toContain(business);
   });
 });

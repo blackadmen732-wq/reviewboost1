@@ -7,7 +7,7 @@ import {
 import { isLocale } from "@/lib/i18n/config";
 import type { RatingValue } from "@/lib/i18n/customer-messages";
 
-const storageVersion = 1;
+const storageVersion = 2;
 
 interface StoredCustomerDraft extends CustomerFlowState {
   version: typeof storageVersion;
@@ -26,7 +26,7 @@ function isRating(value: unknown): value is RatingValue | null {
 }
 
 function isScreen(value: unknown): value is CustomerScreen {
-  return value === "rating" || value === "google" || value === "finished";
+  return value === "rating" || value === "handoff";
 }
 
 function isStatus(value: unknown): value is SubmissionStatus {
@@ -44,15 +44,15 @@ function parseStoredDraft(value: string): CustomerFlowState | null {
       !isStringOrNull(draft.responseId) ||
       !isStringOrNull(draft.sessionKey) ||
       !isStringOrNull(draft.responseKey) ||
-      !isStringOrNull(draft.googleClickKey) ||
-      typeof draft.googleClickPending !== "boolean" ||
+      !isStringOrNull(draft.destinationKey) ||
+      typeof draft.destinationPending !== "boolean" ||
       !isStatus(draft.feedbackStatus) ||
       !isLocale(draft.locale)
     ) {
       return null;
     }
 
-    if (draft.screen === "google" && (!draft.sessionId || !draft.responseId)) {
+    if (draft.screen === "handoff" && (!draft.sessionId || !draft.responseId)) {
       return null;
     }
 
@@ -63,8 +63,8 @@ function parseStoredDraft(value: string): CustomerFlowState | null {
       responseId: draft.responseId,
       sessionKey: draft.sessionKey,
       responseKey: draft.responseKey,
-      googleClickKey: draft.googleClickKey,
-      googleClickPending: draft.googleClickPending,
+      destinationKey: draft.destinationKey,
+      destinationPending: draft.destinationPending,
       feedbackStatus: draft.feedbackStatus === "submitting" ? "error" : draft.feedbackStatus,
       locale: draft.locale,
     };
@@ -83,13 +83,16 @@ export function loadCustomerDraft(token: string): CustomerFlowState | null {
   }
 }
 
+/**
+ * The handoff state is kept deliberately.
+ *
+ * A customer who taps back from the public review page must land on "your
+ * rating was saved", not on a fresh rating form they could submit a second
+ * time. Keeping the state is what makes the back button harmless.
+ */
 export function saveCustomerDraft(token: string, state: CustomerFlowState): void {
   if (typeof window === "undefined") return;
   try {
-    if (state.screen === "finished") {
-      window.sessionStorage.removeItem(storageKey(token));
-      return;
-    }
     const draft: StoredCustomerDraft = { version: storageVersion, ...state };
     window.sessionStorage.setItem(storageKey(token), JSON.stringify(draft));
   } catch {

@@ -1,7 +1,16 @@
 import type { Locale } from "@/lib/i18n/config";
 import type { RatingValue } from "@/lib/i18n/customer-messages";
 
-export type CustomerScreen = "rating" | "google" | "finished";
+/**
+ * V1 customer contract: one tap.
+ *
+ * `rating` is the only screen a customer is ever asked to act on. Tapping a
+ * star submits immediately and hands off to the business's public review
+ * destination. `handoff` is not a step — it is what the page shows while the
+ * browser is already navigating away, and what a customer returning with the
+ * back button lands on instead of an empty form they could rate twice.
+ */
+export type CustomerScreen = "rating" | "handoff";
 export type SubmissionStatus = "idle" | "submitting" | "error" | "offline";
 
 export interface CustomerFlowState {
@@ -11,8 +20,8 @@ export interface CustomerFlowState {
   responseId: string | null;
   sessionKey: string | null;
   responseKey: string | null;
-  googleClickKey: string | null;
-  googleClickPending: boolean;
+  destinationKey: string | null;
+  destinationPending: boolean;
   feedbackStatus: SubmissionStatus;
   locale: Locale;
 }
@@ -24,8 +33,8 @@ export const initialCustomerFlowState: CustomerFlowState = {
   responseId: null,
   sessionKey: null,
   responseKey: null,
-  googleClickKey: null,
-  googleClickPending: false,
+  destinationKey: null,
+  destinationPending: false,
   feedbackStatus: "idle",
   locale: "en",
 };
@@ -38,10 +47,13 @@ export type CustomerFlowAction =
   | { type: "session-ready"; sessionId: string }
   | { type: "feedback-offline" }
   | { type: "feedback-failed" }
-  | { type: "feedback-succeeded"; sessionId: string; responseId: string }
-  | { type: "google-click-started"; idempotencyKey: string }
-  | { type: "google-click-recorded" }
-  | { type: "finish" };
+  | {
+      type: "feedback-succeeded";
+      sessionId: string;
+      responseId: string;
+      destinationKey: string;
+    }
+  | { type: "destination-recorded" };
 
 export function customerFlowReducer(
   state: CustomerFlowState,
@@ -73,28 +85,20 @@ export function customerFlowReducer(
     case "feedback-failed":
       return { ...state, feedbackStatus: "error" };
     case "feedback-succeeded":
+      // `rating` is cleared here, not kept. Nothing after the rating is stored
+      // may vary with its value, and the cheapest way to keep that true is for
+      // the value not to exist on this side of the transition.
       return {
         ...state,
-        screen: "google",
+        screen: "handoff",
         rating: null,
         sessionId: action.sessionId,
         responseId: action.responseId,
+        destinationKey: action.destinationKey,
+        destinationPending: true,
         feedbackStatus: "idle",
       };
-    case "google-click-started":
-      return {
-        ...state,
-        screen: "finished",
-        googleClickKey: action.idempotencyKey,
-        googleClickPending: true,
-      };
-    case "google-click-recorded":
-      return { ...state, googleClickPending: false };
-    case "finish":
-      return {
-        ...initialCustomerFlowState,
-        screen: "finished",
-        locale: state.locale,
-      };
+    case "destination-recorded":
+      return { ...state, destinationPending: false };
   }
 }

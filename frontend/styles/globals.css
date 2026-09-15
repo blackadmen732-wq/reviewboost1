@@ -150,52 +150,59 @@
   --rb-focus-soft: rgb(0 168 107 / 34%);
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-html {
-  min-width: 320px;
-  background: var(--rb-canvas);
-  font-family:
-    var(--font-geist-sans),
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  scroll-padding-block-end: 120px;
-}
-body {
-  min-height: 100vh;
-  min-height: 100dvh;
-  margin: 0;
-  background: var(--rb-canvas);
-  color: var(--rb-ink);
-}
-button,
-input,
-select,
-textarea {
-  color: inherit;
-  font: inherit;
-}
-button,
-a,
-select {
-  -webkit-tap-highlight-color: transparent;
-}
-a {
-  color: inherit;
-}
-::selection {
-  background: var(--rb-brand-soft);
-  color: var(--rb-ink);
+/* These are resets, so they belong in Tailwind's base layer.
+   Unlayered rules beat every layered one, so leaving `a`/`button { color:
+   inherit }` outside a layer silently defeated `text-on-brand` on every
+   primary button — invisible in light mode, where the inherited ink is dark
+   anyway, and a 2.8:1 contrast failure in dark mode. */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+  html {
+    min-width: 320px;
+    background: var(--rb-canvas);
+    font-family:
+      var(--font-geist-sans),
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-padding-block-end: 120px;
+  }
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    margin: 0;
+    background: var(--rb-canvas);
+    color: var(--rb-ink);
+  }
+  button,
+  input,
+  select,
+  textarea {
+    color: inherit;
+    font: inherit;
+  }
+  button,
+  a,
+  select {
+    -webkit-tap-highlight-color: transparent;
+  }
+  a {
+    color: inherit;
+  }
+  ::selection {
+    background: var(--rb-brand-soft);
+    color: var(--rb-ink);
+  }
 }
 .sr-only {
   position: absolute;

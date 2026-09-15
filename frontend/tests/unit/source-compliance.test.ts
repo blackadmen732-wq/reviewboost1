@@ -8,11 +8,20 @@ function source(path: string): string {
 }
 
 describe("review-integrity source boundaries", () => {
-  it("makes the Google opportunity structurally rating-blind", () => {
-    const googleSource = source(
-      "features/customer-flow/screens/google-opportunity.tsx",
+  it("makes the destination handoff structurally rating-blind", () => {
+    const handoffSource = source(
+      "features/customer-flow/screens/handoff-screen.tsx",
     );
-    expect(googleSource).not.toMatch(/rating|reviewThreshold/i);
+    expect(handoffSource.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(
+      /rating|reviewThreshold/i,
+    );
+  });
+
+  it("keeps the customer path free of a screen between the star and the destination", () => {
+    const flowSource = source("features/customer-flow/customer-flow.tsx");
+    const screens = source("features/customer-flow/customer-flow-state.ts");
+    expect(screens).toMatch(/export type CustomerScreen = "rating" \| "handoff";/);
+    expect(flowSource).not.toMatch(/GoogleOpportunity|FinishedScreen|onContinue/);
   });
 
   it("never references the legacy gating DTO or endpoints", () => {

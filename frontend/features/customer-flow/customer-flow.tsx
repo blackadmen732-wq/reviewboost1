@@ -19,14 +19,13 @@ import {
   customerFlowReducer,
   type CustomerFlowState,
 } from "@/features/customer-flow/customer-flow-state";
+import { navigateToDestination } from "@/features/customer-flow/destination-handoff";
 import {
-  clearCustomerDraft,
   loadCustomerDraft,
   safeInitialCustomerState,
   saveCustomerDraft,
 } from "@/features/customer-flow/recovery-storage";
-import { FinishedScreen } from "@/features/customer-flow/screens/finished-screen";
-import { GoogleOpportunity } from "@/features/customer-flow/screens/google-opportunity";
+import { HandoffScreen } from "@/features/customer-flow/screens/handoff-screen";
 import { RatingScreen } from "@/features/customer-flow/screens/rating-screen";
 import {
   getCustomerFlowApi,
@@ -72,6 +71,19 @@ function normalizedContextLocales(locales: readonly string[]): Locale[] {
   return supported.length ? supported : ["en"];
 }
 
+/**
+ * THE V1 CUSTOMER CONTRACT
+ * ------------------------
+ * Scan or tap → choose a star → the rating is saved → the public review
+ * destination opens. That is the whole flow, and it is the same flow for a one
+ * and for a five: the destination comes from `getContext`, which runs before a
+ * rating exists and is never re-fetched with one, so it is structurally unable
+ * to vary by rating.
+ *
+ * There is no note, no Team Praise, no optional destination screen, and no
+ * confirm button. Anything added between the star and the destination is a
+ * change to the product, not a change to this component.
+ */
 export function CustomerFlow({ token }: CustomerFlowProps) {
   const [state, dispatch] = useReducer(
     customerFlowReducer,
@@ -82,7 +94,8 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   const hadRecoveredDraft = useRef(false);
   const localeChosen = useRef(false);
   const feedbackInFlight = useRef(false);
-  const googleClickInFlight = useRef(false);
+  const destinationInFlight = useRef(false);
+  const handoffPending = useRef(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const messages = customerMessages[state.locale];
@@ -104,6 +117,8 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     retry: (failureCount, error) =>
       !isUnavailableReviewLink(error) && failureCount < 1,
   });
+
+  const destinationUrl = contextQuery.data?.googleReviewUrl ?? null;
 
   useEffect(() => {
     const animationFrame = window.requestAnimationFrame(() => {
@@ -184,115 +199,140 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     },
   });
 
-  const submitFeedback = useCallback(async () => {
-    if (!state.rating || feedbackInFlight.current) return;
-
-    const sessionKey = state.sessionKey ?? createIdempotencyKey("session");
-    const responseKey = state.responseKey ?? createIdempotencyKey("response");
-    dispatch({ type: "feedback-started", sessionKey, responseKey });
-
-    if (!navigator.onLine) {
-      dispatch({ type: "feedback-offline" });
-      return;
-    }
-
-    feedbackInFlight.current = true;
-    try {
-      const result = await feedbackMutation.mutateAsync({
-        rating: state.rating,
-        locale: state.locale,
-        sessionId: state.sessionId,
-        sessionKey,
-        responseKey,
-      });
-      dispatch({
-        type: "feedback-succeeded",
-        sessionId: result.sessionId,
-        responseId: result.responseId,
-      });
-    } catch (error) {
-      dispatch({
-        type: isOfflineError(error) ? "feedback-offline" : "feedback-failed",
-      });
-    } finally {
-      feedbackInFlight.current = false;
-    }
-  }, [
-    feedbackMutation,
-    state.locale,
-    state.rating,
-    state.responseKey,
-    state.sessionId,
-    state.sessionKey,
-  ]);
-
-  const recordGoogleClick = useCallback(
+  /**
+   * Record that the customer was handed to the public review destination.
+   *
+   * That is the entire claim: ReviewBoost cannot observe whether a review was
+   * written. It never blocks the handoff — a tracking failure must not stand
+   * between a customer and the review page — so failures are swallowed and the
+   * pending key is retried if the tab is still open when connectivity returns.
+   */
+  const recordDestination = useCallback(
     async (
       api: CustomerFlowApi,
       idempotencyKey: string,
-      snapshot: CustomerFlowState,
+      sessionId: string,
+      responseId: string,
     ) => {
-      if (
-        !snapshot.sessionId ||
-        !snapshot.responseId ||
-        googleClickInFlight.current
-      )
-        return;
-      googleClickInFlight.current = true;
+      if (destinationInFlight.current) return;
+      destinationInFlight.current = true;
       try {
         await api.recordGoogleClick(
           token,
-          { sessionId: snapshot.sessionId, responseId: snapshot.responseId },
+          { sessionId, responseId },
           { idempotencyKey },
         );
-        dispatch({ type: "google-click-recorded" });
+        dispatch({ type: "destination-recorded" });
       } catch {
-        // Tracking must never block or change the public Google opportunity.
-        // The pending key remains in same-tab recovery and retries on reconnect.
+        // Deliberately silent. See above.
       } finally {
-        googleClickInFlight.current = false;
+        destinationInFlight.current = false;
       }
     },
     [token],
   );
 
-  const handleGoogleAction = useCallback(() => {
-    if (!state.sessionId || !state.responseId) return;
-    const idempotencyKey =
-      state.googleClickKey ?? createIdempotencyKey("google-click");
-    dispatch({ type: "google-click-started", idempotencyKey });
-    void getCustomerFlowApi().then((api) =>
-      recordGoogleClick(api, idempotencyKey, state),
-    );
-  }, [recordGoogleClick, state]);
+  const submitFeedback = useCallback(
+    async (rating: RatingValue, previous: CustomerFlowState) => {
+      if (feedbackInFlight.current) return;
+
+      const sessionKey = previous.sessionKey ?? createIdempotencyKey("session");
+      const responseKey = previous.responseKey ?? createIdempotencyKey("response");
+      dispatch({ type: "feedback-started", sessionKey, responseKey });
+
+      if (!navigator.onLine) {
+        dispatch({ type: "feedback-offline" });
+        return;
+      }
+
+      feedbackInFlight.current = true;
+      try {
+        const result = await feedbackMutation.mutateAsync({
+          rating,
+          locale: previous.locale,
+          sessionId: previous.sessionId,
+          sessionKey,
+          responseKey,
+        });
+        const destinationKey =
+          previous.destinationKey ?? createIdempotencyKey("destination");
+        dispatch({
+          type: "feedback-succeeded",
+          sessionId: result.sessionId,
+          responseId: result.responseId,
+          destinationKey,
+        });
+
+        // Start the tracking write and leave. Awaiting it would put a customer
+        // behind a database round trip for a number nobody is waiting on. The
+        // navigation itself is left to the effect below, so the handoff has
+        // rendered before the browser starts leaving — a customer whose
+        // browser refuses the navigation is still looking at a finished page
+        // with a working link, not at a rating form.
+        void getCustomerFlowApi().then((api) =>
+          recordDestination(
+            api,
+            destinationKey,
+            result.sessionId,
+            result.responseId,
+          ),
+        );
+        handoffPending.current = true;
+      } catch (error) {
+        dispatch({
+          type: isOfflineError(error) ? "feedback-offline" : "feedback-failed",
+        });
+      } finally {
+        feedbackInFlight.current = false;
+      }
+    },
+    [feedbackMutation, recordDestination],
+  );
+
+  // Only a submit that just succeeded arms this. A handoff state recovered
+  // from storage — a customer who pressed back — renders the same screen and
+  // stays put, so the back button can never bounce anyone out again.
+  useEffect(() => {
+    if (state.screen !== "handoff" || !handoffPending.current || !destinationUrl) {
+      return;
+    }
+    handoffPending.current = false;
+    navigateToDestination(destinationUrl);
+  }, [destinationUrl, state.screen]);
+
+  const handleRate = useCallback(
+    (rating: RatingValue) => {
+      dispatch({ type: "select-rating", rating });
+      void submitFeedback(rating, { ...state, responseKey: null });
+    },
+    [state, submitFeedback],
+  );
+
+  const handleRetry = useCallback(() => {
+    if (state.rating) void submitFeedback(state.rating, state);
+  }, [state, submitFeedback]);
 
   useEffect(() => {
     function retryWhenOnline() {
-      if (state.feedbackStatus === "offline") void submitFeedback();
-      if (state.googleClickPending && state.googleClickKey) {
+      if (state.feedbackStatus === "offline" && state.rating) {
+        void submitFeedback(state.rating, state);
+      }
+      if (
+        state.destinationPending &&
+        state.destinationKey &&
+        state.sessionId &&
+        state.responseId
+      ) {
+        const { destinationKey, sessionId, responseId } = state;
         void getCustomerFlowApi().then((api) =>
-          recordGoogleClick(api, state.googleClickKey as string, state),
+          recordDestination(api, destinationKey, sessionId, responseId),
         );
       }
     }
 
     window.addEventListener("online", retryWhenOnline);
     return () => window.removeEventListener("online", retryWhenOnline);
-  }, [recordGoogleClick, state, submitFeedback]);
-
-  useEffect(() => {
-    if (
-      recoveryReady &&
-      navigator.onLine &&
-      state.googleClickPending &&
-      state.googleClickKey &&
-      state.screen === "finished"
-    ) {
-      void getCustomerFlowApi().then((api) =>
-        recordGoogleClick(api, state.googleClickKey as string, state),
-      );
-    }
-  }, [recordGoogleClick, recoveryReady, state]);
+  }, [recordDestination, state, submitFeedback]);
 
   const changeLocale = useCallback((locale: Locale) => {
     localeChosen.current = true;
@@ -348,31 +388,19 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
           <m.div key={state.screen} {...motionProps}>
             {state.screen === "rating" ? (
               <RatingScreen
-                businessName={context.business.name}
                 messages={messages}
                 rating={state.rating}
                 status={state.feedbackStatus}
-                onRatingChange={(rating) =>
-                  dispatch({ type: "select-rating", rating })
-                }
-                onSubmit={() => void submitFeedback()}
+                onRate={handleRate}
+                onRetry={handleRetry}
               />
-            ) : null}
-            {state.screen === "google" ? (
-              <GoogleOpportunity
+            ) : (
+              <HandoffScreen
                 businessName={context.business.name}
-                googleReviewUrl={context.googleReviewUrl}
+                destinationUrl={context.googleReviewUrl}
                 messages={messages}
-                onGoogleAction={handleGoogleAction}
-                onContinue={() => {
-                  dispatch({ type: "finish" });
-                  clearCustomerDraft(token);
-                }}
               />
-            ) : null}
-            {state.screen === "finished" ? (
-              <FinishedScreen messages={messages} />
-            ) : null}
+            )}
           </m.div>
         </LazyMotion>
       </div>

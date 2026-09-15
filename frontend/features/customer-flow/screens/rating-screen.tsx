@@ -1,7 +1,5 @@
 "use client";
 
-import type { FormEvent } from "react";
-
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { CustomerActionBar } from "@/features/customer-flow/customer-action-bar";
@@ -13,29 +11,30 @@ import type {
 } from "@/lib/i18n/customer-messages";
 
 interface RatingScreenProps {
-  businessName: string;
   messages: CustomerMessages;
   rating: RatingValue | null;
   status: SubmissionStatus;
-  onRatingChange: (rating: RatingValue) => void;
-  onSubmit: () => void;
+  onRate: (rating: RatingValue) => void;
+  onRetry: () => void;
 }
 
+/**
+ * One tap. Choosing a star submits it.
+ *
+ * There is no confirm step, because a confirm step is where a flow starts
+ * deciding things about the customer. The only buttons that can appear here
+ * are recovery from a failed submit — never a gate in front of one.
+ */
 export function RatingScreen({
   messages,
   rating,
   status,
-  onRatingChange,
-  onSubmit,
+  onRate,
+  onRetry,
 }: RatingScreenProps) {
   const isSubmitting = status === "submitting";
   const isOffline = status === "offline";
   const hasError = status === "error";
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (rating && !isSubmitting && !isOffline) onSubmit();
-  }
 
   return (
     <section className="flow-screen" data-flow-screen="rating">
@@ -46,46 +45,45 @@ export function RatingScreen({
         <p className="customer-support">{messages.ratingSupport}</p>
       </div>
 
-      <form className="customer-form" onSubmit={handleSubmit}>
-        <StarRating
-          value={rating}
-          onChange={onRatingChange}
-          messages={messages}
-          disabled={isSubmitting}
-        />
+      <StarRating
+        value={rating}
+        onChange={onRate}
+        messages={messages}
+        disabled={isSubmitting}
+      />
 
-        {rating ? (
-          <div className="rating-actions" data-rating-actions>
-            {hasError ? (
-              <InlineNotice
-                id="feedback-status"
-                kind="error"
-                title={messages.submitErrorHeading}
-                blocking
-              >
-                <p>{messages.submitErrorBody}</p>
-              </InlineNotice>
-            ) : null}
-            {isOffline ? (
-              <InlineNotice id="feedback-status" kind="offline">
-                <p>{messages.offline}</p>
-              </InlineNotice>
-            ) : null}
-
-            <CustomerActionBar>
-              <Button
-                type="submit"
-                size="lg"
-                loading={isSubmitting}
-                loadingLabel={messages.sending}
-                disabled={isOffline}
-              >
-                {hasError ? messages.tryAgain : messages.continue}
-              </Button>
-            </CustomerActionBar>
-          </div>
+      <div className="rating-actions" data-rating-actions>
+        {isSubmitting ? (
+          <p className="customer-support" role="status">
+            {messages.sending}
+          </p>
         ) : null}
-      </form>
+
+        {hasError ? (
+          <InlineNotice
+            id="feedback-status"
+            kind="error"
+            title={messages.submitErrorHeading}
+            blocking
+          >
+            <p>{messages.submitErrorBody}</p>
+          </InlineNotice>
+        ) : null}
+
+        {isOffline ? (
+          <InlineNotice id="feedback-status" kind="offline">
+            <p>{messages.offline}</p>
+          </InlineNotice>
+        ) : null}
+
+        {hasError ? (
+          <CustomerActionBar>
+            <Button type="button" size="lg" onClick={onRetry}>
+              {messages.tryAgain}
+            </Button>
+          </CustomerActionBar>
+        ) : null}
+      </div>
     </section>
   );
 }

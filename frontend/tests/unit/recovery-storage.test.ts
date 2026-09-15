@@ -34,12 +34,30 @@ describe("same-tab customer recovery", () => {
     expect(loadCustomerDraft("fixture-valid")?.feedbackStatus).toBe("error");
   });
 
-  it("rejects corrupt storage and clears completed data", () => {
+  it("rejects corrupt storage", () => {
     window.sessionStorage.setItem("reviewboost:customer-flow:fixture-valid", "{broken");
     expect(loadCustomerDraft("fixture-valid")).toBeNull();
+  });
 
-    saveCustomerDraft("fixture-valid", { ...initialCustomerFlowState, screen: "finished" });
+  it("rejects a handoff draft that carries no saved response", () => {
+    window.sessionStorage.setItem(
+      "reviewboost:customer-flow:fixture-valid",
+      JSON.stringify({ version: 2, ...initialCustomerFlowState, screen: "handoff" }),
+    );
     expect(loadCustomerDraft("fixture-valid")).toBeNull();
+  });
+
+  it("keeps the handoff state so the back button cannot produce a second rating", () => {
+    const handed = {
+      ...initialCustomerFlowState,
+      screen: "handoff" as const,
+      sessionId: "session-1",
+      responseId: "response-1",
+      destinationKey: "destination-key-123456",
+      destinationPending: false,
+    };
+    saveCustomerDraft("fixture-valid", handed);
+    expect(loadCustomerDraft("fixture-valid")).toEqual(handed);
   });
 
   it("can explicitly remove a private draft", () => {

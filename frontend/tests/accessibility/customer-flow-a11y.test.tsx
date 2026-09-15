@@ -4,8 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { CustomerBlockingState } from "@/features/customer-flow/customer-blocking-state";
 import { CustomerFrame } from "@/features/customer-flow/customer-frame";
-import { FinishedScreen } from "@/features/customer-flow/screens/finished-screen";
-import { GoogleOpportunity } from "@/features/customer-flow/screens/google-opportunity";
+import { HandoffScreen } from "@/features/customer-flow/screens/handoff-screen";
 import { RatingScreen } from "@/features/customer-flow/screens/rating-screen";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 
@@ -16,42 +15,46 @@ describe("customer flow accessibility", () => {
     const { container } = render(
       <CustomerFrame poweredBy={messages.poweredBy}>
         <RatingScreen
-          businessName="Mario's Pizza"
           messages={messages}
           rating={3}
           status="idle"
-          onRatingChange={vi.fn()}
-          onSubmit={vi.fn()}
+          onRate={vi.fn()}
+          onRetry={vi.fn()}
         />
       </CustomerFrame>,
     );
     expect((await axe(container)).violations).toEqual([]);
   });
 
-  it("has no Axe violations on the identical Google opportunity", async () => {
+  it("has no Axe violations on the recoverable error state", async () => {
     const { container } = render(
       <CustomerFrame poweredBy={messages.poweredBy}>
-        <GoogleOpportunity
-          businessName="Mario's Pizza"
-          googleReviewUrl="https://search.google.com/local/writereview?placeid=abc"
+        <RatingScreen
           messages={messages}
-          onGoogleAction={vi.fn()}
-          onContinue={vi.fn()}
+          rating={2}
+          status="error"
+          onRate={vi.fn()}
+          onRetry={vi.fn()}
         />
       </CustomerFrame>,
     );
     expect((await axe(container)).violations).toEqual([]);
   });
 
-  it("has no Axe violations on finished and blocking states", async () => {
-    const finished = render(
+  it("has no Axe violations on the identical handoff", async () => {
+    const { container } = render(
       <CustomerFrame poweredBy={messages.poweredBy}>
-        <FinishedScreen messages={messages} />
+        <HandoffScreen
+          businessName="Mario's Pizza"
+          destinationUrl="https://search.google.com/local/writereview?placeid=abc"
+          messages={messages}
+        />
       </CustomerFrame>,
     );
-    expect((await axe(finished.container)).violations).toEqual([]);
-    finished.unmount();
+    expect((await axe(container)).violations).toEqual([]);
+  });
 
+  it("has no Axe violations on blocking states", async () => {
     const unavailable = render(
       <CustomerBlockingState
         kind="unavailable"

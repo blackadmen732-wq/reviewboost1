@@ -13,7 +13,7 @@ describe("customer flow state", () => {
   });
 
   it.each([1, 2, 3, 4, 5] satisfies RatingValue[])(
-    "erases rating %s before the uniform Google screen",
+    "erases rating %s before the uniform handoff",
     (rating) => {
       let state = customerFlowReducer(initialCustomerFlowState, {
         type: "select-rating",
@@ -28,16 +28,41 @@ describe("customer flow state", () => {
         type: "feedback-succeeded",
         sessionId: "session-1",
         responseId: "response-1",
+        destinationKey: "destination-key-123456",
       });
 
       expect(state).toMatchObject({
-        screen: "google",
+        screen: "handoff",
         rating: null,
         sessionId: "session-1",
         responseId: "response-1",
+        destinationPending: true,
       });
     },
   );
+
+  it("reaches the handoff in one transition from the tap — there is no middle screen", () => {
+    const screens = new Set<string>();
+    let state = initialCustomerFlowState;
+
+    state = customerFlowReducer(state, { type: "select-rating", rating: 1 });
+    screens.add(state.screen);
+    state = customerFlowReducer(state, {
+      type: "feedback-started",
+      sessionKey: "session-key-123456",
+      responseKey: "response-key-123456",
+    });
+    screens.add(state.screen);
+    state = customerFlowReducer(state, {
+      type: "feedback-succeeded",
+      sessionId: "session-1",
+      responseId: "response-1",
+      destinationKey: "destination-key-123456",
+    });
+    screens.add(state.screen);
+
+    expect([...screens]).toEqual(["rating", "handoff"]);
+  });
 
   it("keeps a stable attempt key through recoverable errors", () => {
     const started = customerFlowReducer(initialCustomerFlowState, {
@@ -74,22 +99,24 @@ describe("customer flow state", () => {
     expect(ratingChanged.sessionKey).toBe("session-key-123456");
   });
 
-  it("clears all private drafts on finish", () => {
-    const completed = customerFlowReducer(
+  it("settles the destination record without disturbing the saved rating", () => {
+    const handed = customerFlowReducer(
       {
         ...initialCustomerFlowState,
-        screen: "google",
+        screen: "handoff",
         sessionId: "session-1",
         responseId: "response-1",
+        destinationKey: "destination-key-123456",
+        destinationPending: true,
       },
-      { type: "finish" },
+      { type: "destination-recorded" },
     );
 
-    expect(completed).toMatchObject({
-      screen: "finished",
-      rating: null,
-      sessionId: null,
-      responseId: null,
+    expect(handed).toMatchObject({
+      screen: "handoff",
+      destinationPending: false,
+      sessionId: "session-1",
+      responseId: "response-1",
     });
   });
 });
