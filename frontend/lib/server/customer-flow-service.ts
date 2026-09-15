@@ -224,6 +224,8 @@ interface ResolvedStand {
   destination_url: string | null;
   /** Compatibility storage. Read only as a fallback; never written from here. */
   google_review_url: string | null;
+  /** The business's *published* Customer Page. A draft never arrives here. */
+  customer_page: unknown;
   default_locale: string | null;
   matched_key_version: number;
 }
@@ -320,9 +322,12 @@ export async function getContext(token: string, meta: RequestMeta): Promise<Cust
       ? (locale as SupportedLocale)
       : DEFAULT_LOCALE;
 
+  const page = publishedPage(stand.customer_page);
+
   return {
-    business: { name: stand.business_name, logoUrl: null },
+    business: { name: stand.business_name, logoUrl: page?.logoUrl ?? null },
     location: { name: stand.location_name },
+    page,
     destination,
     // Compatibility alias of destination.url while clients migrate. It is the
     // same value, never a second source of truth.
@@ -483,6 +488,35 @@ export async function recordDestinationSelection(
   }
 
   throwForOutcome(result.outcome);
+}
+
+/**
+ * Narrow the published page snapshot to the fields the contract publishes.
+ *
+ * The snapshot is validated on the way in, but it is JSON in a column, so it
+ * is treated as untrusted on the way out too: an unknown template or a
+ * non-string tagline degrades to the plain default rather than reaching a
+ * customer's browser. A business with no page is not an error — it still has
+ * customers and must still be able to take a rating.
+ */
+function publishedPage(value: unknown): CustomerReviewContext["page"] {
+  if (value === null || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+
+  const templateId = raw["templateId"];
+  const tagline = raw["tagline"];
+  const logoUrl = raw["logoUrl"];
+  const heroUrl = raw["heroUrl"];
+
+  return {
+    templateId:
+      templateId === "classic" || templateId === "bold" || templateId === "minimal"
+        ? templateId
+        : "classic",
+    tagline: typeof tagline === "string" && tagline.length <= 120 ? tagline : null,
+    logoUrl: typeof logoUrl === "string" && logoUrl.startsWith("https://") ? logoUrl : null,
+    heroUrl: typeof heroUrl === "string" && heroUrl.startsWith("https://") ? heroUrl : null,
+  };
 }
 
 /**

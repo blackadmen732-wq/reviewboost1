@@ -47,6 +47,7 @@ const ACTIVE_STAND = {
   destination_provider: "google",
   destination_url: "https://g.page/r/CdSAMPLE/review",
   google_review_url: "https://g.page/r/CdSAMPLE/review",
+  customer_page: { templateId: "bold", tagline: "Thanks for visiting", logoUrl: null, heroUrl: null },
   default_locale: "en",
   matched_key_version: 1,
 };
@@ -146,8 +147,15 @@ describe("GET public context", () => {
       "destination",
       "googleReviewUrl",
       "location",
+      "page",
       "supportedLocales",
     ]);
+    expect(body["page"]).toEqual({
+      templateId: "bold",
+      tagline: "Thanks for visiting",
+      logoUrl: null,
+      heroUrl: null,
+    });
     expect(body["destination"]).toEqual({
       provider: "google",
       url: ACTIVE_STAND.destination_url,
@@ -157,6 +165,37 @@ describe("GET public context", () => {
     expect(body["business"]).toEqual({ name: "The Corner Cafe", logoUrl: null });
     expect(body["location"]).toEqual({ name: "High Street" });
     expect(body["supportedLocales"]).toEqual(["en", "es", "ht"]);
+  });
+
+  it("treats the stored page snapshot as untrusted on the way out", async () => {
+    // It is validated on the way in, but it is JSON in a column: a row edited
+    // by hand, or written by an older version, must degrade to the plain
+    // default rather than reach a customer's browser.
+    rpcHandler = (fn) =>
+      fn === "rpc_public_resolve_stand"
+        ? {
+            data: [
+              {
+                ...ACTIVE_STAND,
+                customer_page: {
+                  templateId: "casino",
+                  tagline: 42,
+                  logoUrl: "javascript:alert(1)",
+                  heroUrl: "http://insecure.example/hero.png",
+                },
+              },
+            ],
+            error: null,
+          }
+        : happyPath(fn);
+
+    const body = (await (await getContext()).json()) as Record<string, unknown>;
+    expect(body["page"]).toEqual({
+      templateId: "classic",
+      tagline: null,
+      logoUrl: null,
+      heroUrl: null,
+    });
   });
 
   it("never leaks a tenant, location, or stand identifier", async () => {

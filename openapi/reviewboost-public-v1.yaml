@@ -345,7 +345,7 @@ components:
     CustomerReviewContext:
       type: object
       additionalProperties: false
-      required: [business, location, destination, googleReviewUrl, supportedLocales, defaultLocale]
+      required: [business, location, destination, page, googleReviewUrl, supportedLocales, defaultLocale]
       description: >-
         Contains no organization id, location id, stand id, or subscription
         state. A caller who learned the tenant could write unlimited fabricated
@@ -367,6 +367,21 @@ components:
           required: [name]
           properties:
             name: { type: [string, "null"], maxLength: 160 }
+        page:
+          type: [object, "null"]
+          additionalProperties: false
+          description: >-
+            The business's published Customer Page, or null if it has not
+            published one — in which case the flow renders its own plain
+            default. A draft is never returned here: only a published page
+            reaches a customer.
+          properties:
+            templateId:
+              type: string
+              enum: [classic, bold, minimal]
+            tagline: { type: [string, "null"], maxLength: 120 }
+            logoUrl: { type: [string, "null"], format: uri }
+            heroUrl: { type: [string, "null"], format: uri }
         destination:
           type: object
           additionalProperties: false

@@ -25,6 +25,7 @@ import {
   safeInitialCustomerState,
   saveCustomerDraft,
 } from "@/features/customer-flow/recovery-storage";
+import { CustomerPageBranding } from "@/features/customer-flow/customer-page-branding";
 import { HandoffScreen } from "@/features/customer-flow/screens/handoff-screen";
 import { RatingScreen } from "@/features/customer-flow/screens/rating-screen";
 import {
@@ -384,6 +385,12 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
         onLocaleChange={changeLocale}
       />
       <div ref={contentRef}>
+        {state.screen === "rating" ? (
+          <CustomerPageBranding
+            page={context.page}
+            businessName={context.business.name}
+          />
+        ) : null}
         <LazyMotion features={domAnimation} strict>
           <m.div key={state.screen} {...motionProps}>
             {state.screen === "rating" ? (

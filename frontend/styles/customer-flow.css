@@ -520,3 +520,47 @@
     border: 1px solid CanvasText;
   }
 }
+
+/* ---------------------------------------------------- customer page ------ */
+
+/* The business's published branding, above the stars. Three looks, one
+   renderer — the owner's preview and the public page are the same component,
+   so a template is a set of tokens rather than a second layout. */
+.customer-page-branding {
+  display: grid;
+  gap: 12px;
+  margin-block-end: 20px;
+}
+.customer-page-hero {
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  /* Reserved before the image loads, so the stars do not jump under a
+     thumb that is already moving towards them. */
+  aspect-ratio: 16 / 9;
+  background: var(--rb-quiet);
+}
+.customer-page-hero img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.customer-page-tagline {
+  margin: 0;
+  color: var(--rb-muted);
+  font-size: 1rem;
+  line-height: 1.45;
+  text-align: center;
+  text-wrap: balance;
+}
+.customer-page-branding[data-template="bold"] .customer-page-tagline {
+  color: var(--rb-ink);
+  font-size: 1.125rem;
+  font-weight: 650;
+}
+.customer-page-branding[data-template="minimal"] .customer-page-hero {
+  aspect-ratio: 21 / 9;
+}
+.customer-page-branding[data-template="minimal"] .customer-page-tagline {
+  font-size: 0.9375rem;
+}

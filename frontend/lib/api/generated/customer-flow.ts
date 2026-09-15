@@ -109,6 +109,16 @@ export interface components {
             location: {
                 name: string | null;
             };
+            /** @description The business's published Customer Page, or null if it has not published one — in which case the flow renders its own plain default. A draft is never returned here: only a published page reaches a customer. */
+            page: {
+                /** @enum {string} */
+                templateId?: "classic" | "bold" | "minimal";
+                tagline?: string | null;
+                /** Format: uri */
+                logoUrl?: string | null;
+                /** Format: uri */
+                heroUrl?: string | null;
+            } | null;
             /** @description Where this Tag's door leads. Server state, not something the Tag carries: an owner can change it and the next scan of the same QR or NFC chip arrives at the new destination. */
             destination: {
                 /**

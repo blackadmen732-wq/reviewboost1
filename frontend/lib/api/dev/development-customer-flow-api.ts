@@ -95,6 +95,15 @@ export const developmentCustomerFlowApi: CustomerFlowApi = {
     return {
       business: { name: "Mario’s Pizza", logoUrl: null },
       location: { name: "Downtown" },
+      page:
+        token === "fixture-no-page"
+          ? null
+          : {
+              templateId: "classic",
+              tagline: "Thanks for stopping by — it takes one tap.",
+              logoUrl: null,
+              heroUrl: null,
+            },
       destination: {
         provider: "google",
         url: "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4",
