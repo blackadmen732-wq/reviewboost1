@@ -17,10 +17,16 @@
 # reference: this shim can only prove the SQL is correct, never that Supabase's
 # own platform pieces agree with it.
 #
+# `test` assumes a freshly reset database, exactly as `supabase test db` does
+# after `supabase db reset`. Some suites assert over unscoped rows, so leftover
+# data from another run makes them fail for a reason that has nothing to do
+# with the code — which is why `upgrade` puts the database back when it is
+# done rather than leaving its fixtures behind.
+#
 # Usage:
 #   scripts/backend/local-postgres.sh start          # start a throwaway cluster
 #   scripts/backend/local-postgres.sh reset          # migrations from empty
-#   scripts/backend/local-postgres.sh test           # pgTAP suites
+#   scripts/backend/local-postgres.sh test           # pgTAP suites (fresh DB)
 #   scripts/backend/local-postgres.sh upgrade <base> # populated-upgrade proof
 #   scripts/backend/local-postgres.sh stop
 #
@@ -192,6 +198,12 @@ upgrade_proof() {
         return 1
     fi
     echo "ok    populated upgrade ($(echo "$output" | grep -cE '^ok [0-9]+') assertions)"
+
+    # Leave the cluster as every other command expects to find it. The proof's
+    # fixtures are realistic old data, and a suite that counts rows without
+    # scoping them would otherwise fail on the next run for no real reason.
+    echo "Restoring a fresh database..."
+    reset_db >/dev/null
 }
 
 run_tests() {
