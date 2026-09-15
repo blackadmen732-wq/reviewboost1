@@ -68,7 +68,7 @@ comment on function app.entitlement_effective_status(text, timestamptz) is
 -- ones. Done before the constraint so the constraint can be trusted.
 update public.entitlement_snapshots
    set trial_ends_at = now() + interval '7 days',
-       source = 'pre_billing_trial_given_an_end',
+       source = 'backfill:trial_end_added',
        updated_at = now()
  where status = 'trialing'
    and trial_ends_at is null;
