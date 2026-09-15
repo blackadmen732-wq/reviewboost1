@@ -327,10 +327,27 @@ CI's is (TCP, md5 auth) and running the harness against it, rather than
 reasoning about whether it would work. Every mode is now verified in both
 configurations.
 
-And `scripts/db/**` was not in this workflow's path filter, so the change
-that fixed the harness did not re-run the job that uses it. Added to both
-the push and pull_request filters: a CI-critical file that does not
-trigger its own job is a test that reports success by not running.
+4. `scripts/db/**` was not in this workflow's path filter, so the change
+   that fixed the harness did not re-run the job that uses it. Added to
+   both filters: a CI-critical file that does not trigger its own job is a
+   test that reports success by not running.
+5. `20260813000100_security_hardening.sql` guarded `create extension
+   pg_cron` on availability alone. pg_cron can only be created in the
+   database named by `cron.database_name` (`postgres` on Supabase) and
+   aborts anywhere else, so the chain could not be applied to a scratch
+   database at all -- which is precisely what an upgrade test must do.
+   The guard now also compares `current_database()`.
+
+That last one required editing a migration that has already been applied,
+against this project's forward-only rule. It is the narrow case where
+that does not diverge anything: where the extension is created today,
+`current_database()` *is* `cron.database_name`, so the outcome is
+identical, and the only behaviour that changes is in databases where the
+file previously failed outright -- which have no state to diverge from.
+
+Reproduced and verified by installing pg_cron locally, so the guard was
+exercised on a server that actually has it rather than one where the
+first clause short-circuits.
 
 ## What this branch does not claim
 

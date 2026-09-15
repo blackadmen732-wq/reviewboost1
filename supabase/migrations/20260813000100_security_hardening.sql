@@ -285,11 +285,33 @@ grant update (status, matched_staff_id, matched_by_user_id, matched_at, shared_a
 -- ============================================================
 -- 9. RATE-LIMIT CLEANUP VIA pg_cron (conditional)
 -- ============================================================
--- Only schedule if pg_cron is available (Supabase Pro plans).
+-- Only schedule if pg_cron is available (Supabase Pro plans) AND this is the
+-- database it can actually be created in.
+--
+-- pg_cron reads its job table from one database, named by `cron.database_name`
+-- (`postgres` on Supabase), and refuses to be created anywhere else. Testing
+-- availability alone was therefore not enough: in any other database on the
+-- same server the guard passed and `create extension` then aborted the whole
+-- migration. That is what stopped the chain being applied to a scratch
+-- database -- which is exactly what an upgrade test needs to do.
+--
+-- Editing a migration that has already been applied is against this project's
+-- forward-only rule, and this is the narrow case where it does not diverge
+-- anything: where the extension is created today, `current_database()` is
+-- `cron.database_name`, so the condition is true and the outcome is identical.
+-- The only behaviour that changes is in databases where this file currently
+-- fails outright, and a database the chain cannot be applied to at all has no
+-- state to diverge from.
+--
+-- `current_setting(..., true)` returns null rather than raising when pg_cron is
+-- not loaded at all, which is the case on a plain PostgreSQL.
 
 do $$
 begin
-    if exists (select 1 from pg_available_extensions where name = 'pg_cron') then
+    if exists (select 1 from pg_available_extensions where name = 'pg_cron')
+       and current_database() = coalesce(
+               current_setting('cron.database_name', true), 'postgres')
+    then
         create extension if not exists pg_cron;
 
         perform cron.schedule(
