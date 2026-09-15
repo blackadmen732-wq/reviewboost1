@@ -4,6 +4,7 @@ import { requireOrganizationContext, requireRole } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
 import { createStand, listStands } from "@/lib/server/owner-service";
+import { assertCanCreateTag } from "@/lib/server/tag-entitlements";
 
 /**
  * The owner's stands.
@@ -53,6 +54,10 @@ export async function POST(request: NextRequest): Promise<Response> {
         details: [{ field: "label", message: "Must be 100 characters or fewer." }],
       });
     }
+
+    // Fast owner-facing check. The database repeats this under a row lock in
+    // rpc_create_stand, which remains the authority for races and direct calls.
+    await assertCanCreateTag(context, context.orgId, requestId);
 
     const created = await createStand(context, context.orgId, locationId, trimmedLabel, requestId);
 
