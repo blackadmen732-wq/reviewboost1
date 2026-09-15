@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { json, preflight } from "@/lib/server/http";
+import { handle, json, preflight } from "@/lib/server/http";
 
 /**
  * POST /api/v1/public/q/{token}/team-praise — removed in V1.
@@ -17,9 +17,11 @@ export const dynamic = "force-dynamic";
 const ROUTE = "/api/v1/public/q/[token]/team-praise";
 
 export async function POST(request: NextRequest): Promise<Response> {
-  return json(request, crypto.randomUUID(), 410, {
-    error: { code: "gone", message: "Team Praise is not active in V1." },
-    requestId: crypto.randomUUID(),
+  return handle(request, ROUTE, async (requestId) => {
+    return json(request, requestId, 410, {
+      error: { code: "gone", message: "Team Praise is not active in V1." },
+      requestId,
+    });
   });
 }
 

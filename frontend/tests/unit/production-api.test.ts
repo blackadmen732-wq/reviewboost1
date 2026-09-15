@@ -20,7 +20,7 @@ describe("production customer API client", () => {
     await expect(
       productionCustomerFlowApi.submitResponse(
         "fixture-valid",
-        { sessionId: "session-1", rating: 3, note: "Unicode: José" },
+        { sessionId: "session-1", rating: 3 },
         { idempotencyKey: "response-key-123456789" },
       ),
     ).resolves.toEqual({ responseId: "response-1" });
@@ -32,7 +32,6 @@ describe("production customer API client", () => {
     await expect(request.clone().json()).resolves.toEqual({
       sessionId: "session-1",
       rating: 3,
-      note: "Unicode: José",
     });
   });
 

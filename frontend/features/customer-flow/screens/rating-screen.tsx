@@ -22,7 +22,6 @@ interface RatingScreenProps {
 }
 
 export function RatingScreen({
-  businessName: _businessName,
   messages,
   rating,
   status,

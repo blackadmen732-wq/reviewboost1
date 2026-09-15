@@ -433,7 +433,6 @@ describe("team praise tombstone", () => {
         body: { sessionId: SESSION_ID, responseId: RESPONSE_ID, firstName: "Sam" },
         headers: { "idempotency-key": key("team-praise") },
       }),
-      params(TOKEN),
     );
     expect(response.status).toBe(410);
     const body = (await response.json()) as { error: { code: string } };

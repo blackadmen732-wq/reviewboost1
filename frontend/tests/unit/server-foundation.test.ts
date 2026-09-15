@@ -255,45 +255,20 @@ describe("request schemas", () => {
     }
   });
 
-  it("bounds a note by characters", async () => {
+  it("rejects a note field — notes are not part of the V1 public contract", async () => {
     const { submitResponseSchema } = await import("@/lib/server/validation");
 
     const base = { sessionId: "a".repeat(43), rating: 3 };
-    expect(submitResponseSchema.safeParse({ ...base, note: "x".repeat(2000) }).success).toBe(true);
-    expect(submitResponseSchema.safeParse({ ...base, note: "x".repeat(2001) }).success).toBe(false);
+    expect(submitResponseSchema.safeParse({ ...base, note: "any text" }).success).toBe(false);
   });
 
-  it("accepts a full-length note in any script, emoji included", async () => {
-    const { submitResponseSchema, MAX_NOTE_LENGTH } = await import("@/lib/server/validation");
+  it("keeps the owner note byte ceiling consistent with the character limit", async () => {
+    const { MAX_NOTE_BYTES, MAX_NOTE_LENGTH } = await import("@/lib/server/validation");
 
-    const base = { sessionId: "a".repeat(43), rating: 3 };
-    // A 2,000-character Japanese note is 6,000 bytes and entirely legitimate.
-    // Setting the byte ceiling below that would reject real customers writing
-    // in their own language.
-    for (const filler of ["x", "é", "田", "🎉"]) {
-      const note = filler.repeat(Math.floor(MAX_NOTE_LENGTH / filler.length));
-      expect(submitResponseSchema.safeParse({ ...base, note }).success, filler).toBe(true);
-    }
-  });
-
-  it("keeps the byte ceiling consistent with the character limit", async () => {
-    const { MAX_NOTE_BYTES, MAX_NOTE_LENGTH, MAX_FIRST_NAME_BYTES, MAX_FIRST_NAME_LENGTH } =
-      await import("@/lib/server/validation");
-
-    // The worst case is 3 bytes per UTF-16 code unit, so the character limit is
-    // always the binding one today. This asserts the pair stays consistent if
-    // someone raises the character limit later.
+    // The worst case is 3 bytes per UTF-16 code unit. This asserts the pair stays
+    // consistent if someone raises the character limit later.
     expect(MAX_NOTE_BYTES).toBe(MAX_NOTE_LENGTH * 3);
-    expect(MAX_FIRST_NAME_BYTES).toBe(MAX_FIRST_NAME_LENGTH * 3);
     expect(Buffer.byteLength("田".repeat(MAX_NOTE_LENGTH), "utf8")).toBeLessThanOrEqual(MAX_NOTE_BYTES);
-  });
-
-  it("requires a first name on Team Praise", async () => {
-    const { teamPraiseSchema } = await import("@/lib/server/validation");
-
-    const base = { sessionId: "a".repeat(43), responseId: "b".repeat(43) };
-    expect(teamPraiseSchema.safeParse(base).success).toBe(false);
-    expect(teamPraiseSchema.safeParse({ ...base, firstName: "Sarah" }).success).toBe(true);
   });
 
   it("rejects an unsupported locale rather than guessing", async () => {

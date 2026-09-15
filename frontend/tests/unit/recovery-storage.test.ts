@@ -12,7 +12,6 @@ describe("same-tab customer recovery", () => {
     const draft = {
       ...initialCustomerFlowState,
       rating: 3 as const,
-      note: "Mwen te renmen sèvis la",
       sessionKey: "session-key-123456",
       responseKey: "response-key-123456",
       feedbackStatus: "error" as const,
@@ -44,7 +43,7 @@ describe("same-tab customer recovery", () => {
   });
 
   it("can explicitly remove a private draft", () => {
-    saveCustomerDraft("fixture-valid", { ...initialCustomerFlowState, note: "private" });
+    saveCustomerDraft("fixture-valid", { ...initialCustomerFlowState, rating: 3 });
     clearCustomerDraft("fixture-valid");
     expect(loadCustomerDraft("fixture-valid")).toBeNull();
   });

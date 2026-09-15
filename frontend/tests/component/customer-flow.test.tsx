@@ -1,4 +1,4 @@
-import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -40,7 +40,7 @@ describe("complete customer flow", () => {
         }),
       );
       expect(
-        await screen.findByRole("heading", { name: customerMessages.en.praiseHeading }),
+        await screen.findByRole("heading", { name: customerMessages.en.doneHeading }),
       ).toBeVisible();
       expect(screen.queryByText(customerMessages.en.ratingLabels[rating])).not.toBeInTheDocument();
       cleanup();
@@ -50,7 +50,7 @@ describe("complete customer flow", () => {
     expect(new Set(googleMarkup).size).toBe(1);
   });
 
-  it("submits Unicode Team Praise and reaches the quiet finished state", async () => {
+  it("reaches the quiet finished state after passing on Google review", async () => {
     const user = await openRating();
     const googleScreen = await reachGoogle(user, 4);
     await user.click(
@@ -58,9 +58,6 @@ describe("complete customer flow", () => {
         name: customerMessages.en.googleContinue,
       }),
     );
-    await user.type(screen.getByRole("textbox", { name: /their first name/i }), "Zoë");
-    await user.type(screen.getByRole("textbox", { name: /what did they do well/i }), "Très gentille");
-    await user.click(screen.getByRole("button", { name: customerMessages.en.sendThanks }));
 
     const doneHeading = await screen.findByRole("heading", {
       name: customerMessages.en.doneHeading,
@@ -82,16 +79,12 @@ describe("complete customer flow", () => {
     expect(responseCalls).toHaveLength(1);
   });
 
-  it("retains the rating, note, and idempotency key after a recoverable failure", async () => {
+  it("retains the rating and idempotency key after a recoverable failure", async () => {
     const user = await openRating("fixture-response-error");
     await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[2] }));
-    await user.type(screen.getByRole("textbox", { name: /want to add a note/i }), "Please keep this");
     await user.click(screen.getByRole("button", { name: customerMessages.en.continue }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Your feedback is still here");
-    expect(screen.getByRole("textbox", { name: /want to add a note/i })).toHaveValue(
-      "Please keep this",
-    );
     await user.click(screen.getByRole("button", { name: customerMessages.en.tryAgain }));
     await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
 
@@ -105,17 +98,17 @@ describe("complete customer flow", () => {
   it("retains the draft offline and retries when connectivity returns", async () => {
     const user = await openRating();
     await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[1] }));
-    await user.type(screen.getByRole("textbox", { name: /want to add a note/i }), "Still here");
     Object.defineProperty(window.navigator, "onLine", { configurable: true, value: false });
     await user.click(screen.getByRole("button", { name: customerMessages.en.continue }));
 
     expect(await screen.findByText(customerMessages.en.offline)).toBeVisible();
-    expect(screen.getByRole("textbox", { name: /want to add a note/i })).toHaveValue("Still here");
 
-    await act(async () => {
-      Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
-      window.dispatchEvent(new Event("online"));
-    });
+    await import("@testing-library/react").then(({ act }) =>
+      act(async () => {
+        Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
+        window.dispatchEvent(new Event("online"));
+      }),
+    );
     await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
   });
 
