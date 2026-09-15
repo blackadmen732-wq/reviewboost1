@@ -37,6 +37,11 @@ interface EditableRowProps {
   emptyText?: string;
   warnWhenEmpty?: boolean;
   type?: "text" | "url";
+  /**
+   * Sent alongside the edited field. A location-scoped change has to name its
+   * location: the API will not guess which place an owner meant.
+   */
+  context?: Record<string, string>;
 }
 
 export function EditableRow({
@@ -48,6 +53,7 @@ export function EditableRow({
   emptyText = "Not set yet",
   warnWhenEmpty = false,
   type = "text",
+  context,
 }: EditableRowProps) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -76,7 +82,7 @@ export function EditableRow({
         "content-type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ [field]: draft.trim() }),
+      body: JSON.stringify({ ...context, [field]: draft.trim() }),
     });
 
     setBusy(false);

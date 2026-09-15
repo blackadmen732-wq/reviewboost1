@@ -105,7 +105,7 @@ select col_has_check('public', 'customer_responses', 'rating', 'rating is constr
 -- Uniqueness the flow depends on.
 select col_is_unique('public', 'customer_responses', 'session_id',
     'one response per session');
-select col_is_unique('public', 'google_review_clicks', 'response_id',
+select col_is_unique('public', 'destination_selections', 'response_id',
     'one Google click per response');
 select col_is_unique('public', 'team_praise_records', 'response_id',
     'one praise record per response');
@@ -121,7 +121,7 @@ select results_eq(
         join pg_namespace n on n.oid = c.relnamespace
        where n.nspname = 'public'
          and c.relname in ('organizations','organization_members','locations','review_stands',
-                           'public_review_sessions','customer_responses','google_review_clicks',
+                           'public_review_sessions','customer_responses','destination_selections',
                            'team_praise_records','idempotency_records','audit_events','profiles')
          and c.relrowsecurity $$,
     $$ values (11) $$,

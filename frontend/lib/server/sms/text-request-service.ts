@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import type { OrganizationContext } from "@/lib/server/auth";
-import { KEY_VERSION, digestStandToken, encrypt } from "@/lib/server/crypto";
+import { KEY_VERSION, decrypt, digestStandToken, encrypt } from "@/lib/server/crypto";
 import { publicFrontendUrl } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { standUrl } from "@/lib/server/google-review-url";
@@ -14,6 +14,7 @@ import { estimateMessageCost } from "@/lib/server/sms/cost";
 import { reviewRequestDedupeKey } from "@/lib/server/sms/dedupe";
 import { normalizePhone, phoneHash, toStoredPhone } from "@/lib/server/sms/phone";
 import { nextAllowedSendTime } from "@/lib/server/sms/quiet-hours";
+import { uuidSchema } from "@/lib/server/validation";
 
 /**
  * Owner-facing Text Requests service.
@@ -23,10 +24,10 @@ import { nextAllowedSendTime } from "@/lib/server/sms/quiet-hours";
  * enforcement live in the database. All PII is normalised, hashed, and encrypted
  * here before any identifier reaches a query; the raw phone never leaves memory.
  *
- * The message body carries the stand's /q link. The caller supplies the stand's
- * opaque token (which they hold from QR/NFC provisioning); the token is verified
- * against the stored keyed digest so a caller cannot target another business's
- * stand, and only the *encrypted* rendered message is persisted.
+ * The message body carries the Tag's /q link. The caller names the Tag by id or
+ * by its opaque token; either way the lookup is scoped to the caller's own
+ * organization through RLS, so a Tag belonging to another business simply
+ * returns no row. Only the *encrypted* rendered message is persisted.
  */
 
 const DEFAULT_TEMPLATE = "How was your visit? Tap here to leave a review: {{link}}";
@@ -59,27 +60,59 @@ const templateSchema = z
   .max(480)
   .refine((v) => v.includes("{{link}}"), "Template must contain the {{link}} placeholder.");
 
-export const previewSchema = z.strictObject({
-  phone: z.string().min(3).max(40),
-  standToken: standTokenSchema,
-  messageTemplate: templateSchema.optional(),
-});
+/**
+ * A Tag is named by its id, or by its raw token.
+ *
+ * The owner UI only ever has the id: the raw token exists at creation and on a
+ * reprint, and is otherwise only a keyed digest in the database. Requiring the
+ * token here would have meant an owner could not send a Text Request for a Tag
+ * already stuck to their counter. The token form stays for callers that hold
+ * one; exactly one of the two is required.
+ */
+const standRefSchema = {
+  standId: uuidSchema("Choose which Tag the link should point at.").optional(),
+  standToken: standTokenSchema.optional(),
+};
 
-export const scheduleSchema = z.strictObject({
-  phone: z.string().min(3).max(40),
-  standToken: standTokenSchema,
-  messageTemplate: templateSchema.optional(),
-  // An explicit client idempotency key makes a deliberate retry exact.
-  idempotencyKey: z.string().min(8).max(200).optional(),
-  // Consent the owner is asserting at schedule time (an import, a point-of-sale
-  // capture). Without a prior opted_in, the send is suppressed at dispatch.
-  consent: z
-    .strictObject({
-      source: z.enum(["owner_import", "customer_flow", "api", "admin"]),
-      evidence: z.record(z.string(), z.unknown()).optional(),
-    })
-    .optional(),
-});
+function requireOneStandRef(
+  value: { standId?: string | undefined; standToken?: string | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  if (Boolean(value.standId) === Boolean(value.standToken)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["standId"],
+      message: "Name exactly one Tag, by id or by token.",
+    });
+  }
+}
+
+export const previewSchema = z
+  .strictObject({
+    phone: z.string().min(3).max(40),
+    ...standRefSchema,
+    messageTemplate: templateSchema.optional(),
+  })
+  .superRefine(requireOneStandRef);
+
+export const scheduleSchema = z
+  .strictObject({
+    phone: z.string().min(3).max(40),
+    ...standRefSchema,
+    messageTemplate: templateSchema.optional(),
+    // An explicit client idempotency key makes a deliberate retry exact.
+    idempotencyKey: z.string().min(8).max(200).optional(),
+    // Consent the owner is asserting at schedule time (an import, a
+    // point-of-sale capture). Without a prior opted_in, the send is suppressed
+    // at dispatch.
+    consent: z
+      .strictObject({
+        source: z.enum(["owner_import", "customer_flow", "api", "admin"]),
+        evidence: z.record(z.string(), z.unknown()).optional(),
+      })
+      .optional(),
+  })
+  .superRefine(requireOneStandRef);
 
 export type ScheduleInput = z.infer<typeof scheduleSchema>;
 export type PreviewInput = z.infer<typeof previewSchema>;
@@ -142,17 +175,40 @@ export function resolveTimezone(raw: string | null | undefined): string {
  * quiet hours are computed in the stand's local time, the closest proxy we have
  * for the recipient's.
  */
-export async function resolveStand(context: OrganizationContext, token: string): Promise<ResolvedStand> {
-  const { data, error } = await context.db
+export async function resolveStand(
+  context: OrganizationContext,
+  ref: { standId?: string | undefined; standToken?: string | undefined },
+): Promise<ResolvedStand> {
+  const query = context.db
     .from("review_stands")
-    .select("id, location_id")
+    .select("id, location_id, public_token_encrypted")
     .eq("org_id", context.orgId)
-    .eq("public_token_hash", digestStandToken(token))
-    .eq("status", "active")
-    .maybeSingle();
+    .eq("status", "active");
+
+  const { data, error } = await (ref.standToken
+    ? query.eq("public_token_hash", digestStandToken(ref.standToken))
+    : query.eq("id", ref.standId as string)
+  ).maybeSingle();
 
   if (error) throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
-  if (!data) throw new ApiError(404, ERROR_CODE.notFound, "That review stand was not found.");
+  if (!data) throw new ApiError(404, ERROR_CODE.notFound, "That Tag was not found.");
+
+  // When the caller named the Tag by id, the link is rebuilt from the stored
+  // encrypted token — the same material a reprint uses. A Tag whose ciphertext
+  // is missing cannot produce a link, and saying so is better than sending a
+  // customer a URL that resolves to nothing.
+  const token =
+    ref.standToken ??
+    decrypt((data.public_token_encrypted as string | null) ?? null) ??
+    null;
+
+  if (!token) {
+    throw new ApiError(
+      409,
+      ERROR_CODE.validationFailed,
+      "This Tag cannot be linked to. Rotate its token to make it usable again.",
+    );
+  }
 
   const locationId = data.location_id as string;
   const { data: loc, error: locError } = await context.db
@@ -190,7 +246,7 @@ export async function previewTextRequest(
   input: PreviewInput,
 ): Promise<PreviewResult> {
   const normalized = normalizePhone(input.phone, phoneOptions());
-  const stand = await resolveStand(context, input.standToken);
+  const stand = await resolveStand(context, input);
   const body = renderMessage(input.messageTemplate, stand.link);
   const cost = estimateMessageCost(body, getProviderRate());
 
@@ -221,7 +277,7 @@ export async function scheduleTextRequest(
 ): Promise<ScheduleResult> {
   const normalized = normalizePhone(input.phone, phoneOptions());
   const stored = toStoredPhone(normalized);
-  const stand = await resolveStand(context, input.standToken);
+  const stand = await resolveStand(context, input);
   const body = renderMessage(input.messageTemplate, stand.link);
   const cost = estimateMessageCost(body, getProviderRate());
 

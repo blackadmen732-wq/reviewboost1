@@ -69,8 +69,33 @@ export async function GET(request: NextRequest): Promise<Response> {
       throw new ApiError(400, ERROR_CODE.validationFailed, "limit must be between 1 and 100.");
     }
 
-    const items = await listTextRequests(context, limit);
-    return json(request, requestId, 200, { data: { items }, requestId });
+    // Balances come back with the list, from one place. The page has no
+    // business knowing that Starter includes 150 — it shows what the ledger
+    // says is left, by source, or it shows nothing.
+    const [items, balance] = await Promise.all([
+      listTextRequests(context, limit),
+      serviceRoleClient().rpc("rpc_sms_balance", { p_org_id: context.orgId }),
+    ]);
+
+    if (balance.error) {
+      throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
+    }
+
+    const row = Array.isArray(balance.data)
+      ? (balance.data[0] as { monthly: number; purchased: number; total: number } | undefined)
+      : undefined;
+
+    return json(request, requestId, 200, {
+      data: {
+        items,
+        balance: {
+          monthly: Number(row?.monthly ?? 0),
+          purchased: Number(row?.purchased ?? 0),
+          total: Number(row?.total ?? 0),
+        },
+      },
+      requestId,
+    });
   });
 }
 

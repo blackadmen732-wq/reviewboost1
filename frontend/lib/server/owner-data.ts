@@ -672,7 +672,21 @@ export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
 export interface OwnerLocation {
   locationId: string;
   name: string;
-  googleReviewUrl: string | null;
+  /**
+   * Where this location's Tags lead. Null means the door is closed: the Tags
+   * exist and resolve, but a customer reaching one sees a dead link.
+   */
+  destination: { provider: string; url: string } | null;
+}
+
+function locationDestination(row: {
+  destination_provider: unknown;
+  destination_url: unknown;
+}): OwnerLocation["destination"] {
+  const provider = row.destination_provider;
+  const url = row.destination_url;
+  if (typeof provider !== "string" || typeof url !== "string") return null;
+  return { provider, url };
 }
 
 export const getPrimaryLocation = cache(async (orgId: string): Promise<OwnerLocation | null> => {
@@ -680,7 +694,7 @@ export const getPrimaryLocation = cache(async (orgId: string): Promise<OwnerLoca
 
   const { data, error } = await supabase
     .from("locations")
-    .select("id, name, google_review_url")
+    .select("id, name, destination_provider, destination_url")
     .eq("org_id", orgId)
     .order("created_at", { ascending: true })
     .limit(1);
@@ -693,7 +707,7 @@ export const getPrimaryLocation = cache(async (orgId: string): Promise<OwnerLoca
   return {
     locationId: row.id as string,
     name: row.name as string,
-    googleReviewUrl: (row.google_review_url as string | null) ?? null,
+    destination: locationDestination(row),
   };
 });
 
@@ -702,7 +716,7 @@ export const listLocations = cache(async (orgId: string): Promise<OwnerLocation[
 
   const { data, error } = await supabase
     .from("locations")
-    .select("id, name, google_review_url")
+    .select("id, name, destination_provider, destination_url")
     .eq("org_id", orgId)
     .order("created_at", { ascending: true });
 
@@ -711,7 +725,7 @@ export const listLocations = cache(async (orgId: string): Promise<OwnerLocation[
   return (data ?? []).map((row) => ({
     locationId: row.id as string,
     name: row.name as string,
-    googleReviewUrl: (row.google_review_url as string | null) ?? null,
+    destination: locationDestination(row),
   }));
 });
 
@@ -785,7 +799,7 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
         ? ratings.reduce((total, rating) => total + rating, 0) / ratings.length
         : null,
     recentCount: ratings.length,
-    hasGoogleLink: Boolean(location?.googleReviewUrl),
+    hasGoogleLink: location?.destination != null,
   };
 });
 
@@ -848,7 +862,11 @@ export async function listVisits(
 
   const [clicksResult, stands] = await Promise.all([
     ids.length > 0
-      ? supabase.from("google_review_clicks").select("response_id").eq("org_id", orgId).in("response_id", ids)
+      ? supabase
+          .from("destination_selections")
+          .select("response_id")
+          .eq("org_id", orgId)
+          .in("response_id", ids)
       : Promise.resolve({ data: [] as Array<{ response_id: string }>, error: null }),
     listStands(orgId),
   ]);
@@ -897,7 +915,10 @@ export async function getVisitSummary(orgId: string): Promise<{
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
       .not("note_encrypted", "is", null),
-    supabase.from("google_review_clicks").select("id", { count: "exact", head: true }).eq("org_id", orgId),
+    supabase
+      .from("destination_selections")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId),
     supabase.rpc("rpc_praise_count", { p_org_id: orgId }),
   ]);
 
@@ -913,3 +934,118 @@ export async function getVisitSummary(orgId: string): Promise<{
     thankedStaff: (praiseResult.data as number | null) ?? 0,
   };
 }
+
+// ------------------------------------------------------- text requests -----
+
+export interface SmsBalance {
+  monthly: number;
+  purchased: number;
+  total: number;
+}
+
+/**
+ * What this business can actually send, by source.
+ *
+ * Read from the ledger, never from the plan. A page that renders a plan's
+ * included allowance is showing what a business was sold, not what it has
+ * left, and the two stop agreeing the moment the first message goes out.
+ */
+export const readSmsBalance = cache(async (orgId: string): Promise<SmsBalance> => {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.rpc("rpc_sms_balance", { p_org_id: orgId });
+
+  if (error) dataFailure("sms_balance", error);
+
+  const row = Array.isArray(data)
+    ? (data[0] as { monthly: number; purchased: number; total: number } | undefined)
+    : undefined;
+
+  return {
+    monthly: Number(row?.monthly ?? 0),
+    purchased: Number(row?.purchased ?? 0),
+    total: Number(row?.total ?? 0),
+  };
+});
+
+export interface RecentTextRequest {
+  id: string;
+  status: string;
+  segments: number;
+  recipientLastFour: string | null;
+  scheduledFor: string;
+  createdAt: string;
+}
+
+export const listRecentTextRequests = cache(
+  async (orgId: string, limit = 20): Promise<RecentTextRequest[]> => {
+    const supabase = await supabaseServer();
+
+    const { data, error } = await supabase
+      .from("text_requests")
+      .select("id, status, segments, recipient_last_four, scheduled_for, created_at")
+      .eq("org_id", orgId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) dataFailure("list_text_requests", error);
+
+    return (data ?? []).map((row) => ({
+      id: row.id as string,
+      status: row.status as string,
+      segments: Number(row.segments ?? 0),
+      recipientLastFour: (row.recipient_last_four as string | null) ?? null,
+      scheduledFor: row.scheduled_for as string,
+      createdAt: row.created_at as string,
+    }));
+  },
+);
+
+// ------------------------------------------------------------- billing -----
+
+export interface OwnerBilling {
+  planId: "starter" | "growth" | "pro" | null;
+  status: "trialing" | "active" | "past_due" | "cancelled" | "suspended" | null;
+  cancelAtPeriodEnd: boolean;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  smsBalance: SmsBalance;
+}
+
+/**
+ * What the backend believes about this business's billing, and nothing else.
+ *
+ * `status: null` means there is no entitlement row to read — which the page
+ * renders as "we could not read your plan", never as a default plan. Inventing
+ * one here is how a suspended business sees a working billing screen.
+ */
+export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBilling> => {
+  const supabase = await supabaseServer();
+
+  const [entitlement, balance] = await Promise.all([
+    supabase
+      .from("entitlement_snapshots")
+      .select("plan_id, status, cancel_at_period_end, trial_ends_at, current_period_end")
+      .eq("org_id", orgId)
+      .maybeSingle(),
+    readSmsBalance(orgId),
+  ]);
+
+  if (entitlement.error) dataFailure("owner_billing", entitlement.error);
+
+  const row = entitlement.data as {
+    plan_id: OwnerBilling["planId"];
+    status: OwnerBilling["status"];
+    cancel_at_period_end: boolean;
+    trial_ends_at: string | null;
+    current_period_end: string | null;
+  } | null;
+
+  return {
+    planId: row?.plan_id ?? null,
+    status: row?.status ?? null,
+    cancelAtPeriodEnd: row?.cancel_at_period_end ?? false,
+    trialEndsAt: row?.trial_ends_at ?? null,
+    currentPeriodEnd: row?.current_period_end ?? null,
+    smsBalance: balance,
+  };
+});

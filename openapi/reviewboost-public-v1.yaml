@@ -9,23 +9,38 @@ info:
   title: ReviewBoost public customer API
   version: 1.0.0
   description: >-
-    The five anonymous endpoints the customer review page calls. Backend-owned
-    and authoritative: `frontend/contracts/customer-flow.openapi.yaml` was the
-    frontend's statement of what it needed, and this document is the backend's
-    answer. They agree on every shape; this one additionally records the error
-    codes, the idempotency semantics, and the review-integrity guarantee.
+    The four anonymous endpoints the customer review page calls. Backend-owned
+    and authoritative; records the error codes, the idempotency semantics, and
+    the review-integrity guarantee.
+
+
+    V1 FLOW: open Tag/QR/NFC → customer taps one star → private rating saved →
+    the business's public review destination opens. One tap, no screen in
+    between. No public note. No active public Team Praise. Historical note and
+    Team Praise data in the database is preserved; these endpoints are simply
+    not exposed in the public V1 API.
+
+
+    REVIEWBOOST OWNS THE DOOR
+
+
+    A Tag's QR and NFC carry one ReviewBoost URL, `/q/{token}`, and never a
+    provider's URL. The destination behind it is server state: `destination`
+    names the provider and the URL, and an owner can repoint it without
+    reprinting a sticker or reprogramming a chip. Google is the provider V1
+    enables, not the architecture. `googleReviewUrl` remains as a compatibility
+    alias of `destination.url` while clients migrate; new code reads
+    `destination`.
 
 
     REVIEW INTEGRITY — binding, and a release blocker
 
 
-    Every rating from one to five receives the same neutral Google review
-    opportunity. `googleReviewUrl` is returned by the context endpoint, which
-    runs before any rating exists and is never re-fetched with one, so the
-    opportunity structurally cannot vary by rating. The private note and Team
-    Praise are additive: extra things a customer may do, never a substitute for
-    the public review. There is no rating threshold, no rating-dependent action,
-    and no metric describing a review as prevented or intercepted.
+    Every rating from one to five receives the same destination. It is returned
+    by the context endpoint, which runs before any rating exists and is never
+    re-fetched with one, so it structurally cannot vary by rating. There is no
+    rating threshold, no rating-dependent action, and no metric describing a
+    review as prevented or intercepted.
 servers:
   - url: /
     description: Same origin as the customer page. No CORS preflight occurs.
@@ -112,15 +127,15 @@ paths:
     post:
       operationId: submitCustomerResponse
       tags: [public]
-      summary: Persist an honest rating and an optional private note
+      summary: Persist an honest rating (1–5)
       description: >-
-        Every rating from one to five is stored and handled identically. The
-        note is optional for all five and is encrypted at rest. One response per
-        session.
+        Every rating from one to five is stored and handled identically. One
+        response per session. Notes and Team Praise are not accepted in the V1
+        public API; the database columns exist for historical data only.
 
 
-        The request schema is strict: a phone number, email address, marketing
-        consent flag, or tenant identifier is rejected, not ignored.
+        The request schema is strict: a phone number, email address, note,
+        marketing consent flag, or tenant identifier is rejected, not ignored.
       parameters:
         - $ref: "#/components/parameters/ReviewToken"
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -153,16 +168,16 @@ paths:
         "500": { $ref: "#/components/responses/InternalError" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
-  /api/v1/public/q/{token}/google-click:
+  /api/v1/public/q/{token}/destination-selection:
     post:
-      operationId: recordGoogleReviewClick
+      operationId: recordDestinationSelection
       tags: [public]
-      summary: Record that the Google action was selected
+      summary: Record that the customer was handed to the review destination
       description: >-
-        Records the selection and nothing more. It does not mean a review was
-        written, submitted, or published, or that a rating changed on Google —
-        ReviewBoost cannot observe any of that, and no metric built on it may
-        imply otherwise.
+        Records the selection and the provider in force at that moment, and
+        nothing more. It does not mean a review was written, submitted, or
+        published, or that a rating changed anywhere — ReviewBoost cannot
+        observe any of that, and no metric built on it may imply otherwise.
 
 
         Never redirects: the client owns the navigation, so a tracking failure
@@ -177,7 +192,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/GoogleClickRequest" }
+            schema: { $ref: "#/components/schemas/DestinationSelectionRequest" }
       responses:
         "204":
           description: Selection recorded
@@ -186,52 +201,6 @@ paths:
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "404": { $ref: "#/components/responses/SessionInvalid" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
-        "429": { $ref: "#/components/responses/RateLimited" }
-        "500": { $ref: "#/components/responses/InternalError" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-
-  /api/v1/public/q/{token}/team-praise:
-    post:
-      operationId: submitTeamPraise
-      tags: [public]
-      summary: Persist private praise, with no rating data and no auto-matching
-      description: >-
-        Stored unmatched, with the name and note encrypted at rest. ReviewBoost
-        never guesses which colleague the customer meant: matching is a human
-        decision made later, with the rating deliberately out of view.
-
-
-        The response carries only the new id. `team_praise_records` has no
-        rating column at all, so the barrier holds in the schema rather than in
-        a query someone must remember to trim. Accepted after every rating,
-        including a one — praise and a complaint are not mutually exclusive.
-      parameters:
-        - $ref: "#/components/parameters/ReviewToken"
-        - $ref: "#/components/parameters/IdempotencyKey"
-        - $ref: "#/components/parameters/RequestId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/TeamPraiseRequest" }
-      responses:
-        "200":
-          description: Idempotent replay. Nothing was created on this call.
-          headers:
-            X-Request-Id: { $ref: "#/components/headers/RequestId" }
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/TeamPraiseResponse" }
-        "201":
-          description: Praise persisted
-          headers:
-            X-Request-Id: { $ref: "#/components/headers/RequestId" }
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/TeamPraiseResponse" }
-        "400": { $ref: "#/components/responses/ValidationFailed" }
-        "404": { $ref: "#/components/responses/SessionInvalid" }
-        "409": { $ref: "#/components/responses/ResponseConflict" }
         "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/InternalError" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
@@ -259,7 +228,7 @@ components:
       description: >-
         Mandatory. The customer flow runs on a phone, so a request that times
         out is the normal case, not the exceptional one — a retry without a key
-        would write a second response, praise record, or scan. The client must
+        would write a second response or scan. The client must
         reuse the same key across an offline retry.
       schema:
         type: string
@@ -329,7 +298,7 @@ components:
               message: This session has expired. Please scan the code again.
             requestId: 6f9619ff-8b86-d011-b42d-00c04fc964ff
     ResponseConflict:
-      description: That session already has a response, or that response already has praise.
+      description: That session already has a response.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -376,7 +345,7 @@ components:
     CustomerReviewContext:
       type: object
       additionalProperties: false
-      required: [business, location, googleReviewUrl, supportedLocales, defaultLocale]
+      required: [business, location, destination, page, googleReviewUrl, supportedLocales, defaultLocale]
       description: >-
         Contains no organization id, location id, stand id, or subscription
         state. A caller who learned the tenant could write unlimited fabricated
@@ -398,13 +367,51 @@ components:
           required: [name]
           properties:
             name: { type: [string, "null"], maxLength: 160 }
+        page:
+          type: [object, "null"]
+          additionalProperties: false
+          description: >-
+            The business's published Customer Page, or null if it has not
+            published one — in which case the flow renders its own plain
+            default. A draft is never returned here: only a published page
+            reaches a customer.
+          properties:
+            templateId:
+              type: string
+              enum: [classic, bold, minimal]
+            tagline: { type: [string, "null"], maxLength: 120 }
+            logoUrl: { type: [string, "null"], format: uri }
+            heroUrl: { type: [string, "null"], format: uri }
+        destination:
+          type: object
+          additionalProperties: false
+          required: [provider, url]
+          description: >-
+            Where this Tag's door leads. Server state, not something the Tag
+            carries: an owner can change it and the next scan of the same QR or
+            NFC chip arrives at the new destination.
+          properties:
+            provider:
+              type: string
+              enum: [google]
+              description: >-
+                The enabled provider. Unknown providers are refused at write
+                time, so this is always one the client knows how to open.
+            url:
+              type: string
+              format: uri
+              description: >-
+                Validated server-side against that provider's host allowlist —
+                HTTPS only, no credentials, no ports — and re-validated by the
+                client. A stand whose destination does not validate cannot serve
+                the flow and returns review_link_inactive.
         googleReviewUrl:
           type: string
           format: uri
+          deprecated: true
           description: >-
-            Validated server-side against an allowlist of Google hosts, and
-            re-validated by the client. A stand whose destination does not
-            validate cannot serve the flow and returns review_link_inactive.
+            Compatibility alias of `destination.url`, kept while clients
+            migrate. Always equal to it. New code reads `destination`.
         supportedLocales:
           type: array
           minItems: 1
@@ -437,10 +444,6 @@ components:
           minimum: 1
           maximum: 5
           description: Stored exactly as chosen. Nothing downstream branches on it.
-        note:
-          type: string
-          maxLength: 2000
-          description: Optional for every rating, including four and five. Encrypted at rest.
 
     SubmitResponseResponse:
       type: object
@@ -449,37 +452,13 @@ components:
       properties:
         responseId: { type: string, minLength: 1, maxLength: 160 }
 
-    GoogleClickRequest:
+    DestinationSelectionRequest:
       type: object
       additionalProperties: false
       required: [sessionId, responseId]
       properties:
         sessionId: { type: string }
         responseId: { type: string }
-
-    TeamPraiseRequest:
-      type: object
-      additionalProperties: false
-      required: [sessionId, responseId, firstName]
-      properties:
-        sessionId: { type: string }
-        responseId: { type: string }
-        firstName:
-          type: string
-          minLength: 1
-          maxLength: 80
-          description: Unicode, stored as written. Never transliterated.
-        note: { type: string, maxLength: 2000 }
-
-    TeamPraiseResponse:
-      type: object
-      additionalProperties: false
-      required: [teamPraiseId]
-      description: >-
-        Carries only the id. No rating, stars, Google state, bonus, payroll,
-        phone, email, or marketing field is ever serialised here.
-      properties:
-        teamPraiseId: { type: string, minLength: 1, maxLength: 160 }
 
     FieldError:
       type: object

@@ -22,24 +22,16 @@ export const DEFAULT_LOCALE = "en";
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
 export const MAX_NOTE_LENGTH = 2000;
-export const MAX_FIRST_NAME_LENGTH = 80;
 
 /**
- * Byte ceilings on top of the character limits.
+ * Byte ceiling on top of the character limit.
  *
- * `maxLength` in the contract counts UTF-16 code units; storage and encryption
- * count bytes. The worst case is 3 bytes per code unit — a 3-byte character
- * like a CJK ideograph is one unit, while a 4-byte emoji is two units and so
- * averages 2 — which makes these exactly the maximum the character limits can
- * produce.
- *
- * With today's limits the character check is therefore always the binding one,
- * and these never fire. They are kept deliberately: if someone raises
- * MAX_NOTE_LENGTH later, the storage bound stays explicit instead of silently
- * tripling. A test asserts the two stay consistent.
+ * `maxLength` counts UTF-16 code units; storage and encryption count bytes.
+ * The worst case is 3 bytes per code unit, making this the maximum
+ * MAX_NOTE_LENGTH can produce. If MAX_NOTE_LENGTH rises later, this bound
+ * stays explicit rather than silently tripling.
  */
 export const MAX_NOTE_BYTES = MAX_NOTE_LENGTH * 3;
-export const MAX_FIRST_NAME_BYTES = MAX_FIRST_NAME_LENGTH * 3;
 
 export const byteLength = (value: string) => Buffer.byteLength(value, "utf8");
 
@@ -64,11 +56,6 @@ const opaqueToken = z
   .max(160)
   .regex(/^[A-Za-z0-9_-]+$/, "Invalid token.");
 
-const customerNote = z
-  .string()
-  .max(MAX_NOTE_LENGTH)
-  .refine((value) => byteLength(value) <= MAX_NOTE_BYTES, "Note is too large.");
-
 export const createSessionSchema = z.strictObject({
   locale: z.enum(SUPPORTED_LOCALES),
 });
@@ -77,25 +64,24 @@ export const submitResponseSchema = z.strictObject({
   sessionId: opaqueToken,
   // Every rating is accepted and stored. Nothing downstream branches on it.
   rating: z.number().int().min(1).max(5),
-  // Optional for every rating, including 4 and 5.
-  note: customerNote.optional(),
 });
 
-export const googleClickSchema = z.strictObject({
-  sessionId: opaqueToken,
-  responseId: opaqueToken,
-});
+/**
+ * The UUID shape this codebase accepts, which is every UUID PostgreSQL will
+ * produce or store — not only RFC-9562 version 1-8 with a variant nibble, which
+ * is what Zod's own `.uuid()` demands and what would reject this repository's
+ * own fixture ids. `lib/server/auth.ts` enforces the same shape for the
+ * organization header; this is that rule, once.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const teamPraiseSchema = z.strictObject({
+export function uuidSchema(message: string) {
+  return z.string().regex(UUID_RE, message);
+}
+
+export const destinationSelectionSchema = z.strictObject({
   sessionId: opaqueToken,
   responseId: opaqueToken,
-  // Unicode accepted as written. Names are never transliterated.
-  firstName: z
-    .string()
-    .min(1)
-    .max(MAX_FIRST_NAME_LENGTH)
-    .refine((value) => byteLength(value) <= MAX_FIRST_NAME_BYTES, "Name is too large."),
-  note: customerNote.optional(),
 });
 
 function toFieldErrors(error: z.ZodError): FieldError[] {

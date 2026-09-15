@@ -271,10 +271,14 @@ export function OnboardingFlow() {
 
       <div className="flex flex-col gap-2">
         <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
-          You are all set
+          Your Tag is ready
         </h1>
+        {/* It is not working yet, and saying "you are all set" would mean a
+            business puts this on the counter and finds out from a customer.
+            The door opens when a plan does. */}
         <p className="text-base text-muted">
-          Print your code and put it where customers pay.
+          Choose a plan to switch it on. Seven days free, and nothing is
+          charged until the trial ends.
         </p>
       </div>
 
@@ -312,7 +316,10 @@ export function OnboardingFlow() {
       ) : null}
 
       <div className="flex w-full flex-col gap-3">
-        <Button size="lg" onClick={() => window.print()}>
+        <Button size="lg" asChild>
+          <a href="/settings/billing">Choose a plan</a>
+        </Button>
+        <Button variant="secondary" onClick={() => window.print()}>
           <Printer className="size-5" aria-hidden="true" />
           Print this code
         </Button>

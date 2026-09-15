@@ -2,11 +2,9 @@ import type {
   CreateSessionRequest,
   CreateSessionResponse,
   CustomerReviewContext,
-  GoogleClickRequest,
+  DestinationSelectionRequest,
   SubmitResponseRequest,
   SubmitResponseResponse,
-  TeamPraiseRequest,
-  TeamPraiseResponse,
 } from "@/lib/api/customer-flow-types";
 import { shouldUseCustomerFixtures } from "@/lib/api/fixture-flags";
 import { productionCustomerFlowApi } from "@/lib/api/production-customer-flow-api";
@@ -34,16 +32,11 @@ export interface CustomerFlowApi {
     body: SubmitResponseRequest,
     options: IdempotentRequestOptions,
   ): Promise<SubmitResponseResponse>;
-  recordGoogleClick(
+  recordDestinationSelection(
     token: string,
-    body: GoogleClickRequest,
+    body: DestinationSelectionRequest,
     options: IdempotentRequestOptions,
   ): Promise<void>;
-  submitTeamPraise(
-    token: string,
-    body: TeamPraiseRequest,
-    options: IdempotentRequestOptions,
-  ): Promise<TeamPraiseResponse>;
 }
 
 let developmentApiPromise: Promise<CustomerFlowApi> | undefined;

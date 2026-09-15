@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Eye, LifeBuoy, Mail, Shield } from "lucide-react";
+import { Eye, LifeBuoy, Mail, Shield, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 import { AppShell } from "@/features/dashboard/app-shell";
@@ -51,20 +51,22 @@ export default async function SettingsPage() {
           label="Place"
           value={location?.name ?? null}
           placeholder="High Street"
+          {...(location ? { context: { locationId: location.locationId } } : {})}
         />
 
         <div>
           <EditableRow
-            field="googleReviewUrl"
+            field="destinationUrl"
             label="Google link"
-            value={location?.googleReviewUrl ?? null}
+            value={location?.destination?.url ?? null}
             type="url"
             placeholder="https://g.page/..."
-            help="Paste the link customers use to review you on Google. Leave it empty to remove it."
+            help="Paste the link customers use to review you on Google. Changing it takes effect on the next scan — your printed codes and NFC tags stay exactly as they are. Leave it empty to remove it."
             emptyText="Not set yet"
             // The one field where absence is a real problem: without it a code
             // cannot serve customers at all.
             warnWhenEmpty
+            {...(location ? { context: { locationId: location.locationId } } : {})}
           />
           <GoogleLinkHelp />
         </div>
@@ -118,18 +120,37 @@ export default async function SettingsPage() {
           </div>
         </Link>
 
-        <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
+        <Link
+          href="/privacy"
+          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
           <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
             <Shield className="size-5 text-muted" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Your customers stay private</p>
-            <p className="text-sm leading-relaxed text-muted">
-              We never ask them for a name, phone number, or email. Private notes
-              are locked so only you can read them.
+            <p className="text-base font-medium text-ink">Privacy policy</p>
+            <p className="text-sm text-muted">What we collect and how to delete your account.</p>
+          </div>
+        </Link>
+      </section>
+
+      <section className="mb-6 flex flex-col gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Account</h2>
+
+        <a
+          href="mailto:privacy@reviewboost.app?subject=Delete%20my%20account&body=Please%20delete%20my%20ReviewBoost%20account%20and%20all%20associated%20data."
+          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+            <Trash2 className="size-5 text-muted" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-medium text-ink">Delete account</p>
+            <p className="text-sm text-muted">
+              Permanently removes your account and all customer data within 30 days.
             </p>
           </div>
-        </div>
+        </a>
       </section>
 
       <SignOutButton />

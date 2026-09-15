@@ -33,64 +33,42 @@ describe("StarRating", () => {
 
 describe("RatingScreen", () => {
   it.each([1, 2, 3, 4, 5] as const)(
-    "reveals the same optional note and Continue action for rating %s",
+    "submits rating %s on the tap itself, with no confirm step",
     async (rating) => {
       const user = userEvent.setup();
-      const onRatingChange = vi.fn();
-      const { rerender } = render(
+      const onRate = vi.fn();
+      render(
         <RatingScreen
-          businessName="Mario’s Pizza"
           messages={customerMessages.en}
           rating={null}
-          note=""
           status="idle"
-          onRatingChange={onRatingChange}
-          onNoteChange={vi.fn()}
-          onSubmit={vi.fn()}
+          onRate={onRate}
+          onRetry={vi.fn()}
         />,
       );
 
-      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-      await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[rating] }));
-      expect(onRatingChange).toHaveBeenCalledWith(rating);
-
-      rerender(
-        <RatingScreen
-          businessName="Mario’s Pizza"
-          messages={customerMessages.en}
-          rating={rating}
-          note=""
-          status="idle"
-          onRatingChange={onRatingChange}
-          onNoteChange={vi.fn()}
-          onSubmit={vi.fn()}
-        />,
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      await user.click(
+        screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[rating] }),
       );
-
-      expect(screen.getByRole("textbox", { name: /want to add a note/i })).toBeVisible();
-      expect(screen.getByRole("button", { name: "Continue" })).toBeVisible();
-      expect(screen.getByText(customerMessages.en.ratingLabels[rating])).toBeVisible();
+      expect(onRate).toHaveBeenCalledWith(rating);
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
     },
   );
 
-  it("keeps the chosen rating and note visible during submission and error", () => {
+  it("offers recovery — and only recovery — after a failed submit", () => {
     const sharedProps = {
-      businessName: "Mario’s Pizza",
       messages: customerMessages.en,
       rating: 1 as const,
-      note: "The wait was long",
-      onRatingChange: vi.fn(),
-      onNoteChange: vi.fn(),
-      onSubmit: vi.fn(),
+      onRate: vi.fn(),
+      onRetry: vi.fn(),
     };
     const { rerender } = render(<RatingScreen {...sharedProps} status="submitting" />);
-    expect(screen.getByRole("textbox")).toHaveValue("The wait was long");
-    expect(screen.getByRole("button", { name: "Sending…" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Sending…");
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
 
     rerender(<RatingScreen {...sharedProps} status="error" />);
-    expect(screen.getByRole("textbox")).toHaveValue("The wait was long");
-    expect(screen.getByRole("alert")).toHaveTextContent("Your feedback is still here");
+    expect(screen.getByRole("alert")).toHaveTextContent("Your rating is still here");
     expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
   });
 });
-

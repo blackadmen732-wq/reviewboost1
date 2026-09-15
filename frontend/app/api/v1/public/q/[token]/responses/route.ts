@@ -11,12 +11,16 @@ import {
 } from "@/lib/server/validation";
 
 /**
- * POST /api/v1/public/q/{token}/responses — store the rating and optional note.
+ * POST /api/v1/public/q/{token}/responses — store the rating (1–5).
+ *
+ * V1 contract: Tag/QR/NFC → rating 1–5 → private rating saved → Google review
+ * opportunity. No public note. No Team Praise. Same Google opportunity for
+ * every rating.
  *
  * REVIEW INTEGRITY: every rating from 1 to 5 is handled identically here. There
  * is no threshold, no branch on the value, and no rating-dependent action in
- * the response. The note is optional for all five. The Google opportunity was
- * already delivered by the context endpoint, before any rating existed.
+ * the response. The Google opportunity was already delivered by the context
+ * endpoint, before any rating existed.
  *
  * The request schema is strict, so a phone number, email address, or marketing
  * consent flag is rejected rather than ignored — an endpoint that quietly
@@ -43,7 +47,6 @@ export async function POST(
       {
         sessionId: body.sessionId,
         rating: body.rating,
-        ...(body.note === undefined ? {} : { note: body.note }),
         idempotencyKey,
       },
       requestMetaOf(request, requestId),
