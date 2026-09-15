@@ -9,6 +9,11 @@ import {
   tokenPrefix,
   tryDecrypt,
 } from "@/lib/server/crypto";
+import {
+  assertCanCreateLocation,
+  assertCanCreateTag,
+  entitlementApiError,
+} from "@/lib/server/entitlements";
 import { publicFrontendUrl, tokenDigestKeyVersion } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { isValidGoogleReviewUrl, standUrl } from "@/lib/server/google-review-url";
@@ -333,6 +338,20 @@ export async function recordNfcProvision(
  * (location_id, org_id) in the database prevents cross-org linkage, and the
  * RPC verifies owner/admin role.
  */
+/**
+ * Create one Tag.
+ *
+ * The encrypted copy of the token — the only thing that makes a reprint or an
+ * NFC rewrite possible later — is passed into the same statement that inserts
+ * the Tag. It used to be stored by a second call afterwards whose error was
+ * discarded, so a Tag could exist, be reported as created, and be impossible
+ * to reprint. The database now refuses the insert without it.
+ *
+ * The plan limit is checked here for the message and enforced there for real:
+ * `rpc_create_stand` locks the organization's entitlement row and counts
+ * inside the transaction, so two simultaneous creates at the cap produce one
+ * Tag, not two.
+ */
 export async function createStand(
   context: AuthenticatedContext,
   orgId: string,
@@ -340,6 +359,8 @@ export async function createStand(
   label: string,
   requestId: string,
 ): Promise<{ standId: string; standUrl: string; standToken: string }> {
+  await assertCanCreateTag(context, orgId, requestId);
+
   const token = generateToken();
 
   const { data, error } = await context.db.rpc("rpc_create_stand", {
@@ -350,9 +371,13 @@ export async function createStand(
     p_stand_token_prefix: tokenPrefix(token),
     p_token_key_version: tokenDigestKeyVersion(),
     p_request_id: requestId,
+    p_token_ciphertext: encrypt(token),
+    p_cipher_key_version: KEY_VERSION,
   });
 
   if (error) {
+    const entitlementError = entitlementApiError(error.message);
+    if (entitlementError) throw entitlementError;
     if (error.message?.includes("not_found_or_forbidden")) {
       throw new ApiError(404, ERROR_CODE.reviewLinkInactive, "Location not found.");
     }
@@ -361,18 +386,51 @@ export async function createStand(
 
   const standId = typeof data === "string" ? data : String(data);
 
-  // Store the encrypted token for reprinting
-  await context.db.rpc("rpc_set_stand_token_ciphertext", {
-    p_stand_id: standId,
-    p_ciphertext: encrypt(token),
-    p_key_version: KEY_VERSION,
-  });
-
   return {
     standId,
     standUrl: standUrl(publicFrontendUrl(), token),
     standToken: token,
   };
+}
+
+/**
+ * Add a place.
+ *
+ * Only onboarding could create one before, which is fine for a plan that
+ * includes exactly one and wrong for the two and five that Growth and Pro
+ * sell. Counted under the same entitlement lock as Tags.
+ *
+ * A new place starts with no destination. The door is closed until the owner
+ * points it somewhere deliberately — better than inheriting another shop's
+ * review link and quietly sending its customers to the wrong page.
+ */
+export async function createLocation(
+  context: AuthenticatedContext,
+  orgId: string,
+  name: string,
+  requestId: string,
+): Promise<{ locationId: string }> {
+  await assertCanCreateLocation(context, orgId, requestId);
+
+  const { data, error } = await context.db.rpc("rpc_create_location", {
+    p_org_id: orgId,
+    p_name: name,
+    p_request_id: requestId,
+  });
+
+  if (error) {
+    const entitlementError = entitlementApiError(error.message);
+    if (entitlementError) throw entitlementError;
+    if (error.message?.includes("not_found_or_forbidden")) {
+      throw new ApiError(403, ERROR_CODE.forbidden, "Only the owner can add a place.");
+    }
+    if (error.message?.includes("invalid_location_name")) {
+      throw new ApiError(400, ERROR_CODE.validationFailed, "Give this place a name.");
+    }
+    databaseFailure("create_location", error, requestId);
+  }
+
+  return { locationId: typeof data === "string" ? data : String(data) };
 }
 
 // ------------------------------------------------------ customer feedback --
