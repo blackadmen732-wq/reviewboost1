@@ -12,7 +12,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(20);
+select plan(21);
 
 create or replace function tests.set_actor(p_user_id uuid) returns void
 language plpgsql as $$
