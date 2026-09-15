@@ -113,6 +113,14 @@ export const productionCustomerFlowApi: CustomerFlowApi = {
           header: { "Idempotency-Key": options.idempotencyKey },
         },
         body,
+        // This request is made a heartbeat before the page navigates to the
+        // destination, and a normal fetch is cancelled when that happens. The
+        // alternative — waiting for it before handing the customer over —
+        // puts a round trip between a tap and Google, which is the one thing
+        // this flow exists not to do. `keepalive` lets the browser finish it
+        // after the document is gone; the body is a few dozen bytes, far
+        // inside the 64KB that allows.
+        keepalive: true,
         ...(options.signal ? { signal: options.signal } : {}),
       });
 

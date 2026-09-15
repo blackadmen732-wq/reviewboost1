@@ -35,6 +35,24 @@ describe("production customer API client", () => {
     });
   });
 
+  it("lets the destination selection outlive the page it was sent from", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await productionCustomerFlowApi.recordDestinationSelection(
+      "fixture-valid",
+      { sessionId: "session-1", responseId: "response-1" },
+      { idempotencyKey: "destination-key-12345678" },
+    );
+
+    // This is sent a heartbeat before `window.location.assign`. Without
+    // keepalive the browser cancels it on navigation and the business's count
+    // of customers it handed to Google is quietly short — with no error
+    // anywhere, because the tab is already gone.
+    const request = fetchMock.mock.calls[0]?.[0] as Request;
+    expect(request.keepalive).toBe(true);
+  });
+
   it("never treats an undocumented 202 as completion", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 202 })));
 

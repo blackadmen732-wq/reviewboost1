@@ -97,6 +97,33 @@ export function allowsService(status: EntitlementStatus): boolean {
   return status === "trialing" || status === "active" || status === "past_due";
 }
 
+/** A trial that ended more than this long ago is over, whatever the row says. */
+const TRIAL_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The status that actually governs, given the clock.
+ *
+ * A stored `trialing` is a claim about a date, and a date passes. Without this
+ * an ended trial keeps its limits — and its open door — until something
+ * sweeps it, which makes a maintenance job that did not run into a free plan.
+ *
+ * The day of grace is deliberate and matches the database rule: Stripe's own
+ * "the trial converted" event arrives moments after the trial ends, and
+ * closing a paying business's door over a webhook's latency is the worse
+ * failure. This mirrors `app.entitlement_effective_status`; the database is
+ * still the authority, and this exists so an owner is told the same thing.
+ */
+export function effectiveStatus(
+  status: EntitlementStatus,
+  trialEndsAt: string | null,
+  now: Date = new Date(),
+): EntitlementStatus {
+  if (status !== "trialing" || trialEndsAt === null) return status;
+  const ends = new Date(trialEndsAt);
+  if (Number.isNaN(ends.getTime())) return status;
+  return ends.getTime() <= now.getTime() - TRIAL_GRACE_MS ? "suspended" : status;
+}
+
 function unavailable(): never {
   throw new ApiError(
     503,
@@ -138,7 +165,7 @@ export async function readEntitlement(
 
   return {
     planId: row.plan_id,
-    status: row.status,
+    status: effectiveStatus(row.status, row.trial_ends_at),
     cancelAtPeriodEnd: row.cancel_at_period_end,
     trialEndsAt: row.trial_ends_at,
     currentPeriodEnd: row.current_period_end,

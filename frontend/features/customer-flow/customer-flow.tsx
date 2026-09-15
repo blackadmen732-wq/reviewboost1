@@ -313,6 +313,21 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     if (state.rating) void submitFeedback(state.rating, state);
   }, [state, submitFeedback]);
 
+  // A selection that was never recorded is retried as soon as we know about
+  // it, not only when the browser announces it came back online. The common
+  // case is a tab that was closed mid-handoff while perfectly online: waiting
+  // for an `online` event there means waiting forever, and the business's
+  // count of customers it handed to Google is quietly short.
+  const { destinationPending, destinationKey, sessionId, responseId } = state;
+  useEffect(() => {
+    if (!destinationPending || !destinationKey || !sessionId || !responseId) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+
+    void getCustomerFlowApi().then((api) =>
+      recordDestination(api, destinationKey, sessionId, responseId),
+    );
+  }, [destinationPending, destinationKey, sessionId, responseId, recordDestination]);
+
   useEffect(() => {
     function retryWhenOnline() {
       if (state.feedbackStatus === "offline" && state.rating) {

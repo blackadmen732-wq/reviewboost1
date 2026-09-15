@@ -38,6 +38,14 @@ select tests.reset_role();
 insert into public.organizations (id, name, slug, status)
 values ('00000000-a010-0000-0000-000000000001', 'Rotation Org', 'rotation-org', 'active');
 
+-- These businesses pay. The entitlement is written explicitly because signing
+-- up no longer grants service: a new organization is suspended until a
+-- verified Stripe subscription says otherwise, and a fixture that relied on
+-- the old free default would be testing a door this product does not have.
+update public.entitlement_snapshots
+   set plan_id = 'pro', status = 'active', source = 'test:paid'
+ where org_id in ('00000000-a010-0000-0000-000000000001');
+
 insert into public.locations (id, org_id, name, google_review_url, status)
 values ('00000000-a010-0000-0000-000000000002', '00000000-a010-0000-0000-000000000001',
         'Rotation Location', 'https://g.page/r/rotation/review', 'active');

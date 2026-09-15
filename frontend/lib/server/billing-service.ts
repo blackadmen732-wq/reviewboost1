@@ -3,7 +3,13 @@ import "server-only";
 import type Stripe from "stripe";
 
 import type { AuthenticatedContext } from "@/lib/server/auth";
-import { PLANS, type PlanId, TRIAL_DAYS } from "@/lib/server/entitlements";
+import {
+  effectiveStatus,
+  type EntitlementStatus,
+  PLANS,
+  type PlanId,
+  TRIAL_DAYS,
+} from "@/lib/server/entitlements";
 import { planIdForPrice, publicFrontendUrl, stripePriceId } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { logger } from "@/lib/server/logger";
@@ -55,6 +61,38 @@ function subscriptionFields(subscription: Stripe.Subscription): {
     currentPeriodStart: unixToIso(item?.current_period_start ?? legacy.current_period_start),
     currentPeriodEnd: unixToIso(item?.current_period_end ?? legacy.current_period_end),
   };
+}
+
+/**
+ * The price an invoice was for.
+ *
+ * Stripe moved this. Through the 2025 API versions a line item carried
+ * `price`; from `2026-08-26.dahlia` it carries `pricing.price_details.price`,
+ * which is a price id or an expanded Price. Reading only the old shape does
+ * not fail loudly — `planIdForPrice` is handed null, the invoice mints no
+ * monthly allowance, and a business that paid gets no SMS with no error
+ * anywhere. Both shapes are read, newest first, and a subscription line's own
+ * price is the last resort.
+ */
+function invoicePriceId(invoice: Stripe.Invoice): string | null {
+  const line = invoice.lines?.data?.[0] as
+    | {
+        pricing?: { price_details?: { price?: string | { id?: string } } };
+        price?: { id?: string } | string;
+        plan?: { id?: string };
+      }
+    | undefined;
+  if (!line) return null;
+
+  const fromPricing = line.pricing?.price_details?.price;
+  if (typeof fromPricing === "string") return fromPricing;
+  if (fromPricing?.id) return fromPricing.id;
+
+  if (typeof line.price === "string") return line.price;
+  if (line.price?.id) return line.price.id;
+
+  // Older still: a subscription line reported its plan rather than its price.
+  return line.plan?.id ?? null;
 }
 
 function customerIdOf(value: string | { id: string } | null | undefined): string | null {
@@ -245,9 +283,7 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
       const orgId = await orgForCustomer(customerIdOf(invoice.customer));
       if (!orgId) return "unknown_customer";
 
-      const line = invoice.lines?.data?.[0] as
-        | { price?: { id?: string }; period?: { start?: number; end?: number } }
-        | undefined;
+      const line = invoice.lines?.data?.[0];
 
       // THE ONLY THING THAT MINTS MONTHLY SMS. Not checkout, not subscription
       // creation: a paid invoice for a billing period, once, expiring at the
@@ -255,7 +291,7 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
       const { error } = await service.rpc("rpc_billing_apply_invoice_paid", {
         p_org_id: orgId,
         p_invoice_id: invoice.id,
-        p_plan_id: planIdForPrice(line?.price?.id ?? null),
+        p_plan_id: planIdForPrice(invoicePriceId(invoice)),
         p_period_start: unixToIso(line?.period?.start),
         p_period_end: unixToIso(line?.period?.end),
         p_amount_paid: invoice.amount_paid ?? 0,
@@ -369,9 +405,15 @@ export async function readBillingState(
     ? (balance.data[0] as { monthly: number; purchased: number; total: number } | undefined)
     : undefined;
 
+  // A stored `trialing` is a claim about a date, and the date can have passed.
+  // The owner is shown the status that governs, not the one last written.
+  const status = row
+    ? effectiveStatus(row.status as EntitlementStatus, row.trial_ends_at)
+    : "suspended";
+
   return {
     planId: row?.plan_id ?? null,
-    status: row?.status ?? "suspended",
+    status,
     cancelAtPeriodEnd: row?.cancel_at_period_end ?? false,
     trialEndsAt: row?.trial_ends_at ?? null,
     currentPeriodEnd: row?.current_period_end ?? null,

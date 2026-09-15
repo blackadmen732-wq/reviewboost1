@@ -43,6 +43,30 @@ describe("the owner surfaces show real state", () => {
     expect(panel).toMatch(/billing\.status === null/);
   });
 
+  it("asks a business with no subscription to choose a plan, not to panic", () => {
+    const panel = code("features/dashboard/billing-panel.tsx");
+
+    // A brand-new business is suspended: it has been through no checkout, so
+    // its Tags serve nobody. Telling it "your account is suspended" would read
+    // as a punishment for signing up, and it would not say what to do next.
+    expect(panel).toMatch(/Choose a plan to open your Tags/);
+    // And it must be offered the checkout, not just the sentence.
+    expect(panel).toMatch(/billing\.status === "trialing" && billing\.planId === null/);
+  });
+
+  it("never claims a card is on file for a trial that never had one", () => {
+    const panel = code("features/dashboard/billing-panel.tsx");
+
+    // Businesses that predate billing were given a finite trial by a
+    // migration. They have no card. The copy that says otherwise must be
+    // behind a branch that knows there is a plan.
+    const cardOnFile = panel.indexOf("Your card is on file");
+    const planCheck = panel.indexOf("billing.planId === null");
+    expect(cardOnFile).toBeGreaterThan(-1);
+    expect(planCheck).toBeGreaterThan(-1);
+    expect(planCheck).toBeLessThan(cardOnFile);
+  });
+
   it("keeps the Text Requests balance out of the component's hands", () => {
     const composer = code("features/dashboard/text-request-composer.tsx");
 

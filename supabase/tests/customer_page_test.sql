@@ -68,6 +68,15 @@ values
     ('00000000-c901-0000-0000-000000000001', 'Page Co', 'page-co', 'active'),
     ('00000000-c901-0000-0000-000000000002', 'Rival Co', 'page-rival', 'active');
 
+-- These businesses pay. The entitlement is written explicitly because signing
+-- up no longer grants service: a new organization is suspended until a
+-- verified Stripe subscription says otherwise, and a fixture that relied on
+-- the old free default would be testing a door this product does not have.
+update public.entitlement_snapshots
+   set plan_id = 'pro', status = 'active', source = 'test:paid'
+ where org_id in ('00000000-c901-0000-0000-000000000001',
+                  '00000000-c901-0000-0000-000000000002');
+
 insert into public.organization_members (org_id, user_id, role, status)
 values
     ('00000000-c901-0000-0000-000000000001', '00000000-c901-0000-0000-0000000000a1', 'owner', 'active'),

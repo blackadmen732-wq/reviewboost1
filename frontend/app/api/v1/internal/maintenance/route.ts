@@ -30,6 +30,10 @@ const STEPS = [
   { name: "reconcile_aged_unknowns", rpc: "rpc_sms_reconcile_aged_unknowns", args: {} },
   { name: "release_dead_letters", rpc: "rpc_sms_release_dead_letters", args: {} },
   { name: "expire_quota", rpc: "rpc_sms_quota_expire", args: {} },
+  // A trial that has ended already opens no doors — the resolver asks the
+  // clock, not the stored status. This makes the stored status agree, so that
+  // an owner's billing screen and an operator's query say the same thing.
+  { name: "expire_trials", rpc: "rpc_entitlements_expire_trials", args: {} },
 ] as const;
 
 async function runMaintenance(requestId: string): Promise<Record<string, number | string>> {

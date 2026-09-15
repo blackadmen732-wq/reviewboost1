@@ -13,7 +13,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(44);
+select plan(48);
 
 -- ------------------------------------------------------------- helpers ------
 
@@ -76,6 +76,15 @@ values
     ('00000000-e001-0000-0000-000000000002', '00000000-e001-0000-0000-0000000000a1', 'owner', 'active'),
     ('00000000-e001-0000-0000-000000000003', '00000000-e001-0000-0000-0000000000a1', 'owner', 'active');
 
+-- A trial is something Stripe starts: a chosen plan, a card, and an end date.
+-- Signing up grants none of it, so a test that wants a trialing business has
+-- to start one — which is the contract, not a workaround for it.
+update public.entitlement_snapshots
+   set plan_id = 'starter', status = 'trialing',
+       trial_ends_at = now() + interval '7 days', source = 'test:trial'
+ where org_id in ('00000000-e001-0000-0000-000000000001',
+                  '00000000-e001-0000-0000-000000000003');
+
 insert into public.locations (id, org_id, name, google_review_url, status)
 values
     ('00000000-e001-0000-0000-000000000011', '00000000-e001-0000-0000-000000000001',
@@ -93,17 +102,27 @@ values ('00000000-e001-0000-0000-000000000021', '00000000-e001-0000-0000-0000000
 -- 1. EVERY ORGANIZATION HAS AN ANSWER, AND IT IS NOT "FREE"
 -- ============================================================
 
+-- Starter Co has not been touched by the fixture above: it is an organization
+-- exactly as creating one leaves it.
 select is(
     (select status from public.entitlement_snapshots
-      where org_id = '00000000-e001-0000-0000-000000000001'),
-    'trialing',
-    'a new organization is trialing the moment it exists');
+      where org_id = '00000000-e001-0000-0000-000000000002'),
+    'suspended',
+    'a new organization serves nobody until it has been through checkout');
 
 select is(
     (select plan_id from public.entitlement_snapshots
-      where org_id = '00000000-e001-0000-0000-000000000001'),
+      where org_id = '00000000-e001-0000-0000-000000000002'),
     null,
     'a new organization is NOT given a paid plan it never chose');
+
+select throws_ok(
+    $$update public.entitlement_snapshots
+         set status = 'trialing', trial_ends_at = null
+       where org_id = '00000000-e001-0000-0000-000000000002'$$,
+    '23514',
+    null,
+    'a trial with no end is the free plan this product does not have');
 
 select is(
     (select count(*)::int from public.entitlement_snapshots
@@ -260,6 +279,32 @@ select is(
     (select count(*)::int from app.resolve_public_stand('lapsed-token-hash')),
     1,
     'a trialing business''s Tag resolves');
+
+-- An ended trial stops opening the door on the clock alone, whether or not
+-- anything has swept it. A day of grace first, because Stripe's own
+-- "the trial converted" event does not always arrive in the same second.
+select tests.reset_role();
+update public.entitlement_snapshots
+   set trial_ends_at = now() - interval '2 days'
+ where org_id = '00000000-e001-0000-0000-000000000003';
+
+select tests.set_service_role();
+select is(
+    (select count(*)::int from app.resolve_public_stand('lapsed-token-hash')),
+    0,
+    'a trial that ended two days ago opens nothing, swept or not');
+
+select tests.reset_role();
+select is(
+    public.rpc_entitlements_expire_trials(),
+    1,
+    'the sweeper makes the stored status say what the clock already decided');
+
+select is(
+    (select status from public.entitlement_snapshots
+      where org_id = '00000000-e001-0000-0000-000000000003'),
+    'suspended',
+    'and an owner reading their billing screen sees the same answer');
 
 select tests.reset_role();
 update public.entitlement_snapshots

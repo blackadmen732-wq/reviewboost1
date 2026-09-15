@@ -149,6 +149,29 @@ describe("the locked V1 plans", () => {
     expect(allowsService("cancelled")).toBe(false);
     expect(allowsService("suspended")).toBe(false);
   });
+
+  it("stops honouring a trial whose end has passed", async () => {
+    const { effectiveStatus } = await import("@/lib/server/entitlements");
+    const now = new Date("2026-09-15T12:00:00Z");
+
+    const ended = new Date("2026-09-10T12:00:00Z").toISOString();
+    expect(effectiveStatus("trialing", ended, now)).toBe("suspended");
+
+    // A trial with an end still to come is a trial.
+    const later = new Date("2026-09-20T12:00:00Z").toISOString();
+    expect(effectiveStatus("trialing", later, now)).toBe("trialing");
+
+    // The day of grace: Stripe's "the trial converted" event does not always
+    // land in the same second, and closing a paying business's door over a
+    // webhook's latency is the worse failure.
+    const anHourAgo = new Date("2026-09-15T11:00:00Z").toISOString();
+    expect(effectiveStatus("trialing", anHourAgo, now)).toBe("trialing");
+
+    // Nothing else is second-guessed by the clock.
+    expect(effectiveStatus("active", ended, now)).toBe("active");
+    expect(effectiveStatus("past_due", ended, now)).toBe("past_due");
+    expect(effectiveStatus("trialing", null, now)).toBe("trialing");
+  });
 });
 
 describe("createStand", () => {

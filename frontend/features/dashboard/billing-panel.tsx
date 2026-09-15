@@ -63,6 +63,19 @@ function describe(billing: Billing): { title: string; body: string; tone: "info"
 
   switch (billing.status) {
     case "trialing":
+      // Only Stripe puts a business here, and Stripe only does it after a card
+      // and a plan — except for businesses that predate billing, who were
+      // given a finite trial by a migration and have neither. Telling them
+      // their card is on file would be a lie they find out about later.
+      if (billing.planId === null) {
+        return {
+          title: "You are on a free trial",
+          body: trialEnd
+            ? `Your trial ends on ${trialEnd}. Choose a plan before then to keep your Tags working.`
+            : "Choose a plan to keep your Tags working when the trial ends.",
+          tone: "info",
+        };
+      }
       return {
         title: "You are on a free trial",
         body: trialEnd
@@ -97,6 +110,16 @@ function describe(billing: Billing): { title: string; body: string; tone: "info"
         tone: "error",
       };
     case "suspended":
+      // Suspended with no plan is not a punishment: it is every business that
+      // has not been through checkout yet, including one that signed up a
+      // minute ago. Saying "suspended" to them would be alarming and wrong.
+      if (billing.planId === null) {
+        return {
+          title: "Choose a plan to open your Tags",
+          body: "Your Tags are ready and they are not serving customers yet. Pick a plan below — seven days free, and nothing is charged until the trial ends.",
+          tone: "info",
+        };
+      }
       return {
         title: "Your account is suspended",
         body: "Your Tags are not serving customers. Nothing has been deleted.",
@@ -116,8 +139,13 @@ export function BillingPanel({ billing }: { billing: Billing }) {
   const [error, setError] = useState<string | null>(null);
 
   const state = describe(billing);
+  // Anyone without a subscription behind them needs to start one. A trial
+  // with no plan is a business that predates billing, not one that has paid.
   const needsCheckout =
-    billing.status === null || billing.status === "cancelled" || billing.status === "suspended";
+    billing.status === null ||
+    billing.status === "cancelled" ||
+    billing.status === "suspended" ||
+    (billing.status === "trialing" && billing.planId === null);
 
   async function act(body: Record<string, unknown>, key: string) {
     setBusy(key);

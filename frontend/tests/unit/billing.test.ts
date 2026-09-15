@@ -170,6 +170,22 @@ describe("the webhook sink", () => {
     expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_complete")).toBe(false);
   });
 
+  it("retries an event that was recorded but never processed", async () => {
+    // Stripe retries for days so that a transient failure does not cost the
+    // event. If the inbox called that retry a duplicate, a subscription change
+    // or a month's allowance would be lost with nothing to replay it.
+    rpcResults.set("rpc_stripe_event_record", { data: "stored", error: null });
+    rpcResults.set("rpc_billing_org_for_customer", { data: ORG, error: null });
+    rpcResults.set("rpc_billing_apply_subscription", { data: "applied", error: null });
+
+    const { receiveStripeWebhook } = await import("@/lib/server/billing-service");
+    const outcome = await receiveStripeWebhook(stripeEvent({ id: "evt_retry" }) as never);
+
+    expect(outcome.outcome).toBe("applied");
+    expect(rpcCalls.some(({ name }) => name === "rpc_billing_apply_subscription")).toBe(true);
+    expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_complete")).toBe(true);
+  });
+
   it("leaves an event whose customer it cannot place visible in the inbox", async () => {
     rpcResults.set("rpc_billing_org_for_customer", { data: null, error: null });
     const body = JSON.stringify(stripeEvent());
@@ -231,6 +247,42 @@ describe("what each event does", () => {
     expect(call?.args["p_invoice_id"]).toBe("in_test1");
     expect(call?.args["p_plan_id"]).toBe("starter");
     expect(call?.args["p_amount_paid"]).toBe(4900);
+  });
+
+  it("reads the price from the pinned API version's invoice shape", async () => {
+    // `2026-08-26.dahlia` moved the price off the line item and into
+    // `pricing.price_details`. Reading only the old field does not throw — it
+    // quietly hands the grant no plan, and a business that paid gets no SMS.
+    rpcResults.set("rpc_billing_apply_invoice_paid", { data: "granted", error: null });
+    const { applyStripeEvent } = await import("@/lib/server/billing-service");
+
+    await applyStripeEvent({
+      id: "evt_inv_dahlia",
+      type: "invoice.paid",
+      created: Math.floor(Date.now() / 1000),
+      data: {
+        object: {
+          id: "in_dahlia",
+          customer: "cus_test1",
+          amount_paid: 7900,
+          lines: {
+            data: [
+              {
+                pricing: {
+                  type: "price_details",
+                  price_details: { price: "price_growth_test", product: "prod_growth" },
+                },
+                period: { start: 1_700_000_000, end: 1_702_592_000 },
+              },
+            ],
+          },
+        },
+      },
+    } as never);
+
+    const call = rpcCalls.find(({ name }) => name === "rpc_billing_apply_invoice_paid");
+    expect(call?.args["p_invoice_id"]).toBe("in_dahlia");
+    expect(call?.args["p_plan_id"]).toBe("growth");
   });
 
   it("mints nothing on a failed payment", async () => {

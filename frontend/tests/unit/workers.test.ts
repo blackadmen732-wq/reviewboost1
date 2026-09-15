@@ -100,6 +100,7 @@ describe("maintenance", () => {
       "rpc_sms_reconcile_aged_unknowns",
       "rpc_sms_release_dead_letters",
       "rpc_sms_quota_expire",
+      "rpc_entitlements_expire_trials",
     ]);
   });
 });

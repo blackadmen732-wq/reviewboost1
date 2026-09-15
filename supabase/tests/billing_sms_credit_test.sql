@@ -12,7 +12,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(50);
+select plan(52);
 
 create or replace function tests.reset_role() returns void
 language plpgsql as $$
@@ -126,10 +126,23 @@ select is(
     public.rpc_stripe_event_record('evt_inbox1', 'invoice.paid', '{"a":1}'::jsonb, now()),
     'stored',
     'a new event is stored');
+
+-- Stripe retries for days so a transient failure does not cost the event.
+-- Calling that retry a duplicate would strand the row unprocessed forever:
+-- nothing else in this system sweeps the inbox.
+select is(
+    public.rpc_stripe_event_record('evt_inbox1', 'invoice.paid', '{"a":1}'::jsonb, now()),
+    'stored',
+    'a redelivery of an event that never finished is a retry, and runs');
+
+select lives_ok(
+    $$select public.rpc_stripe_event_complete('evt_inbox1')$$,
+    'an event can be marked processed');
+
 select is(
     public.rpc_stripe_event_record('evt_inbox1', 'invoice.paid', '{"a":1}'::jsonb, now()),
     'duplicate',
-    'the same event delivered again is a duplicate, not a second effect');
+    'once processed, the same event delivered again is a duplicate, not a second effect');
 
 -- ============================================================
 -- 4. ONLY A PAID INVOICE MINTS MONTHLY ALLOWANCE
