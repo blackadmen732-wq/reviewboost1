@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "crons": [
-    { "path": "/api/v1/internal/sms/dispatch", "schedule": "* * * * *" },
-    { "path": "/api/v1/internal/maintenance", "schedule": "*/15 * * * *" }
+    { "path": "/api/v1/internal/sms/dispatch", "schedule": "0 19 * * *" },
+    { "path": "/api/v1/internal/maintenance", "schedule": "0 8 * * *" }
   ]
 }
