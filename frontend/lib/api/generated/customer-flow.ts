@@ -56,10 +56,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Persist an honest rating and an optional private note
-         * @description Every rating from one to five is stored and handled identically. The note is optional for all five and is encrypted at rest. One response per session.
+         * Persist an honest rating
+         * @description Every rating from one to five is stored and handled identically. One response per session.
          *
-         *     The request schema is strict: a phone number, email address, marketing consent flag, or tenant identifier is rejected, not ignored.
+         *     The request schema is strict: a phone number, email address, marketing consent flag, note, or tenant identifier is rejected, not ignored.
          */
         post: operations["submitCustomerResponse"];
         delete?: never;
@@ -100,10 +100,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Persist private praise, with no rating data and no auto-matching
-         * @description Stored unmatched, with the name and note encrypted at rest. ReviewBoost never guesses which colleague the customer meant: matching is a human decision made later, with the rating deliberately out of view.
-         *
-         *     The response carries only the new id. `team_praise_records` has no rating column at all, so the barrier holds in the schema rather than in a query someone must remember to trim. Accepted after every rating, including a one — praise and a complaint are not mutually exclusive.
+         * [V1 tombstone] Team Praise is not active
+         * @description Team Praise is not active in V1. This endpoint always returns 410 Gone. Historical team_praise_records rows are preserved and remain accessible to owners. The endpoint is retained in the spec so existing clients receive a clean 410 rather than a 404.
          */
         post: operations["submitTeamPraise"];
         delete?: never;
@@ -160,8 +158,6 @@ export interface components {
             sessionId: string;
             /** @description Stored exactly as chosen. Nothing downstream branches on it. */
             rating: number;
-            /** @description Optional for every rating, including four and five. Encrypted at rest. */
-            note?: string;
         };
         SubmitResponseResponse: {
             responseId: string;
@@ -537,38 +533,23 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["TeamPraiseRequest"];
+                "application/json": Record<string, never>;
             };
         };
         responses: {
-            /** @description Idempotent replay. Nothing was created on this call. */
-            200: {
+            /** @description Team Praise is no longer active. */
+            410: {
                 headers: {
                     "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TeamPraiseResponse"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Praise persisted */
-            201: {
-                headers: {
-                    "X-Request-Id": components["headers"]["RequestId"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TeamPraiseResponse"];
-                };
-            };
-            400: components["responses"]["ValidationFailed"];
-            404: components["responses"]["SessionInvalid"];
-            409: components["responses"]["ResponseConflict"];
-            429: components["responses"]["RateLimited"];
             500: components["responses"]["InternalError"];
-            503: components["responses"]["ServiceUnavailable"];
         };
     };
 }

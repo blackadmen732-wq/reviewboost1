@@ -40,6 +40,8 @@ export const ERROR_CODE = {
   requestTimeout: "request_timeout",
   internalError: "internal_error",
   serviceUnavailable: "service_unavailable",
+  // Returned when a feature has been deliberately removed (HTTP 410 Gone).
+  gone: "gone",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODE)[keyof typeof ERROR_CODE];

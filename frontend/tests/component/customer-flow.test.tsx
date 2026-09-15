@@ -34,40 +34,22 @@ describe("complete customer flow", () => {
       expect(googleScreen).not.toBeNull();
       googleMarkup.push(googleScreen?.outerHTML ?? "");
 
+      // Continue from Google goes directly to finished (no praise screen in V1).
       await user.click(
         within(googleScreen as HTMLElement).getByRole("button", {
           name: customerMessages.en.googleContinue,
         }),
       );
       expect(
-        await screen.findByRole("heading", { name: customerMessages.en.praiseHeading }),
+        await screen.findByRole("heading", { name: customerMessages.en.doneHeading }),
       ).toBeVisible();
+      // Rating label must not appear on the finished screen.
       expect(screen.queryByText(customerMessages.en.ratingLabels[rating])).not.toBeInTheDocument();
       cleanup();
       window.sessionStorage.clear();
     }
 
     expect(new Set(googleMarkup).size).toBe(1);
-  });
-
-  it("submits Unicode Team Praise and reaches the quiet finished state", async () => {
-    const user = await openRating();
-    const googleScreen = await reachGoogle(user, 4);
-    await user.click(
-      within(googleScreen as HTMLElement).getByRole("button", {
-        name: customerMessages.en.googleContinue,
-      }),
-    );
-    await user.type(screen.getByRole("textbox", { name: /their first name/i }), "Zoë");
-    await user.type(screen.getByRole("textbox", { name: /what did they do well/i }), "Très gentille");
-    await user.click(screen.getByRole("button", { name: customerMessages.en.sendThanks }));
-
-    const doneHeading = await screen.findByRole("heading", {
-      name: customerMessages.en.doneHeading,
-    });
-    await waitFor(() => expect(doneHeading).toBeVisible());
-    expect(screen.queryByText(/sign up|newsletter|download/i)).not.toBeInTheDocument();
-    expect(window.sessionStorage.length).toBe(0);
   });
 
   it("blocks duplicate taps while preserving one logical response attempt", async () => {
@@ -82,16 +64,12 @@ describe("complete customer flow", () => {
     expect(responseCalls).toHaveLength(1);
   });
 
-  it("retains the rating, note, and idempotency key after a recoverable failure", async () => {
+  it("retains the rating and idempotency key after a recoverable failure", async () => {
     const user = await openRating("fixture-response-error");
     await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[2] }));
-    await user.type(screen.getByRole("textbox", { name: /want to add a note/i }), "Please keep this");
     await user.click(screen.getByRole("button", { name: customerMessages.en.continue }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Your feedback is still here");
-    expect(screen.getByRole("textbox", { name: /want to add a note/i })).toHaveValue(
-      "Please keep this",
-    );
     await user.click(screen.getByRole("button", { name: customerMessages.en.tryAgain }));
     await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
 
@@ -105,12 +83,10 @@ describe("complete customer flow", () => {
   it("retains the draft offline and retries when connectivity returns", async () => {
     const user = await openRating();
     await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[1] }));
-    await user.type(screen.getByRole("textbox", { name: /want to add a note/i }), "Still here");
     Object.defineProperty(window.navigator, "onLine", { configurable: true, value: false });
     await user.click(screen.getByRole("button", { name: customerMessages.en.continue }));
 
     expect(await screen.findByText(customerMessages.en.offline)).toBeVisible();
-    expect(screen.getByRole("textbox", { name: /want to add a note/i })).toHaveValue("Still here");
 
     await act(async () => {
       Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
@@ -137,6 +113,13 @@ describe("complete customer flow", () => {
     expect(screen.queryByLabelText(/phone|email/i)).not.toBeInTheDocument();
     expect(document.querySelector("input[type='email'], input[type='tel']")).toBeNull();
     expect(document.body).not.toHaveTextContent(/newsletter|create an account|download the app/i);
+  });
+
+  it("contains no note field on the rating screen", async () => {
+    const user = await openRating();
+    await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[4] }));
+    // No note textarea should appear regardless of rating.
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
   it("moves focus to each new screen heading", async () => {

@@ -77,8 +77,6 @@ export const submitResponseSchema = z.strictObject({
   sessionId: opaqueToken,
   // Every rating is accepted and stored. Nothing downstream branches on it.
   rating: z.number().int().min(1).max(5),
-  // Optional for every rating, including 4 and 5.
-  note: customerNote.optional(),
 });
 
 export const googleClickSchema = z.strictObject({

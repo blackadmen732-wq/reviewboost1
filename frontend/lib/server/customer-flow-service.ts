@@ -1,15 +1,11 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
-
 import type {
   CreateSessionResponse,
   CustomerReviewContext,
   SubmitResponseResponse,
-  TeamPraiseResponse,
 } from "@/lib/api/customer-flow-types";
 import {
-  KEY_VERSION,
   clientFingerprint,
   decrypt,
   digestIdempotencyKey,
@@ -32,7 +28,6 @@ import {
   DEFAULT_LOCALE,
   SUPPORTED_LOCALES,
   canonicalJson,
-  normalizeCustomerText,
   type SupportedLocale,
 } from "@/lib/server/validation";
 
@@ -74,8 +69,7 @@ type Outcome =
   | "session_invalid"
   | "session_expired"
   | "response_conflict"
-  | "response_not_found"
-  | "praise_conflict";
+  | "response_not_found";
 
 interface RpcResult {
   outcome: Outcome;
@@ -150,12 +144,6 @@ function throwForOutcome(outcome: Outcome): never {
       );
     case "response_not_found":
       throw new ApiError(404, ERROR_CODE.sessionInvalid, "This response is no longer available.");
-    case "praise_conflict":
-      throw new ApiError(
-        409,
-        ERROR_CODE.responseConflict,
-        "Praise has already been recorded for this response.",
-      );
     default:
       throw new ApiError(500, ERROR_CODE.internalError, "Something went wrong on our side.");
   }
@@ -195,7 +183,7 @@ const CONTEXT_BUDGET: Budget = { bucket: "public-context", limit: 240, windowSec
 const STAND_WRITE_BUDGET: Budget = { bucket: "public-write-stand", limit: 60, windowSeconds: 60 };
 const CLIENT_WRITE_BUDGET: Budget = { bucket: "public-write-client", limit: 30, windowSeconds: 300 };
 
-async function consume(budget: Budget, key: string, requestId: string): Promise<void> {
+async function consumeRead(budget: Budget, key: string, requestId: string): Promise<void> {
   const { data, error } = await serviceRoleClient().rpc("rpc_consume_rate_limit", {
     p_bucket: budget.bucket,
     p_bucket_key: key,
@@ -204,9 +192,10 @@ async function consume(budget: Budget, key: string, requestId: string): Promise<
   });
 
   if (error) {
-    // Fails open. A customer standing at a counter must not be turned away
-    // because a limiter is unavailable; the abuse this bounds is a nuisance,
-    // not a breach. Authentication would fail closed — this is not that.
+    // Read/context limiter fails open: a customer loading the page must not be
+    // turned away because the limiter is temporarily unavailable. Reads carry
+    // no mutation risk; the worst case is a page load that succeeds when it
+    // should have been throttled — a nuisance, not a breach.
     logger.warn("public.rate_limit_unavailable", { bucket: budget.bucket, requestId, error });
     return;
   }
@@ -218,19 +207,46 @@ async function consume(budget: Budget, key: string, requestId: string): Promise<
   }
 }
 
+async function consumeWrite(budget: Budget, key: string, requestId: string): Promise<void> {
+  const { data, error } = await serviceRoleClient().rpc("rpc_consume_rate_limit", {
+    p_bucket: budget.bucket,
+    p_bucket_key: key,
+    p_limit: budget.limit,
+    p_window_seconds: budget.windowSeconds,
+  });
+
+  if (error) {
+    // Write limiter fails CLOSED. If enforcement cannot be established, we do
+    // not allow an unlimited flood of rating/session/click mutations. A brief
+    // outage is tolerable; an undetected abuse storm against production data is
+    // not. The error is logged so the on-call team can distinguish a limiter
+    // outage from a real rate-limit event.
+    logger.error("public.rate_limit_write_unavailable", { bucket: budget.bucket, requestId, error });
+    throw rateLimited(60);
+  }
+
+  const row = Array.isArray(data) ? (data[0] as { allowed: boolean; retry_after_seconds: number } | undefined) : undefined;
+  if (row && !row.allowed) {
+    logger.warn("public.rate_limited", { bucket: budget.bucket, requestId });
+    throw rateLimited(row.retry_after_seconds);
+  }
+}
+
 async function guardRead(tokenHash: string, meta: RequestMeta): Promise<void> {
-  await consume(CONTEXT_BUDGET, tokenHash, meta.requestId);
+  await consumeRead(CONTEXT_BUDGET, tokenHash, meta.requestId);
 }
 
 async function guardWrite(tokenHash: string, meta: RequestMeta): Promise<void> {
-  await consume(STAND_WRITE_BUDGET, tokenHash, meta.requestId);
-  await consume(CLIENT_WRITE_BUDGET, clientFingerprint(meta.address, meta.userAgent), meta.requestId);
+  await consumeWrite(STAND_WRITE_BUDGET, tokenHash, meta.requestId);
+  await consumeWrite(CLIENT_WRITE_BUDGET, clientFingerprint(meta.address, meta.userAgent), meta.requestId);
 }
 
 interface ResolvedStand {
   business_name: string;
   location_name: string | null;
   google_review_url: string | null;
+  destination_provider: string | null;
+  destination_url: string | null;
   default_locale: string | null;
   matched_key_version: number;
 }
@@ -317,7 +333,16 @@ export async function getContext(token: string, meta: RequestMeta): Promise<Cust
   // A stand without a validated destination cannot open the door — it fails
   // identically to an unknown token so callers cannot distinguish an unconfigured
   // stand from a paused or retired one.
-  const destination = destinationFromGoogleUrl(stand.google_review_url);
+  //
+  // Use the authoritative destination_provider/url columns when available
+  // (populated by migration 20260915000100). Fall back to google_review_url
+  // during the compatibility window for rows not yet backfilled.
+  let destination: import("@/lib/server/destination").ReviewDestination | null = null;
+  if (stand.destination_provider && stand.destination_url) {
+    destination = { provider: stand.destination_provider as "google", url: stand.destination_url };
+  } else {
+    destination = destinationFromGoogleUrl(stand.google_review_url);
+  }
   if (!destination) {
     throw reviewLinkInactive();
   }
@@ -394,14 +419,19 @@ export async function createSession(
 // ------------------------------------------------------------- responses --
 
 /**
- * Store the rating and the optional private note.
+ * Store the rating.
  *
- * Every rating from 1 to 5 is stored, and the note is optional for all of them.
- * Nothing about the result varies with the value chosen.
+ * V1 contract: sessionId + rating only. Notes are not collected from customers
+ * in V1 — the note_encrypted column remains in the database for historical rows,
+ * but no new submission includes one.
+ *
+ * Every rating from 1 to 5 is stored identically. Nothing about the result
+ * varies with the value chosen, and the destination was already delivered
+ * before any rating existed.
  */
 export async function submitResponse(
   token: string,
-  input: { sessionId: string; rating: number; note?: string; idempotencyKey: string },
+  input: { sessionId: string; rating: number; idempotencyKey: string },
   meta: RequestMeta,
 ): Promise<OperationResult<SubmitResponseResponse>> {
   const tokenHash = digestStandToken(token);
@@ -409,19 +439,16 @@ export async function submitResponse(
 
   const responseToken = generateToken();
   const body: SubmitResponseResponse = { responseId: responseToken };
-  const note = normalizeCustomerText(input.note);
 
   const { data, error } = await serviceRoleClient().rpc("rpc_public_submit_response", {
     p_token_hash: tokenHash,
     p_idempotency_key: digestIdempotencyKey(`response|${input.idempotencyKey}`),
     p_request_hash: digestRequestBody(
-      canonicalJson({ sessionId: input.sessionId, rating: input.rating, note: input.note }),
+      canonicalJson({ sessionId: input.sessionId, rating: input.rating }),
     ),
     p_session_token_hash: digestSessionToken(input.sessionId),
     p_response_token_hash: digestResponseToken(responseToken),
     p_rating: input.rating,
-    p_note_encrypted: note === "" ? null : encrypt(note),
-    p_note_key_version: KEY_VERSION,
     p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
     p_response_body_encrypted: encrypt(JSON.stringify(body)),
     p_previous_token_hash: digestStandTokenWithPreviousKey(token),
@@ -444,18 +471,20 @@ export async function submitResponse(
   return { status: 201, body };
 }
 
-// ---------------------------------------------------------- google click --
+// ---------------------------------------- destination review step (click) --
 
 /**
- * Record that the customer selected the Google action.
+ * Record that the customer selected the configured review destination.
  *
  * That is the entire claim. It does not mean a review was written, submitted,
  * or published — ReviewBoost cannot observe any of that, and no metric built on
- * it may imply otherwise. The API never redirects: the client owns the
- * navigation, so a tracking failure can never stand between a customer and the
- * public review page.
+ * it may imply otherwise. The provider (e.g. "google") is stored with the event
+ * so analytics are not permanently Google-only.
+ *
+ * The API never redirects: the client owns the navigation, so a tracking failure
+ * can never stand between a customer and the public review page.
  */
-export async function recordGoogleClick(
+export async function recordDestinationStep(
   token: string,
   input: { sessionId: string; responseId: string; idempotencyKey: string },
   meta: RequestMeta,
@@ -463,9 +492,9 @@ export async function recordGoogleClick(
   const tokenHash = digestStandToken(token);
   await guardWrite(tokenHash, meta);
 
-  const { data, error } = await serviceRoleClient().rpc("rpc_public_record_google_click", {
+  const { data, error } = await serviceRoleClient().rpc("rpc_public_record_destination_step", {
     p_token_hash: tokenHash,
-    p_idempotency_key: digestIdempotencyKey(`google-click|${input.idempotencyKey}`),
+    p_idempotency_key: digestIdempotencyKey(`destination-step|${input.idempotencyKey}`),
     p_request_hash: digestRequestBody(
       canonicalJson({ sessionId: input.sessionId, responseId: input.responseId }),
     ),
@@ -477,13 +506,12 @@ export async function recordGoogleClick(
     p_previous_response_token_hash: digestResponseTokenWithPreviousKey(input.responseId),
   });
 
-  if (error) fail("google_click", error, meta.requestId);
+  if (error) fail("destination_step", error, meta.requestId);
 
   const result = firstRow(data);
-  if (!result) fail("google_click", new Error("empty rpc result"), meta.requestId);
+  if (!result) fail("destination_step", new Error("empty rpc result"), meta.requestId);
 
-  // 204 on a first record and on a replay alike: the contract documents one
-  // success status for this operation.
+  // 204 on a first record and on a replay alike.
   if (result.outcome === "replay" || result.outcome === "created") {
     return { status: 204, body: null };
   }
@@ -491,81 +519,23 @@ export async function recordGoogleClick(
   throwForOutcome(result.outcome);
 }
 
+/** @deprecated Use recordDestinationStep — kept for any in-flight callers. */
+export const recordGoogleClick = recordDestinationStep;
+
 // ------------------------------------------------------------ team praise -
 
 /**
- * Store praise for a colleague.
+ * Team Praise is not active in V1.
  *
- * Name and note are encrypted at rest and stored unmatched. ReviewBoost never
- * guesses which colleague the customer meant — matching is a decision a human
- * makes later, with the rating deliberately out of view. The response carries
- * only the new id: no rating, no Google state, no contact detail.
+ * Historical team_praise_records are preserved for owners. New public
+ * submissions are not accepted. Returns 410 Gone to any caller.
  */
 export async function submitTeamPraise(
-  token: string,
-  input: {
-    sessionId: string;
-    responseId: string;
-    firstName: string;
-    note?: string;
-    idempotencyKey: string;
-  },
-  meta: RequestMeta,
-): Promise<OperationResult<TeamPraiseResponse>> {
-  const tokenHash = digestStandToken(token);
-  await guardWrite(tokenHash, meta);
-
-  const firstName = normalizeCustomerText(input.firstName);
-  const note = normalizeCustomerText(input.note);
-  // Generated here, not in the database, so the replay body can be encrypted
-  // with it before the call. A retry with no stored body has nothing to return.
-  const praiseId = randomUUID();
-  const body: TeamPraiseResponse = { teamPraiseId: praiseId };
-
-  if (firstName === "") {
-    throw new ApiError(400, ERROR_CODE.validationFailed, "The request could not be accepted.", {
-      details: [{ field: "firstName", message: "A first name is required." }],
-    });
-  }
-
-  const { data, error } = await serviceRoleClient().rpc("rpc_public_submit_team_praise", {
-    p_token_hash: tokenHash,
-    p_idempotency_key: digestIdempotencyKey(`team-praise|${input.idempotencyKey}`),
-    p_request_hash: digestRequestBody(
-      canonicalJson({
-        sessionId: input.sessionId,
-        responseId: input.responseId,
-        firstName: input.firstName,
-        note: input.note,
-      }),
-    ),
-    p_session_token_hash: digestSessionToken(input.sessionId),
-    p_response_token_hash: digestResponseToken(input.responseId),
-    p_praise_id: praiseId,
-    p_first_name_encrypted: encrypt(firstName),
-    p_note_encrypted: note === "" ? null : encrypt(note),
-    p_key_version: KEY_VERSION,
-    p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
-    p_response_body_encrypted: encrypt(JSON.stringify(body)),
-    p_previous_token_hash: digestStandTokenWithPreviousKey(token),
-    p_previous_session_token_hash: digestSessionTokenWithPreviousKey(input.sessionId),
-    p_previous_response_token_hash: digestResponseTokenWithPreviousKey(input.responseId),
-  });
-
-  if (error) fail("team_praise", error, meta.requestId);
-
-  const result = firstRow(data);
-  if (!result) fail("team_praise", new Error("empty rpc result"), meta.requestId);
-
-  if (result.outcome === "replay") {
-    return {
-      status: replayStatus(result.response_status),
-      body: decodeBody<TeamPraiseResponse>(result.response_body_encrypted),
-    };
-  }
-  if (result.outcome !== "created") throwForOutcome(result.outcome);
-
-  return { status: 201, body };
+  _token: string,
+  _input: unknown,
+  _meta: RequestMeta,
+): Promise<never> {
+  throw new ApiError(410, ERROR_CODE.gone, "Team Praise is no longer active.");
 }
 
 /**

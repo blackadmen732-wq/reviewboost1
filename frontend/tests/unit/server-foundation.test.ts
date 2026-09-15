@@ -255,25 +255,14 @@ describe("request schemas", () => {
     }
   });
 
-  it("bounds a note by characters", async () => {
+  it("rejects a note field — V1 contract is sessionId + rating only", async () => {
     const { submitResponseSchema } = await import("@/lib/server/validation");
 
     const base = { sessionId: "a".repeat(43), rating: 3 };
-    expect(submitResponseSchema.safeParse({ ...base, note: "x".repeat(2000) }).success).toBe(true);
-    expect(submitResponseSchema.safeParse({ ...base, note: "x".repeat(2001) }).success).toBe(false);
-  });
-
-  it("accepts a full-length note in any script, emoji included", async () => {
-    const { submitResponseSchema, MAX_NOTE_LENGTH } = await import("@/lib/server/validation");
-
-    const base = { sessionId: "a".repeat(43), rating: 3 };
-    // A 2,000-character Japanese note is 6,000 bytes and entirely legitimate.
-    // Setting the byte ceiling below that would reject real customers writing
-    // in their own language.
-    for (const filler of ["x", "é", "田", "🎉"]) {
-      const note = filler.repeat(Math.floor(MAX_NOTE_LENGTH / filler.length));
-      expect(submitResponseSchema.safeParse({ ...base, note }).success, filler).toBe(true);
-    }
+    // The schema is strict: extra fields are not silently dropped.
+    expect(submitResponseSchema.safeParse({ ...base, note: "some note" }).success).toBe(false);
+    // Without the note field, the schema succeeds.
+    expect(submitResponseSchema.safeParse(base).success).toBe(true);
   });
 
   it("keeps the byte ceiling consistent with the character limit", async () => {

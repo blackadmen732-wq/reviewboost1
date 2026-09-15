@@ -309,33 +309,25 @@ describe("review integrity — every rating is handled identically", () => {
     expect(new Set(argShapes).size).toBe(1);
   });
 
-  it("accepts a note on every rating and demands one on none", async () => {
+  it("rejects a note field — V1 contract is sessionId + rating only", async () => {
+    // The schema is strict: sending a note returns 400 so no one is misled
+    // into thinking it is stored.
     for (const rating of [1, 2, 3, 4, 5]) {
+      const withNote = await postResponse({ sessionId: SESSION_ID, rating, note: "some detail" });
+      expect(withNote.status, `rating ${rating} with a note`).toBe(400);
+
       const without = await postResponse({ sessionId: SESSION_ID, rating });
       expect(without.status, `rating ${rating} without a note`).toBe(201);
-
-      const withNote = await postResponse({ sessionId: SESSION_ID, rating, note: "some detail" });
-      expect(withNote.status, `rating ${rating} with a note`).toBe(201);
     }
   });
 
-  it("encrypts the note before it reaches the database", async () => {
-    calls.length = 0;
-    await postResponse({ sessionId: SESSION_ID, rating: 2, note: "The table was sticky" });
-
-    const submit = calls.find((call) => call.fn === "rpc_public_submit_response");
-    const stored = String(submit?.args["p_note_encrypted"]);
-
-    expect(stored).not.toContain("sticky");
-    expect(stored).toMatch(/^v1:/);
-  });
-
-  it("stores no ciphertext when there is no note", async () => {
+  it("never sends a note ciphertext to the database", async () => {
     calls.length = 0;
     await postResponse({ sessionId: SESSION_ID, rating: 5 });
 
     const submit = calls.find((call) => call.fn === "rpc_public_submit_response");
-    expect(submit?.args["p_note_encrypted"]).toBeNull();
+    // V1 removes note collection; p_note_encrypted is not forwarded to the RPC.
+    expect(submit?.args["p_note_encrypted"]).toBeUndefined();
   });
 });
 
@@ -345,7 +337,6 @@ describe("idempotency", () => {
       () => postSession({ locale: "en" }, {}),
       () => postResponse({ sessionId: SESSION_ID, rating: 3 }, {}),
       () => postGoogleClick({ sessionId: SESSION_ID, responseId: RESPONSE_ID }, {}),
-      () => postTeamPraise({ sessionId: SESSION_ID, responseId: RESPONSE_ID, firstName: "Sam" }, {}),
     ];
 
     for (const mutation of mutations) {
@@ -463,67 +454,34 @@ describe("google click", () => {
   });
 });
 
-describe("team praise", () => {
-  it("returns only the new id", async () => {
+describe("team praise (V1 tombstone)", () => {
+  it("returns 410 Gone — feature is not active in V1", async () => {
     const response = await postTeamPraise({
       sessionId: SESSION_ID,
       responseId: RESPONSE_ID,
       firstName: "Sarah",
-      note: "Stayed late to sort out our order.",
     });
+    expect(response.status).toBe(410);
+  });
 
-    expect(response.status).toBe(201);
-
+  it("returns the standard error envelope with code 'gone'", async () => {
+    const response = await postTeamPraise({});
+    expect(response.status).toBe(410);
     const body = (await response.json()) as Record<string, unknown>;
-    expect(Object.keys(body)).toEqual(["teamPraiseId"]);
+    expect(Object.keys(body).sort()).toEqual(["error", "requestId"]);
+    const error = body["error"] as Record<string, unknown>;
+    expect(error["code"]).toBe("gone");
   });
 
-  it("returns nothing about the rating, Google, or money", async () => {
-    const response = await postTeamPraise({
-      sessionId: SESSION_ID,
-      responseId: RESPONSE_ID,
-      firstName: "Sarah",
-    });
-
-    const serialised = JSON.stringify(await response.json()).toLowerCase();
-    for (const forbidden of ["rating", "star", "google", "bonus", "payroll", "phone", "email"]) {
-      expect(serialised, forbidden).not.toContain(forbidden);
+  it("returns 410 regardless of any body content", async () => {
+    for (const body of [
+      {},
+      { sessionId: SESSION_ID, responseId: RESPONSE_ID, firstName: "Sam" },
+      { junk: true },
+    ]) {
+      const response = await postTeamPraise(body);
+      expect(response.status).toBe(410);
     }
-  });
-
-  it("encrypts the name and the note", async () => {
-    calls.length = 0;
-    await postTeamPraise({
-      sessionId: SESSION_ID,
-      responseId: RESPONSE_ID,
-      firstName: "José",
-      note: "Went out of their way",
-    });
-
-    const submit = calls.find((call) => call.fn === "rpc_public_submit_team_praise");
-    expect(String(submit?.args["p_first_name_encrypted"])).not.toContain("José");
-    expect(String(submit?.args["p_note_encrypted"])).not.toContain("Went out");
-  });
-
-  it("stores the name as written, without transliteration", async () => {
-    const { decrypt } = await import("@/lib/server/crypto");
-    calls.length = 0;
-
-    await postTeamPraise({ sessionId: SESSION_ID, responseId: RESPONSE_ID, firstName: "José" });
-
-    const submit = calls.find((call) => call.fn === "rpc_public_submit_team_praise");
-    expect(decrypt(String(submit?.args["p_first_name_encrypted"]))).toBe("José");
-  });
-
-  it("is accepted after a one-star rating exactly as after a five", async () => {
-    // Praise and a complaint are not mutually exclusive, and the product must
-    // not assume they are.
-    const response = await postTeamPraise({
-      sessionId: SESSION_ID,
-      responseId: RESPONSE_ID,
-      firstName: "Sam",
-    });
-    expect(response.status).toBe(201);
   });
 });
 
@@ -572,7 +530,6 @@ describe("request rejection", () => {
     const responses = await Promise.all([
       postSession({ locale: "en" }),
       postResponse({ sessionId: SESSION_ID, rating: 1 }),
-      postTeamPraise({ sessionId: SESSION_ID, responseId: RESPONSE_ID, firstName: "Sam" }),
     ]);
 
     for (const response of responses) expect(response.status).not.toBe(202);
@@ -625,16 +582,16 @@ describe("rate limiting", () => {
     expect(response.headers.get("retry-after")).toBe("42");
   });
 
-  it("fails open when the limiter itself is unavailable", async () => {
-    // A customer at a counter must not be turned away because a limiter is
-    // down. The abuse this bounds is a nuisance, not a breach.
+  it("fails closed when the write limiter itself is unavailable", async () => {
+    // Write limits fail closed: an unavailable limiter returns 429 so a
+    // downed limiter cannot be used to bypass rate limits on write paths.
     rpcHandler = (fn) =>
       fn === "rpc_consume_rate_limit"
         ? { data: null, error: { message: "connection refused" } }
         : happyPath(fn);
 
     const response = await postResponse({ sessionId: SESSION_ID, rating: 3 });
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(429);
   });
 });
 

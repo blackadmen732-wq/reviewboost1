@@ -113,15 +113,14 @@ paths:
     post:
       operationId: submitCustomerResponse
       tags: [public]
-      summary: Persist an honest rating and an optional private note
+      summary: Persist an honest rating
       description: >-
-        Every rating from one to five is stored and handled identically. The
-        note is optional for all five and is encrypted at rest. One response per
-        session.
+        Every rating from one to five is stored and handled identically. One
+        response per session.
 
 
         The request schema is strict: a phone number, email address, marketing
-        consent flag, or tenant identifier is rejected, not ignored.
+        consent flag, note, or tenant identifier is rejected, not ignored.
       parameters:
         - $ref: "#/components/parameters/ReviewToken"
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -195,47 +194,30 @@ paths:
     post:
       operationId: submitTeamPraise
       tags: [public]
-      summary: Persist private praise, with no rating data and no auto-matching
+      summary: "[V1 tombstone] Team Praise is not active"
       description: >-
-        Stored unmatched, with the name and note encrypted at rest. ReviewBoost
-        never guesses which colleague the customer meant: matching is a human
-        decision made later, with the rating deliberately out of view.
-
-
-        The response carries only the new id. `team_praise_records` has no
-        rating column at all, so the barrier holds in the schema rather than in
-        a query someone must remember to trim. Accepted after every rating,
-        including a one — praise and a complaint are not mutually exclusive.
+        Team Praise is not active in V1. This endpoint always returns 410 Gone.
+        Historical team_praise_records rows are preserved and remain accessible
+        to owners. The endpoint is retained in the spec so existing clients
+        receive a clean 410 rather than a 404.
       parameters:
         - $ref: "#/components/parameters/ReviewToken"
         - $ref: "#/components/parameters/IdempotencyKey"
         - $ref: "#/components/parameters/RequestId"
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/TeamPraiseRequest" }
+            schema: { type: object }
       responses:
-        "200":
-          description: Idempotent replay. Nothing was created on this call.
+        "410":
+          description: Team Praise is no longer active.
           headers:
             X-Request-Id: { $ref: "#/components/headers/RequestId" }
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/TeamPraiseResponse" }
-        "201":
-          description: Praise persisted
-          headers:
-            X-Request-Id: { $ref: "#/components/headers/RequestId" }
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/TeamPraiseResponse" }
-        "400": { $ref: "#/components/responses/ValidationFailed" }
-        "404": { $ref: "#/components/responses/SessionInvalid" }
-        "409": { $ref: "#/components/responses/ResponseConflict" }
-        "429": { $ref: "#/components/responses/RateLimited" }
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
         "500": { $ref: "#/components/responses/InternalError" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
 components:
   parameters:
@@ -465,10 +447,6 @@ components:
           minimum: 1
           maximum: 5
           description: Stored exactly as chosen. Nothing downstream branches on it.
-        note:
-          type: string
-          maxLength: 2000
-          description: Optional for every rating, including four and five. Encrypted at rest.
 
     SubmitResponseResponse:
       type: object

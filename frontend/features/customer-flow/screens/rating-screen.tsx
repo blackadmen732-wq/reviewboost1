@@ -1,11 +1,9 @@
 "use client";
 
-import { ShieldCheck } from "lucide-react";
 import type { FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
-import { Textarea } from "@/components/ui/textarea";
 import { CustomerActionBar } from "@/features/customer-flow/customer-action-bar";
 import { StarRating } from "@/features/customer-flow/star-rating";
 import type { SubmissionStatus } from "@/features/customer-flow/customer-flow-state";
@@ -18,27 +16,22 @@ interface RatingScreenProps {
   businessName: string;
   messages: CustomerMessages;
   rating: RatingValue | null;
-  note: string;
   status: SubmissionStatus;
   onRatingChange: (rating: RatingValue) => void;
-  onNoteChange: (note: string) => void;
   onSubmit: () => void;
 }
 
 export function RatingScreen({
-  businessName,
+  businessName: _businessName,
   messages,
   rating,
-  note,
   status,
   onRatingChange,
-  onNoteChange,
   onSubmit,
 }: RatingScreenProps) {
   const isSubmitting = status === "submitting";
   const isOffline = status === "offline";
   const hasError = status === "error";
-  const noticeId = hasError || isOffline ? "feedback-status" : undefined;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,28 +56,7 @@ export function RatingScreen({
         />
 
         {rating ? (
-          <div className="rating-note" data-rating-note>
-            <label className="field-label" htmlFor="private-note">
-              {messages.noteLabel}{" "}
-              <span className="field-optional">({messages.optional})</span>
-            </label>
-            <Textarea
-              id="private-note"
-              name="private-note"
-              maxLength={2000}
-              value={note}
-              onChange={(event) => onNoteChange(event.target.value)}
-              placeholder={messages.notePlaceholder}
-              disabled={isSubmitting}
-              aria-describedby={
-                noticeId ? `note-trust ${noticeId}` : "note-trust"
-              }
-            />
-            <p className="trust-line" id="note-trust">
-              <ShieldCheck aria-hidden="true" size={17} strokeWidth={2} />
-              <span>{messages.noteTrust(businessName)}</span>
-            </p>
-
+          <div className="rating-actions" data-rating-actions>
             {hasError ? (
               <InlineNotice
                 id="feedback-status"

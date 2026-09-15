@@ -68,6 +68,7 @@ vi.mock("@/lib/server/errors", () => {
       responseConflict: "response_conflict",
       internalError: "internal_error",
       validationFailed: "validation_failed",
+      gone: "gone",
     },
     rateLimited: () => new ApiError(429, "rate_limited", "slow down"),
     reviewLinkInactive: () => new ApiError(404, "not_found", "not found"),
@@ -153,24 +154,18 @@ describe("token rotation — previous stand hash forwarding", () => {
       meta,
     );
 
-    const call = rpcCalls.find((c) => c.name === "rpc_public_record_google_click");
+    const call = rpcCalls.find((c) => c.name === "rpc_public_record_destination_step");
     expect(call).toBeDefined();
     expect(call!.params.p_token_hash).toBe(CURRENT_HASH);
     expect(call!.params.p_previous_token_hash).toBe(PREVIOUS_HASH);
   });
 
-  it("submitTeamPraise passes p_previous_token_hash", async () => {
+  it("submitTeamPraise throws 410 (V1 tombstone — no RPC is called)", async () => {
     const { submitTeamPraise } = await import("@/lib/server/customer-flow-service");
-    await submitTeamPraise(
-      "raw-token",
-      { sessionId: "s", responseId: "r", firstName: "Alice", idempotencyKey: "k4" },
-      meta,
-    );
-
-    const call = rpcCalls.find((c) => c.name === "rpc_public_submit_team_praise");
-    expect(call).toBeDefined();
-    expect(call!.params.p_token_hash).toBe(CURRENT_HASH);
-    expect(call!.params.p_previous_token_hash).toBe(PREVIOUS_HASH);
+    await expect(
+      submitTeamPraise("raw-token", {}, meta),
+    ).rejects.toMatchObject({ status: 410 });
+    expect(rpcCalls.find((c) => c.name === "rpc_public_submit_team_praise")).toBeUndefined();
   });
 });
 
@@ -202,25 +197,12 @@ describe("token rotation — previous session/response hash forwarding", () => {
       meta,
     );
 
-    const call = rpcCalls.find((c) => c.name === "rpc_public_record_google_click");
+    const call = rpcCalls.find((c) => c.name === "rpc_public_record_destination_step");
     expect(call).toBeDefined();
     expect(call!.params.p_previous_session_token_hash).toBe(PREVIOUS_SESSION_HASH);
     expect(call!.params.p_previous_response_token_hash).toBe(PREVIOUS_RESPONSE_HASH);
   });
 
-  it("submitTeamPraise passes p_previous_session_token_hash and p_previous_response_token_hash", async () => {
-    const { submitTeamPraise } = await import("@/lib/server/customer-flow-service");
-    await submitTeamPraise(
-      "raw-token",
-      { sessionId: "s", responseId: "r", firstName: "Alice", idempotencyKey: "k12" },
-      meta,
-    );
-
-    const call = rpcCalls.find((c) => c.name === "rpc_public_submit_team_praise");
-    expect(call).toBeDefined();
-    expect(call!.params.p_previous_session_token_hash).toBe(PREVIOUS_SESSION_HASH);
-    expect(call!.params.p_previous_response_token_hash).toBe(PREVIOUS_RESPONSE_HASH);
-  });
 });
 
 describe("token rotation — null previous hash when no rotation", () => {
@@ -259,7 +241,7 @@ describe("token rotation — null previous hash when no rotation", () => {
       meta,
     );
 
-    const call = rpcCalls.find((c) => c.name === "rpc_public_record_google_click");
+    const call = rpcCalls.find((c) => c.name === "rpc_public_record_destination_step");
     expect(call!.params.p_previous_session_token_hash).toBeNull();
     expect(call!.params.p_previous_response_token_hash).toBeNull();
 

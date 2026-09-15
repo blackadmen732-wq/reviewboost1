@@ -126,24 +126,4 @@ export const productionCustomerFlowApi: CustomerFlowApi = {
     });
   },
 
-  submitTeamPraise(token, body, options) {
-    return safely(async () => {
-      const result = await client.POST("/api/v1/public/q/{token}/team-praise", {
-        params: {
-          path: { token },
-          header: { "Idempotency-Key": options.idempotencyKey },
-        },
-        body,
-        ...(options.signal ? { signal: options.signal } : {}),
-      });
-
-      if ((result.response.status === 200 || result.response.status === 201) && result.data) {
-        return result.data;
-      }
-      if (result.response.ok) {
-        rejectUnexpectedSuccess(result.response);
-      }
-      throw toCustomerApiError(result.response, result.error);
-    });
-  },
 };
