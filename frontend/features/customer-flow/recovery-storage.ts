@@ -26,7 +26,7 @@ function isRating(value: unknown): value is RatingValue | null {
 }
 
 function isScreen(value: unknown): value is CustomerScreen {
-  return value === "rating" || value === "google" || value === "praise" || value === "finished";
+  return value === "rating" || value === "google" || value === "finished";
 }
 
 function isStatus(value: unknown): value is SubmissionStatus {
@@ -40,42 +40,32 @@ function parseStoredDraft(value: string): CustomerFlowState | null {
       draft.version !== storageVersion ||
       !isScreen(draft.screen) ||
       !isRating(draft.rating) ||
-      typeof draft.note !== "string" ||
       !isStringOrNull(draft.sessionId) ||
       !isStringOrNull(draft.responseId) ||
       !isStringOrNull(draft.sessionKey) ||
       !isStringOrNull(draft.responseKey) ||
       !isStringOrNull(draft.googleClickKey) ||
       typeof draft.googleClickPending !== "boolean" ||
-      !isStringOrNull(draft.praiseKey) ||
-      typeof draft.praiseFirstName !== "string" ||
-      typeof draft.praiseNote !== "string" ||
       !isStatus(draft.feedbackStatus) ||
-      !isStatus(draft.praiseStatus) ||
       !isLocale(draft.locale)
     ) {
       return null;
     }
 
-    if ((draft.screen === "google" || draft.screen === "praise") && (!draft.sessionId || !draft.responseId)) {
+    if (draft.screen === "google" && (!draft.sessionId || !draft.responseId)) {
       return null;
     }
 
     return {
       screen: draft.screen,
       rating: draft.rating,
-      note: draft.note.slice(0, 2000),
       sessionId: draft.sessionId,
       responseId: draft.responseId,
       sessionKey: draft.sessionKey,
       responseKey: draft.responseKey,
       googleClickKey: draft.googleClickKey,
       googleClickPending: draft.googleClickPending,
-      praiseKey: draft.praiseKey,
-      praiseFirstName: draft.praiseFirstName.slice(0, 80),
-      praiseNote: draft.praiseNote.slice(0, 2000),
       feedbackStatus: draft.feedbackStatus === "submitting" ? "error" : draft.feedbackStatus,
-      praiseStatus: draft.praiseStatus === "submitting" ? "error" : draft.praiseStatus,
       locale: draft.locale,
     };
   } catch {
@@ -120,4 +110,3 @@ export function clearCustomerDraft(token: string): void {
 export function safeInitialCustomerState(): CustomerFlowState {
   return { ...initialCustomerFlowState };
 }
-

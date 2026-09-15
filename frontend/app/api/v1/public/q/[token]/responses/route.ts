@@ -43,7 +43,6 @@ export async function POST(
       {
         sessionId: body.sessionId,
         rating: body.rating,
-        ...(body.note === undefined ? {} : { note: body.note }),
         idempotencyKey,
       },
       requestMetaOf(request, requestId),

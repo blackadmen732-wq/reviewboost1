@@ -28,7 +28,6 @@ import {
 import { FinishedScreen } from "@/features/customer-flow/screens/finished-screen";
 import { GoogleOpportunity } from "@/features/customer-flow/screens/google-opportunity";
 import { RatingScreen } from "@/features/customer-flow/screens/rating-screen";
-import { TeamPraiseScreen } from "@/features/customer-flow/screens/team-praise-screen";
 import {
   getCustomerFlowApi,
   type CustomerFlowApi,
@@ -37,10 +36,7 @@ import {
   CustomerApiError,
   isUnavailableReviewLink,
 } from "@/lib/api/customer-api-error";
-import type {
-  SubmitResponseRequest,
-  TeamPraiseRequest,
-} from "@/lib/api/customer-flow-types";
+import type { SubmitResponseRequest } from "@/lib/api/customer-flow-types";
 import { createIdempotencyKey } from "@/lib/api/idempotency";
 import {
   customerMessages,
@@ -55,19 +51,10 @@ interface CustomerFlowProps {
 
 interface FeedbackAttempt {
   rating: RatingValue;
-  note: string;
   locale: Locale;
   sessionId: string | null;
   sessionKey: string;
   responseKey: string;
-}
-
-interface PraiseAttempt {
-  firstName: string;
-  note: string;
-  sessionId: string;
-  responseId: string;
-  idempotencyKey: string;
 }
 
 function isOfflineError(error: unknown): boolean {
@@ -95,7 +82,6 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   const hadRecoveredDraft = useRef(false);
   const localeChosen = useRef(false);
   const feedbackInFlight = useRef(false);
-  const praiseInFlight = useRef(false);
   const googleClickInFlight = useRef(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
@@ -187,11 +173,9 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
         dispatch({ type: "session-ready", sessionId });
       }
 
-      const trimmedNote = attempt.note.trim();
       const body: SubmitResponseRequest = {
         sessionId,
         rating: attempt.rating,
-        ...(trimmedNote ? { note: trimmedNote } : {}),
       };
       const response = await api.submitResponse(token, body, {
         idempotencyKey: attempt.responseKey,
@@ -216,7 +200,6 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     try {
       const result = await feedbackMutation.mutateAsync({
         rating: state.rating,
-        note: state.note,
         locale: state.locale,
         sessionId: state.sessionId,
         sessionKey,
@@ -237,74 +220,11 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   }, [
     feedbackMutation,
     state.locale,
-    state.note,
     state.rating,
     state.responseKey,
     state.sessionId,
     state.sessionKey,
   ]);
-
-  const praiseMutation = useMutation({
-    networkMode: "always",
-    mutationFn: async (attempt: PraiseAttempt) => {
-      const api = await getCustomerFlowApi();
-      const trimmedNote = attempt.note.trim();
-      const body: TeamPraiseRequest = {
-        sessionId: attempt.sessionId,
-        responseId: attempt.responseId,
-        firstName: attempt.firstName.trim(),
-        ...(trimmedNote ? { note: trimmedNote } : {}),
-      };
-      return api.submitTeamPraise(token, body, {
-        idempotencyKey: attempt.idempotencyKey,
-      });
-    },
-  });
-
-  const submitPraise = useCallback(
-    async (firstName = state.praiseFirstName, note = state.praiseNote) => {
-      if (!state.sessionId || !state.responseId || praiseInFlight.current)
-        return;
-
-      const idempotencyKey =
-        state.praiseKey ?? createIdempotencyKey("team-praise");
-      dispatch({ type: "change-praise", firstName, note });
-      dispatch({ type: "praise-started", idempotencyKey });
-
-      if (!navigator.onLine) {
-        dispatch({ type: "praise-offline" });
-        return;
-      }
-
-      praiseInFlight.current = true;
-      try {
-        await praiseMutation.mutateAsync({
-          firstName,
-          note,
-          sessionId: state.sessionId,
-          responseId: state.responseId,
-          idempotencyKey,
-        });
-        dispatch({ type: "finish" });
-        clearCustomerDraft(token);
-      } catch (error) {
-        dispatch({
-          type: isOfflineError(error) ? "praise-offline" : "praise-failed",
-        });
-      } finally {
-        praiseInFlight.current = false;
-      }
-    },
-    [
-      praiseMutation,
-      state.praiseFirstName,
-      state.praiseKey,
-      state.praiseNote,
-      state.responseId,
-      state.sessionId,
-      token,
-    ],
-  );
 
   const recordGoogleClick = useCallback(
     async (
@@ -349,7 +269,6 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   useEffect(() => {
     function retryWhenOnline() {
       if (state.feedbackStatus === "offline") void submitFeedback();
-      if (state.praiseStatus === "offline") void submitPraise();
       if (state.googleClickPending && state.googleClickKey) {
         void getCustomerFlowApi().then((api) =>
           recordGoogleClick(api, state.googleClickKey as string, state),
@@ -359,7 +278,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
 
     window.addEventListener("online", retryWhenOnline);
     return () => window.removeEventListener("online", retryWhenOnline);
-  }, [recordGoogleClick, state, submitFeedback, submitPraise]);
+  }, [recordGoogleClick, state, submitFeedback]);
 
   useEffect(() => {
     if (
@@ -367,7 +286,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
       navigator.onLine &&
       state.googleClickPending &&
       state.googleClickKey &&
-      state.screen === "praise"
+      state.screen === "finished"
     ) {
       void getCustomerFlowApi().then((api) =>
         recordGoogleClick(api, state.googleClickKey as string, state),
@@ -432,12 +351,10 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
                 businessName={context.business.name}
                 messages={messages}
                 rating={state.rating}
-                note={state.note}
                 status={state.feedbackStatus}
                 onRatingChange={(rating) =>
                   dispatch({ type: "select-rating", rating })
                 }
-                onNoteChange={(note) => dispatch({ type: "change-note", note })}
                 onSubmit={() => void submitFeedback()}
               />
             ) : null}
@@ -447,23 +364,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
                 googleReviewUrl={context.googleReviewUrl}
                 messages={messages}
                 onGoogleAction={handleGoogleAction}
-                onContinue={() => dispatch({ type: "show-praise" })}
-              />
-            ) : null}
-            {state.screen === "praise" ? (
-              <TeamPraiseScreen
-                businessName={context.business.name}
-                messages={messages}
-                firstName={state.praiseFirstName}
-                note={state.praiseNote}
-                status={state.praiseStatus}
-                onDraftChange={(firstName, note) =>
-                  dispatch({ type: "change-praise", firstName, note })
-                }
-                onSubmit={(firstName, note) =>
-                  void submitPraise(firstName, note)
-                }
-                onSkip={() => {
+                onContinue={() => {
                   dispatch({ type: "finish" });
                   clearCustomerDraft(token);
                 }}

@@ -15,13 +15,6 @@ describe("review-integrity source boundaries", () => {
     expect(googleSource).not.toMatch(/rating|reviewThreshold/i);
   });
 
-  it("keeps Team Praise free of prohibited customer concepts", () => {
-    const praiseSource = source(
-      "features/customer-flow/screens/team-praise-screen.tsx",
-    );
-    expect(praiseSource).not.toMatch(/rating|google|bonus|payroll|reward|ranking/i);
-  });
-
   it("never references the legacy gating DTO or endpoints", () => {
     const apiSource = source("lib/api/production-customer-flow-api.ts");
     expect(apiSource).not.toContain("reviewThreshold");

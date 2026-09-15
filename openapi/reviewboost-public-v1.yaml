@@ -9,11 +9,14 @@ info:
   title: ReviewBoost public customer API
   version: 1.0.0
   description: >-
-    The five anonymous endpoints the customer review page calls. Backend-owned
-    and authoritative: `frontend/contracts/customer-flow.openapi.yaml` was the
-    frontend's statement of what it needed, and this document is the backend's
-    answer. They agree on every shape; this one additionally records the error
-    codes, the idempotency semantics, and the review-integrity guarantee.
+    The four anonymous endpoints the customer review page calls. Backend-owned
+    and authoritative; records the error codes, the idempotency semantics, and
+    the review-integrity guarantee.
+
+
+    V1 FLOW: open Tag → tap 1–5 → rating saved → Google. Private notes and
+    Team Praise are not active in V1. Historical data in the database is
+    preserved; these endpoints are simply not exposed.
 
 
     REVIEW INTEGRITY — binding, and a release blocker
@@ -186,52 +189,6 @@ paths:
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "404": { $ref: "#/components/responses/SessionInvalid" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
-        "429": { $ref: "#/components/responses/RateLimited" }
-        "500": { $ref: "#/components/responses/InternalError" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-
-  /api/v1/public/q/{token}/team-praise:
-    post:
-      operationId: submitTeamPraise
-      tags: [public]
-      summary: Persist private praise, with no rating data and no auto-matching
-      description: >-
-        Stored unmatched, with the name and note encrypted at rest. ReviewBoost
-        never guesses which colleague the customer meant: matching is a human
-        decision made later, with the rating deliberately out of view.
-
-
-        The response carries only the new id. `team_praise_records` has no
-        rating column at all, so the barrier holds in the schema rather than in
-        a query someone must remember to trim. Accepted after every rating,
-        including a one — praise and a complaint are not mutually exclusive.
-      parameters:
-        - $ref: "#/components/parameters/ReviewToken"
-        - $ref: "#/components/parameters/IdempotencyKey"
-        - $ref: "#/components/parameters/RequestId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/TeamPraiseRequest" }
-      responses:
-        "200":
-          description: Idempotent replay. Nothing was created on this call.
-          headers:
-            X-Request-Id: { $ref: "#/components/headers/RequestId" }
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/TeamPraiseResponse" }
-        "201":
-          description: Praise persisted
-          headers:
-            X-Request-Id: { $ref: "#/components/headers/RequestId" }
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/TeamPraiseResponse" }
-        "400": { $ref: "#/components/responses/ValidationFailed" }
-        "404": { $ref: "#/components/responses/SessionInvalid" }
-        "409": { $ref: "#/components/responses/ResponseConflict" }
         "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/InternalError" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
@@ -437,10 +394,6 @@ components:
           minimum: 1
           maximum: 5
           description: Stored exactly as chosen. Nothing downstream branches on it.
-        note:
-          type: string
-          maxLength: 2000
-          description: Optional for every rating, including four and five. Encrypted at rest.
 
     SubmitResponseResponse:
       type: object
@@ -456,30 +409,6 @@ components:
       properties:
         sessionId: { type: string }
         responseId: { type: string }
-
-    TeamPraiseRequest:
-      type: object
-      additionalProperties: false
-      required: [sessionId, responseId, firstName]
-      properties:
-        sessionId: { type: string }
-        responseId: { type: string }
-        firstName:
-          type: string
-          minLength: 1
-          maxLength: 80
-          description: Unicode, stored as written. Never transliterated.
-        note: { type: string, maxLength: 2000 }
-
-    TeamPraiseResponse:
-      type: object
-      additionalProperties: false
-      required: [teamPraiseId]
-      description: >-
-        Carries only the id. No rating, stars, Google state, bonus, payroll,
-        phone, email, or marketing field is ever serialised here.
-      properties:
-        teamPraiseId: { type: string, minLength: 1, maxLength: 160 }
 
     FieldError:
       type: object

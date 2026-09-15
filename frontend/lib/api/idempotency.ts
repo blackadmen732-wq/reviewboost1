@@ -1,5 +1,5 @@
 export type CustomerMutation =
-  "session" | "response" | "google-click" | "team-praise";
+  "session" | "response" | "google-click";
 
 export function createIdempotencyKey(operation: CustomerMutation): string {
   const cryptoApi = globalThis.crypto;

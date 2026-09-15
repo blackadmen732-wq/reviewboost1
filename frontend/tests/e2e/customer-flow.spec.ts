@@ -22,7 +22,7 @@ async function reachGoogle(page: Page, ratingIndex = 2) {
 }
 
 test.describe("ReviewBoost customer flow", () => {
-  test("ratings 1–5 receive the same Google DOM, styling, geometry, and Team Praise", async ({
+  test("ratings 1–5 receive the same Google DOM, styling, and geometry", async ({
     page,
   }) => {
     const snapshots: Array<{
@@ -52,10 +52,7 @@ test.describe("ReviewBoost customer flow", () => {
       });
 
       await google.getByRole("button", { name: "Continue without Google" }).click();
-      await expect(page.getByRole("heading", { name: "Want to thank someone?" })).toBeVisible();
-      await expect(page.locator("[data-flow-screen='team-praise']")).not.toContainText(
-        /rating|google|bonus|payroll|reward|ranking/i,
-      );
+      await expect(page.getByRole("heading", { name: "You're all done." })).toBeVisible();
     }
 
     expect(new Set(snapshots.map(({ html }) => html)).size).toBe(1);
@@ -69,41 +66,32 @@ test.describe("ReviewBoost customer flow", () => {
     await rating.focus();
     await page.keyboard.press("ArrowRight");
     await expect(page.getByRole("radio", { name: spokenRatings[1] })).toBeChecked();
-    await page.getByRole("textbox", { name: /want to add a note/i }).fill("Keyboard note");
     await page.getByRole("button", { name: "Continue" }).focus();
     await page.keyboard.press("Enter");
     const googleHeading = page.getByRole("heading", { name: "Thanks for sharing." });
     await expect(googleHeading).toBeFocused();
     await page.getByRole("button", { name: "Continue without Google" }).press("Enter");
-    await expect(page.getByRole("heading", { name: "Want to thank someone?" })).toBeFocused();
-    await page.getByRole("button", { name: "Skip" }).press("Enter");
-    await expect(page.getByRole("heading", { name: "You’re all done." })).toBeFocused();
+    await expect(page.getByRole("heading", { name: "You're all done." })).toBeFocused();
   });
 
-  test("offline submission keeps the private note and retries after reconnect", async ({
+  test("offline submission retries after reconnect", async ({
     context,
     page,
   }) => {
     await openFlow(page);
     await page.getByRole("radio", { name: spokenRatings[0] }).click();
-    const note = page.getByRole("textbox", { name: /want to add a note/i });
-    await note.fill("Please keep this note");
     await context.setOffline(true);
     await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.getByText("You’re offline. We’ll try when you reconnect.")).toBeVisible();
-    await expect(note).toHaveValue("Please keep this note");
+    await expect(page.getByText("You're offline. We'll try when you reconnect.")).toBeVisible();
     await context.setOffline(false);
     await expect(page.getByRole("heading", { name: "Thanks for sharing." })).toBeVisible();
   });
 
-  test("recoverable failure keeps content and reuses the same idempotency key", async ({ page }) => {
+  test("recoverable failure keeps selection and reuses the same idempotency key", async ({ page }) => {
     await openFlow(page, "fixture-response-error");
     await page.getByRole("radio", { name: spokenRatings[1] }).click();
-    const note = page.getByRole("textbox", { name: /want to add a note/i });
-    await note.fill("Retained after failure");
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(page.locator("#feedback-status")).toContainText("Your feedback is still here");
-    await expect(note).toHaveValue("Retained after failure");
     await page.getByRole("button", { name: "Try again" }).click();
     await expect(page.getByRole("heading", { name: "Thanks for sharing." })).toBeVisible();
 
@@ -129,11 +117,11 @@ test.describe("ReviewBoost customer flow", () => {
 
   test("unknown and inactive links are visually and textually indistinguishable", async ({ page }) => {
     await page.goto("/q/fixture-unknown");
-    await expect(page.getByRole("heading", { name: "This review link isn’t active." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "This review link isn't active." })).toBeVisible();
     const unknown = await page.locator(".customer-card").innerHTML();
 
     await page.goto("/q/fixture-inactive");
-    await expect(page.getByRole("heading", { name: "This review link isn’t active." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "This review link isn't active." })).toBeVisible();
     expect(await page.locator(".customer-card").innerHTML()).toBe(unknown);
   });
 
@@ -169,6 +157,5 @@ test.describe("ReviewBoost customer flow", () => {
     await page.getByRole("radio", { name: spokenRatings[3] }).click();
     const selectedLabel = page.locator(".star-option__input:checked + .star-option__label");
     await expect(selectedLabel).toHaveCSS("transform", "none");
-    await expect(page.locator("[data-rating-note]")).toHaveCSS("animation-name", "none");
   });
 });
