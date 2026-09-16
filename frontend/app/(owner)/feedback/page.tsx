@@ -43,14 +43,14 @@ export default async function FeedbackPage({
   const showAll = show === "all";
 
   const [{ items }, counts] = await Promise.all([
-    listReviews(organization.orgId, { withNotesOnly: true, limit: 50, ...(showAll ? {} : { openOnly: true }) }),
+    listReviews(organization.orgId, { limit: 50, ...(showAll ? {} : { openOnly: true }) }),
     getOwnerCounts(organization.orgId, organization.timezone),
   ]);
 
   return (
     <AppShell unreadCount={counts.unread}>
       <h1 className="mb-2 text-2xl font-semibold tracking-[-0.02em] text-ink">Feedback</h1>
-      <p className="mb-5 text-base text-muted">Messages customers wrote for you.</p>
+      <p className="mb-5 text-base text-muted">Ratings and messages from your customers.</p>
 
       <div className="mb-5 flex gap-2" role="group" aria-label="Filter feedback">
         <FilterTab href="/feedback" label="Needs you" active={!showAll} />

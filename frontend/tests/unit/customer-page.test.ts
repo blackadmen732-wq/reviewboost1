@@ -154,6 +154,53 @@ describe("writing the page", () => {
       saveCustomerPageDraft(await context(), ORG, null, { templateId: "bold" }, "req-6"),
     ).rejects.toThrow(/cannot change this page/);
   });
+
+  it("preserves all draft fields when only tagline changes", async () => {
+    // An owner with an existing draft containing template + logo + hero edits
+    // only the tagline. The full merged draft must reach the RPC so the RPC
+    // replace does not drop the other fields.
+    const { saveCustomerPageDraft } = await import("@/lib/server/customer-page-service");
+    const fullDraft = {
+      templateId: "bold" as const,
+      tagline: "Old tagline",
+      logoAssetId: "33333333-3333-3333-3333-333333333333",
+      heroAssetId: "44444444-4444-4444-4444-444444444444",
+    };
+
+    // Simulate what the editor does: load full draft, change tagline, save all.
+    await saveCustomerPageDraft(
+      await context(),
+      ORG,
+      null,
+      { ...fullDraft, tagline: "New tagline" },
+      "req-preserve-1",
+    );
+
+    const call = rpcCalls.find(({ name }) => name === "rpc_customer_page_save_draft");
+    const saved = call?.args["p_draft"] as Record<string, unknown>;
+    expect(saved["templateId"]).toBe("bold");
+    expect(saved["tagline"]).toBe("New tagline");
+    expect(saved["logoAssetId"]).toBe("33333333-3333-3333-3333-333333333333");
+    expect(saved["heroAssetId"]).toBe("44444444-4444-4444-4444-444444444444");
+  });
+
+  it("preserves all draft fields when saving without any change", async () => {
+    const { saveCustomerPageDraft } = await import("@/lib/server/customer-page-service");
+    const existingDraft = {
+      templateId: "minimal" as const,
+      tagline: "Unchanged",
+      heroAssetId: "55555555-5555-5555-5555-555555555555",
+    };
+
+    // Owner reloads editor and immediately saves — draft must be unchanged.
+    await saveCustomerPageDraft(await context(), ORG, null, { ...existingDraft }, "req-preserve-2");
+
+    const call = rpcCalls.find(({ name }) => name === "rpc_customer_page_save_draft");
+    const saved = call?.args["p_draft"] as Record<string, unknown>;
+    expect(saved["templateId"]).toBe("minimal");
+    expect(saved["tagline"]).toBe("Unchanged");
+    expect(saved["heroAssetId"]).toBe("55555555-5555-5555-5555-555555555555");
+  });
 });
 
 describe("uploads", () => {

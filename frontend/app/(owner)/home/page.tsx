@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/features/dashboard/app-shell";
 import { InstallPrompt } from "@/features/dashboard/install-prompt";
+import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page";
 import { StatusBanner } from "@/features/dashboard/status-banner";
 import { StatTile } from "@/features/dashboard/stat-tile";
 import { getOwnerCounts, localHour, requireOwner } from "@/lib/server/owner-data";
@@ -132,6 +133,12 @@ export default async function HomePage() {
           {hasStand ? "Print your code" : "Finish setting up"}
         </Link>
       </Button>
+
+      {hasStand && (
+        <div className="mt-4">
+          <PreviewCustomerPage />
+        </div>
+      )}
 
     </AppShell>
   );
