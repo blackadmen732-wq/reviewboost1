@@ -163,6 +163,76 @@ test.describe("ReviewBoost customer flow", () => {
     await expect(page.getByRole("radio", { name: spokenRatings[4] })).toBeAttached();
   });
 
+  /**
+   * The customer page fills the phone, and all five stars are on it.
+   *
+   * The live stage used to carry the preview's 390/844 canvas, so any viewport
+   * shorter than 844px — every phone, once the URL bar takes its cut — kept the
+   * ratio by shrinking its width. That left white bars down both sides and
+   * pushed the fifth star off the card. Only a real browser at a real phone
+   * size catches it, so it is checked here, where CI runs it.
+   */
+  for (const [label, width, height] of [
+    ["small", 320, 568],
+    ["common", 390, 664],
+    ["large", 430, 745],
+  ] as const) {
+    test(`fills the viewport and shows five stars on a ${label} phone`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await openFlow(page, "fixture-valid", { stayOnPage: true });
+
+      const stage = page.locator(".visit-stage");
+      const stageBox = await stage.boundingBox();
+      if (!stageBox) throw new Error("No stage box.");
+      // Edge to edge: no letterboxing.
+      expect(stageBox.x).toBeLessThanOrEqual(1);
+      expect(stageBox.width).toBeGreaterThanOrEqual(width - 1);
+
+      const stars = page.locator(".visit-star__label");
+      await expect(stars).toHaveCount(5);
+
+      const card = await page.locator(".visit-card").boundingBox();
+      if (!card) throw new Error("No card box.");
+      for (let index = 0; index < 5; index += 1) {
+        const star = await stars.nth(index).boundingBox();
+        if (!star) throw new Error(`Star ${index + 1} has no box.`);
+        expect(star.x).toBeGreaterThanOrEqual(card.x - 1);
+        expect(star.x + star.width).toBeLessThanOrEqual(card.x + card.width + 1);
+        // Still a thumb-sized target after scaling down.
+        expect(star.width).toBeGreaterThanOrEqual(44);
+      }
+    });
+  }
+
+  /**
+   * The fallback link is the whole point of the handoff screen.
+   *
+   * If the automatic redirect does not fire — a blocked popup, a slow network,
+   * a browser that declines the navigation — this link is how the customer
+   * still reaches the review page. It was being clipped by the fixed 44% card,
+   * so on a phone it existed but could not be tapped.
+   */
+  for (const [label, width, height] of [
+    ["small", 320, 568],
+    ["common", 390, 664],
+  ] as const) {
+    test(`handoff keeps the review link reachable on a ${label} phone`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await openFlow(page, "fixture-valid", { stayOnPage: true });
+      await page.getByRole("radio", { name: spokenRatings[2] }).click();
+
+      await expect(page.locator("[data-flow-screen='handoff']")).toBeVisible();
+      const link = page.getByRole("link", { name: /open the review page/i });
+      await expect(link).toBeVisible();
+
+      await link.scrollIntoViewIfNeeded();
+      const box = await link.boundingBox();
+      if (!box) throw new Error("Fallback link has no box.");
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y + box.height).toBeLessThanOrEqual(height + 1);
+    });
+  }
+
   test("reduced motion removes star scaling and content movement", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await openFlow(page, "fixture-valid", { stayOnPage: true });

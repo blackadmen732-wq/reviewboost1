@@ -13,7 +13,7 @@ import {
 } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Home — ReviewBoost",
+  title: "Home",
   robots: { index: false, follow: false },
 };
 

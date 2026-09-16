@@ -11,7 +11,7 @@ import { getReview, requireOwner } from "@/lib/server/owner-data";
 import { relativeDay } from "@/lib/utils/relative-day";
 
 export const metadata: Metadata = {
-  title: "Feedback — ReviewBoost",
+  title: "Feedback",
   robots: { index: false, follow: false },
 };
 

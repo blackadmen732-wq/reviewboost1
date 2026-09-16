@@ -5,7 +5,7 @@ import { BillingPanel } from "@/features/dashboard/billing-panel";
 import { readOwnerBilling, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Billing — ReviewBoost",
+  title: "Billing",
   robots: { index: false, follow: false },
 };
 

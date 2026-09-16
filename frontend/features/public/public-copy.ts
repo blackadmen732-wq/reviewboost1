@@ -22,6 +22,8 @@ export const PUBLIC_FOOTER = [
   { href: "/pricing", label: "Pricing" },
   { href: "/security", label: "Security" },
   { href: "/privacy", label: "Privacy" },
+  { href: "/terms", label: "Terms" },
+  { href: "/support", label: "Support" },
 ] as const;
 
 export function isGetStartedNext(path: string): boolean {

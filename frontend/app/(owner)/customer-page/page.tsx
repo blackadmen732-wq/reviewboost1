@@ -6,7 +6,7 @@ import { CustomerPageEditor } from "@/features/customer-page/customer-page-edito
 import { getOwnerCounts, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Customer Page — ReviewBoost",
+  title: "Customer Page",
   robots: { index: false, follow: false },
 };
 

@@ -8,7 +8,7 @@ import { getVisitSummary, listVisits, requireOwner } from "@/lib/server/owner-da
 import { relativeDay } from "@/lib/utils/relative-day";
 
 export const metadata: Metadata = {
-  title: "Customers — ReviewBoost",
+  title: "Customers",
   robots: { index: false, follow: false },
 };
 

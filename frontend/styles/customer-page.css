@@ -70,6 +70,61 @@
   overflow: hidden;
 }
 
+/* 56/44 is the *rating* geometry: the stars sit at a fixed height so the page
+ * cannot reflow under the customer's thumb while they choose.
+ *
+ * The handoff screen is a different shape — a heading, two lines of status and
+ * the "Open the review page" link. Pinned at 44% of a fixed-height stage, its
+ * content ran to 353px inside a 169px box, so that link was reachable only by
+ * scrolling a region most people will not realise scrolls. It is the fallback
+ * for when the automatic redirect does not fire, which makes it the last thing
+ * that may be hidden.
+ *
+ * So once the rating is taken, the stage stops being a fixed canvas: it grows
+ * with its content and the page scrolls normally. Nothing is clipped at any
+ * size, and the rating screen keeps the geometry that matters to it. */
+.customer-live:has([data-flow-screen="handoff"]),
+.customer-live:has([data-flow-screen="blocking"]) {
+  align-items: start;
+}
+
+.customer-live:has([data-flow-screen="handoff"]) .visit-stage,
+.customer-live:has([data-flow-screen="blocking"]) .visit-stage {
+  height: auto;
+  min-height: 100dvh;
+  max-height: none;
+}
+
+/* Flex is what squeezes: the column keeps dividing a fixed height however the
+   card is sized. On these screens the stage is ordinary block flow instead, so
+   the card is exactly as tall as its content and the page scrolls if it must. */
+.visit-stage:has([data-flow-screen="handoff"]),
+.visit-stage:has([data-flow-screen="blocking"]) {
+  display: block;
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+}
+
+.visit-stage:has([data-flow-screen="handoff"]) .visit-card,
+.visit-stage:has([data-flow-screen="blocking"]) .visit-card {
+  display: block;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.visit-stage:has([data-flow-screen="handoff"]) .visit-hero,
+.visit-stage:has([data-flow-screen="blocking"]) .visit-hero {
+  height: 32vh;
+  min-height: 160px;
+}
+
+.visit-stage:has([data-flow-screen="handoff"]) .visit-card__body,
+.visit-stage:has([data-flow-screen="blocking"]) .visit-card__body {
+  overflow: visible;
+}
+
 .visit-card__copy {
   flex: 0 0 auto;
   text-align: center;
@@ -128,11 +183,13 @@
   padding: 0;
 }
 
+/* Five stars, on a 320px phone as much as a 430px one. Fixed 52px targets with
+   an 18px gap needed 332px of card and clipped the fifth star below that. */
 .visit-stars__row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: clamp(6px, 3.5vw, 18px);
 }
 
 .visit-star {
@@ -149,16 +206,16 @@
 
 .visit-star__label {
   display: grid;
-  width: 52px;
-  height: 52px;
+  width: clamp(44px, 13vw, 52px);
+  height: clamp(44px, 13vw, 52px);
   place-items: center;
   color: #c5c5c5;
   cursor: pointer;
 }
 
 .visit-star__label svg {
-  width: 44px;
-  height: 44px;
+  width: clamp(38px, 11vw, 44px);
+  height: clamp(38px, 11vw, 44px);
   fill: transparent;
 }
 
@@ -217,11 +274,18 @@
   background: #fff;
 }
 
+/* The live page fills the phone. It does not imitate one.
+ *
+ * This used to force the 390/844 canvas here too, so on any viewport shorter
+ * than 844px — which is every phone once the browser's URL bar takes its cut —
+ * the stage kept the ratio by shrinking its own width, leaving white bars down
+ * both sides and squeezing the five stars until the fifth clipped off the card.
+ * The 390/844 canvas is the *preview's* geometry, inside phone chrome. Here the
+ * viewport is the phone, so the split is what matters, not the ratio. */
 .customer-live .visit-stage {
-  width: min(100vw, calc(100dvh * 390 / 844));
-  height: min(100dvh, calc(100vw * 844 / 390));
+  width: 100%;
+  height: 100dvh;
   max-height: 100dvh;
-  aspect-ratio: 390 / 844;
 }
 
 .customer-page-editor {

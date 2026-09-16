@@ -9,7 +9,7 @@ import { SignOutButton } from "@/features/dashboard/sign-out-button";
 import { getPrimaryLocation, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Settings — ReviewBoost",
+  title: "Settings",
   robots: { index: false, follow: false },
 };
 

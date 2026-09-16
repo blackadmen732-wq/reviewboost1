@@ -10,7 +10,7 @@ import { listStands, listLocations, requireOwner } from "@/lib/server/owner-data
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Tags — ReviewBoost",
+  title: "Tags",
   robots: { index: false, follow: false },
 };
 

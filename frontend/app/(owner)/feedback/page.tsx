@@ -9,7 +9,7 @@ import { getOwnerCounts, listReviews, requireOwner } from "@/lib/server/owner-da
 import { cn } from "@/lib/utils/cn";
 
 export const metadata: Metadata = {
-  title: "Feedback — ReviewBoost",
+  title: "Feedback",
   robots: { index: false, follow: false },
 };
 

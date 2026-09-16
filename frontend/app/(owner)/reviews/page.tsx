@@ -11,7 +11,7 @@ import { relativeDay } from "@/lib/utils/relative-day";
 import { cn } from "@/lib/utils/cn";
 
 export const metadata: Metadata = {
-  title: "Reviews — ReviewBoost",
+  title: "Reviews",
   robots: { index: false, follow: false },
 };
 

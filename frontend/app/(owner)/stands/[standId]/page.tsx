@@ -7,7 +7,7 @@ import { TagDetail } from "@/features/tags/tag-detail";
 import { getStand, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Tag — ReviewBoost",
+  title: "Tag",
   robots: { index: false, follow: false },
 };
 
