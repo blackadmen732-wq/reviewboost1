@@ -12,7 +12,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(14);
+select plan(18);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -117,10 +117,18 @@ select is(
 -- ================================================== import job idempotency
 
 select tests.set_service();
+
+-- First call: existed=false, running.
 select is(
-    app.customer_import_begin('7c000000-0000-0000-0000-0000000000c1', 'csv', null, false, 'imp-key-abc12345', null),
-    app.customer_import_begin('7c000000-0000-0000-0000-0000000000c1', 'csv', null, false, 'imp-key-abc12345', null),
-    'a retried import with the same idempotency key returns the same job id');
+    (select existed from app.customer_import_begin('7c000000-0000-0000-0000-0000000000c1', 'csv', null, false, 'imp-key-abc12345', null)),
+    false, 'first call to customer_import_begin reports existed=false');
+select is(
+    (select status::text from app.customer_import_begin('7c000000-0000-0000-0000-0000000000c1', 'csv', null, false, 'imp-key-abc12345', null)),
+    'running', 'a retried customer_import_begin reports the current job status');
+select is(
+    (select job_id from app.customer_import_begin('7c000000-0000-0000-0000-0000000000c1', 'csv', null, false, 'imp-key-abc12345', null)),
+    (select job_id from app.customer_import_begin('7c000000-0000-0000-0000-0000000000c1', 'csv', null, false, 'imp-key-abc12345', null)),
+    'a retried customer_import_begin returns the same job id (idempotent)');
 
 -- =================================================== per-row + finish =====
 
@@ -129,7 +137,7 @@ do $$
 declare
     v_job uuid;
 begin
-    v_job := app.customer_import_begin('7c000000-0000-0000-0000-0000000000c1', 'csv', null, false, 'imp-key-xyz45678', null);
+    select job_id into v_job from app.customer_import_begin('7c000000-0000-0000-0000-0000000000c1', 'csv', null, false, 'imp-key-xyz45678', null);
     perform app.customer_import_record_row(v_job, '7c000000-0000-0000-0000-0000000000c1', 1, 'imported', null, null, null);
     perform app.customer_import_record_row(v_job, '7c000000-0000-0000-0000-0000000000c1', 2, 'invalid', null, null, 'bad phone');
     -- Idempotent: re-recording the same (job, row_number) is a no-op.
@@ -144,6 +152,51 @@ select is(
 select is(
     (select status::text from public.customer_import_jobs where idempotency_key = 'imp-key-xyz45678'),
     'partial', 'a job with imports AND invalid rows finishes as partial');
+
+-- ============================================= visit upsert (Fix #4) ======
+
+select tests.set_service();
+-- Two visits for the same (org, source_kind, external_id) collapse via the
+-- nulls-not-distinct unique constraint; occurred_at reflects the later value.
+do $$
+declare
+    v_customer uuid;
+    v_visit1   uuid;
+    v_visit2   uuid;
+begin
+    select customer_id into v_customer from app.customer_upsert_by_phone(
+        '7c000000-0000-0000-0000-0000000000c1', repeat('b',64), null, 1::smallint, '0002',
+        'Bob', null, null, null, null);
+    v_visit1 := app.customer_visit_upsert(
+        '7c000000-0000-0000-0000-0000000000c1', v_customer, 'csv', 'visit-1',
+        '2026-01-01T10:00:00Z'::timestamptz, null, null);
+    v_visit2 := app.customer_visit_upsert(
+        '7c000000-0000-0000-0000-0000000000c1', v_customer, 'csv', 'visit-1',
+        '2026-01-02T10:00:00Z'::timestamptz, null, null);
+    if v_visit1 is distinct from v_visit2 then
+        raise exception 'visit upsert should return the same id on conflict';
+    end if;
+end $$;
+
+select is(
+    (select count(*)::integer from public.customer_visits
+      where customer_id = (select id from public.customers where org_id = '7c000000-0000-0000-0000-0000000000c1' and phone_hash = repeat('b',64))),
+    1, 'a resynced visit for the same (org, source_kind, external_id) is upserted, not duplicated');
+
+-- =========================== known-consent count (Fix #6) ==================
+
+-- Seed a consent row for Alice's phone hash, then ask how many of a set of
+-- hashes are "known" — only Alice's should count.
+select tests.set_service();
+select app.sms_record_consent(
+    '7c000000-0000-0000-0000-0000000000c1', repeat('a',64), 'v1:enc', 1::smallint, '0001',
+    'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+
+select is(
+    app.customer_count_known_consent(
+        '7c000000-0000-0000-0000-0000000000c1',
+        array[repeat('a',64), repeat('b',64), repeat('c',64)]),
+    1, 'known-consent count reflects sms_consent_state, not a blanket upper bound');
 
 -- ============================================================== RLS =======
 

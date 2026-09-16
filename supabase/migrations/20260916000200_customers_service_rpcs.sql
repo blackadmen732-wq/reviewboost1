@@ -46,9 +46,30 @@ create or replace function public.rpc_customer_import_begin(
     p_idempotency_key    text,
     p_actor              uuid
 )
+returns table (job_id uuid, existed boolean, status public.customer_import_status)
+language sql security definer set search_path = ''
+as $$ select * from app.customer_import_begin(p_org_id, p_source_kind, p_source_connection_id, p_dry_run, p_idempotency_key, p_actor); $$;
+
+create or replace function public.rpc_customer_visit_upsert(
+    p_org_id      uuid,
+    p_customer_id uuid,
+    p_source_kind public.customer_source_kind,
+    p_external_id text,
+    p_occurred_at timestamptz,
+    p_note_encrypted text,
+    p_meta        jsonb
+)
 returns uuid
 language sql security definer set search_path = ''
-as $$ select app.customer_import_begin(p_org_id, p_source_kind, p_source_connection_id, p_dry_run, p_idempotency_key, p_actor); $$;
+as $$ select app.customer_visit_upsert(p_org_id, p_customer_id, p_source_kind, p_external_id, p_occurred_at, p_note_encrypted, p_meta); $$;
+
+create or replace function public.rpc_customer_count_known_consent(
+    p_org_id       uuid,
+    p_phone_hashes text[]
+)
+returns integer
+language sql security definer set search_path = ''
+as $$ select app.customer_count_known_consent(p_org_id, p_phone_hashes); $$;
 
 create or replace function public.rpc_customer_import_record_row(
     p_job_id             uuid,
@@ -92,7 +113,9 @@ begin
         'public.rpc_customer_external_link(uuid, uuid, public.customer_source_kind, uuid, text, jsonb)',
         'public.rpc_customer_import_begin(uuid, public.customer_source_kind, uuid, boolean, text, uuid)',
         'public.rpc_customer_import_record_row(uuid, uuid, integer, public.customer_import_row_action, uuid, text, text)',
-        'public.rpc_customer_import_finish(uuid, uuid, integer, integer, integer, integer, integer, integer, integer, text)'
+        'public.rpc_customer_import_finish(uuid, uuid, integer, integer, integer, integer, integer, integer, integer, text)',
+        'public.rpc_customer_visit_upsert(uuid, uuid, public.customer_source_kind, text, timestamptz, text, jsonb)',
+        'public.rpc_customer_count_known_consent(uuid, text[])'
     ]
     loop
         execute format('revoke all on function %s from public, anon, authenticated;', fn);

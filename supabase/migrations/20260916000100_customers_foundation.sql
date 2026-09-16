@@ -233,9 +233,14 @@ end $$;
 -- --------------------------------------------- definer writers ------------
 
 -- Match or create a canonical customer by phone hash (with optional email).
--- Idempotent: matching an existing phone updates last_seen_at and returns the
--- same customer id; a new phone creates one row. Cross-org leakage is
--- impossible: matches are always scoped to (org_id, phone_hash).
+-- ATOMIC: a single `INSERT ... ON CONFLICT (org_id, phone_hash) DO UPDATE`
+-- statement, so two imports processing the same previously-unseen phone
+-- concurrently cannot BOTH see "no row", both insert, and have the second
+-- one fail the unique constraint. `xmax = 0` on the returned row means the
+-- tuple was newly inserted (not matched); a nonzero `xmax` means the
+-- `ON CONFLICT DO UPDATE` branch ran, so we matched an existing customer.
+-- Cross-org leakage remains impossible: matches are always scoped to
+-- (org_id, phone_hash).
 create or replace function app.customer_upsert_by_phone(
     p_org_id            uuid,
     p_phone_hash        text,
@@ -255,36 +260,27 @@ set search_path = ''
 as $$
 declare
     v_id uuid;
-    v_matched boolean := false;
+    v_matched boolean;
 begin
     if p_phone_hash is null then
         raise exception 'phone_hash is required to upsert a customer';
     end if;
 
-    select id into v_id
-      from public.customers
-     where org_id = p_org_id and phone_hash = p_phone_hash;
-
-    if v_id is not null then
-        v_matched := true;
-        update public.customers
-           set last_seen_at = now(),
-               display_name = coalesce(display_name, p_display_name),
-               email_hash = coalesce(email_hash, p_email_hash),
-               email_encrypted = coalesce(email_encrypted, p_email_encrypted),
-               email_key_version = coalesce(email_key_version, p_email_key_version),
-               email_domain = coalesce(email_domain, p_email_domain),
-               updated_at = now()
-         where id = v_id;
-    else
-        insert into public.customers
-            (org_id, display_name, phone_hash, phone_encrypted, phone_key_version, phone_last_four,
-             email_hash, email_encrypted, email_key_version, email_domain)
-        values
-            (p_org_id, p_display_name, p_phone_hash, p_phone_encrypted, p_phone_key_version, p_phone_last_four,
-             p_email_hash, p_email_encrypted, p_email_key_version, p_email_domain)
-        returning id into v_id;
-    end if;
+    insert into public.customers
+        (org_id, display_name, phone_hash, phone_encrypted, phone_key_version, phone_last_four,
+         email_hash, email_encrypted, email_key_version, email_domain)
+    values
+        (p_org_id, p_display_name, p_phone_hash, p_phone_encrypted, p_phone_key_version, p_phone_last_four,
+         p_email_hash, p_email_encrypted, p_email_key_version, p_email_domain)
+    on conflict (org_id, phone_hash) do update
+       set last_seen_at = now(),
+           display_name = coalesce(public.customers.display_name, excluded.display_name),
+           email_hash = coalesce(public.customers.email_hash, excluded.email_hash),
+           email_encrypted = coalesce(public.customers.email_encrypted, excluded.email_encrypted),
+           email_key_version = coalesce(public.customers.email_key_version, excluded.email_key_version),
+           email_domain = coalesce(public.customers.email_domain, excluded.email_domain),
+           updated_at = now()
+    returning id, (xmax <> 0) into v_id, v_matched;
 
     -- Record the phone as a contact identity (idempotent).
     insert into public.customer_contact_identities
@@ -338,8 +334,14 @@ begin
 end;
 $$;
 
--- Open an import job, idempotent on (org_id, idempotency_key). A retry of the
--- same upload returns the existing job rather than duplicating it.
+-- Open an import job, idempotent on (org_id, idempotency_key). A retry with
+-- the same key returns the existing job WITH its current status, so the
+-- caller can distinguish "we just opened this" (existed=false, run the
+-- pipeline) from "this job was already finished" (existed=true and status
+-- in succeeded/partial/failed — replay the stored result, do not
+-- reprocess the payload) from "another worker is running" (existed=true
+-- with status running/pending — return the current state, do not
+-- reprocess).
 create or replace function app.customer_import_begin(
     p_org_id             uuid,
     p_source_kind        public.customer_source_kind,
@@ -348,13 +350,14 @@ create or replace function app.customer_import_begin(
     p_idempotency_key    text,
     p_actor              uuid
 )
-returns uuid
+returns table (job_id uuid, existed boolean, status public.customer_import_status)
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
     v_id uuid;
+    v_status public.customer_import_status;
 begin
     insert into public.customer_import_jobs
         (org_id, source_connection_id, source_kind, idempotency_key, dry_run, status, started_at, created_by)
@@ -364,11 +367,14 @@ begin
     on conflict (org_id, idempotency_key) do nothing
     returning id into v_id;
 
-    if v_id is null then
-        select id into v_id from public.customer_import_jobs
-         where org_id = p_org_id and idempotency_key = p_idempotency_key;
+    if v_id is not null then
+        return query select v_id, false, 'running'::public.customer_import_status;
+    else
+        select j.id, j.status into v_id, v_status
+          from public.customer_import_jobs j
+         where j.org_id = p_org_id and j.idempotency_key = p_idempotency_key;
+        return query select v_id, true, v_status;
     end if;
-    return v_id;
 end;
 $$;
 
@@ -442,6 +448,62 @@ begin
 end;
 $$;
 
+-- Record a visit (interaction event) for a canonical customer. Idempotent
+-- per (org_id, source_kind, external_id) via the `customer_visits`
+-- constraint (`nulls not distinct`), so a resync of the same source event
+-- does not double-record. When `external_id` is null the visit is treated
+-- as unique to that call (unique constraint still applies but null-null is
+-- not distinct → at most one null-external row per (org, source)).
+create or replace function app.customer_visit_upsert(
+    p_org_id      uuid,
+    p_customer_id uuid,
+    p_source_kind public.customer_source_kind,
+    p_external_id text,
+    p_occurred_at timestamptz,
+    p_note_encrypted text,
+    p_meta        jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+    v_id uuid;
+begin
+    insert into public.customer_visits
+        (customer_id, org_id, source_kind, external_id, occurred_at, note_encrypted, meta)
+    values
+        (p_customer_id, p_org_id, p_source_kind, p_external_id, p_occurred_at, p_note_encrypted, p_meta)
+    on conflict (org_id, source_kind, external_id) do update
+       set occurred_at = excluded.occurred_at,
+           note_encrypted = coalesce(excluded.note_encrypted, public.customer_visits.note_encrypted),
+           meta = coalesce(excluded.meta, public.customer_visits.meta)
+    returning id into v_id;
+    return v_id;
+end;
+$$;
+
+-- Count how many of the given phone hashes have any recorded SMS consent
+-- state for this org — the counterpart to "unknown consent" the importer
+-- reports honestly. A hash with no row is unknown; any row (opted_in,
+-- opted_out, unknown, help) counts as "known". Scoped by org so a hash
+-- known at another tenant does not leak.
+create or replace function app.customer_count_known_consent(
+    p_org_id       uuid,
+    p_phone_hashes text[]
+)
+returns integer
+language sql
+security definer
+set search_path = ''
+as $$
+    select coalesce(count(distinct s.phone_hash)::integer, 0)
+      from public.sms_consent_state s
+     where s.org_id = p_org_id
+       and s.phone_hash = any(p_phone_hashes);
+$$;
+
 -- --------------------------------------------------------- grants ----------
 
 do $$
@@ -453,7 +515,9 @@ begin
         'app.customer_external_link(uuid, uuid, public.customer_source_kind, uuid, text, jsonb)',
         'app.customer_import_begin(uuid, public.customer_source_kind, uuid, boolean, text, uuid)',
         'app.customer_import_record_row(uuid, uuid, integer, public.customer_import_row_action, uuid, text, text)',
-        'app.customer_import_finish(uuid, uuid, integer, integer, integer, integer, integer, integer, integer, text)'
+        'app.customer_import_finish(uuid, uuid, integer, integer, integer, integer, integer, integer, integer, text)',
+        'app.customer_visit_upsert(uuid, uuid, public.customer_source_kind, text, timestamptz, text, jsonb)',
+        'app.customer_count_known_consent(uuid, text[])'
     ]
     loop
         execute format('revoke all on function %s from public, anon, authenticated;', fn);
