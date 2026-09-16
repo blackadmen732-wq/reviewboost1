@@ -203,7 +203,7 @@ export function CustomerPageEditor({
   const previewPage = {
     heroUrl: heroUrl ?? null,
     tagline: draft.tagline ?? null,
-    templateId: draft.templateId,
+    templateId: draft.templateId ?? ("classic" as const),
     logoUrl: null,
   };
 
