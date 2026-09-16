@@ -81,12 +81,15 @@ export const PRICING = {
 
 export const SECURITY = {
   headline: "Held the way a till should be held.",
-  lede: "Owner pages need a signed-in session. Customer pages do not collect a name, phone, or email.",
+  lede: "Owner pages need a signed-in session. Customer pages collect a rating and nothing else — no name, phone, or email.",
 } as const;
 
 export const PRIVACY = {
   headline: "We do not ask your customers who they are.",
-  lede: "The public page takes a rating and, if they want, a few words. That is all.",
+  // V1 takes the star and nothing else — no note field, and no team praise.
+  // A privacy disclosure that overstates what is collected is the one kind of
+  // copy that cannot be approximately right.
+  lede: "The public page takes a rating. That is all.",
 } as const;
 
 export const CLOSE = {

@@ -794,11 +794,16 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
       .eq("org_id", orgId)
       .gte("submitted_at", priorWeekStart.toISOString())
       .lt("submitted_at", weekStart.toISOString()),
+    // Unread *and* unresolved, matching the list Home and Feedback actually
+    // show. Counting every unread row meant a rating a teammate had already
+    // resolved still said "1 message needs you" above a list with nothing in
+    // it — the owner goes looking for work that is not there.
     supabase
       .from("customer_responses")
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
-      .is("read_at", null),
+      .is("read_at", null)
+      .is("resolved_at", null),
     supabase
       .from("praise_safe_view")
       .select("id", { count: "exact", head: true })

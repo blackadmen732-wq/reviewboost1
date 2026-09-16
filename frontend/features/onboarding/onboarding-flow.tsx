@@ -69,50 +69,62 @@ export function OnboardingFlow() {
     return base.length >= 3 ? `${base}-${suffix}` : `business-${suffix}`;
   }
 
+  /**
+   * Create the business, and never strand the owner if the network drops.
+   *
+   * The session lookup and the POST used to sit outside any try/catch with
+   * `busy` already set, so a rejected request escaped the voided click handler
+   * and left both Continue and "I will do this later" spinning and disabled,
+   * with no error shown. That is the first screen of the product, and the only
+   * way out was a reload that loses what they typed.
+   */
   async function finish(withUrl: string | undefined) {
     setBusy(true);
     setError(null);
 
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
+    try {
+      const {
+        data: { session },
+      } = await supabaseBrowser().auth.getSession();
 
-    if (!session) {
+      if (!session) {
+        setError("Your session expired. Please sign in again.");
+        return;
+      }
+
+      const response = await fetch("/api/v1/onboarding", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          slug: slugify(name),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          defaultLocale: "en",
+          locationName: name.trim(),
+          ...(withUrl ? { googleReviewUrl: withUrl } : {}),
+        }),
+      });
+
+      if (!response.ok) {
+        setError(
+          response.status === 409
+            ? "That name is already taken. Try adding your street or city."
+            : "Something went wrong. Please try again.",
+        );
+        return;
+      }
+
+      const body = (await response.json()) as { data: Created };
+      setCreated(body.data);
+      setStep("done");
+    } catch {
+      setError("Could not reach ReviewBoost. Check your connection and try again.");
+    } finally {
       setBusy(false);
-      setError("Your session expired. Please sign in again.");
-      return;
     }
-
-    const response = await fetch("/api/v1/onboarding", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        name: name.trim(),
-        slug: slugify(name),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-        defaultLocale: "en",
-        locationName: name.trim(),
-        ...(withUrl ? { googleReviewUrl: withUrl } : {}),
-      }),
-    });
-
-    setBusy(false);
-
-    if (!response.ok) {
-      setError(
-        response.status === 409
-          ? "That name is already taken. Try adding your street or city."
-          : "Something went wrong. Please try again.",
-      );
-      return;
-    }
-
-    const body = (await response.json()) as { data: Created };
-    setCreated(body.data);
-    setStep("done");
   }
 
   // ------------------------------------------------------------ step 1 -----
