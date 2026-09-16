@@ -5,6 +5,7 @@ import {
   isHomeEmpty,
   tagProgramPhase,
   tagProgramPhaseLabel,
+  summarizeTags,
   tagStatusLine,
   type HomeCounts,
   type HomeStand,
@@ -219,5 +220,99 @@ describe("tagStatusLine", () => {
     expect(
       tagStatusLine({ total: 2, live: 2, programmed: 2, needsRewrite: 1 }),
     ).toBe("2 tags · 1 needs reprogramming");
+  });
+});
+
+/**
+ * A Tag that is paused or retired is not doing anything for the business.
+ *
+ * `hasStand` used to be `tags.live > 0 || tags.total > 0`, so the second clause
+ * made any Tag count. An org whose only Tag was retired saw a finished setup,
+ * no prompt to fix it, and a "preview customer page" button pointing at a Tag
+ * that no longer resolves.
+ */
+describe("only active Tags count as ready", () => {
+  const paused: HomeStand = {
+    standId: "paused-1",
+    label: "Paused",
+    status: "paused",
+    nfcProvisionedAt: "2026-01-01T00:00:00Z",
+    tokenRotatedAt: null,
+  };
+  const retired: HomeStand = { ...paused, standId: "retired-1", status: "retired" };
+  const active: HomeStand = { ...paused, standId: "active-1", status: "active" };
+
+  const counts = {
+    ratingsToday: 0,
+    unread: 0,
+    activeStands: 0,
+    recentCount: 0,
+    hasGoogleLink: true,
+  };
+
+  it("shows the missing-active-Tag state when every Tag is paused or retired", () => {
+    const model = deriveHomeModel({ counts, stands: [paused, retired], hasLocation: true });
+
+    expect(model.attentions.map((a) => a.kind)).toContain("tag-missing");
+    expect(model.primary).toEqual({ label: "Create a Tag", href: "/stands" });
+  });
+
+  it("says Tags exist but none are live, rather than none exist", () => {
+    const model = deriveHomeModel({ counts, stands: [paused], hasLocation: true });
+    const missing = model.attentions.find((a) => a.kind === "tag-missing");
+
+    expect(missing?.title).toBe("No Tag is live");
+    expect(missing?.body).toMatch(/paused or retired/i);
+  });
+
+  it("offers no customer preview when no Tag is live", () => {
+    // The preview opens the live /q page, which a retired Tag cannot serve.
+    const model = deriveHomeModel({ counts, stands: [paused, retired], hasLocation: true });
+
+    expect(model.showPreview).toBe(false);
+    expect(model.previewStandId).toBeNull();
+  });
+
+  it("never picks a non-active Tag for the preview", () => {
+    const model = deriveHomeModel({
+      counts,
+      stands: [retired, paused, active],
+      hasLocation: true,
+    });
+    expect(model.previewStandId).toBe("active-1");
+  });
+
+  it("does not count a paused Tag as programmed", () => {
+    const status = summarizeTags([paused, retired]);
+
+    expect(status.total).toBe(2);
+    expect(status.live).toBe(0);
+    expect(status.programmed).toBe(0);
+  });
+
+  it("does not nag about reprogramming a retired Tag", () => {
+    const staleRetired: HomeStand = {
+      ...retired,
+      nfcProvisionedAt: "2026-01-01T00:00:00Z",
+      tokenRotatedAt: "2026-02-01T00:00:00Z",
+    };
+    const status = summarizeTags([staleRetired]);
+    expect(status.needsRewrite).toBe(0);
+
+    const model = deriveHomeModel({ counts, stands: [staleRetired], hasLocation: true });
+    expect(model.attentions.map((a) => a.kind)).not.toContain("tag-rewrite");
+  });
+
+  it("goes back to ready once a Tag is active again", () => {
+    const model = deriveHomeModel({ counts, stands: [active], hasLocation: true });
+
+    expect(model.attentions.map((a) => a.kind)).not.toContain("tag-missing");
+    expect(model.showPreview).toBe(true);
+    expect(model.previewStandId).toBe("active-1");
+  });
+
+  it("reads as none live in the status line", () => {
+    expect(tagStatusLine(summarizeTags([paused]))).toBe("1 tag, none live");
+    expect(tagStatusLine(summarizeTags([paused, retired]))).toBe("2 tags, none live");
   });
 });

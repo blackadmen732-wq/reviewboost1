@@ -16,12 +16,23 @@ function source(path: string): string {
 }
 
 describe("hero transform", () => {
-  it("clamps drag and pinch so the photo cannot leave the frame", () => {
+  it("clamps the crop so the photo cannot leave the frame", () => {
+    // The travel available is the overhang the scale creates, (s - 1) / 2. At
+    // the maximum scale of 3 that is ±100, so ±90 is genuinely still covered.
+    // This used to assert a flat ±50 at every scale, which was both too tight
+    // here and — the reason it mattered — far too loose at scale 1, where it
+    // let the artwork slide off and show empty background behind it.
     expect(clampHeroTransform({ x: 90, y: -90, scale: 9 })).toEqual({
-      x: 50,
-      y: -50,
+      x: 90,
+      y: -90,
       scale: 3,
     });
+    expect(clampHeroTransform({ x: 150, y: -150, scale: 3 })).toEqual({
+      x: 100,
+      y: -100,
+      scale: 3,
+    });
+    expect(clampHeroTransform({ x: 30, y: -30, scale: 1 })).toEqual({ x: 0, y: 0, scale: 1 });
     expect(heroTransformStyle({ x: 10, y: -4, scale: 1.5 })).toBe(
       "translate(10%, -4%) scale(1.5)",
     );

@@ -169,31 +169,57 @@ export function CustomerPageEditor({
     }
   }, [draft, onSaved]);
 
+  /**
+   * Publish is save-then-publish, and the save has to succeed.
+   *
+   * The save result used to be discarded. Publish snapshots whatever draft the
+   * server currently holds, so a failed save — expired session, validation,
+   * dropped connection — meant publishing the *previous* draft and then telling
+   * the owner "Page is live!". They would walk away believing the photo they
+   * just picked was on the counter. Stop at the first failure and say which
+   * step failed.
+   */
   const publish = useCallback(async () => {
     setPublishing(true);
     setStatusMsg(null);
-    // Save the full draft first so the published snapshot captures everything.
-    await fetch("/api/v1/customer-page", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...draft, tagline: draft.tagline ?? null }),
-    });
 
-    const res = await fetch("/api/v1/customer-page", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    setPublishing(false);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setStatusMsg(
-        (err as { error?: { message?: string } }).error?.message ?? "Publish failed. Try again.",
-      );
-    } else {
+    try {
+      const saved = await fetch("/api/v1/customer-page", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...draft, tagline: draft.tagline ?? null }),
+      });
+
+      if (!saved.ok) {
+        const err = await saved.json().catch(() => ({}));
+        setStatusMsg(
+          (err as { error?: { message?: string } }).error?.message ??
+            "Could not save your changes, so nothing was published. Try again.",
+        );
+        return;
+      }
+
+      const res = await fetch("/api/v1/customer-page", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setStatusMsg(
+          (err as { error?: { message?: string } }).error?.message ?? "Publish failed. Try again.",
+        );
+        return;
+      }
+
       setStatusMsg("Page is live!");
       setIsPublished(true);
       onSaved?.();
+    } catch {
+      setStatusMsg("Could not reach ReviewBoost. Check your connection and try again.");
+    } finally {
+      setPublishing(false);
     }
   }, [draft, onSaved]);
 

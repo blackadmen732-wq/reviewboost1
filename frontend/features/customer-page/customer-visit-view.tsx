@@ -1,6 +1,6 @@
 "use client";
 
-import type { PointerEvent, ReactNode, WheelEvent } from "react";
+import type { ReactNode } from "react";
 
 import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
 import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
@@ -9,7 +9,6 @@ import {
   heroTransformStyle,
   type HeroTransform,
 } from "@/lib/owner/hero-transform";
-import { cn } from "@/lib/utils/cn";
 
 /**
  * The customer page. Owner preview and live /q render this same tree.
@@ -17,6 +16,13 @@ import { cn } from "@/lib/utils/cn";
  *
  * SoT v1.9 / v1.10: Mario’s Pizza — rich hero, fixed white card, five stars,
  * ReviewBoost footer. No location. Same crop the customer sees.
+ *
+ * The hero has no drag or pinch controls in V1. It carried a single-pointer
+ * drag and a wheel handler that read as pinch-to-zoom without being it, and the
+ * Customer Page contract stores no per-owner transform — so whatever the owner
+ * dragged to was never sent anywhere and the customer received the default crop
+ * regardless. One deterministic crop, shared by this preview and /q/{token}, is
+ * the honest version. Real crop controls need the transform persisted first.
  */
 
 export interface CustomerVisitViewProps {
@@ -27,12 +33,6 @@ export interface CustomerVisitViewProps {
   footerLine: string;
   children: ReactNode;
   language?: ReactNode;
-  /** Owner editor only: drag/pinch the hero. The card never receives this. */
-  heroInteractive?: boolean;
-  onHeroPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
-  onHeroPointerMove?: (event: PointerEvent<HTMLDivElement>) => void;
-  onHeroPointerUp?: (event: PointerEvent<HTMLDivElement>) => void;
-  onHeroWheel?: (event: WheelEvent<HTMLDivElement>) => void;
 }
 
 export function CustomerVisitView({
@@ -43,11 +43,6 @@ export function CustomerVisitView({
   footerLine,
   children,
   language,
-  heroInteractive = false,
-  onHeroPointerDown,
-  onHeroPointerMove,
-  onHeroPointerUp,
-  onHeroWheel,
 }: CustomerVisitViewProps) {
   const crop = clampHeroTransform(transform);
 
@@ -58,15 +53,7 @@ export function CustomerVisitView({
       data-customer-canvas={CUSTOMER_CANVAS.aspectRatio}
       data-card-fixed=""
     >
-      <div
-        className={cn("visit-hero", heroInteractive && "visit-hero--live")}
-        data-hero-layer
-        onPointerDown={heroInteractive ? onHeroPointerDown : undefined}
-        onPointerMove={heroInteractive ? onHeroPointerMove : undefined}
-        onPointerUp={heroInteractive ? onHeroPointerUp : undefined}
-        onPointerCancel={heroInteractive ? onHeroPointerUp : undefined}
-        onWheel={heroInteractive ? onHeroWheel : undefined}
-      >
+      <div className="visit-hero" data-hero-layer>
         {heroUrl ? (
           // Artwork origin is the owner's published/draft upload.
           // eslint-disable-next-line @next/next/no-img-element

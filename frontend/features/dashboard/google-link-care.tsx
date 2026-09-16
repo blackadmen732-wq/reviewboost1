@@ -63,44 +63,56 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
     setBusy(true);
     setError(null);
 
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
+    // Everything that can throw is inside the try, and `busy` is cleared in
+    // `finally`. Previously a dropped connection or an auth failure threw out
+    // of `save()` with `busy` still true: the button stayed in its loading
+    // state forever and the owner had no way to retry but reload the page —
+    // on the one field whose absence stops every Tag from working.
+    try {
+      const {
+        data: { session },
+      } = await supabaseBrowser().auth.getSession();
 
-    if (!session) {
+      if (!session) {
+        setError("Your session expired. Sign in again, then save.");
+        notify.error("Please sign in again", "Your session expired.");
+        return;
+      }
+
+      const response = await fetch("/api/v1/settings", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ destinationProvider: "google", destinationUrl: trimmed }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: { message?: string; details?: Array<{ message?: string }> };
+        } | null;
+        setError(
+          payload?.error?.details?.[0]?.message ??
+            payload?.error?.message ??
+            "Could not save that. Please try again.",
+        );
+        return;
+      }
+
+      setEditing(false);
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 4000);
+      router.refresh();
+      notify.success("Saved", "Google link updated.");
+    } catch {
+      // Transport or auth failure: say so, and leave the draft in the field so
+      // pressing Save again is the whole retry.
+      setError("Could not reach ReviewBoost. Check your connection and try again.");
+      notify.error("Could not save", "Check your connection and try again.");
+    } finally {
       setBusy(false);
-      notify.error("Please sign in again", "Your session expired.");
-      return;
     }
-
-    const response = await fetch("/api/v1/settings", {
-      method: "PATCH",
-      headers: {
-        "content-type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ destinationProvider: "google", destinationUrl: trimmed }),
-    });
-
-    setBusy(false);
-
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as {
-        error?: { message?: string; details?: Array<{ message?: string }> };
-      } | null;
-      setError(
-        payload?.error?.details?.[0]?.message ??
-          payload?.error?.message ??
-          "Could not save that. Please try again.",
-      );
-      return;
-    }
-
-    setEditing(false);
-    setJustSaved(true);
-    setTimeout(() => setJustSaved(false), 4000);
-    router.refresh();
-    notify.success("Saved", "Google link updated.");
   }
 
   return (

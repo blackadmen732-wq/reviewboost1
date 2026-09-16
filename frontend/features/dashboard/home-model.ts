@@ -86,12 +86,22 @@ export function tagProgramPhaseLabel(phase: TagProgramPhase): string {
   return "Programmed";
 }
 
+/**
+ * Only an active Tag is doing anything for the business.
+ *
+ * programmed and needsRewrite deliberately count active Tags alone. A retired
+ * Tag whose code has moved on is not work anybody should be nagged about, and
+ * counting a paused one as programmed made setup look finished while nothing on
+ * the counter actually worked. `total` stays every Tag, because the list still
+ * shows them.
+ */
 export function summarizeTags(stands: HomeStand[]): TagStatus {
+  const active = stands.filter((stand) => stand.status === "active");
   return {
     total: stands.length,
-    live: stands.filter((stand) => stand.status === "active").length,
-    programmed: stands.filter((stand) => stand.nfcProvisionedAt !== null).length,
-    needsRewrite: stands.filter(tagNeedsRewrite).length,
+    live: active.length,
+    programmed: active.filter((stand) => stand.nfcProvisionedAt !== null).length,
+    needsRewrite: active.filter(tagNeedsRewrite).length,
   };
 }
 
@@ -106,8 +116,13 @@ export function deriveHomeModel({
 }): HomeModel {
   const kind: HomeKind = isHomeEmpty(counts) ? "empty" : "active";
   const tags = summarizeTags(stands);
-  const hasStand = tags.live > 0 || tags.total > 0;
-  const previewStand = stands.find((stand) => stand.status === "active") ?? stands[0] ?? null;
+  // Readiness is about a Tag a customer can actually tap. A paused or retired
+  // one used to satisfy this through `|| tags.total > 0`, so an org whose only
+  // Tag was retired saw a finished setup and no prompt to fix it.
+  const hasStand = tags.live > 0;
+  // The preview opens the live customer page, so it can only be an active Tag.
+  // Falling back to stands[0] offered a preview that would not resolve.
+  const previewStand = stands.find((stand) => stand.status === "active") ?? null;
 
   const googleHref = hasLocation ? "/settings" : "/onboarding";
   const createHref = hasLocation ? "/stands" : "/onboarding";
@@ -127,8 +142,11 @@ export function deriveHomeModel({
   if (!hasStand) {
     attentions.push({
       kind: "tag-missing",
-      title: "No tag yet",
-      body: "Create a Tag and put it where people pay.",
+      title: tags.total > 0 ? "No Tag is live" : "No tag yet",
+      body:
+        tags.total > 0
+          ? "Every Tag is paused or retired, so nothing on the counter works. Make one live again, or create a Tag."
+          : "Create a Tag and put it where people pay.",
     });
   }
 
@@ -203,6 +221,9 @@ export function ratingsHeadline(counts: Pick<HomeCounts, "ratingsThisWeek" | "ra
 
 export function tagStatusLine(status: TagStatus): string {
   if (status.total === 0) return "No tags yet";
+  if (status.live === 0) {
+    return status.total === 1 ? "1 tag, none live" : `${status.total} tags, none live`;
+  }
 
   const tagWord = status.total === 1 ? "tag" : "tags";
   const parts = [`${status.total} ${tagWord}`];

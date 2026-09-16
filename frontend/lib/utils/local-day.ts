@@ -33,6 +33,37 @@ export function localHour(timezone: string, now: Date = new Date()): number {
  * out of the arithmetic rather than needing cases.
  */
 export function startOfLocalDay(timezone: string, now: Date = new Date()): Date {
+  const { year, month, day } = localCalendarDate(timezone, now);
+  return localMidnight(timezone, year, month, day);
+}
+
+/**
+ * Midnight six local days back — the start of “this week” as owners say it.
+ *
+ * Calendar arithmetic, then that date's own midnight. Subtracting 6 × 24h of
+ * milliseconds from today's midnight is only the same thing in a zone that
+ * never changes offset: across a spring-forward the week began an hour later
+ * than the subtraction claims, so the boundary landed at 23:00 on the wrong
+ * calendar day and a whole evening of ratings moved between "this week" and
+ * "last week". Days are a calendar concept; milliseconds are not.
+ */
+export function startOfLocalWeek(timezone: string, now: Date = new Date()): Date {
+  const { year, month, day } = localCalendarDate(timezone, now);
+  // Date.UTC normalises the rollover, so day - 6 crosses months and years.
+  const shifted = new Date(Date.UTC(year, month - 1, day - 6));
+  return localMidnight(
+    timezone,
+    shifted.getUTCFullYear(),
+    shifted.getUTCMonth() + 1,
+    shifted.getUTCDate(),
+  );
+}
+
+/** The calendar date showing on a wall clock in that zone, right now. */
+function localCalendarDate(
+  timezone: string,
+  now: Date,
+): { year: number; month: number; day: number } {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
     year: "numeric",
@@ -41,16 +72,22 @@ export function startOfLocalDay(timezone: string, now: Date = new Date()): Date 
   }).formatToParts(now);
 
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "01";
-  const wallClockAsUtc = new Date(
-    Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day"))),
-  );
-
-  return new Date(wallClockAsUtc.getTime() + offsetMs(timezone, wallClockAsUtc));
+  return { year: Number(get("year")), month: Number(get("month")), day: Number(get("day")) };
 }
 
-/** Midnight seven local days ago — the start of “this week” as owners say it. */
-export function startOfLocalWeek(timezone: string, now: Date = new Date()): Date {
-  return new Date(startOfLocalDay(timezone, now).getTime() - 6 * 86_400_000);
+/**
+ * The instant at which a given local calendar date begins.
+ *
+ * Resolved twice on purpose. The first pass has to guess the offset from the
+ * wall-clock numbers read as UTC, which is the wrong instant whenever the zone
+ * changed offset between the two; the second pass asks again at the instant the
+ * first pass produced. On a DST weekend that is the difference between midnight
+ * and 23:00 the day before.
+ */
+function localMidnight(timezone: string, year: number, month: number, day: number): Date {
+  const wallClockAsUtc = Date.UTC(year, month - 1, day);
+  const firstPass = new Date(wallClockAsUtc + offsetMs(timezone, new Date(wallClockAsUtc)));
+  return new Date(wallClockAsUtc + offsetMs(timezone, firstPass));
 }
 
 /** Start of the current month in the business's zone. */
@@ -62,9 +99,7 @@ export function startOfLocalMonth(timezone: string, now: Date = new Date()): Dat
   }).formatToParts(now);
 
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "01";
-  const wallClockAsUtc = new Date(Date.UTC(Number(get("year")), Number(get("month")) - 1, 1));
-
-  return new Date(wallClockAsUtc.getTime() + offsetMs(timezone, wallClockAsUtc));
+  return localMidnight(timezone, Number(get("year")), Number(get("month")), 1);
 }
 
 /**
