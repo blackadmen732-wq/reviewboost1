@@ -2,39 +2,40 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { DEFAULT_HERO_TRANSFORM, type HeroTransform } from "@/lib/owner/hero-transform";
-import { useHeroGestures } from "./use-hero-gestures";
-import { CustomerPageView } from "./customer-page-view";
+import { CustomerPageBranding } from "@/features/customer-flow/customer-page-branding";
+import type { CustomerPageContent } from "@/lib/server/customer-page-service";
 
 interface CustomerPageEditorProps {
   businessName: string;
-  initialTagline: string | null;
-  initialHeroUrl: string | null;
-  initialTransform?: HeroTransform;
   isPublished: boolean;
   onSaved?: () => void;
 }
 
 type UploadState = "idle" | "signing" | "uploading" | "confirming" | "done" | "error";
 
+/**
+ * The preview uses the same CustomerPageBranding component that /q/{token}
+ * renders, fed the same shape. There is no separate preview renderer.
+ *
+ * Draft preservation: on mount the editor loads the complete draft from the
+ * server and tracks it as a single object. Edits (tagline, hero) are merged
+ * into that object before saving, so an edit to one field never silently drops
+ * the others (templateId, logoAssetId) that were saved in a previous session.
+ */
 export function CustomerPageEditor({
   businessName,
-  initialTagline,
-  initialHeroUrl,
-  initialTransform,
   isPublished: initialIsPublished,
   onSaved,
 }: CustomerPageEditorProps) {
-  const [tagline, setTagline] = useState(initialTagline ?? "");
-  const [heroUrl, setHeroUrl] = useState(initialHeroUrl);
-  const [heroAssetId, setHeroAssetId] = useState<string | null>(null);
+  // The full draft as returned by GET /api/v1/customer-page.
+  // Editing is done by merging changes into this rather than tracking fields
+  // separately, so a save never drops a field the owner set in a prior session.
+  const [draft, setDraft] = useState<CustomerPageContent>({});
+  // heroUrl is display-only: the confirmed public URL for the preview.
+  const [heroUrl, setHeroUrl] = useState<string | null>(null);
   const [isPublished, setIsPublished] = useState(initialIsPublished);
-  const [transform, setTransform] = useState<HeroTransform>(
-    initialTransform ?? DEFAULT_HERO_TRANSFORM,
-  );
+  const [loaded, setLoaded] = useState(false);
 
-  // Load current state from the API on mount so the editor reflects reality
-  // even when the server component passed empty defaults.
   useEffect(() => {
     void (async () => {
       try {
@@ -42,30 +43,29 @@ export function CustomerPageEditor({
         if (!res.ok) return;
         const { data } = (await res.json()) as {
           data: {
-            draft: { tagline?: string | null; heroAssetId?: string | null };
-            published: { heroUrl?: string | null } | null;
+            draft: CustomerPageContent;
+            published: { heroUrl?: string | null; tagline?: string | null } | null;
           };
         };
-        if (data.draft.tagline != null) setTagline(data.draft.tagline);
-        if (data.draft.heroAssetId) setHeroAssetId(data.draft.heroAssetId);
+        setDraft(data.draft ?? {});
+        // Show the published hero URL for the preview (the draft asset URL is
+        // not resolved here; only published assets have a public URL).
         if (data.published?.heroUrl) setHeroUrl(data.published.heroUrl);
         setIsPublished(data.published !== null);
       } catch {
-        // ignore — stale defaults are fine
+        // ignore — defaults are fine
+      } finally {
+        setLoaded(true);
       }
     })();
   }, []);
+
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const { onPointerDown, onPointerMove, onPointerUp, onWheel } = useHeroGestures(
-    transform,
-    setTransform,
-  );
 
   const uploadHero = useCallback(async (file: File) => {
     setUploadError(null);
@@ -118,9 +118,9 @@ export function CustomerPageEditor({
       return;
     }
 
-    // Show preview from object URL while backend processes
+    // Show a local preview URL and record the assetId in the draft.
     setHeroUrl(URL.createObjectURL(file));
-    setHeroAssetId(ticket.assetId);
+    setDraft((prev) => ({ ...prev, heroAssetId: ticket.assetId }));
     setUploadState("done");
   }, []);
 
@@ -137,8 +137,9 @@ export function CustomerPageEditor({
   const saveDraft = useCallback(async () => {
     setSaving(true);
     setStatusMsg(null);
-    const body: Record<string, unknown> = { tagline: tagline || null };
-    if (heroAssetId) body.heroAssetId = heroAssetId;
+    // Send the full draft so the RPC replace does not drop fields the owner
+    // set in a previous session (templateId, logoAssetId, etc.).
+    const body: CustomerPageContent = { ...draft, tagline: draft.tagline ?? null };
     const res = await fetch("/api/v1/customer-page", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -154,18 +155,16 @@ export function CustomerPageEditor({
       setStatusMsg("Draft saved.");
       onSaved?.();
     }
-  }, [tagline, heroAssetId, onSaved]);
+  }, [draft, onSaved]);
 
   const publish = useCallback(async () => {
     setPublishing(true);
     setStatusMsg(null);
-    // Save draft first to capture any unsaved tagline/hero changes
-    const saveBody: Record<string, unknown> = { tagline: tagline || null };
-    if (heroAssetId) saveBody.heroAssetId = heroAssetId;
+    // Save the full draft first so the published snapshot captures everything.
     await fetch("/api/v1/customer-page", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(saveBody),
+      body: JSON.stringify({ ...draft, tagline: draft.tagline ?? null }),
     });
 
     const res = await fetch("/api/v1/customer-page", {
@@ -184,36 +183,50 @@ export function CustomerPageEditor({
       setIsPublished(true);
       onSaved?.();
     }
-  }, [tagline, heroAssetId, onSaved]);
+  }, [draft, onSaved]);
 
   const uploading =
     uploadState === "signing" || uploadState === "uploading" || uploadState === "confirming";
-  const uploadLabel = uploadState === "signing"
-    ? "Preparing…"
-    : uploadState === "uploading"
-      ? "Uploading…"
-      : uploadState === "confirming"
-        ? "Verifying…"
-        : "Add photo";
+  const uploadLabel =
+    uploadState === "signing"
+      ? "Preparing…"
+      : uploadState === "uploading"
+        ? "Uploading…"
+        : uploadState === "confirming"
+          ? "Verifying…"
+          : heroUrl
+            ? "Replace photo"
+            : "Add photo";
+
+  // The preview page shape mirrors CustomerReviewContext["page"] so
+  // CustomerPageBranding renders exactly what the customer will receive.
+  const previewPage = {
+    heroUrl: heroUrl ?? null,
+    tagline: draft.tagline ?? null,
+    templateId: draft.templateId,
+    logoUrl: null,
+  };
+
+  if (!loaded) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        Loading…
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-      {/* Live preview */}
-      <div className="w-full max-w-[220px] shrink-0 self-center lg:self-start">
-        <CustomerPageView
-          businessName={businessName}
-          heroUrl={heroUrl}
-          transform={transform}
-          tagline={tagline || null}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onWheel={onWheel}
-        />
-        {heroUrl && (
-          <p className="mt-2 text-center text-[11px] text-[#6b635b]">
-            Drag to reposition · scroll to zoom
-          </p>
+      {/* Live preview — uses the real CustomerPageBranding component */}
+      <div className="w-full max-w-xs shrink-0 rounded-2xl border border-border bg-[var(--rb-canvas)] p-4">
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted">
+          Preview
+        </p>
+        {previewPage.heroUrl || previewPage.tagline ? (
+          <CustomerPageBranding page={previewPage} businessName={businessName} />
+        ) : (
+          <p className="text-sm text-muted">Your cover photo and tagline will appear here.</p>
         )}
       </div>
 
@@ -257,12 +270,14 @@ export function CustomerPageEditor({
             id="tagline"
             type="text"
             maxLength={120}
-            value={tagline}
-            onChange={(e) => setTagline(e.target.value)}
+            value={draft.tagline ?? ""}
+            onChange={(e) => setDraft((prev) => ({ ...prev, tagline: e.target.value || null }))}
             placeholder="e.g. Fresh coffee, good vibes"
             className="w-full rounded-lg border border-[color:var(--rb-border)] bg-white px-3 py-2 text-sm text-[#1a1712] placeholder-[#9e968e] focus:outline-none focus:ring-2 focus:ring-[color:var(--rb-ink)]"
           />
-          <p className="mt-1 text-right text-[10px] text-[#9e968e]">{tagline.length}/120</p>
+          <p className="mt-1 text-right text-[10px] text-[#9e968e]">
+            {(draft.tagline ?? "").length}/120
+          </p>
         </div>
 
         {/* Status */}

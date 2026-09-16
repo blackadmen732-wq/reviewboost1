@@ -27,8 +27,6 @@ export default async function CustomerPagePage() {
       {canEdit ? (
         <CustomerPageEditor
           businessName={organization.name}
-          initialTagline={null}
-          initialHeroUrl={null}
           isPublished={false}
         />
       ) : (
