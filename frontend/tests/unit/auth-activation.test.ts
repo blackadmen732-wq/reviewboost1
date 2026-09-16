@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import robots from "@/app/robots";
+
 function source(path: string): string {
   return readFileSync(join(process.cwd(), path), "utf8");
 }
@@ -43,12 +45,51 @@ describe("login, verify, and activation chrome", () => {
     expect(signIn).toContain('intent === "start" ? "Get started" : "Sign in"');
   });
 
+  /**
+   * Asserted against the rules the function returns, not the text of the file.
+   * The previous version matched a literal `allow: ["/", "/how-it-works"`, so
+   * reformatting the array broke it while the behaviour was unchanged — and it
+   * would equally have passed on a list that had stopped being true.
+   */
   it("keeps crawlers off owner, login, and customer tokens", () => {
-    const robots = code("app/robots.ts");
-    expect(robots).toContain('allow: ["/", "/how-it-works"');
-    expect(robots).toContain('"/login"');
-    expect(robots).toContain('"/onboarding"');
-    expect(robots).toContain('"/q/"');
+    const { rules } = robots() as {
+      rules: { allow: string[]; disallow: string[] };
+    };
+
+    // The public site is meant to be found, the legal pages included.
+    for (const path of [
+      "/",
+      "/how-it-works",
+      "/product",
+      "/integrity",
+      "/pricing",
+      "/security",
+      "/privacy",
+      "/terms",
+      "/support",
+    ]) {
+      expect(rules.allow).toContain(path);
+    }
+
+    // Owner screens, the auth flow, customer tokens and the API are not.
+    for (const path of [
+      "/home",
+      "/feedback",
+      "/stands",
+      "/text-requests",
+      "/customer-page",
+      "/settings",
+      "/select-org",
+      "/login",
+      "/onboarding",
+      "/q/",
+      "/api/",
+    ]) {
+      expect(rules.disallow).toContain(path);
+    }
+
+    // Nothing may be both.
+    expect(rules.allow.filter((path) => rules.disallow.includes(path))).toEqual([]);
   });
 
   it("onboarding still posts to the existing API once", () => {

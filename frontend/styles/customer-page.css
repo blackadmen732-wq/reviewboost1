@@ -1,3 +1,14 @@
+/* The customer page is the one screen that must reach the edges.
+ *
+ * globals.css reserves a stable scrollbar gutter so the owner app does not
+ * shift sideways when a short page becomes a long one. That is right there and
+ * wrong here: on a desktop browser it left a 15px white strip down the side of
+ * a full-bleed page that never scrolls on the rating screen. Phones are
+ * unaffected either way — their scrollbars are overlays. */
+html:has(.customer-live) {
+  scrollbar-gutter: auto;
+}
+
 /* Shared customer visit view — owner preview and live /q are this tree.
    Canvas is 390/844 (Mario SoT). Hero 56% / card 44%. Card never moves. */
 
@@ -55,6 +66,48 @@
 .visit-language .language-select {
   min-height: 40px;
   color: #fff;
+}
+
+/* The Mario card is a fixed light surface in both themes — so every colour
+ * inside it is a light-theme colour.
+ *
+ * The card hardcodes #fff while its contents inherited the themed tokens. Under
+ * prefers-color-scheme: dark that put #f7f4ee text on white at 1.09:1 — on a
+ * phone set to dark mode, "How was your visit?" was invisible.
+ *
+ * Pinning --rb-ink alone was not enough and briefly made it worse: the offline
+ * and error notices inside the card kept the dark --rb-danger-soft (#452323)
+ * behind newly-dark text, at 1.26:1. A half-pinned palette is two themes in one
+ * box. So the whole set is pinned, and anything added to the card inherits a
+ * consistent light palette rather than whichever tokens someone remembered.
+ *
+ * The hero above is dark artwork in both modes for the same reason: this is a
+ * printed-feeling page a customer sees once, not a themed surface. */
+.visit-card {
+  --rb-canvas: #f8f5f0;
+  --rb-surface: #ffffff;
+  --rb-quiet: #f2efe9;
+  --rb-ink: #171a18;
+  --rb-muted: #5d655f;
+  --rb-border: #d8ded9;
+  --rb-border-strong: #b7c0ba;
+  --rb-brand-hover: #009a61;
+  --rb-brand-active: #008f5b;
+  --rb-brand-soft: #ddf5ea;
+  --rb-brand-text: #007a4d;
+  --rb-on-brand: #0d2118;
+  --rb-action: #007a4d;
+  --rb-action-hover: #006b43;
+  --rb-action-pressed: #005b39;
+  --rb-on-action: #ffffff;
+  --rb-star: #bf7d00;
+  --rb-star-soft: #fff3d0;
+  --rb-danger: #b33a3a;
+  --rb-danger-soft: #faeaea;
+  --rb-info: #356d8c;
+  --rb-focus: #005fcc;
+  --rb-focus-soft: rgb(0 95 204 / 28%);
+  color: #171a18;
 }
 
 .visit-card {
@@ -193,15 +246,35 @@
 }
 
 .visit-star {
+  position: relative;
   display: block;
 }
 
+/* The input is the control and it covers its own star.
+ *
+ * Collapsing it to a clipped 1px left two problems. `.visit-star` was not
+ * positioned, so all five inputs stacked at the page origin rather than over
+ * their stars — focus could scroll the page to the wrong place. And the label
+ * then sat on top of the real control, so the only thing that worked was the
+ * browser forwarding label clicks; a tap that landed a pixel off the glyph hit
+ * nothing at all.
+ *
+ * Covering the cell at zero opacity keeps the native radio invisible while
+ * making the whole star the hit target — which is what a thumb aims at. */
 .visit-star__input {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.visit-star__input:disabled {
+  cursor: default;
 }
 
 .visit-star__label {

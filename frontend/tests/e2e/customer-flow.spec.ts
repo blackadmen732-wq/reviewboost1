@@ -236,8 +236,16 @@ test.describe("ReviewBoost customer flow", () => {
   test("reduced motion removes star scaling and content movement", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await openFlow(page, "fixture-valid", { stayOnPage: true });
+
+    // The customer page renders the Mario stars, so this is checked on those.
+    // The old selector named `.star-option__label`, which this page no longer
+    // renders — it passed by matching nothing.
+    const chosen = page.locator(".visit-star__input:checked + .visit-star__label");
+    const anyStar = page.locator(".visit-star__label").first();
+    await expect(anyStar).toHaveCSS("transform", "none");
+
     await page.getByRole("radio", { name: spokenRatings[3] }).click();
-    const selectedLabel = page.locator(".star-option__input:checked + .star-option__label");
-    await expect(selectedLabel).toHaveCSS("transform", "none");
+    await expect(chosen).toHaveCSS("transform", "none");
+    await expect(page.locator("[data-flow-screen='handoff']")).toBeVisible();
   });
 });
