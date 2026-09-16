@@ -8,6 +8,7 @@ import { buildEntitlementSnapshot, capabilityLabel } from "@/lib/owner/entitleme
 import { PLAN_CATALOG } from "@/lib/owner/plan-catalog";
 import { lastUsedLabel, tagReadiness, tagReadinessLabel } from "@/lib/owner/tag-readiness";
 import { payloadContainsTenantIds } from "@/lib/owner/public-customer";
+import { NFC_SCENE_COPY } from "@/lib/owner/nfc-presentation";
 import { PROGRAM_PHASE_COPY } from "@/lib/owner/nfc-phases";
 import { ratingsHeadline } from "@/features/dashboard/home-model";
 
@@ -145,12 +146,22 @@ describe("program Tag words", () => {
     const joined = Object.values(PROGRAM_PHASE_COPY)
       .map((item) => `${item.title} ${item.body}`)
       .join(" ");
-    expect(joined).toMatch(/Hold near Tag/);
-    expect(joined).toMatch(/Tag ready/);
     expect(joined).not.toMatch(/NDEF|RPC|token hash/i);
     const sheet = source("features/tags/program-tag-sheet.tsx");
     expect(sheet).not.toMatch(/\bNDEF\b/);
-    expect(sheet).toContain("Test customer page");
+  });
+
+  /**
+   * The success scene used to offer "Test customer page" beside "Done", which
+   * made the end of a finished operation a choice between two buttons. It now
+   * shows the check and leaves on its own, so this asserts the opposite of what
+   * it originally did — deliberately.
+   */
+  it("ends on a check rather than another decision", () => {
+    const sheet = source("features/tags/program-tag-sheet.tsx");
+    expect(sheet).not.toContain("Test customer page");
+    expect(NFC_SCENE_COPY.done.action).toBeUndefined();
+    expect(NFC_SCENE_COPY.done.dismiss).toBeUndefined();
   });
 });
 

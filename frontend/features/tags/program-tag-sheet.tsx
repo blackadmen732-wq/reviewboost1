@@ -1,10 +1,17 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { NfcCard } from "@/features/tags/nfc-card";
+import { ReaderIndicator, SuccessCheck } from "@/features/tags/nfc-visuals";
 import {
-  PROGRAM_PHASE_COPY,
+  DONE_DWELL_MS,
+  isWorking,
+  NFC_SCENE_COPY,
+  sceneForPhase,
+} from "@/lib/owner/nfc-presentation";
+import {
   programFailureMessage,
   type ProgramPhase,
   type TagContents,
@@ -42,7 +49,11 @@ export function ProgramTagSheet({
   onClose: () => void;
   onReady: () => void;
 }) {
-  const [phase, setPhase] = useState<ProgramPhase>("hold");
+  // Opens on the start scene, not mid-operation. Web NFC will only scan or
+  // write inside a user gesture, so the first tap has to come from the owner —
+  // and a sheet that opens already saying "hold it there" is describing
+  // something that has not begun.
+  const [phase, setPhase] = useState<ProgramPhase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [standUrl, setStandUrl] = useState<string | null>(null);
   const [existing, setExisting] = useState<TagContents | null>(null);
@@ -209,70 +220,67 @@ export function ProgramTagSheet({
     await writeAndConfirm(url, token);
   }, [accessToken, confirmWithServer, onReady, standId, writeAndConfirm]);
 
+  // The success scene closes itself. Nobody should have to dismiss a green
+  // check, and leaving it up invites a second, pointless programming run.
+  useEffect(() => {
+    if (sceneForPhase(phase) !== "done") return undefined;
+    const timer = setTimeout(() => onClose(), DONE_DWELL_MS);
+    return () => clearTimeout(timer);
+  }, [phase, onClose]);
+
   if (!open) return null;
 
-  const copy = PROGRAM_PHASE_COPY[phase];
-  const conflictBody =
-    existing?.kind === "other"
-      ? `This Tag already has ${existing.description} on it. Programming replaces it, and whatever used it will stop working.`
-      : copy.body;
+  const scene = sceneForPhase(phase);
+  const copy = NFC_SCENE_COPY[scene];
+  const working = isWorking(scene);
+
+  // The one place a description of what was found is worth showing, because the
+  // owner is about to erase it.
+  const body =
+    scene === "conflict" && existing?.kind === "other"
+      ? `This Tag already has ${existing.description} on it. Replacing it will erase what is there.`
+      : scene === "unreadable" && error
+        ? error
+        : copy.body;
+
+  const primary =
+    scene === "conflict"
+      ? () => void overwrite()
+      : scene === "partial"
+        ? () => void retryConfirmation()
+        : () => void run();
 
   return (
     <div className="nfc-sheet" role="dialog" aria-modal="true" aria-labelledby="nfc-title">
-      <div className="nfc-sheet__panel" data-nfc-phase={phase}>
-        <div className="nfc-sheet__phase">
-          <p className="nfc-sheet__title" id="nfc-title">
+      <div className="nfc-sheet__panel" data-nfc-phase={phase} data-nfc-scene={scene}>
+        <NfcCard working={working} status={working ? "READY TO SCAN" : "NFC TAG"} />
+
+        <div className="nfc-sheet__stage">
+          {scene === "done" ? <SuccessCheck /> : null}
+          {working ? <ReaderIndicator /> : null}
+
+          <p className="nfc-sheet__title" id="nfc-title" aria-live="polite">
             {copy.title}
           </p>
-          <p className="nfc-sheet__body">
-            {error ?? (phase === "conflict" ? conflictBody : copy.body)}
-          </p>
+          {body ? <p className="nfc-sheet__body">{body}</p> : null}
         </div>
-        <div className="flex flex-col gap-3">
-          {phase === "conflict" ? (
-            <>
-              <Button variant="action" size="lg" onClick={() => void overwrite()}>
-                Replace what is on it
+
+        {/* The success scene has no controls at all — it is finished, and it
+            leaves on its own. Everywhere else, one obvious action. */}
+        {scene === "done" ? null : (
+          <div className="nfc-sheet__actions">
+            {copy.action ? (
+              <Button variant="action" size="lg" onClick={primary}>
+                {copy.action}
               </Button>
+            ) : null}
+            {copy.dismiss ? (
               <Button variant="secondary" size="lg" onClick={onClose}>
-                Keep it as it is
+                {copy.dismiss}
               </Button>
-            </>
-          ) : phase === "unconfirmed" ? (
-            <>
-              <Button variant="action" size="lg" onClick={() => void retryConfirmation()}>
-                Retry
-              </Button>
-              <Button variant="secondary" size="lg" onClick={onClose}>
-                Done
-              </Button>
-            </>
-          ) : phase === "ready" ? (
-            <>
-              <Button
-                variant="action"
-                size="lg"
-                onClick={() => {
-                  if (standUrl) window.open(standUrl, "_blank", "noopener,noreferrer");
-                }}
-              >
-                Test customer page
-              </Button>
-              <Button variant="secondary" size="lg" onClick={onClose}>
-                Done
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="action" size="lg" onClick={() => void run()}>
-                {phase === "failed" ? "Try again" : "Hold near Tag"}
-              </Button>
-              <Button variant="secondary" size="lg" onClick={onClose}>
-                Cancel
-              </Button>
-            </>
-          )}
-        </div>
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   );

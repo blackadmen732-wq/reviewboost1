@@ -59,7 +59,25 @@ export function ReviewBoostLogo({
       {pose === "mark" ? (
         <span className="sr-only">ReviewBoost</span>
       ) : (
-        <span className={cn("font-semibold", WORD[size])}>ReviewBoost</span>
+        /* Two-tone, as the approved lockup sets it: "Review" in ink, "Boost" in
+           green. One <span> in a single colour was not the wordmark.
+           `aria-hidden` on the halves with a single readable label keeps a
+           screen reader from announcing it as two words.
+
+           The green here is the ACTION green (#007A4D), not the brand green
+           (#00A86B), and that is deliberate. A logotype rendered as an image is
+           exempt from WCAG contrast; this is live text, which is not. Brand
+           green on white measures 3.08:1 — below the 4.5:1 floor for normal
+           text, and the "Powered by ReviewBoost" footer sets it at 13px. The
+           action green measures 5.4:1 on white and 4.96:1 on the warm canvas.
+           The mark itself keeps the brand green, because a graphic may. */
+        <span className={cn("font-semibold", WORD[size])}>
+          <span className="sr-only">ReviewBoost</span>
+          <span aria-hidden="true">Review</span>
+          <span aria-hidden="true" className="text-[color:var(--rb-action)]">
+            Boost
+          </span>
+        </span>
       )}
     </span>
   );

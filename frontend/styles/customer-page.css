@@ -389,19 +389,175 @@ html:has(.customer-live) {
   border-radius: 28px 28px 0 0;
 }
 
-.nfc-sheet__phase {
+/* The stage between the card and the controls. It carries whichever figure the
+   scene owns, so the sheet's shape stays put while the content changes. */
+.nfc-sheet__stage {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
   text-align: center;
 }
 
 .nfc-sheet__title {
   margin: 0;
-  font-size: 2rem;
+  font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.03em;
 }
 
 .nfc-sheet__body {
-  margin: 12px 0 0;
+  margin: 0;
+  max-width: 30ch;
   color: var(--rb-muted);
-  font-size: 1.125rem;
+  font-size: 1.0625rem;
+}
+
+.nfc-sheet__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---------------------------------------------------------- NFC card ----- */
+
+.nfc-card {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 18px 20px;
+  border-radius: 18px;
+  /* Near-black rather than the warm canvas: the card is a physical object in
+     the owner's hand, and the contrast makes the arcs legible at arm's length. */
+  background: #10130F;
+  color: #FFFFFF;
+}
+
+.nfc-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.nfc-card__name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.nfc-card__word {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.nfc-card__word-accent {
+  /* The brand green, not the darker action green: this is identity, not a CTA. */
+  color: var(--rb-brand);
+}
+
+.nfc-card__kind {
+  color: rgb(255 255 255 / 62%);
+  font-size: 0.8125rem;
+}
+
+.nfc-card__status {
+  margin-left: auto;
+  padding-top: 2px;
+  color: rgb(255 255 255 / 62%);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.nfc-card__waves {
+  display: flex;
+  justify-content: center;
+  padding-top: 6px;
+  color: var(--rb-brand);
+}
+
+.nfc-card__wave {
+  opacity: 0.25;
+}
+
+.nfc-card[data-working="true"] .nfc-card__wave {
+  animation: nfc-wave 1.8s ease-in-out infinite;
+}
+
+@keyframes nfc-wave {
+  0%, 100% { opacity: 0.18; }
+  45% { opacity: 1; }
+}
+
+/* ------------------------------------------------------ reader + check --- */
+
+.nfc-reader {
+  position: relative;
+  display: grid;
+  place-items: center;
+  color: var(--rb-brand);
+}
+
+.nfc-reader__halo {
+  position: absolute;
+  width: 116px;
+  height: 116px;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+  opacity: 0.9;
+}
+
+.nfc-card[data-working="true"] ~ * .nfc-reader__halo,
+.nfc-sheet__panel[data-nfc-scene="waiting"] .nfc-reader__halo {
+  animation: nfc-halo 2s ease-in-out infinite;
+}
+
+@keyframes nfc-halo {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+.nfc-check {
+  /* The action green every confirming control in the product uses, so success
+     reads as ReviewBoost rather than as a system alert. */
+  color: var(--rb-action);
+}
+
+.nfc-check__ring,
+.nfc-check__tick {
+  stroke-dasharray: var(--len, 300);
+  stroke-dashoffset: 0;
+}
+
+.nfc-check__ring {
+  --len: 264;
+  animation: nfc-draw 0.42s ease-out both;
+}
+
+.nfc-check__tick {
+  --len: 76;
+  animation: nfc-draw 0.28s ease-out 0.3s both;
+}
+
+@keyframes nfc-draw {
+  from { stroke-dashoffset: var(--len); }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Motion here is instructional, never decorative — but somebody who has asked
+   for less of it still needs to see the arcs, the halo and the check, so they
+   are shown in their finished state rather than removed. */
+@media (prefers-reduced-motion: reduce) {
+  .nfc-card[data-working="true"] .nfc-card__wave,
+  .nfc-sheet__panel[data-nfc-scene="waiting"] .nfc-reader__halo,
+  .nfc-check__ring,
+  .nfc-check__tick {
+    animation: none;
+  }
+
+  .nfc-card[data-working="true"] .nfc-card__wave { opacity: 1; }
+  .nfc-check__ring,
+  .nfc-check__tick { stroke-dashoffset: 0; }
 }

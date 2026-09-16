@@ -86,7 +86,12 @@ describe("Program Tag sheet", () => {
   }
 
   async function hold() {
-    fireEvent.click(screen.getByRole("button", { name: /hold near tag/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^start$/i }));
+  }
+
+  /** The owner-visible scene, as opposed to the machine phase underneath. */
+  function scene(): string | null {
+    return document.querySelector("[data-nfc-scene]")?.getAttribute("data-nfc-scene") ?? null;
   }
 
   function renderSheet(onReady = vi.fn()) {
@@ -121,7 +126,7 @@ describe("Program Tag sheet", () => {
     // The decisive assertion: nothing was written.
     expect(FakeNDEFReader.writes).toHaveLength(0);
     expect(screen.getByText(/hotel\.example/i)).toBeVisible();
-    expect(screen.getByRole("button", { name: /keep it as it is/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^cancel$/i })).toBeVisible();
   });
 
   it("writes over it only once the owner says so", async () => {
@@ -133,7 +138,7 @@ describe("Program Tag sheet", () => {
     await hold();
     await waitFor(() => expect(phase()).toBe("conflict"));
 
-    fireEvent.click(screen.getByRole("button", { name: /replace what is on it/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^replace$/i }));
 
     await waitFor(() => expect(FakeNDEFReader.writes).toHaveLength(1));
     expect(FakeNDEFReader.writes[0]?.records[0]?.data).toBe(STAND_URL);
@@ -164,6 +169,7 @@ describe("Program Tag sheet", () => {
     await waitFor(() => expect(phase()).toBe("failed"));
     expect(FakeNDEFReader.writes).toHaveLength(0);
     expect(screen.getByText(/nothing was written/i)).toBeVisible();
+    expect(scene()).toBe("unreadable");
   });
 
   it("tells the truth when the chip was written but the server was not told", async () => {
@@ -174,7 +180,7 @@ describe("Program Tag sheet", () => {
     await hold();
 
     await waitFor(() => expect(phase()).toBe("unconfirmed"));
-    expect(screen.getByText(/could not confirm it/i)).toBeVisible();
+    expect(screen.getByText(/couldn’t finish saving/i)).toBeVisible();
     // The chip really was written, so this is not a failure state…
     expect(FakeNDEFReader.writes).toHaveLength(1);
     expect(phase()).not.toBe("ready");
@@ -202,7 +208,7 @@ describe("Program Tag sheet", () => {
     expect(FakeNDEFReader.writes).toHaveLength(1);
 
     provisionOk = true;
-    fireEvent.click(screen.getByRole("button", { name: /^retry$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /finish setup/i }));
 
     await waitFor(() => expect(phase()).toBe("ready"));
     // The whole point of a separate retry: still exactly one write.
