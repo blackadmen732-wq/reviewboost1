@@ -11,13 +11,13 @@
       "bundleIdentifier": "fit.reviewboost.app",
       "supportsTablet": true,
       "infoPlist": {
-        "NFCReaderUsageDescription": "ReviewBoost uses NFC to write stand URLs to physical tags."
+        "NFCReaderUsageDescription": "ReviewBoost uses NFC to program your Tags."
       }
     },
     "android": {
       "package": "fit.reviewboost.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#035B3B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
