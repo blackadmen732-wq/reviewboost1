@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, Copy, Download, ExternalLink, Printer, RefreshCw } from "lucide-react";
+import { ArrowLeft, Check, Download, ExternalLink, Printer, RefreshCw, Store } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -9,38 +9,45 @@ import { Input } from "@/components/ui/input";
 import { TestGoogleLinkButton } from "@/features/dashboard/google-link-care";
 import {
   GOOGLE_LINK_BLAST,
-  GOOGLE_LINK_HELP_STEPS,
-  GOOGLE_LINK_INVALID,
   GOOGLE_LINK_LATER,
 } from "@/features/dashboard/google-link-copy";
-import {
-  advanceOnboarding,
-  type CreatedStand,
-  ONBOARDING_STEP_COUNT,
-  onboardingStepNumber,
-  type OnboardingStep,
-  prevOnboardingStep,
-} from "@/features/onboarding/onboarding-model";
 import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
 import { isValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
- * Activation. One question per screen.
+ * Setup, in three screens.
  *
- * Google is skippable. The stand is created there, then they preview the
- * frozen customer page as it actually ships — a new tab on /q, not a mock.
+ * One question per screen, one button under it. A single long form with five
+ * fields looks like paperwork, and paperwork is where people close the tab.
+ * Three short screens take the same total taps and feel like progress.
+ *
+ * The Google link is the hard part and everything here is arranged around it.
+ * An owner who has never opened Google Business Profile does not know what a
+ * "review URL" is, cannot be told to "copy the place ID", and will not read a
+ * paragraph explaining either. So: a button that opens the right Google page
+ * for them, three short steps, and a field that tells them the moment the
+ * pasted link is the right kind — before they submit, not after.
+ *
+ * It is also skippable. Trapping someone on the one step they cannot complete
+ * is how you lose them permanently; they can add it later and their code still
+ * prints today.
  */
 
+type Step = "name" | "google" | "done";
+
+interface Created {
+  standUrl: string;
+  standId: string;
+}
+
 export function OnboardingFlow() {
-  const [step, setStep] = useState<OnboardingStep>("business");
+  const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState("");
   const [googleUrl, setGoogleUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<CreatedStand | null>(null);
-  const [googleLinkSaved, setGoogleLinkSaved] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [created, setCreated] = useState<Created | null>(null);
 
   const qr = useAuthenticatedQr(created?.standId ?? null);
 
@@ -48,6 +55,8 @@ export function OnboardingFlow() {
   const urlLooksRight = trimmedUrl !== "" && isValidatedGoogleReviewUrl(trimmedUrl);
 
   function slugify(value: string): string {
+    // Generated rather than asked for. "Choose a web address" is a question
+    // that means nothing to a restaurant owner and stops them cold.
     const base = value
       .toLowerCase()
       .normalize("NFD")
@@ -60,54 +69,7 @@ export function OnboardingFlow() {
     return base.length >= 3 ? `${base}-${suffix}` : `business-${suffix}`;
   }
 
-  function go(next: OnboardingStep | null) {
-    if (!next) return;
-    setError(null);
-    setStep(next);
-  }
-
-  async function persistGoogleUrl(url: string, accessToken: string): Promise<boolean> {
-    const response = await fetch("/api/v1/settings", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ googleReviewUrl: url }),
-    });
-    return response.ok;
-  }
-
   async function finish(withUrl: string | undefined) {
-    if (created) {
-      if (withUrl) {
-        setBusy(true);
-        setError(null);
-
-        const {
-          data: { session },
-        } = await supabaseBrowser().auth.getSession();
-
-        if (!session) {
-          setBusy(false);
-          setError("Your session expired. Please sign in again.");
-          return;
-        }
-
-        const saved = await persistGoogleUrl(withUrl, session.access_token);
-        setBusy(false);
-
-        if (!saved) {
-          setError("Could not save that. Please try again.");
-          return;
-        }
-
-        setGoogleLinkSaved(true);
-      }
-      go(advanceOnboarding("google", created));
-      return;
-    }
-
     setBusy(true);
     setError(null);
 
@@ -148,361 +110,227 @@ export function OnboardingFlow() {
       return;
     }
 
-    const body = (await response.json()) as { data: CreatedStand };
+    const body = (await response.json()) as { data: Created };
     setCreated(body.data);
-    setGoogleLinkSaved(Boolean(withUrl));
-    go(advanceOnboarding("google", body.data));
+    setStep("done");
   }
 
-  async function copyStandUrl() {
-    if (!created) return;
-    try {
-      await navigator.clipboard.writeText(created.standUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setError("Could not copy the link.");
-    }
-  }
+  // ------------------------------------------------------------ step 1 -----
 
-  const back = prevOnboardingStep(step);
+  if (step === "name") {
+    return (
+      <div className="flex flex-col gap-8" data-onboarding-step="name">
+        <Progress current={1} />
 
-  return (
-    <div className="flex flex-col gap-8" data-onboarding-step={step}>
-      <div className="flex flex-col gap-8 print:hidden">
-        {back ? <BackButton onClick={() => go(back)} /> : null}
-        <Progress current={onboardingStepNumber(step)} />
-      </div>
+        <div className="flex flex-col gap-2">
+          <div className="mb-2 grid size-14 place-items-center rounded-full bg-brand-soft">
+            <Store className="size-7 text-brand-text" aria-hidden="true" />
+          </div>
+          <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
+            What is your business called?
+          </h1>
+          <p className="text-base text-muted">This is what customers will see.</p>
+        </div>
 
-      {step === "business" ? (
-        <BusinessStep
-          name={name}
-          error={error}
-          onName={(value) => {
-            setName(value);
-            setError(null);
-          }}
-          onContinue={() => go(advanceOnboarding("business", created))}
-        />
-      ) : null}
+        <div className="flex flex-col gap-3">
+          <Input
+            id="business-name"
+            value={name}
+            autoFocus
+            autoComplete="organization"
+            placeholder="Corner Cafe"
+            aria-label="Business name"
+            onChange={(event) => {
+              setName(event.target.value);
+              setError(null);
+            }}
+            className="h-16 text-lg"
+          />
+          {urlLooksRight ? <TestGoogleLinkButton url={trimmedUrl} /> : null}
 
-      {step === "google" ? (
-        <GoogleStep
-          googleUrl={googleUrl}
-          trimmedUrl={trimmedUrl}
-          urlLooksRight={urlLooksRight}
-          busy={busy}
-          error={error}
-          onUrl={(value) => {
-            setGoogleUrl(value);
-            setError(null);
-          }}
-          onContinue={() => void finish(trimmedUrl)}
-          onSkip={() => void finish(undefined)}
-        />
-      ) : null}
+          {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
+        </div>
 
-      {step === "preview" && created ? (
-        <PreviewStep
-          standUrl={created.standUrl}
-          googleLinkSaved={googleLinkSaved}
-          onContinue={() => go(advanceOnboarding("preview", created))}
-        />
-      ) : null}
-
-      {step === "tag" && created ? (
-        <TagStep
-          businessName={name.trim()}
-          googleLinkSaved={googleLinkSaved}
-          onContinue={() => go(advanceOnboarding("tag", created))}
-        />
-      ) : null}
-
-      {step === "print" && created ? (
-        <PrintStep
-          qr={qr}
-          copied={copied}
-          googleLinkSaved={googleLinkSaved}
-          onCopy={() => void copyStandUrl()}
-          onContinue={() => go(advanceOnboarding("print", created))}
-        />
-      ) : null}
-
-      {step === "ready" ? <ReadyStep googleLinkSaved={googleLinkSaved} /> : null}
-    </div>
-  );
-}
-
-function BusinessStep({
-  name,
-  error,
-  onName,
-  onContinue,
-}: {
-  name: string;
-  error: string | null;
-  onName: (value: string) => void;
-  onContinue: () => void;
-}) {
-  return (
-    <>
-      <div className="flex flex-col gap-2">
-        <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.02em] text-ink">
-          What is your business called?
-        </h1>
-        <p className="text-base text-muted">This is what customers will see.</p>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <Input
-          id="business-name"
-          value={name}
-          autoFocus
-          autoComplete="organization"
-          placeholder="Corner Cafe"
-          aria-label="Business name"
-          onChange={(event) => onName(event.target.value)}
-          className="h-16 text-lg"
-        />
-        {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
-      </div>
-
-      <Button
-        variant="action"
-        size="lg"
-        disabled={name.trim().length < 2}
-        onClick={onContinue}
-      >
-        Continue
-      </Button>
-    </>
-  );
-}
-
-function GoogleStep({
-  googleUrl,
-  trimmedUrl,
-  urlLooksRight,
-  busy,
-  error,
-  onUrl,
-  onContinue,
-  onSkip,
-}: {
-  googleUrl: string;
-  trimmedUrl: string;
-  urlLooksRight: boolean;
-  busy: boolean;
-  error: string | null;
-  onUrl: (value: string) => void;
-  onContinue: () => void;
-  onSkip: () => void;
-}) {
-  return (
-    <>
-      <div className="flex flex-col gap-2">
-        <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.02em] text-ink">
-          Your Google link
-        </h1>
-        <p className="text-base text-muted">
-          This is where every customer goes to leave you a review — the same
-          link, whatever they rated.
-        </p>
-        <p className="text-sm leading-relaxed text-muted">{GOOGLE_LINK_BLAST}</p>
-      </div>
-
-      <ol className="flex flex-col gap-3 rounded-[var(--radius-card)] bg-quiet p-5">
-        {GOOGLE_LINK_HELP_STEPS.map((instruction, index) => (
-          <li key={instruction} className="flex items-start gap-3">
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface text-sm font-bold text-ink">
-              {index + 1}
-            </span>
-            <span className="pt-0.5 text-base text-ink">{instruction}</span>
-          </li>
-        ))}
-      </ol>
-
-      <Button variant="secondary" asChild>
-        <a href="https://business.google.com/reviews" target="_blank" rel="noopener noreferrer">
-          Open Google
-          <ExternalLink className="size-4" aria-hidden="true" />
-        </a>
-      </Button>
-
-      <div className="flex flex-col gap-3">
-        <Input
-          id="google-url"
-          value={googleUrl}
-          inputMode="url"
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-          placeholder="Paste your link here"
-          aria-label="Google review link"
-          onChange={(event) => onUrl(event.target.value)}
-          className="h-16 text-base"
-          invalid={trimmedUrl !== "" && !urlLooksRight}
-        />
-
-        {urlLooksRight ? (
-          <p className="flex items-center gap-2 text-sm font-medium text-brand-text">
-            <Check className="size-4" aria-hidden="true" />
-            That is the right link
-          </p>
-        ) : null}
-
-        {trimmedUrl !== "" && !urlLooksRight ? (
-          <InlineNotice kind="error">{GOOGLE_LINK_INVALID}</InlineNotice>
-        ) : null}
-
-        {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
-      </div>
-
-      <TestGoogleLinkButton url={trimmedUrl} />
-
-      <div className="flex flex-col gap-3">
         <Button
-          variant="action"
           size="lg"
-          loading={busy}
-          loadingLabel="Setting up…"
-          disabled={!urlLooksRight}
-          onClick={onContinue}
+          disabled={name.trim().length < 2}
+          onClick={() => {
+            setError(null);
+            setStep("google");
+          }}
         >
           Continue
         </Button>
-        <Button variant="ghost" loading={busy} onClick={onSkip}>
-          I will do this later
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------------ step 2 -----
+
+  if (step === "google") {
+    return (
+      <div className="flex flex-col gap-8" data-onboarding-step="google">
+        <BackButton onClick={() => setStep("name")} />
+        <Progress current={2} />
+
+        <div className="flex flex-col gap-2">
+          <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
+            Your Google link
+          </h1>
+          <p className="text-base text-muted">
+            This is where customers go to leave you a review.
+          </p>
+          <p className="text-sm text-muted">{GOOGLE_LINK_BLAST}</p>
+        </div>
+
+        {/* Numbered, three steps, no paragraph. Someone who has never done this
+            can follow it while holding a phone in the other hand. */}
+        <ol className="flex flex-col gap-3 rounded-[var(--radius-card)] bg-quiet p-5">
+          {[
+            "Open your business on Google",
+            "Tap “Ask for reviews”",
+            "Copy the link and paste it below",
+          ].map((instruction, index) => (
+            <li key={instruction} className="flex items-start gap-3">
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface text-sm font-bold text-ink">
+                {index + 1}
+              </span>
+              <span className="pt-0.5 text-base text-ink">{instruction}</span>
+            </li>
+          ))}
+        </ol>
+
+        <Button variant="secondary" asChild>
+          <a
+            href="https://business.google.com/reviews"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open Google
+            <ExternalLink className="size-4" aria-hidden="true" />
+          </a>
         </Button>
-      </div>
-    </>
-  );
-}
 
-function PreviewStep({
-  standUrl,
-  googleLinkSaved,
-  onContinue,
-}: {
-  standUrl: string;
-  googleLinkSaved: boolean;
-  onContinue: () => void;
-}) {
-  return (
-    <>
-      <div className="flex flex-col gap-2">
-        <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.02em] text-ink">
-          This is what customers see
-        </h1>
-        <p className="text-base leading-relaxed text-muted">
-          The live page. We do not restyle it here. Open it, then come back.
-        </p>
-        <GoogleUnsetNote show={!googleLinkSaved} />
-      </div>
-
-      <Button variant="action" size="lg" asChild>
-        <a href={standUrl} target="_blank" rel="noopener noreferrer">
-          Open customer page
-          <ExternalLink className="size-4" aria-hidden="true" />
-        </a>
-      </Button>
-
-      <Button variant="ghost" size="lg" onClick={onContinue}>
-        Continue
-      </Button>
-    </>
-  );
-}
-
-function TagStep({
-  businessName,
-  googleLinkSaved,
-  onContinue,
-}: {
-  businessName: string;
-  googleLinkSaved: boolean;
-  onContinue: () => void;
-}) {
-  return (
-    <>
-      <div className="flex flex-col gap-2">
-        <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.02em] text-ink">
-          Your first Tag is ready
-        </h1>
-        <p className="text-base leading-relaxed text-muted">
-          A Tag is the code people scan. You have one
-          {businessName ? ` for ${businessName}` : ""}. Print the code or
-          program a blank NFC tag with the same link.
-        </p>
-        <GoogleUnsetNote show={!googleLinkSaved} />
-      </div>
-
-      <Button variant="action" size="lg" onClick={onContinue}>
-        Continue
-      </Button>
-    </>
-  );
-}
-
-function PrintStep({
-  qr,
-  copied,
-  googleLinkSaved,
-  onCopy,
-  onContinue,
-}: {
-  qr: ReturnType<typeof useAuthenticatedQr>;
-  copied: boolean;
-  googleLinkSaved: boolean;
-  onCopy: () => void;
-  onContinue: () => void;
-}) {
-  return (
-    <>
-      <div className="flex flex-col gap-2">
-        <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.02em] text-ink">
-          Print or program
-        </h1>
-        <p className="text-base leading-relaxed text-muted">
-          Put the code where people pay. To program a tag, write this same link
-          onto a blank NFC tag — you can also do that from Tags after setup.
-        </p>
-        <GoogleUnsetNote show={!googleLinkSaved} />
-      </div>
-
-      <div className="rounded-[var(--radius-card)] border border-border bg-surface p-6">
-        {qr.status === "error" || qr.status === "expired" ? (
-          <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center">
-            <div className="flex flex-col items-center gap-3">
-              <p className="text-sm text-muted">
-                {qr.status === "expired" ? "Please sign in again" : "Could not load QR code"}
-              </p>
-              <button
-                type="button"
-                onClick={qr.reload}
-                className="inline-flex items-center gap-1 text-sm font-medium text-brand-text"
-              >
-                <RefreshCw className="size-3.5" aria-hidden="true" />
-                Try again
-              </button>
-            </div>
-          </div>
-        ) : qr.objectUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={qr.objectUrl}
-            alt="Your QR code"
-            className="mx-auto aspect-square w-full max-w-[220px]"
+        <div className="flex flex-col gap-3">
+          <Input
+            id="google-url"
+            value={googleUrl}
+            inputMode="url"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="Paste your link here"
+            aria-label="Google review link"
+            onChange={(event) => {
+              setGoogleUrl(event.target.value);
+              setError(null);
+            }}
+            className="h-16 text-base"
+            invalid={trimmedUrl !== "" && !urlLooksRight}
           />
-        ) : (
-          <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center">
-            <div className="size-8 animate-spin rounded-full border-4 border-border border-t-brand-text" />
-          </div>
-        )}
+
+          {/* Confirmation the instant it is right, so nobody submits and waits
+              to find out. A green tick here removes real anxiety. */}
+          {urlLooksRight ? (
+            <p className="flex items-center gap-2 text-sm font-medium text-brand-text">
+              <Check className="size-4" aria-hidden="true" />
+              That is the right link
+            </p>
+          ) : null}
+
+          {trimmedUrl !== "" && !urlLooksRight ? (
+            <InlineNotice kind="error">
+              That does not look like a Google link. It should start with
+              g.page or google.com.
+            </InlineNotice>
+          ) : null}
+
+          {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <Button
+            size="lg"
+            loading={busy}
+            loadingLabel="Setting up…"
+            disabled={!urlLooksRight}
+            onClick={() => void finish(trimmedUrl)}
+          >
+            Continue
+          </Button>
+
+          {/* Always available. The person who cannot find this link today is
+              exactly the person who must not be locked out today. */}
+          <Button variant="ghost" loading={busy} onClick={() => void finish(undefined)}>
+            I will do this later
+          </Button>
+          <p className="text-sm text-muted" data-google-unset="true">
+            {GOOGLE_LINK_LATER}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------------ step 3 -----
+
+  return (
+    <div className="flex flex-col items-center gap-8 text-center">
+      <div className="grid size-20 place-items-center rounded-full bg-brand-soft">
+        <Check className="size-10 text-brand-text" strokeWidth={3} aria-hidden="true" />
       </div>
 
-      <div className="flex flex-col gap-3 print:hidden">
-        <Button variant="action" size="lg" onClick={() => window.print()}>
+      <div className="flex flex-col gap-2">
+        <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
+          Your Tag is ready
+        </h1>
+        {/* It is not working yet, and saying "you are all set" would mean a
+            business puts this on the counter and finds out from a customer.
+            The door opens when a plan does. */}
+        <p className="text-base text-muted">
+          Choose a plan to switch it on. Seven days free, and nothing is
+          charged until the trial ends.
+        </p>
+      </div>
+
+      {created ? (
+        <div className="w-full rounded-[var(--radius-card)] border border-border bg-surface p-6 shadow-[var(--shadow-card)]">
+          {qr.status === "error" || qr.status === "expired" ? (
+            <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-sm text-muted">
+                  {qr.status === "expired" ? "Please sign in again" : "Could not load QR code"}
+                </p>
+                <button
+                  type="button"
+                  onClick={qr.reload}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-brand-text"
+                >
+                  <RefreshCw className="size-3.5" aria-hidden="true" />
+                  Try again
+                </button>
+              </div>
+            </div>
+          ) : qr.objectUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={qr.objectUrl}
+              alt="Your QR code"
+              className="mx-auto aspect-square w-full max-w-[220px]"
+            />
+          ) : (
+            <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center">
+              <div className="size-8 animate-spin rounded-full border-4 border-border border-t-brand-text" />
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      <div className="flex w-full flex-col gap-3">
+        <Button size="lg" asChild>
+          <a href="/settings/billing">Choose a plan</a>
+        </Button>
+        <Button variant="secondary" onClick={() => window.print()}>
           <Printer className="size-5" aria-hidden="true" />
           Print this code
         </Button>
@@ -514,64 +342,23 @@ function PrintStep({
           <Download className="size-5" aria-hidden="true" />
           Save to my phone
         </Button>
-        <Button variant="secondary" onClick={onCopy}>
-          {copied ? (
-            <Check className="size-5" aria-hidden="true" />
-          ) : (
-            <Copy className="size-5" aria-hidden="true" />
-          )}
-          {copied ? "Link copied" : "Copy the tag link"}
-        </Button>
-        <Button variant="ghost" onClick={onContinue}>
-          Continue
+        <Button variant="ghost" asChild>
+          <a href="/home">Go to my dashboard</a>
         </Button>
       </div>
-    </>
-  );
-}
-
-function ReadyStep({ googleLinkSaved }: { googleLinkSaved: boolean }) {
-  return (
-    <>
-      <div className="flex flex-col gap-2">
-        <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.02em] text-ink">
-          You are ready
-        </h1>
-        <p className="text-base leading-relaxed text-muted">
-          Print the code or program the tag, then put it where people pay.
-        </p>
-        <GoogleUnsetNote show={!googleLinkSaved} />
-      </div>
-
-      <Button variant="action" size="lg" asChild>
-        <a href="/home">Go to Home</a>
-      </Button>
-    </>
-  );
-}
-
-function GoogleUnsetNote({ show }: { show: boolean }) {
-  if (!show) return null;
-  return (
-    <p className="text-sm leading-relaxed text-muted" data-google-unset="true">
-      {GOOGLE_LINK_LATER}
-    </p>
+    </div>
   );
 }
 
 function Progress({ current }: { current: number }) {
   return (
-    <div
-      className="flex items-center gap-2"
-      role="img"
-      aria-label={`Step ${current} of ${ONBOARDING_STEP_COUNT}`}
-    >
-      {Array.from({ length: ONBOARDING_STEP_COUNT }, (_, index) => index + 1).map((step) => (
+    <div className="flex items-center gap-2" role="img" aria-label={`Step ${current} of 3`}>
+      {[1, 2, 3].map((step) => (
         <span
           key={step}
           className={
             step <= current
-              ? "h-1.5 flex-1 rounded-full bg-action"
+              ? "h-1.5 flex-1 rounded-full bg-brand"
               : "h-1.5 flex-1 rounded-full bg-border"
           }
         />

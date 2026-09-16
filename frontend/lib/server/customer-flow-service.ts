@@ -1,14 +1,10 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
-
 import type {
   CreateSessionResponse,
   CustomerReviewContext,
   SubmitResponseResponse,
-  TeamPraiseResponse,
 } from "@/lib/api/customer-flow-types";
-import { getPublicPresentation } from "@/lib/server/customer-page-service";
 import {
   KEY_VERSION,
   clientFingerprint,
@@ -26,14 +22,13 @@ import {
 } from "@/lib/server/crypto";
 import { tokenDigestKeyVersion } from "@/lib/server/env";
 import { ApiError, ERROR_CODE, rateLimited, reviewLinkInactive } from "@/lib/server/errors";
-import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
+import { resolveDestination } from "@/lib/server/destination";
 import { logger } from "@/lib/server/logger";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import {
   DEFAULT_LOCALE,
   SUPPORTED_LOCALES,
   canonicalJson,
-  normalizeCustomerText,
   type SupportedLocale,
 } from "@/lib/server/validation";
 
@@ -43,13 +38,14 @@ import {
  * REVIEW INTEGRITY — the rule this module exists to keep
  * ------------------------------------------------------
  * Nothing here branches on the rating. A 1 and a 5 take the same path, produce
- * the same response shape, and receive the same Google opportunity. The
- * opportunity itself comes from `getContext`, which runs *before any rating
- * exists* and is never re-fetched with one — that is the structural reason it
- * cannot vary by rating, rather than a rule someone has to remember.
+ * the same response shape, and receive the same destination. The destination
+ * itself comes from `getContext`, which runs *before any rating exists* and is
+ * never re-fetched with one — that is the structural reason it cannot vary by
+ * rating, rather than a rule someone has to remember.
  *
- * The private note and Team Praise are additive: extra things a customer may
- * choose to do, never a substitute for the public review.
+ * V1 contract: Tag/QR/NFC → rating 1–5 → private rating saved → the business's
+ * public review destination. No public note. No Team Praise in the customer
+ * path. The same destination is served for every rating, 1 through 5.
  *
  * If a change ever makes a customer-facing value depend on `rating`, that
  * change is wrong.
@@ -75,8 +71,7 @@ type Outcome =
   | "session_invalid"
   | "session_expired"
   | "response_conflict"
-  | "response_not_found"
-  | "praise_conflict";
+  | "response_not_found";
 
 interface RpcResult {
   outcome: Outcome;
@@ -151,12 +146,6 @@ function throwForOutcome(outcome: Outcome): never {
       );
     case "response_not_found":
       throw new ApiError(404, ERROR_CODE.sessionInvalid, "This response is no longer available.");
-    case "praise_conflict":
-      throw new ApiError(
-        409,
-        ERROR_CODE.responseConflict,
-        "Praise has already been recorded for this response.",
-      );
     default:
       throw new ApiError(500, ERROR_CODE.internalError, "Something went wrong on our side.");
   }
@@ -192,11 +181,33 @@ interface Budget {
  * at exactly the busiest moment. Per client fingerprint stops one device
  * filling a business's feedback while everyone else at that stand carries on.
  */
+/** How long to ask a customer to wait when the limiter itself is unavailable. */
+const RETRY_WHEN_LIMITER_DOWN_SECONDS = 5;
+
 const CONTEXT_BUDGET: Budget = { bucket: "public-context", limit: 240, windowSeconds: 60 };
 const STAND_WRITE_BUDGET: Budget = { bucket: "public-write-stand", limit: 60, windowSeconds: 60 };
 const CLIENT_WRITE_BUDGET: Budget = { bucket: "public-write-client", limit: 30, windowSeconds: 300 };
 
-async function consume(budget: Budget, key: string, requestId: string): Promise<void> {
+/**
+ * Consume one unit of a budget.
+ *
+ * `onUnavailable` is the whole design decision. A read that cannot be
+ * rate-limited still serves a page: the worst case is a crawler reading a
+ * business name it could have read anyway, and turning a real customer away
+ * from the only screen they will ever see costs that business a rating.
+ *
+ * A *write* is the opposite. With the limiter down, failing open means anyone
+ * holding a token can fabricate unlimited feedback into a business's data —
+ * and unlike a read, that is not recoverable by retrying later. So a write
+ * whose budget cannot be enforced is refused, and the customer is asked to try
+ * again in a moment.
+ */
+async function consume(
+  budget: Budget,
+  key: string,
+  requestId: string,
+  onUnavailable: "allow" | "refuse",
+): Promise<void> {
   const { data, error } = await serviceRoleClient().rpc("rpc_consume_rate_limit", {
     p_bucket: budget.bucket,
     p_bucket_key: key,
@@ -205,33 +216,55 @@ async function consume(budget: Budget, key: string, requestId: string): Promise<
   });
 
   if (error) {
-    // Fails open. A customer standing at a counter must not be turned away
-    // because a limiter is unavailable; the abuse this bounds is a nuisance,
-    // not a breach. Authentication would fail closed — this is not that.
-    logger.warn("public.rate_limit_unavailable", { bucket: budget.bucket, requestId, error });
+    logger.warn("public.rate_limit_unavailable", {
+      bucket: budget.bucket,
+      requestId,
+      onUnavailable,
+      error,
+    });
+    if (onUnavailable === "refuse") throw rateLimited(RETRY_WHEN_LIMITER_DOWN_SECONDS);
     return;
   }
 
   const row = Array.isArray(data) ? (data[0] as { allowed: boolean; retry_after_seconds: number } | undefined) : undefined;
-  if (row && !row.allowed) {
+
+  // No row is not a pass. The function is meant to return a decision, and a
+  // missing one means it could not make it — which for a write is a refusal.
+  if (!row) {
+    logger.warn("public.rate_limit_no_decision", { bucket: budget.bucket, requestId });
+    if (onUnavailable === "refuse") throw rateLimited(RETRY_WHEN_LIMITER_DOWN_SECONDS);
+    return;
+  }
+
+  if (!row.allowed) {
     logger.warn("public.rate_limited", { bucket: budget.bucket, requestId });
     throw rateLimited(row.retry_after_seconds);
   }
 }
 
 async function guardRead(tokenHash: string, meta: RequestMeta): Promise<void> {
-  await consume(CONTEXT_BUDGET, tokenHash, meta.requestId);
+  await consume(CONTEXT_BUDGET, tokenHash, meta.requestId, "allow");
 }
 
 async function guardWrite(tokenHash: string, meta: RequestMeta): Promise<void> {
-  await consume(STAND_WRITE_BUDGET, tokenHash, meta.requestId);
-  await consume(CLIENT_WRITE_BUDGET, clientFingerprint(meta.address, meta.userAgent), meta.requestId);
+  await consume(STAND_WRITE_BUDGET, tokenHash, meta.requestId, "refuse");
+  await consume(
+    CLIENT_WRITE_BUDGET,
+    clientFingerprint(meta.address, meta.userAgent),
+    meta.requestId,
+    "refuse",
+  );
 }
 
 interface ResolvedStand {
   business_name: string;
   location_name: string | null;
+  destination_provider: string | null;
+  destination_url: string | null;
+  /** Compatibility storage. Read only as a fallback; never written from here. */
   google_review_url: string | null;
+  /** The business's *published* Customer Page. A draft never arrives here. */
+  customer_page: unknown;
   default_locale: string | null;
   matched_key_version: number;
 }
@@ -315,13 +348,12 @@ export async function getContext(token: string, meta: RequestMeta): Promise<Cust
   const stand = await resolveStand(token, tokenHash, meta);
   if (!stand) throw reviewLinkInactive();
 
-  // The contract makes googleReviewUrl required and non-nullable, and the
-  // client re-validates it. A stand without a validated destination cannot
-  // produce a usable page, so it fails identically to an unknown token rather
-  // than serving a context the client will reject with no explanation.
-  if (!stand.google_review_url || !isValidGoogleReviewUrl(stand.google_review_url)) {
-    throw reviewLinkInactive();
-  }
+  // A door with no valid destination is a closed door, and a closed door is
+  // the same neutral dead link as an unknown token. Never "this business has
+  // not finished setting up": the customer is not who that message is for, and
+  // a caller holding a guessed token learns nothing either way.
+  const destination = resolveDestination(stand);
+  if (!destination) throw reviewLinkInactive();
 
   const locale = stand.default_locale;
   const defaultLocale: SupportedLocale =
@@ -329,15 +361,18 @@ export async function getContext(token: string, meta: RequestMeta): Promise<Cust
       ? (locale as SupportedLocale)
       : DEFAULT_LOCALE;
 
-  const presentation = await getPublicPresentation(token);
+  const page = publishedPage(stand.customer_page);
 
   return {
-    business: { name: stand.business_name, logoUrl: null },
+    business: { name: stand.business_name, logoUrl: page?.logoUrl ?? null },
     location: { name: stand.location_name },
-    googleReviewUrl: stand.google_review_url,
+    page,
+    destination,
+    // Compatibility alias of destination.url while clients migrate. It is the
+    // same value, never a second source of truth.
+    googleReviewUrl: destination.url,
     supportedLocales: [...SUPPORTED_LOCALES],
     defaultLocale,
-    presentation,
   };
 }
 
@@ -394,14 +429,15 @@ export async function createSession(
 // ------------------------------------------------------------- responses --
 
 /**
- * Store the rating and the optional private note.
+ * Store the rating.
  *
- * Every rating from 1 to 5 is stored, and the note is optional for all of them.
- * Nothing about the result varies with the value chosen.
+ * V1 public contract: sessionId + rating only. No note, no name, no contact
+ * detail. Every rating from 1 to 5 takes the same path and receives the same
+ * Google opportunity. Nothing about the result varies with the value chosen.
  */
 export async function submitResponse(
   token: string,
-  input: { sessionId: string; rating: number; note?: string; idempotencyKey: string },
+  input: { sessionId: string; rating: number; idempotencyKey: string },
   meta: RequestMeta,
 ): Promise<OperationResult<SubmitResponseResponse>> {
   const tokenHash = digestStandToken(token);
@@ -409,18 +445,17 @@ export async function submitResponse(
 
   const responseToken = generateToken();
   const body: SubmitResponseResponse = { responseId: responseToken };
-  const note = normalizeCustomerText(input.note);
 
   const { data, error } = await serviceRoleClient().rpc("rpc_public_submit_response", {
     p_token_hash: tokenHash,
     p_idempotency_key: digestIdempotencyKey(`response|${input.idempotencyKey}`),
     p_request_hash: digestRequestBody(
-      canonicalJson({ sessionId: input.sessionId, rating: input.rating, note: input.note }),
+      canonicalJson({ sessionId: input.sessionId, rating: input.rating }),
     ),
     p_session_token_hash: digestSessionToken(input.sessionId),
     p_response_token_hash: digestResponseToken(responseToken),
     p_rating: input.rating,
-    p_note_encrypted: note === "" ? null : encrypt(note),
+    p_note_encrypted: null,
     p_note_key_version: KEY_VERSION,
     p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
     p_response_body_encrypted: encrypt(JSON.stringify(body)),
@@ -444,18 +479,21 @@ export async function submitResponse(
   return { status: 201, body };
 }
 
-// ---------------------------------------------------------- google click --
+// --------------------------------------------------- destination handoff --
 
 /**
- * Record that the customer selected the Google action.
+ * Record that the customer was handed to the configured review destination.
  *
  * That is the entire claim. It does not mean a review was written, submitted,
  * or published — ReviewBoost cannot observe any of that, and no metric built on
- * it may imply otherwise. The API never redirects: the client owns the
- * navigation, so a tracking failure can never stand between a customer and the
- * public review page.
+ * it may imply otherwise. The provider is recorded by the database from the
+ * location it resolves, not taken from the request, so the stored history says
+ * which door was open at that moment rather than what a client asserted.
+ *
+ * The API never redirects: the client owns the navigation, so a tracking
+ * failure can never stand between a customer and the public review page.
  */
-export async function recordGoogleClick(
+export async function recordDestinationSelection(
   token: string,
   input: { sessionId: string; responseId: string; idempotencyKey: string },
   meta: RequestMeta,
@@ -463,9 +501,9 @@ export async function recordGoogleClick(
   const tokenHash = digestStandToken(token);
   await guardWrite(tokenHash, meta);
 
-  const { data, error } = await serviceRoleClient().rpc("rpc_public_record_google_click", {
+  const { data, error } = await serviceRoleClient().rpc("rpc_public_record_destination_selection", {
     p_token_hash: tokenHash,
-    p_idempotency_key: digestIdempotencyKey(`google-click|${input.idempotencyKey}`),
+    p_idempotency_key: digestIdempotencyKey(`destination-selection|${input.idempotencyKey}`),
     p_request_hash: digestRequestBody(
       canonicalJson({ sessionId: input.sessionId, responseId: input.responseId }),
     ),
@@ -477,10 +515,10 @@ export async function recordGoogleClick(
     p_previous_response_token_hash: digestResponseTokenWithPreviousKey(input.responseId),
   });
 
-  if (error) fail("google_click", error, meta.requestId);
+  if (error) fail("destination_selection", error, meta.requestId);
 
   const result = firstRow(data);
-  if (!result) fail("google_click", new Error("empty rpc result"), meta.requestId);
+  if (!result) fail("destination_selection", new Error("empty rpc result"), meta.requestId);
 
   // 204 on a first record and on a replay alike: the contract documents one
   // success status for this operation.
@@ -491,81 +529,33 @@ export async function recordGoogleClick(
   throwForOutcome(result.outcome);
 }
 
-// ------------------------------------------------------------ team praise -
-
 /**
- * Store praise for a colleague.
+ * Narrow the published page snapshot to the fields the contract publishes.
  *
- * Name and note are encrypted at rest and stored unmatched. ReviewBoost never
- * guesses which colleague the customer meant — matching is a decision a human
- * makes later, with the rating deliberately out of view. The response carries
- * only the new id: no rating, no Google state, no contact detail.
+ * The snapshot is validated on the way in, but it is JSON in a column, so it
+ * is treated as untrusted on the way out too: an unknown template or a
+ * non-string tagline degrades to the plain default rather than reaching a
+ * customer's browser. A business with no page is not an error — it still has
+ * customers and must still be able to take a rating.
  */
-export async function submitTeamPraise(
-  token: string,
-  input: {
-    sessionId: string;
-    responseId: string;
-    firstName: string;
-    note?: string;
-    idempotencyKey: string;
-  },
-  meta: RequestMeta,
-): Promise<OperationResult<TeamPraiseResponse>> {
-  const tokenHash = digestStandToken(token);
-  await guardWrite(tokenHash, meta);
+function publishedPage(value: unknown): CustomerReviewContext["page"] {
+  if (value === null || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
 
-  const firstName = normalizeCustomerText(input.firstName);
-  const note = normalizeCustomerText(input.note);
-  // Generated here, not in the database, so the replay body can be encrypted
-  // with it before the call. A retry with no stored body has nothing to return.
-  const praiseId = randomUUID();
-  const body: TeamPraiseResponse = { teamPraiseId: praiseId };
+  const templateId = raw["templateId"];
+  const tagline = raw["tagline"];
+  const logoUrl = raw["logoUrl"];
+  const heroUrl = raw["heroUrl"];
 
-  if (firstName === "") {
-    throw new ApiError(400, ERROR_CODE.validationFailed, "The request could not be accepted.", {
-      details: [{ field: "firstName", message: "A first name is required." }],
-    });
-  }
-
-  const { data, error } = await serviceRoleClient().rpc("rpc_public_submit_team_praise", {
-    p_token_hash: tokenHash,
-    p_idempotency_key: digestIdempotencyKey(`team-praise|${input.idempotencyKey}`),
-    p_request_hash: digestRequestBody(
-      canonicalJson({
-        sessionId: input.sessionId,
-        responseId: input.responseId,
-        firstName: input.firstName,
-        note: input.note,
-      }),
-    ),
-    p_session_token_hash: digestSessionToken(input.sessionId),
-    p_response_token_hash: digestResponseToken(input.responseId),
-    p_praise_id: praiseId,
-    p_first_name_encrypted: encrypt(firstName),
-    p_note_encrypted: note === "" ? null : encrypt(note),
-    p_key_version: KEY_VERSION,
-    p_idempotency_ttl_seconds: IDEMPOTENCY_TTL_SECONDS,
-    p_response_body_encrypted: encrypt(JSON.stringify(body)),
-    p_previous_token_hash: digestStandTokenWithPreviousKey(token),
-    p_previous_session_token_hash: digestSessionTokenWithPreviousKey(input.sessionId),
-    p_previous_response_token_hash: digestResponseTokenWithPreviousKey(input.responseId),
-  });
-
-  if (error) fail("team_praise", error, meta.requestId);
-
-  const result = firstRow(data);
-  if (!result) fail("team_praise", new Error("empty rpc result"), meta.requestId);
-
-  if (result.outcome === "replay") {
-    return {
-      status: replayStatus(result.response_status),
-      body: decodeBody<TeamPraiseResponse>(result.response_body_encrypted),
-    };
-  }
-  if (result.outcome !== "created") throwForOutcome(result.outcome);
-
-  return { status: 201, body };
+  return {
+    templateId:
+      templateId === "classic" || templateId === "bold" || templateId === "minimal"
+        ? templateId
+        : "classic",
+    tagline: typeof tagline === "string" && tagline.length <= 120 ? tagline : null,
+    logoUrl: typeof logoUrl === "string" && logoUrl.startsWith("https://") ? logoUrl : null,
+    heroUrl: typeof heroUrl === "string" && heroUrl.startsWith("https://") ? heroUrl : null,
+  };
 }
 
 /**

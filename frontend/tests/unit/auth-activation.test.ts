@@ -55,8 +55,8 @@ describe("login, verify, and activation chrome", () => {
     const flow = code("features/onboarding/onboarding-flow.tsx");
     expect(flow).toContain("/api/v1/onboarding");
     expect(flow).toContain("data-onboarding-step");
-    expect(flow).toContain("Open customer page");
     expect(flow).toContain("Print this code");
-    expect(flow).toContain("Copy the tag link");
+    // Setting up is free; serving customers is what needs a plan.
+    expect(flow).toContain("Choose a plan to switch it on");
   });
 });

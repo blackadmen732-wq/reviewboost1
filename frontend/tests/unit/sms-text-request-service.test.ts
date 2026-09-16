@@ -62,7 +62,7 @@ describe("resolveStand — fail closed on the timezone lookup", () => {
   it("uses the location's timezone on success", async () => {
     const { resolveStand } = await load();
     const ctx = makeContext(okStand, { data: { timezone: "America/New_York" }, error: null });
-    const r = await resolveStand(ctx, "tokentokentoken");
+    const r = await resolveStand(ctx, { standToken: "tokentokentoken" });
     expect(r.timezone).toBe("America/New_York");
     expect(r.standId).toBe("s1");
     expect(r.locationId).toBe("l1");
@@ -72,9 +72,9 @@ describe("resolveStand — fail closed on the timezone lookup", () => {
     const { resolveStand } = await load();
     const { ApiError } = await import("@/lib/server/errors");
     const ctx = makeContext(okStand, { data: null, error: { message: "connection reset" } });
-    await expect(resolveStand(ctx, "tokentokentoken")).rejects.toMatchObject({ status: 503 });
+    await expect(resolveStand(ctx, { standToken: "tokentokentoken" })).rejects.toMatchObject({ status: 503 });
     // Prove it is the typed API error, not some other throw.
-    await resolveStand(ctx, "tokentokentoken").catch((e) => {
+    await resolveStand(ctx, { standToken: "tokentokentoken" }).catch((e) => {
       expect(e).toBeInstanceOf(ApiError);
     });
   });
@@ -82,19 +82,19 @@ describe("resolveStand — fail closed on the timezone lookup", () => {
   it("applies the documented UTC fallback for a successfully-read missing zone", async () => {
     const { resolveStand } = await load();
     const ctx = makeContext(okStand, { data: { timezone: null }, error: null });
-    const r = await resolveStand(ctx, "tokentokentoken");
+    const r = await resolveStand(ctx, { standToken: "tokentokentoken" });
     expect(r.timezone).toBe("UTC");
   });
 
   it("still 404s when the stand is not found", async () => {
     const { resolveStand } = await load();
     const ctx = makeContext({ data: null, error: null }, { data: null, error: null });
-    await expect(resolveStand(ctx, "tokentokentoken")).rejects.toMatchObject({ status: 404 });
+    await expect(resolveStand(ctx, { standToken: "tokentokentoken" })).rejects.toMatchObject({ status: 404 });
   });
 
   it("fails closed (503) when the stand query errors", async () => {
     const { resolveStand } = await load();
     const ctx = makeContext({ data: null, error: { message: "db down" } }, { data: null, error: null });
-    await expect(resolveStand(ctx, "tokentokentoken")).rejects.toMatchObject({ status: 503 });
+    await expect(resolveStand(ctx, { standToken: "tokentokentoken" })).rejects.toMatchObject({ status: 503 });
   });
 });

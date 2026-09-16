@@ -1,63 +1,59 @@
 import type { Locale } from "@/lib/i18n/config";
 import type { RatingValue } from "@/lib/i18n/customer-messages";
 
-export type CustomerScreen = "rating" | "google" | "praise" | "finished";
+/**
+ * V1 customer contract: one tap.
+ *
+ * `rating` is the only screen a customer is ever asked to act on. Tapping a
+ * star submits immediately and hands off to the business's public review
+ * destination. `handoff` is not a step — it is what the page shows while the
+ * browser is already navigating away, and what a customer returning with the
+ * back button lands on instead of an empty form they could rate twice.
+ */
+export type CustomerScreen = "rating" | "handoff";
 export type SubmissionStatus = "idle" | "submitting" | "error" | "offline";
 
 export interface CustomerFlowState {
   screen: CustomerScreen;
   rating: RatingValue | null;
-  note: string;
   sessionId: string | null;
   responseId: string | null;
   sessionKey: string | null;
   responseKey: string | null;
-  googleClickKey: string | null;
-  googleClickPending: boolean;
-  praiseKey: string | null;
-  praiseFirstName: string;
-  praiseNote: string;
+  destinationKey: string | null;
+  destinationPending: boolean;
   feedbackStatus: SubmissionStatus;
-  praiseStatus: SubmissionStatus;
   locale: Locale;
 }
 
 export const initialCustomerFlowState: CustomerFlowState = {
   screen: "rating",
   rating: null,
-  note: "",
   sessionId: null,
   responseId: null,
   sessionKey: null,
   responseKey: null,
-  googleClickKey: null,
-  googleClickPending: false,
-  praiseKey: null,
-  praiseFirstName: "",
-  praiseNote: "",
+  destinationKey: null,
+  destinationPending: false,
   feedbackStatus: "idle",
-  praiseStatus: "idle",
   locale: "en",
 };
 
 export type CustomerFlowAction =
   | { type: "restore"; state: CustomerFlowState }
   | { type: "select-rating"; rating: RatingValue }
-  | { type: "change-note"; note: string }
   | { type: "change-locale"; locale: Locale }
   | { type: "feedback-started"; sessionKey: string; responseKey: string }
   | { type: "session-ready"; sessionId: string }
   | { type: "feedback-offline" }
   | { type: "feedback-failed" }
-  | { type: "feedback-succeeded"; sessionId: string; responseId: string }
-  | { type: "google-click-started"; idempotencyKey: string }
-  | { type: "google-click-recorded" }
-  | { type: "show-praise" }
-  | { type: "change-praise"; firstName: string; note: string }
-  | { type: "praise-started"; idempotencyKey: string }
-  | { type: "praise-offline" }
-  | { type: "praise-failed" }
-  | { type: "finish" };
+  | {
+      type: "feedback-succeeded";
+      sessionId: string;
+      responseId: string;
+      destinationKey: string;
+    }
+  | { type: "destination-recorded" };
 
 export function customerFlowReducer(
   state: CustomerFlowState,
@@ -70,13 +66,6 @@ export function customerFlowReducer(
       return {
         ...state,
         rating: action.rating,
-        responseKey: null,
-        feedbackStatus: "idle",
-      };
-    case "change-note":
-      return {
-        ...state,
-        note: action.note,
         responseKey: null,
         feedbackStatus: "idle",
       };
@@ -96,49 +85,20 @@ export function customerFlowReducer(
     case "feedback-failed":
       return { ...state, feedbackStatus: "error" };
     case "feedback-succeeded":
+      // `rating` is cleared here, not kept. Nothing after the rating is stored
+      // may vary with its value, and the cheapest way to keep that true is for
+      // the value not to exist on this side of the transition.
       return {
         ...state,
-        screen: "google",
+        screen: "handoff",
         rating: null,
-        note: "",
         sessionId: action.sessionId,
         responseId: action.responseId,
+        destinationKey: action.destinationKey,
+        destinationPending: true,
         feedbackStatus: "idle",
       };
-    case "google-click-started":
-      return {
-        ...state,
-        screen: "praise",
-        googleClickKey: action.idempotencyKey,
-        googleClickPending: true,
-      };
-    case "google-click-recorded":
-      return { ...state, googleClickPending: false };
-    case "show-praise":
-      return { ...state, screen: "praise" };
-    case "change-praise":
-      return {
-        ...state,
-        praiseFirstName: action.firstName,
-        praiseNote: action.note,
-        praiseKey: null,
-        praiseStatus: "idle",
-      };
-    case "praise-started":
-      return {
-        ...state,
-        praiseKey: action.idempotencyKey,
-        praiseStatus: "submitting",
-      };
-    case "praise-offline":
-      return { ...state, praiseStatus: "offline" };
-    case "praise-failed":
-      return { ...state, praiseStatus: "error" };
-    case "finish":
-      return {
-        ...initialCustomerFlowState,
-        screen: "finished",
-        locale: state.locale,
-      };
+    case "destination-recorded":
+      return { ...state, destinationPending: false };
   }
 }

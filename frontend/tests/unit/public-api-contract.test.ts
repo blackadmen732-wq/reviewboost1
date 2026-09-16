@@ -4,7 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 /**
- * Contract tests for the five public Route Handlers.
+ * Contract tests for the four public Route Handlers.
  *
  * Supabase is mocked, so what these prove is everything above the database:
  * routing, validation, the error envelope, status codes, security headers, the
@@ -44,7 +44,10 @@ const ACTIVE_STAND = {
   stand_id: "33333333-3333-3333-3333-333333333333",
   business_name: "The Corner Cafe",
   location_name: "High Street",
+  destination_provider: "google",
+  destination_url: "https://g.page/r/CdSAMPLE/review",
   google_review_url: "https://g.page/r/CdSAMPLE/review",
+  customer_page: { templateId: "bold", tagline: "Thanks for visiting", logoUrl: null, heroUrl: null },
   default_locale: "en",
   matched_key_version: 1,
 };
@@ -57,8 +60,6 @@ function allowed() {
 function happyPath(fn: string): { data: unknown; error: unknown } {
   if (fn === "rpc_consume_rate_limit") return allowed();
   if (fn === "rpc_public_resolve_stand") return { data: [ACTIVE_STAND], error: null };
-  if (fn === "rpc_public_customer_presentation") return { data: [], error: null };
-  if (fn === "rpc_public_customer_hero") return { data: [], error: null };
   return { data: [{ outcome: "created", response_status: null, response_body_encrypted: null }], error: null };
 }
 
@@ -123,26 +124,16 @@ async function postResponse(body: unknown, headers?: Record<string, string>) {
 }
 
 async function postGoogleClick(body: unknown, headers?: Record<string, string>) {
-  const { POST } = await import("@/app/api/v1/public/q/[token]/google-click/route");
+  const { POST } = await import("@/app/api/v1/public/q/[token]/destination-selection/route");
   return POST(
-    request("POST", `/api/v1/public/q/${TOKEN}/google-click`, {
+    request("POST", `/api/v1/public/q/${TOKEN}/destination-selection`, {
       body,
-      ...(headers ? { headers } : { headers: { "idempotency-key": key("google-click") } }),
+      ...(headers ? { headers } : { headers: { "idempotency-key": key("destination-selection") } }),
     }),
     params(TOKEN),
   );
 }
 
-async function postTeamPraise(body: unknown, headers?: Record<string, string>) {
-  const { POST } = await import("@/app/api/v1/public/q/[token]/team-praise/route");
-  return POST(
-    request("POST", `/api/v1/public/q/${TOKEN}/team-praise`, {
-      body,
-      ...(headers ? { headers } : { headers: { "idempotency-key": key("team-praise") } }),
-    }),
-    params(TOKEN),
-  );
-}
 
 describe("GET public context", () => {
   it("returns exactly the contract shape", async () => {
@@ -153,20 +144,58 @@ describe("GET public context", () => {
     expect(Object.keys(body).sort()).toEqual([
       "business",
       "defaultLocale",
+      "destination",
       "googleReviewUrl",
       "location",
-      "presentation",
+      "page",
       "supportedLocales",
     ]);
-    expect(body["googleReviewUrl"]).toBe(ACTIVE_STAND.google_review_url);
+    expect(body["page"]).toEqual({
+      templateId: "bold",
+      tagline: "Thanks for visiting",
+      logoUrl: null,
+      heroUrl: null,
+    });
+    expect(body["destination"]).toEqual({
+      provider: "google",
+      url: ACTIVE_STAND.destination_url,
+    });
+    // The compatibility alias is the same value, never a second source of truth.
+    expect(body["googleReviewUrl"]).toBe(ACTIVE_STAND.destination_url);
     expect(body["business"]).toEqual({ name: "The Corner Cafe", logoUrl: null });
     expect(body["location"]).toEqual({ name: "High Street" });
-    expect(body["presentation"]).toEqual({
-      heroUrl: null,
-      transform: { x: 0, y: 0, scale: 1 },
-      tagline: null,
-    });
     expect(body["supportedLocales"]).toEqual(["en", "es", "ht"]);
+  });
+
+  it("treats the stored page snapshot as untrusted on the way out", async () => {
+    // It is validated on the way in, but it is JSON in a column: a row edited
+    // by hand, or written by an older version, must degrade to the plain
+    // default rather than reach a customer's browser.
+    rpcHandler = (fn) =>
+      fn === "rpc_public_resolve_stand"
+        ? {
+            data: [
+              {
+                ...ACTIVE_STAND,
+                customer_page: {
+                  templateId: "casino",
+                  tagline: 42,
+                  logoUrl: "javascript:alert(1)",
+                  heroUrl: "http://insecure.example/hero.png",
+                },
+              },
+            ],
+            error: null,
+          }
+        : happyPath(fn);
+
+    const body = (await (await getContext()).json()) as Record<string, unknown>;
+    expect(body["page"]).toEqual({
+      templateId: "classic",
+      tagline: null,
+      logoUrl: null,
+      heroUrl: null,
+    });
   });
 
   it("never leaks a tenant, location, or stand identifier", async () => {
@@ -224,7 +253,16 @@ describe("GET public context", () => {
     rpcHandler = (fn) =>
       fn === "rpc_consume_rate_limit"
         ? allowed()
-        : { data: [{ ...ACTIVE_STAND, google_review_url: "https://evil.example/review" }], error: null };
+        : {
+            data: [
+              {
+                ...ACTIVE_STAND,
+                destination_url: "https://evil.example/review",
+                google_review_url: "https://evil.example/review",
+              },
+            ],
+            error: null,
+          };
     response = await getContext();
     outcomes.push({ status: response.status, body: await response.json() });
 
@@ -232,7 +270,17 @@ describe("GET public context", () => {
     rpcHandler = (fn) =>
       fn === "rpc_consume_rate_limit"
         ? allowed()
-        : { data: [{ ...ACTIVE_STAND, google_review_url: null }], error: null };
+        : {
+            data: [
+              {
+                ...ACTIVE_STAND,
+                destination_provider: null,
+                destination_url: null,
+                google_review_url: null,
+              },
+            ],
+            error: null,
+          };
     response = await getContext();
     outcomes.push({ status: response.status, body: await response.json() });
 
@@ -312,33 +360,11 @@ describe("review integrity — every rating is handled identically", () => {
     expect(new Set(argShapes).size).toBe(1);
   });
 
-  it("accepts a note on every rating and demands one on none", async () => {
+  it("rejects a note field — notes are not part of the V1 public contract", async () => {
     for (const rating of [1, 2, 3, 4, 5]) {
-      const without = await postResponse({ sessionId: SESSION_ID, rating });
-      expect(without.status, `rating ${rating} without a note`).toBe(201);
-
       const withNote = await postResponse({ sessionId: SESSION_ID, rating, note: "some detail" });
-      expect(withNote.status, `rating ${rating} with a note`).toBe(201);
+      expect(withNote.status, `rating ${rating} with note field`).toBe(400);
     }
-  });
-
-  it("encrypts the note before it reaches the database", async () => {
-    calls.length = 0;
-    await postResponse({ sessionId: SESSION_ID, rating: 2, note: "The table was sticky" });
-
-    const submit = calls.find((call) => call.fn === "rpc_public_submit_response");
-    const stored = String(submit?.args["p_note_encrypted"]);
-
-    expect(stored).not.toContain("sticky");
-    expect(stored).toMatch(/^v1:/);
-  });
-
-  it("stores no ciphertext when there is no note", async () => {
-    calls.length = 0;
-    await postResponse({ sessionId: SESSION_ID, rating: 5 });
-
-    const submit = calls.find((call) => call.fn === "rpc_public_submit_response");
-    expect(submit?.args["p_note_encrypted"]).toBeNull();
   });
 });
 
@@ -348,7 +374,6 @@ describe("idempotency", () => {
       () => postSession({ locale: "en" }, {}),
       () => postResponse({ sessionId: SESSION_ID, rating: 3 }, {}),
       () => postGoogleClick({ sessionId: SESSION_ID, responseId: RESPONSE_ID }, {}),
-      () => postTeamPraise({ sessionId: SESSION_ID, responseId: RESPONSE_ID, firstName: "Sam" }, {}),
     ];
 
     for (const mutation of mutations) {
@@ -466,67 +491,18 @@ describe("google click", () => {
   });
 });
 
-describe("team praise", () => {
-  it("returns only the new id", async () => {
-    const response = await postTeamPraise({
-      sessionId: SESSION_ID,
-      responseId: RESPONSE_ID,
-      firstName: "Sarah",
-      note: "Stayed late to sort out our order.",
-    });
-
-    expect(response.status).toBe(201);
-
-    const body = (await response.json()) as Record<string, unknown>;
-    expect(Object.keys(body)).toEqual(["teamPraiseId"]);
-  });
-
-  it("returns nothing about the rating, Google, or money", async () => {
-    const response = await postTeamPraise({
-      sessionId: SESSION_ID,
-      responseId: RESPONSE_ID,
-      firstName: "Sarah",
-    });
-
-    const serialised = JSON.stringify(await response.json()).toLowerCase();
-    for (const forbidden of ["rating", "star", "google", "bonus", "payroll", "phone", "email"]) {
-      expect(serialised, forbidden).not.toContain(forbidden);
-    }
-  });
-
-  it("encrypts the name and the note", async () => {
-    calls.length = 0;
-    await postTeamPraise({
-      sessionId: SESSION_ID,
-      responseId: RESPONSE_ID,
-      firstName: "José",
-      note: "Went out of their way",
-    });
-
-    const submit = calls.find((call) => call.fn === "rpc_public_submit_team_praise");
-    expect(String(submit?.args["p_first_name_encrypted"])).not.toContain("José");
-    expect(String(submit?.args["p_note_encrypted"])).not.toContain("Went out");
-  });
-
-  it("stores the name as written, without transliteration", async () => {
-    const { decrypt } = await import("@/lib/server/crypto");
-    calls.length = 0;
-
-    await postTeamPraise({ sessionId: SESSION_ID, responseId: RESPONSE_ID, firstName: "José" });
-
-    const submit = calls.find((call) => call.fn === "rpc_public_submit_team_praise");
-    expect(decrypt(String(submit?.args["p_first_name_encrypted"]))).toBe("José");
-  });
-
-  it("is accepted after a one-star rating exactly as after a five", async () => {
-    // Praise and a complaint are not mutually exclusive, and the product must
-    // not assume they are.
-    const response = await postTeamPraise({
-      sessionId: SESSION_ID,
-      responseId: RESPONSE_ID,
-      firstName: "Sam",
-    });
-    expect(response.status).toBe(201);
+describe("team praise tombstone", () => {
+  it("returns 410 Gone — Team Praise is not active in V1", async () => {
+    const { POST } = await import("@/app/api/v1/public/q/[token]/team-praise/route");
+    const response = await POST(
+      request("POST", `/api/v1/public/q/${TOKEN}/team-praise`, {
+        body: { sessionId: SESSION_ID, responseId: RESPONSE_ID, firstName: "Sam" },
+        headers: { "idempotency-key": key("team-praise") },
+      }),
+    );
+    expect(response.status).toBe(410);
+    const body = (await response.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("gone");
   });
 });
 
@@ -575,7 +551,6 @@ describe("request rejection", () => {
     const responses = await Promise.all([
       postSession({ locale: "en" }),
       postResponse({ sessionId: SESSION_ID, rating: 1 }),
-      postTeamPraise({ sessionId: SESSION_ID, responseId: RESPONSE_ID, firstName: "Sam" }),
     ]);
 
     for (const response of responses) expect(response.status).not.toBe(202);
@@ -628,16 +603,41 @@ describe("rate limiting", () => {
     expect(response.headers.get("retry-after")).toBe("42");
   });
 
-  it("fails open when the limiter itself is unavailable", async () => {
-    // A customer at a counter must not be turned away because a limiter is
-    // down. The abuse this bounds is a nuisance, not a breach.
+  it("refuses a WRITE when the limiter itself is unavailable", async () => {
+    // Failing open on a write means anyone holding a token can fabricate
+    // unlimited feedback into a business's data while the limiter is down, and
+    // unlike a failed read that is not recoverable by trying again later.
     rpcHandler = (fn) =>
       fn === "rpc_consume_rate_limit"
         ? { data: null, error: { message: "connection refused" } }
         : happyPath(fn);
 
     const response = await postResponse({ sessionId: SESSION_ID, rating: 3 });
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("5");
+  });
+
+  it("refuses a write when the limiter returns no decision at all", async () => {
+    // An empty result is not a pass: the function is meant to return a
+    // decision, and a missing one means it could not make one.
+    rpcHandler = (fn) =>
+      fn === "rpc_consume_rate_limit" ? { data: [], error: null } : happyPath(fn);
+
+    const response = await postResponse({ sessionId: SESSION_ID, rating: 3 });
+    expect(response.status).toBe(429);
+  });
+
+  it("still serves a READ when the limiter is unavailable", async () => {
+    // The worst case for a read is a crawler seeing a business name it could
+    // have seen anyway. Turning a real customer away from the only screen they
+    // will ever see costs that business a rating.
+    rpcHandler = (fn) =>
+      fn === "rpc_consume_rate_limit"
+        ? { data: null, error: { message: "connection refused" } }
+        : happyPath(fn);
+
+    const response = await getContext();
+    expect(response.status).toBe(200);
   });
 });
 

@@ -79,7 +79,7 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
         "content-type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ googleReviewUrl: trimmed }),
+      body: JSON.stringify({ destinationProvider: "google", destinationUrl: trimmed }),
     });
 
     setBusy(false);

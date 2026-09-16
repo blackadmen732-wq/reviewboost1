@@ -10,29 +10,29 @@ function source(path: string): string {
 }
 
 describe("OwnerShell IA", () => {
-  it("desktop is Home / Feedback / Tags / Team / Settings", () => {
+  it("desktop is Home / Feedback / Text Requests / Tags / Settings", () => {
     expect(DESKTOP_NAV.map((item) => item.label)).toEqual([
       "Home",
       "Feedback",
+      "Text Requests",
       "Tags",
-      "Team",
       "Settings",
     ]);
     expect(DESKTOP_NAV.map((item) => item.href)).toEqual([
       "/home",
       "/feedback",
+      "/text-requests",
       "/stands",
-      "/praise",
       "/settings",
     ]);
   });
 
-  it("mobile is four tabs without Team", () => {
+  it("mobile is four tabs, Settings reached by profile", () => {
     expect(MOBILE_NAV.map((item) => item.label)).toEqual([
       "Home",
       "Feedback",
+      "Text Requests",
       "Tags",
-      "Settings",
     ]);
     expect(MOBILE_NAV).toHaveLength(4);
   });
@@ -42,6 +42,9 @@ describe("OwnerShell IA", () => {
     expect(labels).not.toContain("Customers");
     expect(labels).not.toContain("Praise");
     expect(labels).not.toContain("Reviews");
+    // "Team" was /praise wearing a different label.
+    expect(labels).not.toContain("Team");
+    expect([...DESKTOP_NAV, ...MOBILE_NAV].map((item) => item.href)).not.toContain("/praise");
   });
 
   it("keeps Home on existing owner-data reads", () => {

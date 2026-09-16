@@ -190,7 +190,7 @@ select lives_ok(
         'newpfx',
         1::smallint,
         'test-rotation',
-        'v1:enc-rotated-token',
+        'v1:cm90YXRlZC1pdg==:cm90YXRlZC1jdA==:cm90YXRlZC10YWc=',
         1::smallint) $$,
     'rpc_rotate_stand_token succeeds for owner');
 
@@ -217,7 +217,7 @@ select throws_ok(
         'outpfx',
         1::smallint,
         'outsider-rotation',
-        'v1:enc-outsider-token',
+        'v1:b3V0c2lkZXItaXY=:b3V0c2lkZXItY3Q=:b3V0c2lkZXItdGFn',
         1::smallint) $$,
     'P0001', null,
     'outsider cannot rotate stand token');
@@ -238,7 +238,7 @@ select throws_ok(
         'mempfx',
         1::smallint,
         'member-rotation',
-        'v1:enc-member-token',
+        'v1:bWVtYmVyLWl2Ygo=:bWVtYmVyLWN0Ygo=:bWVtYmVyLXRhZwo=',
         1::smallint) $$,
     'P0001', null,
     'member cannot rotate stand token');

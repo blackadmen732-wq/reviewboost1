@@ -105,14 +105,22 @@ export const productionCustomerFlowApi: CustomerFlowApi = {
     });
   },
 
-  recordGoogleClick(token, body, options) {
+  recordDestinationSelection(token, body, options) {
     return safely(async () => {
-      const result = await client.POST("/api/v1/public/q/{token}/google-click", {
+      const result = await client.POST("/api/v1/public/q/{token}/destination-selection", {
         params: {
           path: { token },
           header: { "Idempotency-Key": options.idempotencyKey },
         },
         body,
+        // This request is made a heartbeat before the page navigates to the
+        // destination, and a normal fetch is cancelled when that happens. The
+        // alternative — waiting for it before handing the customer over —
+        // puts a round trip between a tap and Google, which is the one thing
+        // this flow exists not to do. `keepalive` lets the browser finish it
+        // after the document is gone; the body is a few dozen bytes, far
+        // inside the 64KB that allows.
+        keepalive: true,
         ...(options.signal ? { signal: options.signal } : {}),
       });
 
@@ -126,24 +134,4 @@ export const productionCustomerFlowApi: CustomerFlowApi = {
     });
   },
 
-  submitTeamPraise(token, body, options) {
-    return safely(async () => {
-      const result = await client.POST("/api/v1/public/q/{token}/team-praise", {
-        params: {
-          path: { token },
-          header: { "Idempotency-Key": options.idempotencyKey },
-        },
-        body,
-        ...(options.signal ? { signal: options.signal } : {}),
-      });
-
-      if ((result.response.status === 200 || result.response.status === 201) && result.data) {
-        return result.data;
-      }
-      if (result.response.ok) {
-        rejectUnexpectedSuccess(result.response);
-      }
-      throw toCustomerApiError(result.response, result.error);
-    });
-  },
 };

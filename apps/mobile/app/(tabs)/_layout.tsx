@@ -6,7 +6,9 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   const icons: Record<string, string> = {
     Feed: "◉",
     Feedback: "✉",
-    Stands: "⬡",
+    Texts: "➤",
+    Tags: "⬡",
+    Account: "☰",
   };
   return (
     <Text style={{ fontSize: 20, color: focused ? colors.brandText : colors.inkFaint }}>
@@ -41,10 +43,28 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="text-requests"
+        options={{
+          // The header says the product's name; the bar has room for one word.
+          title: "Text Requests",
+          tabBarLabel: "Texts",
+          tabBarIcon: ({ focused }) => <TabIcon label="Texts" focused={focused} />,
+        }}
+      />
+      {/* "Tags" is what the product calls the physical thing on the counter.
+          The route stays /stands so existing deep links keep working. */}
+      <Tabs.Screen
         name="stands"
         options={{
-          title: "Stands",
-          tabBarIcon: ({ focused }) => <TabIcon label="Stands" focused={focused} />,
+          title: "Tags",
+          tabBarIcon: ({ focused }) => <TabIcon label="Tags" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="account"
+        options={{
+          title: "Account",
+          tabBarIcon: ({ focused }) => <TabIcon label="Account" focused={focused} />,
         }}
       />
     </Tabs>

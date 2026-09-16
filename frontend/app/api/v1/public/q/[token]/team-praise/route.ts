@@ -1,29 +1,14 @@
 import type { NextRequest } from "next/server";
 
-import { submitTeamPraise } from "@/lib/server/customer-flow-service";
-import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
-import { requestMetaOf } from "@/lib/server/request-meta";
-import {
-  parseIdempotencyKeyOrThrow,
-  parseOrThrow,
-  parseTokenOrThrow,
-  teamPraiseSchema,
-} from "@/lib/server/validation";
+import { handle, json, preflight } from "@/lib/server/http";
 
 /**
- * POST /api/v1/public/q/{token}/team-praise — praise a colleague.
+ * POST /api/v1/public/q/{token}/team-praise — removed in V1.
  *
- * Stored unmatched, with the name and note encrypted at rest. ReviewBoost never
- * guesses which colleague the customer meant: matching is a decision a human
- * makes later, with the rating deliberately out of view.
- *
- * The response carries only the new id. No rating, no Google state, no bonus,
- * payroll, phone, email, or marketing field — `team_praise_records` has no
- * rating column at all, so the barrier holds in the schema rather than in a
- * query someone has to remember to trim.
- *
- * Accepted after every rating, including a 1. Praise and a complaint are not
- * mutually exclusive, and the product must not assume they are.
+ * Team Praise is not active in V1. Historical records in the database are
+ * preserved. This route returns 410 Gone so any client that still calls it
+ * receives a clear, intentional signal rather than a 404 (which would imply
+ * the path was never valid).
  */
 
 export const runtime = "nodejs";
@@ -31,29 +16,12 @@ export const dynamic = "force-dynamic";
 
 const ROUTE = "/api/v1/public/q/[token]/team-praise";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ token: string }> },
-): Promise<Response> {
+export async function POST(request: NextRequest): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    const { token } = await params;
-    const validToken = parseTokenOrThrow(token);
-    const idempotencyKey = parseIdempotencyKeyOrThrow(request);
-    const body = parseOrThrow(teamPraiseSchema, await readJsonBody(request));
-
-    const result = await submitTeamPraise(
-      validToken,
-      {
-        sessionId: body.sessionId,
-        responseId: body.responseId,
-        firstName: body.firstName,
-        ...(body.note === undefined ? {} : { note: body.note }),
-        idempotencyKey,
-      },
-      requestMetaOf(request, requestId),
-    );
-
-    return json(request, requestId, result.status, result.body);
+    return json(request, requestId, 410, {
+      error: { code: "gone", message: "Team Praise is not active in V1." },
+      requestId,
+    });
   });
 }
 

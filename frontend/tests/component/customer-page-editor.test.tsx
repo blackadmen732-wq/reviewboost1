@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/browser", () => ({
   supabaseBrowser: () => ({
@@ -10,37 +10,56 @@ vi.mock("@/lib/supabase/browser", () => ({
 import { CustomerPageEditor } from "@/features/customer-page/customer-page-editor";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 
+/**
+ * The owner preview is the customer page, not a drawing of it.
+ *
+ * These assertions are on the shared presentation tree — the same markers
+ * /q/{token} renders — so a future preview that quietly diverges from the live
+ * page fails here rather than in front of a customer.
+ */
 describe("Customer page editor", () => {
-  it("shows the live customer view in the phone, not a sketch", () => {
-    render(
-      <CustomerPageEditor
-        initial={{
-          draft: { x: 0, y: 0, scale: 1 },
-          draftTagline: null,
-          hasDraftHero: false,
-          hasPublishedHero: false,
-          publishedAt: null,
-          draftArtworkUrl: "/api/v1/customer-page/artwork?side=draft",
-        }}
-      />,
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({ data: { draft: {}, published: null } }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("previews the live customer view inside the phone, not a sketch", async () => {
+    render(<CustomerPageEditor businessName="Mario’s Pizza" isPublished={false} />);
+
+    await waitFor(() =>
+      expect(screen.getByText(customerMessages.en.ratingHeading)).toBeVisible(),
     );
 
-    expect(screen.getByText(customerMessages.en.ratingHeading)).toBeVisible();
-    expect(screen.getByText(customerMessages.en.ratingSupport)).toBeVisible();
-    expect(screen.getByText(customerMessages.en.footerPromise)).toBeVisible();
-    expect(screen.getByRole("img", { name: "Customer page" })).toBeInTheDocument();
-    expect(document.querySelector("[data-rating-card]")).toBeTruthy();
+    // The Mario composition: hero layer, fixed rating card, 390/844 canvas.
+    expect(document.querySelector("[data-customer-visit]")).toBeTruthy();
     expect(document.querySelector("[data-hero-layer]")).toBeTruthy();
+    expect(document.querySelector("[data-rating-card]")).toBeTruthy();
     expect(document.querySelector("[data-customer-canvas='390 / 844']")).toBeTruthy();
     expect(document.querySelector("[data-card-fixed]")).toBeTruthy();
-    expect(screen.getByText("Not on Tags yet")).toBeVisible();
-    expect(screen.getByText("Drag to move. Stars stay put.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Add photo" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Publish" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Download blank page" })).toBeVisible();
-    expect(screen.queryByLabelText(/business name/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/logo/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Looks|template pack/i)).not.toBeInTheDocument();
+    expect(screen.getByText(customerMessages.en.footerPromise)).toBeVisible();
+
+    // Five stars, and none of them ratable from the owner's chair.
+    const stars = screen.getAllByRole("radio");
+    expect(stars).toHaveLength(5);
+    for (const star of stars) expect(star).toBeDisabled();
+
+    // The owner's controls reach main's draft/publish contract.
+    expect(screen.getByRole("button", { name: /add photo/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /save draft/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /go live/i })).toBeVisible();
+
+    // No location clutter on the customer page.
     expect(screen.queryByText(/location/i)).not.toBeInTheDocument();
   });
 });

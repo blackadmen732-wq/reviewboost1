@@ -113,9 +113,28 @@ port = 54324
 # sender_name = "Admin"
 
 [storage]
-enabled = false
+# On since the Customer Page landed: it uploads a logo and a hero image
+# through a signed URL, and with Storage off the local stack does not run the
+# service at all, so every upload fails against a bucket that is declared
+# right below.
+enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
+
+[storage.image_transformation]
+# Off. A Customer Page serves the logo and hero image exactly as uploaded —
+# nothing resizes on the fly — so running imgproxy would be one more service
+# to start and one more thing that can fail for no benefit.
+enabled = false
+
+# The Customer Page's images. Public because the URL is stamped into a
+# published page a customer's browser loads directly, and the bucket holds
+# only what an owner deliberately published as their own branding. Writes are
+# never public: uploads go through a signed URL the server mints for one path.
+[storage.buckets.customer-page]
+public = true
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/png", "image/jpeg", "image/webp"]
 
 # Uncomment to configure local storage buckets
 # [storage.buckets.images]

@@ -1,10 +1,9 @@
-import { timingSafeEqual } from "node:crypto";
-
 import type { NextRequest } from "next/server";
 
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json } from "@/lib/server/http";
 import { dispatchOnce } from "@/lib/server/sms/dispatch";
+import { workerAuthorized } from "@/lib/server/worker-auth";
 
 /**
  * Internal dispatch trigger.
@@ -22,26 +21,9 @@ export const dynamic = "force-dynamic";
 
 const ROUTE = "/api/v1/internal/sms/dispatch";
 
-function authorized(request: Request): boolean {
-  const secret = process.env.SMS_WORKER_SECRET;
-  if (!secret) return false;
-
-  const header = request.headers.get("authorization") ?? "";
-  const parts = header.split(" ");
-  // Exactly "Bearer <token>" — reject trailing junk like "Bearer <token> x".
-  if (parts.length !== 2) return false;
-  const [scheme, token] = parts;
-  if (scheme?.toLowerCase() !== "bearer" || !token) return false;
-
-  const a = Buffer.from(token);
-  const b = Buffer.from(secret);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
-
 export async function POST(request: NextRequest): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
-    if (!authorized(request)) {
+    if (!workerAuthorized(request)) {
       // Indistinguishable from a route that does not exist.
       throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
     }
@@ -49,4 +31,12 @@ export async function POST(request: NextRequest): Promise<Response> {
     const summary = await dispatchOnce({ limit: 25, leaseSeconds: 90 });
     return json(request, requestId, 200, { data: summary, requestId });
   });
+}
+
+/**
+ * The platform's scheduler issues a GET, not a POST. Same guard, same work:
+ * a cron that cannot reach the worker is a product where nothing ever sends.
+ */
+export async function GET(request: NextRequest): Promise<Response> {
+  return POST(request);
 }

@@ -44,6 +44,9 @@ describe("real loop language", () => {
     expect(onboarding).toContain("GOOGLE_LINK_BLAST");
     expect(onboarding).toContain("GOOGLE_LINK_LATER");
     expect(onboarding).toContain("data-google-unset");
+    // The plan gate is what makes a Tag actually serve customers. It must
+    // survive any future edit to this step.
+    expect(onboarding).toContain("Choose a plan to switch it on");
     expect(care).toContain("data-google-link-state");
     expect(care).toContain("googleLinkRefusal");
   });
@@ -64,7 +67,6 @@ describe("real loop language", () => {
     expect(create).toContain("Create a Tag");
     expect(create).not.toMatch(/Stand created|create stand/);
     expect(onboarding).toContain("Print this code");
-    expect(onboarding).toContain("program a blank NFC tag");
     expect(onboarding).not.toMatch(/\bNDEF\b/);
     expect(onboarding).not.toMatch(/NTAG\d/);
     expect(writerUi).not.toMatch(/NTAG\d/);

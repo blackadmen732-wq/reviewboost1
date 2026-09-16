@@ -56,10 +56,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Persist an honest rating and an optional private note
-         * @description Every rating from one to five is stored and handled identically. The note is optional for all five and is encrypted at rest. One response per session.
+         * Persist an honest rating (1–5)
+         * @description Every rating from one to five is stored and handled identically. One response per session. Notes and Team Praise are not accepted in the V1 public API; the database columns exist for historical data only.
          *
-         *     The request schema is strict: a phone number, email address, marketing consent flag, or tenant identifier is rejected, not ignored.
+         *     The request schema is strict: a phone number, email address, note, marketing consent flag, or tenant identifier is rejected, not ignored.
          */
         post: operations["submitCustomerResponse"];
         delete?: never;
@@ -68,7 +68,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/public/q/{token}/google-click": {
+    "/api/v1/public/q/{token}/destination-selection": {
         parameters: {
             query?: never;
             header?: never;
@@ -78,34 +78,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Record that the Google action was selected
-         * @description Records the selection and nothing more. It does not mean a review was written, submitted, or published, or that a rating changed on Google — ReviewBoost cannot observe any of that, and no metric built on it may imply otherwise.
+         * Record that the customer was handed to the review destination
+         * @description Records the selection and the provider in force at that moment, and nothing more. It does not mean a review was written, submitted, or published, or that a rating changed anywhere — ReviewBoost cannot observe any of that, and no metric built on it may imply otherwise.
          *
          *     Never redirects: the client owns the navigation, so a tracking failure can never stand between a customer and the public review page. Deduplicated per response, so 204 is returned on a first record and on a replay alike.
          */
-        post: operations["recordGoogleReviewClick"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/public/q/{token}/team-praise": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Persist private praise, with no rating data and no auto-matching
-         * @description Stored unmatched, with the name and note encrypted at rest. ReviewBoost never guesses which colleague the customer meant: matching is a human decision made later, with the rating deliberately out of view.
-         *
-         *     The response carries only the new id. `team_praise_records` has no rating column at all, so the barrier holds in the schema rather than in a query someone must remember to trim. Accepted after every rating, including a one — praise and a complaint are not mutually exclusive.
-         */
-        post: operations["submitTeamPraise"];
+        post: operations["recordDestinationSelection"];
         delete?: never;
         options?: never;
         head?: never;
@@ -131,22 +109,37 @@ export interface components {
             location: {
                 name: string | null;
             };
+            /** @description The business's published Customer Page, or null if it has not published one — in which case the flow renders its own plain default. A draft is never returned here: only a published page reaches a customer. */
+            page: {
+                /** @enum {string} */
+                templateId?: "classic" | "bold" | "minimal";
+                tagline?: string | null;
+                /** Format: uri */
+                logoUrl?: string | null;
+                /** Format: uri */
+                heroUrl?: string | null;
+            } | null;
+            /** @description Where this Tag's door leads. Server state, not something the Tag carries: an owner can change it and the next scan of the same QR or NFC chip arrives at the new destination. */
+            destination: {
+                /**
+                 * @description The enabled provider. Unknown providers are refused at write time, so this is always one the client knows how to open.
+                 * @enum {string}
+                 */
+                provider: "google";
+                /**
+                 * Format: uri
+                 * @description Validated server-side against that provider's host allowlist — HTTPS only, no credentials, no ports — and re-validated by the client. A stand whose destination does not validate cannot serve the flow and returns review_link_inactive.
+                 */
+                url: string;
+            };
             /**
              * Format: uri
-             * @description Validated server-side against an allowlist of Google hosts, and re-validated by the client. A stand whose destination does not validate cannot serve the flow and returns review_link_inactive.
+             * @deprecated
+             * @description Compatibility alias of `destination.url`, kept while clients migrate. Always equal to it. New code reads `destination`.
              */
             googleReviewUrl: string;
             supportedLocales: components["schemas"]["Locale"][];
             defaultLocale: components["schemas"]["Locale"];
-            presentation: {
-                heroUrl: string | null;
-                transform: {
-                    x: number;
-                    y: number;
-                    scale: number;
-                };
-                tagline: string | null;
-            };
         };
         CreateSessionRequest: {
             locale: components["schemas"]["Locale"];
@@ -158,26 +151,13 @@ export interface components {
             sessionId: string;
             /** @description Stored exactly as chosen. Nothing downstream branches on it. */
             rating: number;
-            /** @description Optional for every rating, including four and five. Encrypted at rest. */
-            note?: string;
         };
         SubmitResponseResponse: {
             responseId: string;
         };
-        GoogleClickRequest: {
+        DestinationSelectionRequest: {
             sessionId: string;
             responseId: string;
-        };
-        TeamPraiseRequest: {
-            sessionId: string;
-            responseId: string;
-            /** @description Unicode, stored as written. Never transliterated. */
-            firstName: string;
-            note?: string;
-        };
-        /** @description Carries only the id. No rating, stars, Google state, bonus, payroll, phone, email, or marketing field is ever serialised here. */
-        TeamPraiseResponse: {
-            teamPraiseId: string;
         };
         FieldError: {
             field: string;
@@ -275,7 +255,7 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description That session already has a response, or that response already has praise. */
+        /** @description That session already has a response. */
         ResponseConflict: {
             headers: {
                 [name: string]: unknown;
@@ -335,7 +315,7 @@ export interface components {
     parameters: {
         /** @description The stand's public token. At least 256 bits of entropy, stored only as a keyed digest, and never sequential — it is the sole thing authorising a write into a business's data, so guessability is the whole security argument. */
         ReviewToken: string;
-        /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response, praise record, or scan. The client must reuse the same key across an offline retry. */
+        /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response or scan. The client must reuse the same key across an offline retry. */
         IdempotencyKey: string;
         /** @description Echoed back, so a trace survives the hop. */
         RequestId: string;
@@ -388,7 +368,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response, praise record, or scan. The client must reuse the same key across an offline retry. */
+                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response or scan. The client must reuse the same key across an offline retry. */
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Echoed back, so a trace survives the hop. */
                 "X-Request-Id"?: components["parameters"]["RequestId"];
@@ -437,7 +417,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response, praise record, or scan. The client must reuse the same key across an offline retry. */
+                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response or scan. The client must reuse the same key across an offline retry. */
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Echoed back, so a trace survives the hop. */
                 "X-Request-Id"?: components["parameters"]["RequestId"];
@@ -483,11 +463,11 @@ export interface operations {
             503: components["responses"]["ServiceUnavailable"];
         };
     };
-    recordGoogleReviewClick: {
+    recordDestinationSelection: {
         parameters: {
             query?: never;
             header: {
-                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response, praise record, or scan. The client must reuse the same key across an offline retry. */
+                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response or scan. The client must reuse the same key across an offline retry. */
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Echoed back, so a trace survives the hop. */
                 "X-Request-Id"?: components["parameters"]["RequestId"];
@@ -500,7 +480,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["GoogleClickRequest"];
+                "application/json": components["schemas"]["DestinationSelectionRequest"];
             };
         };
         responses: {
@@ -515,55 +495,6 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             404: components["responses"]["SessionInvalid"];
             409: components["responses"]["IdempotencyConflict"];
-            429: components["responses"]["RateLimited"];
-            500: components["responses"]["InternalError"];
-            503: components["responses"]["ServiceUnavailable"];
-        };
-    };
-    submitTeamPraise: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response, praise record, or scan. The client must reuse the same key across an offline retry. */
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                /** @description Echoed back, so a trace survives the hop. */
-                "X-Request-Id"?: components["parameters"]["RequestId"];
-            };
-            path: {
-                /** @description The stand's public token. At least 256 bits of entropy, stored only as a keyed digest, and never sequential — it is the sole thing authorising a write into a business's data, so guessability is the whole security argument. */
-                token: components["parameters"]["ReviewToken"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TeamPraiseRequest"];
-            };
-        };
-        responses: {
-            /** @description Idempotent replay. Nothing was created on this call. */
-            200: {
-                headers: {
-                    "X-Request-Id": components["headers"]["RequestId"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TeamPraiseResponse"];
-                };
-            };
-            /** @description Praise persisted */
-            201: {
-                headers: {
-                    "X-Request-Id": components["headers"]["RequestId"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TeamPraiseResponse"];
-                };
-            };
-            400: components["responses"]["ValidationFailed"];
-            404: components["responses"]["SessionInvalid"];
-            409: components["responses"]["ResponseConflict"];
             429: components["responses"]["RateLimited"];
             500: components["responses"]["InternalError"];
             503: components["responses"]["ServiceUnavailable"];

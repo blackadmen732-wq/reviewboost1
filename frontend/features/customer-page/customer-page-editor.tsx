@@ -1,158 +1,322 @@
 "use client";
 
-import { Download, ImagePlus, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { notify } from "@/components/ui/toast";
-import { PhoneFrame } from "@/features/customer-page/phone-frame";
 import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
+import { PhoneFrame } from "@/features/customer-page/phone-frame";
 import { VisitStars } from "@/features/customer-page/visit-stars";
-import { downloadBlankCustomerTemplate } from "@/features/customer-page/blank-template";
-import { useHeroGestures } from "@/features/customer-page/use-hero-gestures";
-import { type HeroTransform } from "@/lib/owner/hero-transform";
 import { customerMessages } from "@/lib/i18n/customer-messages";
-import { supabaseBrowser } from "@/lib/supabase/browser";
+import { DEFAULT_HERO_TRANSFORM } from "@/lib/owner/hero-transform";
+import type { CustomerPageContent } from "@/lib/server/customer-page-service";
 
-const messages = customerMessages.en;
+const previewMessages = customerMessages.en;
 
-export interface CustomerPageEditorModel {
-  draft: HeroTransform;
-  draftTagline: string | null;
-  hasDraftHero: boolean;
-  hasPublishedHero: boolean;
-  publishedAt: string | null;
-  draftArtworkUrl: string;
+interface CustomerPageEditorProps {
+  businessName: string;
+  isPublished: boolean;
+  onSaved?: () => void;
 }
 
-export function CustomerPageEditor({ initial }: { initial: CustomerPageEditorModel }) {
-  const [transform, setTransform] = useState<HeroTransform>(initial.draft);
-  const [heroUrl, setHeroUrl] = useState<string | null>(
-    initial.hasDraftHero
-      ? `${initial.draftArtworkUrl}&t=${initial.publishedAt ?? "draft"}`
-      : null,
-  );
-  const [busy, setBusy] = useState<"upload" | "publish" | null>(null);
-  const [live, setLive] = useState(Boolean(initial.hasPublishedHero && initial.publishedAt));
-  const fileRef = useRef<HTMLInputElement>(null);
-  const gestures = useHeroGestures(transform, setTransform);
+type UploadState = "idle" | "signing" | "uploading" | "confirming" | "done" | "error";
+
+/**
+ * The preview is the customer page itself — the same CustomerVisitView tree
+ * that /q/{token} renders, inside phone chrome. Not a summary of it, and not a
+ * second renderer that can drift: if the owner sees it here, that is what the
+ * customer gets.
+ *
+ * The hero crop is DEFAULT_HERO_TRANSFORM on both sides. The Customer Page
+ * contract stores no per-owner transform, so offering drag/pinch controls here
+ * would be a control over nothing — the customer would still receive this crop.
+ *
+ * Draft preservation: on mount the editor loads the complete draft from the
+ * server and tracks it as a single object. Edits (tagline, hero) are merged
+ * into that object before saving, so an edit to one field never silently drops
+ * the others (templateId, logoAssetId) that were saved in a previous session.
+ */
+export function CustomerPageEditor({
+  businessName,
+  isPublished: initialIsPublished,
+  onSaved,
+}: CustomerPageEditorProps) {
+  // The full draft as returned by GET /api/v1/customer-page.
+  // Editing is done by merging changes into this rather than tracking fields
+  // separately, so a save never drops a field the owner set in a prior session.
+  const [draft, setDraft] = useState<CustomerPageContent>({});
+  // heroUrl is display-only: the confirmed public URL for the preview.
+  const [heroUrl, setHeroUrl] = useState<string | null>(null);
+  const [isPublished, setIsPublished] = useState(initialIsPublished);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    return () => {
-      if (heroUrl?.startsWith("blob:")) URL.revokeObjectURL(heroUrl);
-    };
-  }, [heroUrl]);
-
-  const authHeaders = useCallback(async () => {
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
-    if (!session) {
-      notify.error("Please sign in again", "Your session expired.");
-      return null;
-    }
-    return { Authorization: `Bearer ${session.access_token}` };
+    void (async () => {
+      try {
+        const res = await fetch("/api/v1/customer-page");
+        if (!res.ok) return;
+        const { data } = (await res.json()) as {
+          data: {
+            draft: CustomerPageContent;
+            published: { heroUrl?: string | null; tagline?: string | null } | null;
+          };
+        };
+        setDraft(data.draft ?? {});
+        // Show the published hero URL for the preview (the draft asset URL is
+        // not resolved here; only published assets have a public URL).
+        if (data.published?.heroUrl) setHeroUrl(data.published.heroUrl);
+        setIsPublished(data.published !== null);
+      } catch {
+        // ignore — defaults are fine
+      } finally {
+        setLoaded(true);
+      }
+    })();
   }, []);
 
-  async function onFile(file: File) {
-    const local = URL.createObjectURL(file);
-    setHeroUrl(local);
+  const [uploadState, setUploadState] = useState<UploadState>("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const headers = await authHeaders();
-    if (!headers) return;
-    setBusy("upload");
-    try {
-      const body = new FormData();
-      body.append("file", file);
-      const response = await fetch("/api/v1/customer-page/artwork", {
-        method: "POST",
-        headers,
-        body,
-      });
-      if (!response.ok) throw new Error("upload");
-      notify.success("Photo added", "Move it until it looks right, then publish.");
-    } catch {
-      notify.error("Could not add that photo", "Use a JPG or PNG under 2 MB.");
-    } finally {
-      setBusy(null);
-    }
-  }
+  const uploadHero = useCallback(async (file: File) => {
+    setUploadError(null);
+    setUploadState("signing");
 
-  async function publish() {
-    const headers = await authHeaders();
-    if (!headers) return;
-    setBusy("publish");
-    try {
-      const response = await fetch("/api/v1/customer-page", {
-        method: "PATCH",
-        headers: { ...headers, "content-type": "application/json" },
-        body: JSON.stringify({ transform, publish: true }),
-      });
-      if (!response.ok) throw new Error("publish");
-      setLive(true);
-      notify.success("Published", "Tags now open this page.");
-    } catch {
-      notify.error("Could not publish", "Please try again.");
-    } finally {
-      setBusy(null);
+    // Step 1: get signed upload ticket
+    const beginRes = await fetch("/api/v1/customer-page/assets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "hero", contentType: file.type }),
+    });
+    if (!beginRes.ok) {
+      const err = await beginRes.json().catch(() => ({}));
+      setUploadState("error");
+      setUploadError((err as { error?: { message?: string } }).error?.message ?? "Upload failed.");
+      return;
     }
+    const { data: ticket } = (await beginRes.json()) as {
+      data: { assetId: string; path: string; token: string };
+    };
+
+    // Step 2: upload directly to Supabase Storage
+    setUploadState("uploading");
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const storageUrl = `${supabaseUrl}/storage/v1/object/upload/sign/customer-page/${ticket.path}?token=${ticket.token}`;
+    const putRes = await fetch(storageUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type, "x-upsert": "true" },
+      body: file,
+    });
+    if (!putRes.ok) {
+      setUploadState("error");
+      setUploadError("Storage upload failed. Please try again.");
+      return;
+    }
+
+    // Step 3: confirm upload server-side
+    setUploadState("confirming");
+    const confirmRes = await fetch("/api/v1/customer-page/assets", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assetId: ticket.assetId, path: ticket.path }),
+    });
+    if (!confirmRes.ok) {
+      const err = await confirmRes.json().catch(() => ({}));
+      setUploadState("error");
+      setUploadError(
+        (err as { error?: { message?: string } }).error?.message ?? "Confirmation failed.",
+      );
+      return;
+    }
+
+    // Show a local preview URL and record the assetId in the draft.
+    setHeroUrl(URL.createObjectURL(file));
+    setDraft((prev) => ({ ...prev, heroAssetId: ticket.assetId }));
+    setUploadState("done");
+  }, []);
+
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      void uploadHero(file);
+      e.target.value = "";
+    },
+    [uploadHero],
+  );
+
+  const saveDraft = useCallback(async () => {
+    setSaving(true);
+    setStatusMsg(null);
+    // Send the full draft so the RPC replace does not drop fields the owner
+    // set in a previous session (templateId, logoAssetId, etc.).
+    const body: CustomerPageContent = { ...draft, tagline: draft.tagline ?? null };
+    const res = await fetch("/api/v1/customer-page", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    setSaving(false);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setStatusMsg(
+        (err as { error?: { message?: string } }).error?.message ?? "Save failed. Try again.",
+      );
+    } else {
+      setStatusMsg("Draft saved.");
+      onSaved?.();
+    }
+  }, [draft, onSaved]);
+
+  const publish = useCallback(async () => {
+    setPublishing(true);
+    setStatusMsg(null);
+    // Save the full draft first so the published snapshot captures everything.
+    await fetch("/api/v1/customer-page", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...draft, tagline: draft.tagline ?? null }),
+    });
+
+    const res = await fetch("/api/v1/customer-page", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    setPublishing(false);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setStatusMsg(
+        (err as { error?: { message?: string } }).error?.message ?? "Publish failed. Try again.",
+      );
+    } else {
+      setStatusMsg("Page is live!");
+      setIsPublished(true);
+      onSaved?.();
+    }
+  }, [draft, onSaved]);
+
+  const uploading =
+    uploadState === "signing" || uploadState === "uploading" || uploadState === "confirming";
+  const uploadLabel =
+    uploadState === "signing"
+      ? "Preparing…"
+      : uploadState === "uploading"
+        ? "Uploading…"
+        : uploadState === "confirming"
+          ? "Verifying…"
+          : heroUrl
+            ? "Replace photo"
+            : "Add photo";
+
+  if (!loaded) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        Loading…
+      </div>
+    );
   }
 
   return (
-    <div className="customer-page-editor">
-      <div className="customer-page-editor__preview">
-        <p className="mb-3 text-sm font-medium text-muted">
-          {live ? "On your Tags" : "Not on Tags yet"}
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      {/* Live preview — the real customer page, in phone chrome. */}
+      <div className="w-full shrink-0 lg:max-w-sm">
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted">
+          What your customers see
         </p>
-        <PhoneFrame>
+        <PhoneFrame label={`${businessName} customer page preview`}>
           <CustomerVisitView
-            heroUrl={heroUrl}
-            transform={transform}
-            heading={messages.ratingHeading}
-            support={messages.ratingSupport}
-            footerLine={messages.footerPromise}
-            heroInteractive={Boolean(heroUrl)}
-            {...gestures}
+            heroUrl={heroUrl ?? null}
+            transform={DEFAULT_HERO_TRANSFORM}
+            heading={previewMessages.ratingHeading}
+            support={draft.tagline ?? previewMessages.ratingSupport}
+            footerLine={previewMessages.footerPromise}
           >
-            <VisitStars value={null} messages={messages} preview />
+            {/* Inert: this is a picture of the page, not a place to rate. */}
+            <VisitStars value={null} messages={previewMessages} preview />
           </CustomerVisitView>
         </PhoneFrame>
       </div>
 
-      <div className="customer-page-editor__rail">
-        <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink">Your photo</h2>
-        <p className="mt-1 text-base text-muted">Drag to move. Stars stay put.</p>
-
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="sr-only"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) void onFile(file);
-            event.target.value = "";
-          }}
-        />
-
-        <div className="mt-5 flex flex-col gap-3">
-          <Button
-            variant="action"
-            size="lg"
-            onClick={() => fileRef.current?.click()}
-            loading={busy === "upload"}
+      {/* Controls */}
+      <div className="flex flex-1 flex-col gap-4">
+        {/* Photo upload */}
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6b635b]">
+            Cover photo
+          </p>
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+            className="flex h-10 items-center gap-2 rounded-lg border border-[color:var(--rb-border)] bg-white px-4 text-sm font-medium text-[#1a1712] hover:bg-[#faf9f7] disabled:opacity-60"
           >
-            <ImagePlus className="size-5" aria-hidden="true" />
-            {heroUrl ? "Replace photo" : "Add photo"}
-          </Button>
-          <Button variant="secondary" size="lg" onClick={() => void publish()} loading={busy === "publish"}>
-            <Upload className="size-5" aria-hidden="true" />
-            Publish
-          </Button>
-          <Button variant="secondary" size="lg" onClick={() => downloadBlankCustomerTemplate()}>
-            <Download className="size-5" aria-hidden="true" />
-            Download blank page
-          </Button>
+            {uploading ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : null}
+            {uploadLabel}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          {uploadError && <p className="mt-1 text-xs text-red-600">{uploadError}</p>}
+        </div>
+
+        {/* Tagline */}
+        <div>
+          <label
+            htmlFor="tagline"
+            className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#6b635b]"
+          >
+            Tagline
+          </label>
+          <input
+            id="tagline"
+            type="text"
+            maxLength={120}
+            value={draft.tagline ?? ""}
+            onChange={(e) => setDraft((prev) => ({ ...prev, tagline: e.target.value || null }))}
+            placeholder="e.g. Fresh coffee, good vibes"
+            className="w-full rounded-lg border border-[color:var(--rb-border)] bg-white px-3 py-2 text-sm text-[#1a1712] placeholder-[#9e968e] focus:outline-none focus:ring-2 focus:ring-[color:var(--rb-ink)]"
+          />
+          <p className="mt-1 text-right text-[10px] text-[#9e968e]">
+            {(draft.tagline ?? "").length}/120
+          </p>
+        </div>
+
+        {/* Status */}
+        {statusMsg && (
+          <p
+            className={`text-sm ${statusMsg.includes("live") || statusMsg.includes("saved") ? "text-green-700" : "text-red-600"}`}
+          >
+            {statusMsg}
+          </p>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button
+            type="button"
+            disabled={saving || uploading}
+            onClick={() => void saveDraft()}
+            className="flex h-10 items-center rounded-lg border border-[color:var(--rb-border)] bg-white px-4 text-sm font-medium text-[#1a1712] hover:bg-[#faf9f7] disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save draft"}
+          </button>
+          <button
+            type="button"
+            disabled={publishing || uploading}
+            onClick={() => void publish()}
+            className="flex h-10 items-center rounded-lg bg-[color:var(--rb-ink)] px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+          >
+            {publishing ? "Publishing…" : isPublished ? "Update live page" : "Go live"}
+          </button>
         </div>
       </div>
     </div>

@@ -34,7 +34,6 @@ export default async function HomePage() {
     listLocations(organization.orgId),
     listReviews(organization.orgId, {
       unreadOnly: true,
-      withNotesOnly: true,
       openOnly: true,
       limit: 5,
     }),
