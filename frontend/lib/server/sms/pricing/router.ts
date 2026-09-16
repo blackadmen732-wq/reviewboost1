@@ -57,6 +57,13 @@ export type RouteRejectionReason =
   | "arithmetic_unsafe";
 
 export interface EvaluatedRoute {
+  /**
+   * Index into the caller's `candidates` array. This is the unambiguous
+   * identity of the route: `expected_cost` and `sell_price` on the quote must
+   * be recomputed from `candidates[candidateIndex]` exactly, never by
+   * re-finding by provider name (two candidates can share a provider).
+   */
+  candidateIndex: number;
   provider: string;
   eligible: boolean;
   rejection: RouteRejectionReason | null;
@@ -85,8 +92,9 @@ export interface RouterOptions {
   now?: Date;
 }
 
-function evaluate(candidate: RouteCandidate, opts: Required<Omit<RouterOptions, "now">> & { now: Date }): EvaluatedRoute {
+function evaluate(candidate: RouteCandidate, candidateIndex: number, opts: Required<Omit<RouterOptions, "now">> & { now: Date }): EvaluatedRoute {
   const base: EvaluatedRoute = {
+    candidateIndex,
     provider: candidate.provider,
     eligible: false,
     rejection: null,
@@ -144,7 +152,7 @@ export function selectRoute(candidates: RouteCandidate[], options: RouterOptions
     now: options.now ?? new Date(),
   };
 
-  const evaluated = candidates.map((c) => evaluate(c, opts));
+  const evaluated = candidates.map((c, i) => evaluate(c, i, opts));
   const eligible = evaluated.filter((e) => e.eligible);
 
   const eligibleProviders = new Set(eligible.map((e) => e.provider));

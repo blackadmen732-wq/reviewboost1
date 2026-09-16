@@ -79,13 +79,16 @@ function assertSafeNonNegativeInt(value: number, label: string): void {
 }
 
 /**
- * Is a rate too old to price a live send? A rate with no expiry is treated as
- * perpetual only for the manual deck (which carries its own explicit version);
- * an API rate should always set `expiresAt`. Callers that must fail closed on
- * staleness pass the current time and check the boolean.
+ * Is a rate too old to price a live send? Perpetual (null-expiry) is legitimate
+ * only for a versioned imported deck — a manual deck carries its own explicit
+ * `rateVersion` and a human's promise it is current. Any other source (an API
+ * ingest) whose `expiresAt` is null is treated as STALE, because the absence
+ * of a freshness window from a live API is missing information, not a permit
+ * to price forever. Callers that must fail closed on staleness pass the
+ * current time and check the boolean.
  */
 export function isRateStale(rate: NormalizedRate, now: Date = new Date()): boolean {
-  if (rate.expiresAt === null) return false;
+  if (rate.expiresAt === null) return rate.source !== "manual_deck";
   return rate.expiresAt.getTime() <= now.getTime();
 }
 

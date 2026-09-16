@@ -314,10 +314,21 @@ begin
          coalesce(p_estimated_carrier, 0), p_actual_provider, p_actual_carrier,
          coalesce(p_charged_credits, 0), coalesce(p_customer_revenue, 0), v_contribution,
          v_margin, v_state)
+    -- On conflict, keep the whole snapshot internally consistent: the
+    -- derived `actual_contribution_micros` and `actual_gross_margin_bps` were
+    -- computed from THESE arguments, so the stored revenue, credits,
+    -- currency, and estimated components have to update to match — otherwise
+    -- a later corrected revenue would leave `actual_contribution` beside an
+    -- older `customer_revenue_micros` and financial reporting would lie.
     on conflict (org_id, request_id) do update set
         quote_id = excluded.quote_id,
+        currency = excluded.currency,
+        estimated_provider_cost_micros = excluded.estimated_provider_cost_micros,
+        estimated_carrier_cost_micros = excluded.estimated_carrier_cost_micros,
         actual_provider_cost_micros = excluded.actual_provider_cost_micros,
         actual_carrier_cost_micros = excluded.actual_carrier_cost_micros,
+        charged_credits = excluded.charged_credits,
+        customer_revenue_micros = excluded.customer_revenue_micros,
         actual_contribution_micros = excluded.actual_contribution_micros,
         actual_gross_margin_bps = excluded.actual_gross_margin_bps,
         state = excluded.state,

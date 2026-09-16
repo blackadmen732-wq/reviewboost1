@@ -103,6 +103,24 @@ describe("quote engine", () => {
     ).toThrow(/no route/i);
   });
 
+  it("uses the exact winning candidate (never the first same-provider one) when pricing the quote", async () => {
+    const { buildQuote } = await load();
+    // Two candidates, same provider name, different rates. The cheaper one
+    // must win, and the sell price must match ITS cost — not the first entry
+    // that shares the provider name.
+    const dear = candidate({ basePriceMicros: 9000 });
+    const cheap = candidate({ basePriceMicros: 4000 });
+    const q = buildQuote({
+      body: "hi",
+      candidates: [dear, cheap],
+      requiredCurrency: "USD",
+      ttlSeconds: 900,
+      now: NOW,
+    });
+    expect(q.expectedCostMicros).toBe(4000); // cheap candidate's cost, not the dear one
+    expect(q.routing.chosen?.candidateIndex).toBe(1);
+  });
+
   it("computes an expiry and reports expiry correctly", async () => {
     const { buildQuote, isQuoteExpired } = await load();
     const q = buildQuote({ body: "hi", candidates: [candidate()], requiredCurrency: "USD", ttlSeconds: 900, now: NOW });

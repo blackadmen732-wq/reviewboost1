@@ -55,9 +55,11 @@ create table public.sms_provider_rates (
 
     created_at             timestamptz not null default now(),
 
-    -- One row per logical key + version. mcc/mnc null collapses to '' for the
-    -- uniqueness scope so a country-level rate has exactly one row per version.
-    constraint sms_provider_rates_key unique
+    -- One row per logical key + version. `NULLS NOT DISTINCT` is required so a
+    -- country-level rate (mcc/mnc null) collapses to a single logical row per
+    -- version — default NULL-is-distinct semantics would let a retried
+    -- `sms_rate_upsert` insert a duplicate rather than reach ON CONFLICT.
+    constraint sms_provider_rates_key unique nulls not distinct
         (provider, country, mcc, mnc, number_type, direction, rate_version)
 );
 

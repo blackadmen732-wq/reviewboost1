@@ -23,7 +23,16 @@ describe("rate normalization + staleness", () => {
     const { isRateStale } = await loadRates();
     expect(isRateStale(rate(), NOW)).toBe(false);
     expect(isRateStale(rate({ expiresAt: new Date(NOW.getTime() - 1) }), NOW)).toBe(true);
-    expect(isRateStale(rate({ expiresAt: null }), NOW)).toBe(false); // deck: perpetual
+  });
+
+  it("treats null expiry as perpetual ONLY for a manual deck; an API rate with null expiry is stale", async () => {
+    const { isRateStale } = await loadRates();
+    // Manual deck: null expiry is legitimate (versioned import).
+    expect(isRateStale(rate({ source: "manual_deck", expiresAt: null }), NOW)).toBe(false);
+    // Twilio pricing API: null expiry is missing information → stale, never perpetual.
+    expect(isRateStale(rate({ source: "twilio_pricing_api", expiresAt: null }), NOW)).toBe(true);
+    // Generic provider API: same rule.
+    expect(isRateStale(rate({ source: "provider_api", expiresAt: null }), NOW)).toBe(true);
   });
 
   it("prefers the current price over the base price and validates integers", async () => {
@@ -66,6 +75,14 @@ describe("manual deck adapter — serves imported rows only", () => {
     expect(us[0]!.basePriceMicros).toBe(6000);
     const gb = await a.ingest({ provider: "telnyx", country: "GB", numberType: "long_code", direction: "outbound" });
     expect(gb).toHaveLength(0); // uncovered → nothing, never a fabricated price
+  });
+
+  it("does not return a long_code row for a toll_free query (numberType participates in the match)", async () => {
+    const { ManualDeckRateAdapter } = await loadDeck();
+    const deck = [rate({ provider: "telnyx", numberType: "long_code" })];
+    const a = new ManualDeckRateAdapter("telnyx", deck);
+    const rows = await a.ingest({ provider: "telnyx", country: "US", numberType: "toll_free", direction: "outbound" });
+    expect(rows).toHaveLength(0); // an incompatible-sender row must never be returned
   });
 
   it("supersedes an older row with a higher rateVersion on re-import", async () => {

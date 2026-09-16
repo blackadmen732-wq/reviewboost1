@@ -103,6 +103,21 @@ describe("provider router — validity before price", () => {
     expect(d.chosen?.provider).toBe("hi");
   });
 
+  it("returns the winner's candidateIndex so the exact winning candidate is unambiguous", async () => {
+    const { selectRoute } = await load();
+    // Two candidates from the SAME provider — the second is cheaper and should
+    // be chosen. Finding by provider name alone would return the first (wrong).
+    const dear = candidate({ provider: "twilio", rate: rate({ provider: "twilio", basePriceMicros: 9000, rateVersion: 1 }) });
+    const cheap = candidate({ provider: "twilio", rate: rate({ provider: "twilio", basePriceMicros: 4000, rateVersion: 2 }) });
+    const d = selectRoute([dear, cheap], { requiredCurrency: "USD", now: NOW });
+    expect(d.chosen).not.toBeNull();
+    expect(d.chosen!.candidateIndex).toBe(1);
+    expect(d.chosen!.expectedDeliveredCostMicros).toBe(4000);
+    // Sanity: every evaluated route carries its index too.
+    expect(d.candidates[0]!.candidateIndex).toBe(0);
+    expect(d.candidates[1]!.candidateIndex).toBe(1);
+  });
+
   it("prefers the account current price when present", async () => {
     const { selectRoute } = await load();
     const c = candidate({ rate: rate({ currentPriceMicros: 4000 }) });

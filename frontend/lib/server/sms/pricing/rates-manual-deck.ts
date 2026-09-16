@@ -47,13 +47,21 @@ export class ManualDeckRateAdapter implements ProviderRateAdapter {
       throw new Error(`No imported rate deck loaded for provider ${this.provider}.`);
     }
     // Serve the covered rows for this destination; highest rateVersion wins per
-    // (country, mcc, mnc, numberType, direction) so a re-import supersedes cleanly.
+    // (country, mcc, mnc, numberType, direction) so a re-import supersedes
+    // cleanly. `numberType` MUST participate in the match — a caller asking for
+    // a `toll_free` price must not receive a `long_code` row. `unknown` on
+    // either side is a legitimate ambiguity marker (a deck row that didn't
+    // record the sender type, or a caller that doesn't know) and matches any
+    // side; a fully-specified pair must agree exactly.
     const matches = this.deck.filter(
       (r) =>
         r.country === query.country &&
         r.direction === query.direction &&
         (query.mcc == null || r.mcc == null || r.mcc === query.mcc) &&
-        (query.mnc == null || r.mnc == null || r.mnc === query.mnc),
+        (query.mnc == null || r.mnc == null || r.mnc === query.mnc) &&
+        (query.numberType === "unknown" ||
+          r.numberType === "unknown" ||
+          r.numberType === query.numberType),
     );
     const bestByKey = new Map<string, NormalizedRate>();
     for (const r of matches) {

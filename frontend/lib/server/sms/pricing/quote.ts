@@ -84,8 +84,12 @@ export function buildQuote(input: QuoteInput): Quote {
   }
 
   // Re-derive the cost breakdown from the winning candidate so the quote carries
-  // the full itemised cost, not just the router's total.
-  const winner = input.candidates.find((c) => c.provider === routing.chosen!.provider);
+  // the full itemised cost, not just the router's total. Use the winner's
+  // `candidateIndex` — two candidates can share a provider name, so a lookup
+  // by provider could grab an inferior rate and produce a sell price the
+  // routing decision would not agree with.
+  const winnerIndex = routing.chosen.candidateIndex;
+  const winner = input.candidates[winnerIndex];
   if (!winner) throw new Error("Chosen route not found among candidates (internal).");
   const effective = toEffectiveRate(winner.rate);
   const cost = expectedCost(seg.segments, effective, allocation);
