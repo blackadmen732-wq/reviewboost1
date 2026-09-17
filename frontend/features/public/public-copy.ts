@@ -24,6 +24,9 @@ export const PUBLIC_FOOTER = [
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
   { href: "/support", label: "Support" },
+  // In the footer because that is where somebody who cannot sign in will look
+  // for it, and because both app stores require it to be findable.
+  { href: "/delete-account", label: "Delete account" },
 ] as const;
 
 export function isGetStartedNext(path: string): boolean {

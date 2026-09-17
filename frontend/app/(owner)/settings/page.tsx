@@ -130,8 +130,11 @@ export default async function SettingsPage() {
       <section className="mb-6 flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Account</h2>
 
-        <a
-          href="mailto:privacy@reviewboost.fit?subject=Delete%20my%20account&body=Please%20delete%20my%20ReviewBoost%20account%20and%20all%20associated%20data."
+        {/* Goes to the explanation, not straight to a mail client. Deletion is
+            irreversible and takes the Tags on the counter with it; the page
+            says so, and carries the mailto once somebody has read it. */}
+        <Link
+          href="/delete-account"
           className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
         >
           <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
@@ -143,11 +146,11 @@ export default async function SettingsPage() {
                 had agreed to operationally, and a deletion promise is the worst
                 place to be approximately right. */}
             <p className="text-sm text-muted">
-              Removes your account, your Tags and your ratings. We will confirm before
-              anything is deleted.
+              Removes your account, your Tags and your ratings. Cancelling is the
+              way to stop billing without losing anything.
             </p>
           </div>
-        </a>
+        </Link>
       </section>
 
       <SignOutButton />

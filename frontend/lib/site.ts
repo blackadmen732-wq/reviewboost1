@@ -38,4 +38,7 @@ export const PUBLIC_ROUTES = [
   "/privacy",
   "/terms",
   "/support",
+  // Both app stores require a publicly reachable deletion URL, readable by
+  // somebody who has already lost access to their account.
+  "/delete-account",
 ] as const;
