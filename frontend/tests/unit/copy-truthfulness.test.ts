@@ -89,12 +89,47 @@ describe("the product does not describe itself inaccurately", () => {
     ).toEqual([]);
   });
 
-  it("does not describe a note field anywhere a visitor reads", () => {
-    // Any surviving phrasing of "the customer writes something".
-    expect(offenders(/customer(s)? (can )?(leave|write|add) (a )?(note|comment|message)/i)).toEqual(
-      [],
-    );
-    expect(offenders(/leave a note|write a note|private note field/i)).toEqual([]);
+  /**
+   * A customer note is not a V1 feature, and every attempt to guard that with a
+   * single regex over the noun has been wrong in one direction or the other.
+   *
+   * Matching exact phrases missed the Integrity page saying "read what they
+   * wrote". A bare /\bnotes?\b/ went too far the other way: a business CAN
+   * write a note on a rating — ActionThread posts to
+   * /customer-responses/{id}/notes and it renders on the feedback detail page —
+   * so the blanket rule flagged accurate sentences and flagged `note:
+   * item.note` for being an identifier. Narrowing to "customer note" then
+   * flagged the Privacy page for correctly describing historical rows, and the
+   * Security page for the very sentence that corrects the claim.
+   *
+   * The noun is not the thing that is false. `customer_responses.note_encrypted`
+   * exists, earlier versions filled it, and the owner read path still decrypts
+   * it; what changed is that `submitCustomerResponse` now passes
+   * `p_note_encrypted: null`, so nothing new is ever collected. So the rule is
+   * about tense, not vocabulary: mention a customer note and you must say in the
+   * same breath that it is gone.
+   *
+   * This is the shape that catches the original offender — "Customer notes and
+   * the reprintable copy of Tag codes are encrypted" — which named the field
+   * with nothing to say it no longer fills.
+   */
+  it("never mentions a customer note without saying it is not collected", () => {
+    const MENTION = /customer'?s?\s+notes?\b|notes?\s+(?:from|left by)\s+(?:a\s+)?customer/i;
+    // "never sent to a client" is not a disclaimer about the note, so a bare
+    // "never" must not count as one.
+    const RETIRED =
+      /historical|earlier version|legacy|previous version|no longer|does not collect|never collected|no customer note|write nothing|writes nothing/i;
+
+    const offenders: string[] = [];
+    for (const file of userFacingSources()) {
+      const prose = code(readFileSync(file, "utf8")).replace(/\s+/g, " ");
+      for (const sentence of prose.split(/(?<=[.!?])\s+/)) {
+        if (MENTION.test(sentence) && !RETIRED.test(sentence)) {
+          offenders.push(`${file.replace(`${ROOT}/`, "")}: ${sentence.trim()}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });
 

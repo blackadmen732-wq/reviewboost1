@@ -67,8 +67,9 @@ export default function SecurityPage() {
       <p>
         The credentials that bypass those database rules are server-only, and the
         build fails if one is ever named so that it could be bundled into a
-        browser. Customer notes and the reprintable copy of Tag codes are
-        encrypted with a key that is never sent to a client.
+        browser. The notes a business writes on a rating, and the reprintable
+        copy of Tag codes, are encrypted with a key that is never sent to a
+        client. Customers write nothing — there is no customer note to encrypt.
       </p>
 
       <h2>What we do not claim</h2>

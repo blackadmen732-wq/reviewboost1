@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { PublicArticle } from "@/features/public/public-article";
 
@@ -87,10 +88,23 @@ export default function TermsPage() {
       </p>
 
       <h2>Your content and data</h2>
+      {/* "your notes" is accurate — a business can write notes on a rating, and
+          ActionThread posts them to /customer-responses/{id}/notes. The false
+          claim was the other half: "you can export ... at any time", when no
+          export exists. I nearly removed the true part too, having generalised
+          "no note field" from the customer flow to the whole product. */}
       <p>
-        Your business details, your ratings, and your notes remain yours. We process them
-        to run the service, as described in the Privacy Policy. You can export or delete
-        them at any time.
+        Your business details, your ratings, the notes you write on them and the
+        artwork you upload remain yours. We process them to run the service, as
+        described in the Privacy Policy.
+      </p>
+      <p>
+        You can ask us to delete your account and everything in it — see{" "}
+        <Link href="/delete-account" className="text-brand underline underline-offset-4">
+          Delete your account
+        </Link>
+        . There is no self-service export today. If you need your ratings in a
+        file, ask and we will send them.
       </p>
 
       <h2>Availability</h2>
