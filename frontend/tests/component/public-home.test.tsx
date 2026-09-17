@@ -60,7 +60,11 @@ describe("PublicHome", () => {
     }
     // The trial is a trial: seven days, a card, and not a free tier.
     expect(screen.getByText(/7 days free/i)).toBeVisible();
-    expect(screen.queryByText(/free forever|free plan/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/free forever/i)).not.toBeInTheDocument();
+    // The FAQ does ask "Is there a free plan?" — and answers No. Matching the
+    // phrase would fail on the denial, so this checks the offer instead: every
+    // plan on the page costs money.
+    expect(PUBLIC_PLANS.every((plan) => plan.price > 0)).toBe(true);
   });
 
   it("reuses the ReviewBoost logo placeholder in chrome", () => {

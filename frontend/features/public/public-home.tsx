@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { FAQ } from "@/features/public/faq";
 import { PricingTable } from "@/features/public/pricing-table";
 import {
   CLOSE,
@@ -159,6 +160,32 @@ export function PublicHome() {
               Privacy
             </Link>
           </p>
+        </div>
+      </section>
+
+      <section className="border-t border-border">
+        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
+          <p className="text-sm font-medium text-muted">Questions</p>
+          {/* Plain <details>. It is keyboard accessible and works before any
+              JavaScript arrives, which matters on a phone with two bars. */}
+          <div className="mt-8 divide-y divide-border border-y border-border">
+            {FAQ.map((entry) => (
+              <details key={entry.question} className="group py-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-medium text-ink [&::-webkit-details-marker]:hidden">
+                  {entry.question}
+                  <span
+                    aria-hidden="true"
+                    className="shrink-0 text-muted transition-transform duration-150 group-open:rotate-45"
+                  >
+                    +
+                  </span>
+                </summary>
+                <p className="mt-3 max-w-[52ch] text-base leading-relaxed text-muted">
+                  {entry.answer}
+                </p>
+              </details>
+            ))}
+          </div>
         </div>
       </section>
 
