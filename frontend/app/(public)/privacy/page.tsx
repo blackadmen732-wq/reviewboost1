@@ -8,8 +8,8 @@ export const metadata: Metadata = {
 };
 
 const LAST_UPDATED = "15 September 2026";
-const CONTACT_EMAIL = "privacy@reviewboost.app";
-const SUPPORT_EMAIL = "help@reviewboost.app";
+const CONTACT_EMAIL = "privacy@reviewboost.fit";
+const SUPPORT_EMAIL = "help@reviewboost.fit";
 
 /**
  * The real policy, inside the public site.

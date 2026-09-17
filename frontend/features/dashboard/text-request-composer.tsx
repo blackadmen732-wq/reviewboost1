@@ -236,9 +236,14 @@ export function TextRequestComposer({ balance, tags, recent }: TextRequestCompos
 
             {preview ? (
               <InlineNotice kind="info">
+                {/* Message count only. The server still computes exact segments —
+                    including the GSM-7/UCS-2 split that makes one emoji halve the
+                    limit — and the ledger still bills on that. An owner cannot act
+                    on "UCS-2" and should not have to learn what it means. */}
                 <p>
-                  {preview.segments} {preview.segments === 1 ? "message" : "messages"} will be
-                  billed ({preview.unitCount} characters, {preview.encoding.toUpperCase()}).
+                  {preview.segments === 1
+                    ? "1 message will be billed."
+                    : `${preview.segments} messages will be billed.`}
                 </p>
               </InlineNotice>
             ) : null}

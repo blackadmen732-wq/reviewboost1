@@ -63,13 +63,21 @@ describe("public + activation copy", () => {
 
   it("states the rating-blind Google opportunity", () => {
     expect(INTEGRITY.headline.toLowerCase()).toContain("same google opportunity");
-    expect(INTEGRITY.body.toLowerCase()).toContain("never instead");
+    // Was "Private notes are extra — never instead", describing a note field
+    // V1 does not have. The claim that matters is the one about routing.
+    expect(INTEGRITY.body.toLowerCase()).toContain("do not hide, delay, or filter");
+    expect(INTEGRITY.body.toLowerCase()).not.toMatch(/private note|words they left/);
     expect(HOW_IT_WORKS[2]?.title.toLowerCase()).toContain("google");
   });
 
   it("describes Tags without inventing a price", () => {
     expect(PRODUCT.headline.toLowerCase()).toContain("tag");
-    expect(PRICING.caveat.toLowerCase()).toContain("not live");
+    // Was "Billing is not live yet" — true when written, false since Stripe
+    // shipped, and the kind of stale line that makes a visitor doubt the rest
+    // of the page. The caveat still has to say a card is needed up front.
+    expect(PRICING.caveat.toLowerCase()).not.toContain("not live");
+    expect(PRICING.caveat.toLowerCase()).toContain("card");
+    expect(PRICING.caveat.toLowerCase()).toContain("trial");
     expect(`${PRICING.headline} ${PRICING.lede} ${PRICING.caveat}`).not.toMatch(/\$\d/);
   });
 

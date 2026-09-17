@@ -48,7 +48,7 @@ export const HOW_IT_WORKS = [
   },
   {
     title: "Everyone is offered Google",
-    body: "The rating never decides who gets the public review link. You also see the words they left for you.",
+    body: "The rating never decides who gets the public review link. One star and five stars are offered the same page.",
   },
 ] as const;
 
@@ -70,13 +70,16 @@ export const PRODUCT = {
 export const INTEGRITY = {
   headline: "Every rating gets the same Google opportunity.",
   lede: "A one-star customer and a five-star customer are offered the same chance to review you on Google.",
-  body: "Private notes are extra — never instead. We do not hide, delay, or filter the public review link because of the stars they chose.",
+  body: "We do not hide, delay, or filter the public review link because of the stars they chose. There is no version of this page that routes an unhappy customer somewhere quieter.",
 } as const;
 
 export const PRICING = {
   headline: "One subscription, per location.",
   lede: "You will see the price before anything is charged.",
-  caveat: "Billing is not live yet. Starting now does not bill you.",
+  // Stripe billing is live. This used to read "Billing is not live yet",
+  // which was true when it was written and is now the kind of stale sentence
+  // that makes a visitor doubt everything else on the page.
+  caveat: "Seven days free. A card is required to start, and nothing is charged until the trial ends.",
 } as const;
 
 export const SECURITY = {

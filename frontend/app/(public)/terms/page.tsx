@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 const LAST_UPDATED = "16 September 2026";
-const SUPPORT_EMAIL = "help@reviewboost.app";
+const SUPPORT_EMAIL = "help@reviewboost.fit";
 
 /**
  * Terms of Service.

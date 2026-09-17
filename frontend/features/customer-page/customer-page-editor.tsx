@@ -13,7 +13,6 @@ const previewMessages = customerMessages.en;
 
 interface CustomerPageEditorProps {
   businessName: string;
-  isPublished: boolean;
   onSaved?: () => void;
 }
 
@@ -36,7 +35,6 @@ type UploadState = "idle" | "signing" | "uploading" | "confirming" | "done" | "e
  */
 export function CustomerPageEditor({
   businessName,
-  isPublished: initialIsPublished,
   onSaved,
 }: CustomerPageEditorProps) {
   // The full draft as returned by GET /api/v1/customer-page.
@@ -45,7 +43,6 @@ export function CustomerPageEditor({
   const [draft, setDraft] = useState<CustomerPageContent>({});
   // heroUrl is display-only: the confirmed public URL for the preview.
   const [heroUrl, setHeroUrl] = useState<string | null>(null);
-  const [isPublished, setIsPublished] = useState(initialIsPublished);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -63,7 +60,6 @@ export function CustomerPageEditor({
         // Show the published hero URL for the preview (the draft asset URL is
         // not resolved here; only published assets have a public URL).
         if (data.published?.heroUrl) setHeroUrl(data.published.heroUrl);
-        setIsPublished(data.published !== null);
       } catch {
         // ignore — defaults are fine
       } finally {
@@ -74,7 +70,6 @@ export function CustomerPageEditor({
 
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -146,29 +141,6 @@ export function CustomerPageEditor({
     [uploadHero],
   );
 
-  const saveDraft = useCallback(async () => {
-    setSaving(true);
-    setStatusMsg(null);
-    // Send the full draft so the RPC replace does not drop fields the owner
-    // set in a previous session (templateId, logoAssetId, etc.).
-    const body: CustomerPageContent = { ...draft, tagline: draft.tagline ?? null };
-    const res = await fetch("/api/v1/customer-page", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setStatusMsg(
-        (err as { error?: { message?: string } }).error?.message ?? "Save failed. Try again.",
-      );
-    } else {
-      setStatusMsg("Draft saved.");
-      onSaved?.();
-    }
-  }, [draft, onSaved]);
-
   /**
    * Publish is save-then-publish, and the save has to succeed.
    *
@@ -214,7 +186,6 @@ export function CustomerPageEditor({
       }
 
       setStatusMsg("Page is live!");
-      setIsPublished(true);
       onSaved?.();
     } catch {
       setStatusMsg("Could not reach ReviewBoost. Check your connection and try again.");
@@ -294,27 +265,10 @@ export function CustomerPageEditor({
           {uploadError && <p className="mt-1 text-xs text-red-600">{uploadError}</p>}
         </div>
 
-        {/* Tagline */}
-        <div>
-          <label
-            htmlFor="tagline"
-            className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#6b635b]"
-          >
-            Tagline
-          </label>
-          <input
-            id="tagline"
-            type="text"
-            maxLength={120}
-            value={draft.tagline ?? ""}
-            onChange={(e) => setDraft((prev) => ({ ...prev, tagline: e.target.value || null }))}
-            placeholder="e.g. Fresh coffee, good vibes"
-            className="w-full rounded-lg border border-[color:var(--rb-border)] bg-white px-3 py-2 text-sm text-[#1a1712] placeholder-[#9e968e] focus:outline-none focus:ring-2 focus:ring-[color:var(--rb-ink)]"
-          />
-          <p className="mt-1 text-right text-[10px] text-[#9e968e]">
-            {(draft.tagline ?? "").length}/120
-          </p>
-        </div>
+        {/* The tagline input lived here. V1 is deliberately upload → preview →
+            Publish, so the control is gone; `tagline` stays in the draft, the
+            payload and the renderer, so nothing an owner already wrote is lost
+            and restoring the field is putting this input back. */}
 
         {/* Status */}
         {statusMsg && (
@@ -325,23 +279,18 @@ export function CustomerPageEditor({
           </p>
         )}
 
-        {/* Actions */}
-        <div className="flex gap-3">
-          <button
-            type="button"
-            disabled={saving || uploading}
-            onClick={() => void saveDraft()}
-            className="flex h-10 items-center rounded-lg border border-[color:var(--rb-border)] bg-white px-4 text-sm font-medium text-[#1a1712] hover:bg-[#faf9f7] disabled:opacity-60"
-          >
-            {saving ? "Saving…" : "Save draft"}
-          </button>
+        {/* One action. "Save draft" beside "Go live" asked the owner to hold a
+            draft/published model in their head to decide which button meant
+            "done"; publish() saves first regardless, so the draft step was
+            already implicit. The safety underneath is unchanged. */}
+        <div>
           <button
             type="button"
             disabled={publishing || uploading}
             onClick={() => void publish()}
-            className="flex h-10 items-center rounded-lg bg-[color:var(--rb-ink)] px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            className="flex h-11 w-full items-center justify-center rounded-lg bg-[color:var(--rb-action)] px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60 sm:w-auto"
           >
-            {publishing ? "Publishing…" : isPublished ? "Update live page" : "Go live"}
+            {publishing ? "Publishing…" : "Publish"}
           </button>
         </div>
       </div>

@@ -86,7 +86,7 @@ export default async function SettingsPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Help</h2>
 
         <a
-          href="mailto:help@reviewboost.app"
+          href="mailto:help@reviewboost.fit"
           className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
         >
           <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft">
@@ -94,7 +94,7 @@ export default async function SettingsPage() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-base font-medium text-ink">Ask us anything</p>
-            <p className="text-sm text-muted">We answer every message.</p>
+            <p className="text-sm text-muted">Questions about Tags, billing or your Google link.</p>
           </div>
         </a>
 
@@ -131,7 +131,7 @@ export default async function SettingsPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Account</h2>
 
         <a
-          href="mailto:privacy@reviewboost.app?subject=Delete%20my%20account&body=Please%20delete%20my%20ReviewBoost%20account%20and%20all%20associated%20data."
+          href="mailto:privacy@reviewboost.fit?subject=Delete%20my%20account&body=Please%20delete%20my%20ReviewBoost%20account%20and%20all%20associated%20data."
           className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
         >
           <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
@@ -139,8 +139,12 @@ export default async function SettingsPage() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-base font-medium text-ink">Delete account</p>
+            {/* No timeframe. "within 30 days" was a retention commitment nobody
+                had agreed to operationally, and a deletion promise is the worst
+                place to be approximately right. */}
             <p className="text-sm text-muted">
-              Permanently removes your account and all customer data within 30 days.
+              Removes your account, your Tags and your ratings. We will confirm before
+              anything is deleted.
             </p>
           </div>
         </a>

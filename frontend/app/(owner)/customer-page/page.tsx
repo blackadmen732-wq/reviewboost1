@@ -26,10 +26,7 @@ export default async function CustomerPagePage() {
       />
 
       {canEdit ? (
-        <CustomerPageEditor
-          businessName={organization.name}
-          isPublished={false}
-        />
+        <CustomerPageEditor businessName={organization.name} />
       ) : (
         <p className="text-sm text-muted">
           Only owners and admins can edit the customer page. Ask the account owner to make changes.

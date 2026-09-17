@@ -26,12 +26,15 @@ export default function SupportPage() {
         <p className="mb-4 text-base text-muted">
           Email{" "}
           <a
-            href="mailto:help@reviewboost.app"
+            href="mailto:help@reviewboost.fit"
             className="font-medium text-ink underline underline-offset-2 hover:no-underline"
           >
-            help@reviewboost.app
+            help@reviewboost.fit
           </a>{" "}
-          and we&apos;ll reply within one business day.
+          {/* No service level. "within one business day" was a commitment
+              nobody had agreed to, and a support promise the product cannot keep
+              costs more trust than having made none. */}
+          with what you are stuck on and we will get back to you.
         </p>
       </section>
 
@@ -77,13 +80,13 @@ export default function SupportPage() {
           <p className="mt-3 text-base text-muted">
             Email{" "}
             <a
-              href="mailto:privacy@reviewboost.app?subject=Delete%20my%20account"
+              href="mailto:privacy@reviewboost.fit?subject=Delete%20my%20account"
               className="font-medium text-ink underline underline-offset-2 hover:no-underline"
             >
-              privacy@reviewboost.app
+              privacy@reviewboost.fit
             </a>{" "}
-            with the subject &quot;Delete my account&quot;. We will delete your organization,
-            ratings data, and login within 30 days and confirm by email.
+            with the subject &quot;Delete my account&quot;. We will confirm by email
+            before anything is removed, and tell you what has been deleted.
           </p>
         </details>
 

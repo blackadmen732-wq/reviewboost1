@@ -35,7 +35,7 @@ describe("Customer page editor", () => {
   });
 
   it("previews the live customer view inside the phone, not a sketch", async () => {
-    render(<CustomerPageEditor businessName="Mario’s Pizza" isPublished={false} />);
+    render(<CustomerPageEditor businessName="Mario’s Pizza" />);
 
     await waitFor(() =>
       expect(screen.getByText(customerMessages.en.ratingHeading)).toBeVisible(),
@@ -54,10 +54,15 @@ describe("Customer page editor", () => {
     expect(stars).toHaveLength(5);
     for (const star of stars) expect(star).toBeDisabled();
 
-    // The owner's controls reach main's draft/publish contract.
-    expect(screen.getByRole("button", { name: /add photo/i })).toBeVisible();
-    expect(screen.getByRole("button", { name: /save draft/i })).toBeVisible();
-    expect(screen.getByRole("button", { name: /go live/i })).toBeVisible();
+    // V1 is upload → preview → Publish. "Save draft" beside "Go live" asked the
+    // owner to hold a draft/published model in their head just to decide which
+    // button meant "done" — and publish() saves first anyway, so the draft step
+    // was always implicit. One action, and no tagline field.
+    expect(screen.getByRole("button", { name: /add photo|replace photo/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^publish/i })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /save draft/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /go live|update live/i })).toBeNull();
+    expect(screen.queryByLabelText(/tagline/i)).toBeNull();
 
     // No location clutter on the customer page.
     expect(screen.queryByText(/location/i)).not.toBeInTheDocument();
@@ -97,9 +102,9 @@ describe("Customer page publish", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   async function renderEditor() {
-    render(<CustomerPageEditor businessName="Mario’s Pizza" isPublished={false} />);
+    render(<CustomerPageEditor businessName="Mario’s Pizza" />);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /go live/i })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: /^publish/i })).toBeInTheDocument(),
     );
   }
 
@@ -112,7 +117,7 @@ describe("Customer page publish", () => {
     });
 
     await renderEditor();
-    fireEvent.click(screen.getByRole("button", { name: /go live/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^publish/i }));
 
     await waitFor(() => expect(screen.getByText(/session expired/i)).toBeVisible());
     expect(screen.queryByText(/page is live/i)).not.toBeInTheDocument();
@@ -124,7 +129,7 @@ describe("Customer page publish", () => {
     mockFetch({ save: () => new Response("{}", { status: 500 }) });
 
     await renderEditor();
-    fireEvent.click(screen.getByRole("button", { name: /go live/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^publish/i }));
 
     await waitFor(() => expect(screen.getByText(/nothing was published/i)).toBeVisible());
     expect(screen.queryByText(/page is live/i)).not.toBeInTheDocument();
@@ -138,12 +143,12 @@ describe("Customer page publish", () => {
     });
 
     await renderEditor();
-    fireEvent.click(screen.getByRole("button", { name: /go live/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^publish/i }));
 
     await waitFor(() => expect(screen.getByText(/could not reach reviewboost/i)).toBeVisible());
     expect(screen.queryByText(/page is live/i)).not.toBeInTheDocument();
     // And the button is usable again rather than stuck on "Publishing…".
-    expect(screen.getByRole("button", { name: /go live/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^publish/i })).toBeEnabled();
   });
 
   it("publishes, in order, once the save succeeds", async () => {
@@ -153,7 +158,7 @@ describe("Customer page publish", () => {
     });
 
     await renderEditor();
-    fireEvent.click(screen.getByRole("button", { name: /go live/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^publish/i }));
 
     await waitFor(() => expect(screen.getByText(/page is live/i)).toBeVisible());
     const writes = calls.filter((call) => !call.startsWith("GET"));
@@ -171,7 +176,7 @@ describe("Customer page publish", () => {
     });
 
     await renderEditor();
-    fireEvent.click(screen.getByRole("button", { name: /go live/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^publish/i }));
 
     await waitFor(() => expect(screen.getByText(/storage is unavailable/i)).toBeVisible());
     expect(screen.queryByText(/page is live/i)).not.toBeInTheDocument();

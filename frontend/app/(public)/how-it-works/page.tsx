@@ -25,9 +25,14 @@ export default function HowItWorksPage() {
           </li>
         ))}
       </ol>
+      {/* This described a note field and rating-dependent routing, neither of
+          which V1 has. The page takes a star and opens the same Google link for
+          every rating — saying otherwise on the How it works page contradicts
+          the Integrity page two clicks away. */}
       <p>
-        After they rate, you see the words they left. Low stars can open a private
-        note so you can make it right. That note never replaces the Google link.
+        You see every rating in Feedback, including the ones nobody would have
+        told you about. The Google link is offered the same way whatever the
+        rating was.
       </p>
       <div className="mt-4 max-w-xs">
         <Button asChild variant="action">
