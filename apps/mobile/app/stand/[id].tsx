@@ -16,6 +16,11 @@ import { useAuth } from "@/data/auth-context";
 import { apiFetch } from "@/data/api";
 import { colors, radii, fonts } from "@/theme";
 import {
+  DONE_DWELL_MS,
+  NFC_SCENE_COPY,
+  sceneForWriteState,
+} from "@/lib/nfc-scenes";
+import {
   isNfcSupported,
   isNfcEnabled,
   initNfc,
@@ -58,7 +63,7 @@ export default function StandDetailScreen() {
         setStandUrl(res.data.standUrl);
         setStandLabel(res.data.label);
       } catch {
-        setError("Could not load stand details. Please try again.");
+        setError("Could not load this Tag. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -201,10 +206,28 @@ export default function StandDetailScreen() {
     };
   }, []);
 
+  const scene = sceneForWriteState(writeState);
+  const sceneCopy = NFC_SCENE_COPY[scene];
+  // The one place the existing contents are worth naming: the owner is about
+  // to erase them.
+  const sceneBody =
+    scene === "conflict" && existingContentDesc
+      ? `This Tag already has ${existingContentDesc} on it. Replacing it will erase what is there.`
+      : scene === "unreadable" && writeError
+        ? writeError
+        : sceneCopy.body;
+
+  // Success closes itself, the way the web sheet does.
+  useEffect(() => {
+    if (scene !== "done") return undefined;
+    const timer = setTimeout(() => setWriteState("idle"), DONE_DWELL_MS);
+    return () => clearTimeout(timer);
+  }, [scene]);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
-        <Stack.Screen options={{ title: "Stand" }} />
+        <Stack.Screen options={{ title: "Tag" }} />
         <ActivityIndicator size="large" color={colors.brandText} />
       </SafeAreaView>
     );
@@ -212,7 +235,7 @@ export default function StandDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: standLabel || "Stand" }} />
+      <Stack.Screen options={{ title: standLabel || "Tag" }} />
       <ScrollView contentContainerStyle={styles.content}>
         {error ? (
           <View style={styles.errorBanner}>
@@ -220,128 +243,75 @@ export default function StandDetailScreen() {
           </View>
         ) : null}
 
-        {/* NFC Write Section */}
+        {/* Programming a Tag.
+            One visible operation. The machine underneath still checks the chip,
+            refuses an unreadable one, writes, verifies and records — but
+            "Checking NFC and reading tag…", "Hold your phone to the NFC tag…"
+            and "Verifying…" were three screens for something the owner
+            experiences as holding a Tag against a phone until it says Done. */}
         {Platform.OS !== "web" && nfcSupported && canProvision && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Write NFC Tag</Text>
-            <Text style={styles.sectionDesc}>
-              Hold an NFC tag to the back of your phone to write this stand&apos;s URL.
-              Use NTAG213 or NTAG215 tags.
-            </Text>
+          <View style={styles.nfcStage}>
+            {scene === "done" ? (
+              <View style={styles.checkWrap}>
+                <Text style={styles.check}>✓</Text>
+              </View>
+            ) : null}
 
-            {writeState === "idle" && (
+            <Text style={styles.nfcTitle}>{sceneCopy.title}</Text>
+            {sceneBody ? <Text style={styles.nfcBody}>{sceneBody}</Text> : null}
+
+            {scene === "waiting" ? (
+              <ActivityIndicator
+                size="large"
+                color={colors.brandText}
+                style={{ marginTop: 20 }}
+              />
+            ) : null}
+
+            {/* The success scene has no controls. It is finished, and it leaves
+                on its own — a button there is one more decision after the work
+                is done, and an invitation to program the same Tag twice. */}
+            {scene !== "done" && sceneCopy.action ? (
               <Pressable
-                style={styles.nfcButton}
-                onPress={() => void handleWriteNfc()}
+                style={[styles.nfcButton, { marginTop: 20 }]}
                 disabled={!standUrl}
-              >
-                <Text style={styles.nfcButtonText}>Write to NFC Tag</Text>
-              </Pressable>
-            )}
-
-            {writeState === "checking" && (
-              <View style={styles.statusRow}>
-                <ActivityIndicator size="small" color={colors.brandText} />
-                <Text style={styles.statusText}>Checking NFC and reading tag...</Text>
-              </View>
-            )}
-
-            {writeState === "confirm-overwrite" && (
-              <View style={[styles.resultBanner, { backgroundColor: colors.infoBg }]}>
-                <Text style={[styles.resultText, { color: colors.info }]}>
-                  This tag already has content ({existingContentDesc}). Writing will replace it.
-                </Text>
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
-                  <Pressable
-                    style={[styles.nfcButton, { flex: 1 }]}
-                    onPress={() => void handleWriteNfc(true)}
-                  >
-                    <Text style={styles.nfcButtonText}>Overwrite</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.nfcButton, styles.cancelButton, { flex: 1 }]}
-                    onPress={() => setWriteState("idle")}
-                  >
-                    <Text style={[styles.nfcButtonText, { color: colors.danger }]}>Cancel</Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-
-            {writeState === "writing" && (
-              <View style={styles.statusRow}>
-                <ActivityIndicator size="small" color={colors.brandText} />
-                <Text style={styles.statusText}>
-                  Hold your phone to the NFC tag...
-                </Text>
-              </View>
-            )}
-
-            {writeState === "verifying" && (
-              <View style={styles.statusRow}>
-                <ActivityIndicator size="small" color={colors.brandText} />
-                <Text style={styles.statusText}>Verifying...</Text>
-              </View>
-            )}
-
-            {writeState === "success" && (
-              <View style={[styles.resultBanner, { backgroundColor: colors.successBg }]}>
-                <Text style={[styles.resultText, { color: colors.success }]}>
-                  NFC tag written and verified successfully
-                </Text>
-              </View>
-            )}
-
-            {writeState === "partial" && (
-              <View style={[styles.resultBanner, { backgroundColor: colors.infoBg }]}>
-                <Text style={[styles.resultText, { color: colors.info }]}>
-                  Your NFC tag works, but ReviewBoost couldn&apos;t save its setup status.
-                </Text>
-                <Pressable
-                  style={[styles.nfcButton, { marginTop: 12 }]}
-                  onPress={() => void retryServerRecord()}
-                >
-                  <Text style={styles.nfcButtonText}>Retry saving status</Text>
-                </Pressable>
-              </View>
-            )}
-
-            {writeState === "error" && (
-              <View style={[styles.resultBanner, { backgroundColor: colors.dangerBg }]}>
-                <Text style={[styles.resultText, { color: colors.danger }]}>
-                  {writeError}
-                </Text>
-                <Pressable
-                  style={[styles.nfcButton, { marginTop: 12 }]}
-                  onPress={() => void handleWriteNfc()}
-                >
-                  <Text style={styles.nfcButtonText}>Try Again</Text>
-                </Pressable>
-              </View>
-            )}
-
-            {(writeState === "checking" || writeState === "writing") && (
-              <Pressable
-                style={[styles.nfcButton, styles.cancelButton]}
                 onPress={() => {
-                  cancelledRef.current = true;
-                  cancelNfcRequest();
+                  if (scene === "conflict") void handleWriteNfc(true);
+                  else if (scene === "partial") void retryServerRecord();
+                  else void handleWriteNfc();
+                }}
+              >
+                <Text style={styles.nfcButtonText}>{sceneCopy.action}</Text>
+              </Pressable>
+            ) : null}
+
+            {scene !== "done" && sceneCopy.dismiss ? (
+              <Pressable
+                style={[styles.nfcButton, styles.cancelButton, { marginTop: 8 }]}
+                onPress={() => {
+                  if (scene === "waiting") {
+                    cancelledRef.current = true;
+                    cancelNfcRequest();
+                  }
                   setWriteState("idle");
                 }}
               >
-                <Text style={[styles.nfcButtonText, { color: colors.danger }]}>Cancel</Text>
+                <Text style={[styles.nfcButtonText, { color: colors.danger }]}>
+                  {sceneCopy.dismiss}
+                </Text>
               </Pressable>
-            )}
+            ) : null}
           </View>
         )}
 
         {Platform.OS !== "web" && nfcSupported === false && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>NFC Not Available</Text>
+            <Text style={styles.sectionTitle}>This phone cannot program Tags</Text>
+            {/* The QR code on the same Tag works without any of this, which is
+                the useful thing to say — not a list of third-party tools. */}
             <Text style={styles.sectionDesc}>
-              This device does not support NFC. Use the NFC Tools app on a
-              compatible phone, or write tags from the web dashboard on Android
-              Chrome.
+              The QR code on this Tag still works. To add NFC, program it from a
+              phone that supports it.
             </Text>
           </View>
         )}
@@ -349,8 +319,8 @@ export default function StandDetailScreen() {
         {!canProvision && (
           <View style={styles.section}>
             <Text style={styles.sectionDesc}>
-              Only owners and admins can write NFC tags. Ask your organization
-              owner for access.
+              Only owners and admins can program Tags. Ask the account owner for
+              access.
             </Text>
           </View>
         )}
@@ -358,15 +328,15 @@ export default function StandDetailScreen() {
         {/* Test Stand */}
         {standUrl && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Test Stand</Text>
+            <Text style={styles.sectionTitle}>Preview customer page</Text>
             <Text style={styles.sectionDesc}>
-              Open the live customer page for this stand to verify it works correctly.
+              See exactly what a customer sees when they tap or scan this Tag.
             </Text>
             <Pressable
               style={styles.nfcButton}
               onPress={() => void Linking.openURL(standUrl)}
             >
-              <Text style={styles.nfcButtonText}>Open Stand Page</Text>
+              <Text style={styles.nfcButtonText}>Open customer page</Text>
             </Pressable>
           </View>
         )}
@@ -374,10 +344,9 @@ export default function StandDetailScreen() {
         {/* Share the stand link — the same URL the QR and NFC tag carry */}
         {standUrl && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Copy NFC Link</Text>
+            <Text style={styles.sectionTitle}>Tag link</Text>
             <Text style={styles.sectionDesc}>
-              Share or copy this stand&apos;s link. It is the same link the QR code
-              and NFC tag use.
+              The same link the QR code and the NFC chip both carry.
             </Text>
             <Pressable
               style={styles.nfcButton}
@@ -398,30 +367,58 @@ export default function StandDetailScreen() {
           </View>
         )}
 
-        {/* NFC Tools fallback */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Alternative: NFC Tools App</Text>
-          <Text style={styles.sectionDesc}>
-            If native NFC write is not available, use the free NFC Tools app:
-          </Text>
-          <View style={styles.steps}>
-            <Text style={styles.step}>1. Install NFC Tools from App Store or Play Store</Text>
-            <Text style={styles.step}>2. Open the app → tap Write</Text>
-            <Text style={styles.step}>3. Add a record → URL / URI</Text>
-            <Text style={styles.step}>4. Copy the stand link from the web dashboard and paste it</Text>
-            <Text style={styles.step}>5. Tap Write and hold your phone to the tag</Text>
-            <Text style={styles.step}>6. Verify: tap the tag to confirm it opens the correct page</Text>
-          </View>
-          <Text style={[styles.sectionDesc, { marginTop: 8, fontStyle: "italic" }]}>
-            Do not permanently write-lock tags. If the code is rotated, the tag must be rewritten.
-          </Text>
-        </View>
+        {/* A six-step tutorial for a third-party app used to sit here, on every
+            Tag screen, unconditionally. Programming happens above; a phone that
+            cannot do it is told so, and the QR code on the same Tag works
+            regardless. Sending an owner to another app to hand-enter a URL is
+            not a feature of this product. */}
+
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  // The programming stage. One centred column so nothing competes with the
+  // Tag the owner is holding against the phone.
+  nfcStage: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+    backgroundColor: colors.surface,
+    borderRadius: radii.card,
+    gap: 6,
+  },
+  checkWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 6,
+    borderColor: colors.success,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  check: {
+    fontSize: 52,
+    lineHeight: 58,
+    color: colors.success,
+    fontWeight: "700",
+  },
+  nfcTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: colors.ink,
+    textAlign: "center",
+  },
+  nfcBody: {
+    fontSize: 15,
+    color: colors.inkMuted,
+    textAlign: "center",
+    maxWidth: 280,
+    marginTop: 4,
+  },
   container: { flex: 1, backgroundColor: colors.canvas },
   center: {
     flex: 1,
@@ -467,24 +464,6 @@ const styles = StyleSheet.create({
     borderColor: colors.dangerBorder,
     marginTop: 12,
   },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 8,
-  },
-  statusText: {
-    fontSize: 15,
-    color: colors.ink,
-  },
-  resultBanner: {
-    borderRadius: radii.control,
-    padding: 12,
-  },
-  resultText: {
-    fontSize: 14,
-    ...fonts.label,
-  },
   errorBanner: {
     backgroundColor: colors.dangerBg,
     borderRadius: radii.control,
@@ -495,13 +474,5 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.danger,
     fontSize: 14,
-  },
-  steps: {
-    gap: 6,
-  },
-  step: {
-    fontSize: 14,
-    color: colors.ink,
-    lineHeight: 20,
   },
 });
