@@ -48,14 +48,40 @@ describe("owner empty, error, offline, permission language", () => {
     expect(offline).not.toMatch(/Something went wrong/i);
   });
 
+  /**
+   * This read `features/dashboard/web-nfc-writer.tsx`, which was imported only
+   * by `features/dashboard/stand-card.tsx`, which nothing rendered. Both are
+   * gone.
+   *
+   * It is worth saying what the dead file cost, because it was not only
+   * wasted: one assertion here was `expect(nfc).not.toMatch(/couldn'?t/i)`,
+   * banning a contraction. The live NFC flow says "Couldn't read this Tag" —
+   * that exact wording was specified when the flow was simplified. So a green
+   * test was enforcing a rule the product had overruled, against a file no
+   * user could reach. Anyone reading the suite would have believed the ban
+   * held.
+   *
+   * The copy now lives in one place, `lib/owner/nfc-presentation.ts`, shared
+   * by the web sheet and mirrored on native.
+   */
   it("permission copy is human and does not invent a reason", () => {
     const auth = code("lib/server/auth.ts");
-    const nfc = code("features/dashboard/web-nfc-writer.tsx");
+    const nfc = code("lib/owner/nfc-presentation.ts");
 
     expect(auth).toContain("You do not have permission to do that.");
-    expect(nfc).toContain("This phone did not allow tagging. Allow it and try again.");
-    expect(nfc).toContain("Could not read this tag. Try again, or use a blank one.");
-    expect(nfc).not.toMatch(/couldn'?t/i);
+
+    // The three moments that need a human decision, in the words the flow uses.
+    expect(nfc).toMatch(/Couldn[’']t read this Tag/);
+    expect(nfc).toContain("Try again");
+    expect(nfc).toContain("This Tag already has something on it");
+    expect(nfc).toContain("Replacing it will erase what is there.");
+    expect(nfc).toContain("Your Tag works");
+    expect(nfc).toContain("Finish setup");
+
+    // No hardware vocabulary, and no fake precision about proximity: NFC
+    // reports no distance, so nothing may claim one.
     expect(nfc).not.toMatch(/NTAG\d/);
+    expect(nfc).not.toMatch(/\bNDEF\b/);
+    expect(nfc).not.toMatch(/\bcm\b|centimet|inches away|getting closer/i);
   });
 });

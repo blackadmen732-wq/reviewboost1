@@ -51,26 +51,50 @@ describe("real loop language", () => {
     expect(care).toContain("googleLinkRefusal");
   });
 
+  /**
+   * This used to read `features/dashboard/stand-card.tsx` and
+   * `features/dashboard/web-nfc-writer.tsx`. Nothing rendered either one: the
+   * Tag detail page mounts `features/tags/tag-detail.tsx`, which opens
+   * `features/tags/program-tag-sheet.tsx`. stand-card was the previous
+   * implementation, web-nfc-writer was imported only by stand-card, and both
+   * were superseded when the NFC flow collapsed to one visible operation.
+   *
+   * So these assertions passed for weeks while guarding nothing. The live Tag
+   * UI could have grown every piece of jargon this forbids and the suite would
+   * have stayed green — which is worse than having no test, because the green
+   * says the rule is enforced. Both dead files are gone and this reads the
+   * surface an owner actually sees.
+   */
   it("keeps NDEF and provision chrome out of Tag UI copy", () => {
-    const card = code("features/dashboard/stand-card.tsx");
+    const detail = code("features/tags/tag-detail.tsx");
+    const sheet = code("features/tags/program-tag-sheet.tsx");
     const create = code("features/dashboard/add-stand-button.tsx");
     const onboarding = code("features/onboarding/onboarding-flow.tsx");
-    const writerUi = code("features/dashboard/web-nfc-writer.tsx");
 
-    expect(card).not.toMatch(/\bNDEF\b/);
-    expect(card).not.toMatch(/URL\s*\/\s*URI/);
-    expect(card).not.toMatch(/NTAG\d/);
-    expect(card).not.toMatch(/provisioning|Status recorded|Retry saving/i);
-    expect(card).toContain("Program a tag");
-    expect(card).toContain("Print your code");
-    expect(card).toContain("tagProgramPhaseLabel");
+    for (const [name, ui] of [
+      ["tag detail", detail],
+      ["program sheet", sheet],
+    ] as const) {
+      expect(ui, `${name} shows NTAG jargon`).not.toMatch(/NTAG\d/);
+      expect(ui, `${name} shows URL/URI jargon`).not.toMatch(/URL\s*\/\s*URI/);
+      expect(ui, `${name} shows provisioning chrome`).not.toMatch(
+        /provisioning|Status recorded|Retry saving/i,
+      );
+    }
+
+    // `NDEFReader` is the Web NFC API and has to be named in the sheet that
+    // calls it. What must not reach a screen is the word as vocabulary.
+    expect(detail).not.toMatch(/\bNDEF\b/);
+    expect(sheet.replace(/NDEFReader/g, "")).not.toMatch(/\bNDEF\b/);
+
+    expect(detail).toContain("Program NFC");
+    expect(detail).toContain("Print this code");
+
     expect(create).toContain("Create a Tag");
     expect(create).not.toMatch(/Stand created|create stand/);
     expect(onboarding).toContain("Print this code");
     expect(onboarding).not.toMatch(/\bNDEF\b/);
     expect(onboarding).not.toMatch(/NTAG\d/);
-    expect(writerUi).not.toMatch(/NTAG\d/);
-    expect(writerUi).toContain("Program this tag");
   });
 
   it("Program Tag status is a human sequence", () => {
@@ -81,10 +105,10 @@ describe("real loop language", () => {
 
   it("does not invent a new Google or NFC API", () => {
     const care = code("features/dashboard/google-link-care.tsx");
-    const writer = source("features/dashboard/web-nfc-writer.tsx");
+    const sheet = source("features/tags/program-tag-sheet.tsx");
 
     expect(care).toContain("/api/v1/settings");
-    expect(writer).toContain("/api/v1/review-stands/${standId}/nfc-provision");
+    expect(sheet).toContain("/api/v1/review-stands/${standId}/nfc-provision");
     expect(care).not.toMatch(/\/api\/v1\/google/);
 
     const counts = source("lib/server/owner-data.ts");
