@@ -182,7 +182,7 @@ export function ProgramTagSheet({
 
     if (!("NDEFReader" in window)) {
       setPhase("failed");
-      setError("This phone cannot program a Tag. Use Chrome on Android, or NFC Tools.");
+      setError("This phone cannot program a Tag. Use the ReviewBoost app, or Chrome on Android.");
       return;
     }
 
