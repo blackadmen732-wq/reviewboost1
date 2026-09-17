@@ -76,7 +76,25 @@ describe("the product does not describe itself inaccurately", () => {
 
   it("does not claim customers leave written feedback", () => {
     // V1 takes a star and nothing else: no note field, no praise.
-    expect(offenders(/words they left|private notes are extra/i)).toEqual([]);
+    //
+    // The first version of this matched two exact phrases, and missed the
+    // Integrity page saying "letting you read what they wrote" and "words you
+    // can act on" — the same false claim in different words, on the page whose
+    // whole argument is that the product is honest. Matching the concept
+    // instead.
+    expect(
+      offenders(
+        /words they left|private notes are extra|read what they wrote|words you can act on|what they wrote/i,
+      ),
+    ).toEqual([]);
+  });
+
+  it("does not describe a note field anywhere a visitor reads", () => {
+    // Any surviving phrasing of "the customer writes something".
+    expect(offenders(/customer(s)? (can )?(leave|write|add) (a )?(note|comment|message)/i)).toEqual(
+      [],
+    );
+    expect(offenders(/leave a note|write a note|private note field/i)).toEqual([]);
   });
 });
 
