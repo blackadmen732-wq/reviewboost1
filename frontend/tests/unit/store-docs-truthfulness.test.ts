@@ -26,11 +26,24 @@ const REPO = join(process.cwd(), "..");
 
 const STORE_DOCS = [
   "docs/app-store/SUBMISSION.md",
+  "docs/google-play/SUBMISSION.md",
   "docs/mobile/MOBILE_RELEASE.md",
 ];
 
 function doc(path: string): string {
   return readFileSync(join(REPO, path), "utf8");
+}
+
+/**
+ * The same document with its line wrapping collapsed.
+ *
+ * A sentence in a hard-wrapped Markdown file is one thing to a reader and a
+ * different string to a regex: "contains no\nPlay Billing integration" does
+ * not match /contains no Play Billing/. Every prose assertion below reads this
+ * instead, so a reflow cannot silently turn a guard off.
+ */
+function prose(path: string): string {
+  return doc(path).replace(/\s+/g, " ");
 }
 
 describe("the store documents point at a domain that exists", () => {
@@ -49,8 +62,45 @@ describe("the store documents point at a domain that exists", () => {
   });
 });
 
+describe("the two store listings agree with each other", () => {
+  const apple = prose("docs/app-store/SUBMISSION.md");
+  const play = prose("docs/google-play/SUBMISSION.md");
+
+  it("quote the same prices, because there is one price list", () => {
+    for (const price of ["$49", "$79", "$129"]) {
+      expect(apple, `the App Store listing omits ${price}`).toContain(price);
+      expect(play, `the Play listing omits ${price}`).toContain(price);
+    }
+  });
+
+  it("both declare no analytics, in the form each store asks for", () => {
+    // Play's Data safety form and Apple's nutrition labels ask the same
+    // question. Two different answers means at least one is a false
+    // declaration, and it is the sort of inconsistency a reviewer notices
+    // because the two listings sit side by side.
+    expect(apple).toMatch(/no analytics SDK/i);
+    expect(play).toMatch(/no analytics or crash SDK/i);
+  });
+
+  it("both point at the same deletion URL", () => {
+    for (const [store, text] of [["App Store", apple], ["Play", play]] as const) {
+      expect(text, `${store} omits the deletion URL`).toContain(
+        "reviewboost.fit/delete-account",
+      );
+    }
+  });
+
+  it("both state that the app sells nothing", () => {
+    // The moment either app grows a purchase button or a link to one, the
+    // store answer changes — Apple 3.1.3(b), Play Payments policy. These
+    // sentences are the record of the posture being deliberate.
+    expect(apple).toMatch(/no purchase mechanism and no link to one/i);
+    expect(play).toMatch(/no Play Billing integration, no purchase flow/i);
+  });
+});
+
 describe("the App Store listing describes this product", () => {
-  const submission = doc("docs/app-store/SUBMISSION.md");
+  const submission = prose("docs/app-store/SUBMISSION.md");
 
   it("does not advertise written feedback from customers", () => {
     // One tap is the whole customer interaction. There is no message box, so
@@ -79,15 +129,11 @@ describe("the App Store listing describes this product", () => {
     // regex for "User ID ... analytics" flagged exactly the sentence that
     // fixed the problem — the same way the customer-notes guard once flagged
     // "there is no customer note to encrypt".
-    const userIdRow = /^\|\s*User ID\s*\|([^|]*)\|([^|]*)\|/m.exec(submission);
+    const userIdRow = /\|\s*User ID\s*\|([^|]*)\|([^|]*)\|/.exec(
+      doc("docs/app-store/SUBMISSION.md"),
+    );
     expect(userIdRow, "the User ID privacy row is missing").not.toBeNull();
     expect(userIdRow![2]).toMatch(/not used for analytics/i);
-  });
-
-  it("states the frozen price rather than gesturing at one", () => {
-    for (const price of ["$49", "$79", "$129"]) {
-      expect(submission, `the listing omits ${price}`).toContain(price);
-    }
   });
 
   it("names the NFC labels the app actually shows", () => {
