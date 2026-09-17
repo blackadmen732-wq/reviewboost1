@@ -180,7 +180,7 @@ export default function StandsScreen() {
           <View style={styles.center}>
             <Text style={styles.emptyTitle}>No Tags yet</Text>
             <Text style={styles.emptyDesc}>
-              Create a stand from the web dashboard to get started.
+              Create a Tag from the web dashboard to get started.
             </Text>
           </View>
         }

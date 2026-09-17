@@ -33,7 +33,7 @@ function FeedCard({ item }: { item: LiveFeedEntry }) {
               { color: item.type === "feedback" ? colors.info : colors.success },
             ]}
           >
-            {item.type === "feedback" ? "Feedback" : "Stand tap"}
+            {item.type === "feedback" ? "Feedback" : "Tag tap"}
           </Text>
         </View>
         <Text style={styles.time}>{relativeTime(item.submittedAt)}</Text>
