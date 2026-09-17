@@ -61,7 +61,7 @@ export const PRODUCT = {
       body: "A QR that survives a scuffed counter. Put it by the till, the receipt, or the door.",
     },
     {
-      title: "Program a tag",
+      title: "Program a Tag",
       body: "Write that same link onto a blank NFC tag. They tap. The page opens. No app for them.",
     },
   ],
