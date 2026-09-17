@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { PLAN_CATALOG } from "@/lib/owner/plan-catalog";
+
 import {
   HOW_IT_WORKS,
   INTEGRITY,
@@ -44,7 +46,6 @@ const FORBIDDEN = [
   /reviews?\s+intercepted/i,
   /intercept(?:ed|ion)?\s*rate/i,
   /only\s+[45][-\s]/i,
-  /\$\d/,
   /£\d/,
   /€\d/,
   /trusted by/i,
@@ -88,6 +89,26 @@ describe("public + activation copy", () => {
       const text = code(path);
       for (const pattern of FORBIDDEN) {
         expect(text, `${path} matched ${pattern}`).not.toMatch(pattern);
+      }
+    }
+  });
+
+  /**
+   * Dollar amounts used to be banned outright, because the product had no
+   * published price and an invented one is worse than none. The offer is frozen
+   * now, so the rule inverts: a price may appear, but only a real one.
+   *
+   * `pricing-plans.test.ts` pins those numbers to PLAN_CATALOG and to
+   * `app.entitlement_monthly_sms` in the migration. This stops a different
+   * number being typed into prose somewhere else on the site.
+   */
+  it("quotes no price that the plan catalog does not charge", () => {
+    const real = new Set(Object.values(PLAN_CATALOG).map((plan) => plan.priceMicros / 1_000_000));
+
+    for (const path of PUBLIC_SOURCES) {
+      for (const [, amount] of code(path).matchAll(/\$(\d[\d,]*)/g)) {
+        const value = Number(amount!.replace(/,/g, ""));
+        expect(real.has(value), `${path} quotes $${amount}, which no plan charges`).toBe(true);
       }
     }
   });

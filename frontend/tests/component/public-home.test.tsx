@@ -17,6 +17,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+import { PUBLIC_PLANS } from "@/features/public/pricing-plans";
 import { PublicHome } from "@/features/public/public-home";
 import { INTEGRITY, PUBLIC_HERO, SECURITY, START_HREF } from "@/features/public/public-copy";
 
@@ -39,9 +40,27 @@ describe("PublicHome", () => {
     expect(screen.getByText(SECURITY.headline)).toBeVisible();
     expect(screen.getAllByRole("link", { name: "Security" })[0]).toHaveAttribute("href", "/security");
     expect(screen.getAllByRole("link", { name: "Privacy" })[0]).toHaveAttribute("href", "/privacy");
-    expect(screen.queryByText(/\$\d/)).not.toBeInTheDocument();
+    // No invented social proof. The product has no customers to quote yet, and
+    // a fabricated one is the fastest way to make everything else look fake.
     expect(screen.queryByText(/trusted by/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/reviews prevented/i)).not.toBeInTheDocument();
+  });
+
+  /**
+   * The homepage used to be asserted to contain NO price at all, which was the
+   * right rule while the product had none. The offer is frozen now, and a
+   * pricing section with no prices in it fails to answer the one question the
+   * visitor came with.
+   */
+  it("shows the real prices, not invented ones", () => {
+    render(<PublicHome />);
+
+    for (const plan of PUBLIC_PLANS) {
+      expect(screen.getByText(`$${plan.price}`)).toBeVisible();
+    }
+    // The trial is a trial: seven days, a card, and not a free tier.
+    expect(screen.getByText(/7 days free/i)).toBeVisible();
+    expect(screen.queryByText(/free forever|free plan/i)).not.toBeInTheDocument();
   });
 
   it("reuses the ReviewBoost logo placeholder in chrome", () => {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { PricingTable } from "@/features/public/pricing-table";
 import {
   CLOSE,
   HOW_IT_WORKS,
@@ -116,7 +117,15 @@ export function PublicHome() {
             {PRICING.headline}
           </h2>
           <p className="mt-3 max-w-[36ch] text-base leading-relaxed text-muted">{PRICING.lede}</p>
-          <p className="mt-3 max-w-[36ch] text-base leading-relaxed text-muted">{PRICING.caveat}</p>
+
+          {/* The prices themselves. This section used to be a headline, a lede
+              and a link — a pricing section with no prices in it, which is the
+              one question a visitor came to answer. */}
+          <div className="mt-10">
+            <PricingTable />
+          </div>
+
+          <p className="mt-6 max-w-[48ch] text-sm leading-relaxed text-muted">{PRICING.caveat}</p>
           <p className="mt-10">
             <Link
               href="/pricing"
