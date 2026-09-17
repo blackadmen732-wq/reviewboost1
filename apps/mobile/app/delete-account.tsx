@@ -91,9 +91,14 @@ export default function DeleteAccountScreen() {
               </Text>
             </View>
 
+            {/* States the distinction without instructing a step that cannot
+                be taken here — cancelling lives in Billing on the web, and
+                pointing at it from inside the app is what 3.1.3(b) restricts.
+                The sentence still earns its place: somebody about to delete
+                when they meant to pause needs to know those are different. */}
             <Text style={styles.body}>
-              If you only want the billing to stop, cancel your plan instead.
-              That keeps your account and your ratings.
+              Cancelling your plan stops the billing without deleting anything,
+              and keeps your ratings. Deleting is not the way to pause.
             </Text>
 
             <View>
