@@ -9,7 +9,7 @@ import {
   Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "expo-router";
+import { Link, useFocusEffect } from "expo-router";
 import { useAuth } from "@/data/auth-context";
 import { useBilling } from "@/data/use-billing";
 import { accountView } from "@/data/billing-view";
@@ -89,6 +89,16 @@ export default function AccountScreen() {
         <Pressable style={styles.signOut} onPress={() => void logout()}>
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
+
+        {/* Apple 5.1.1(v): an app that creates accounts has to let someone
+            start deleting one from inside it. Below sign-out and styled as a
+            plain row rather than a second red button, so the destructive one
+            is not the thing a thumb finds first. */}
+        <Link href="/delete-account" asChild>
+          <Pressable style={styles.deleteRow}>
+            <Text style={styles.deleteText}>Delete account</Text>
+          </Pressable>
+        </Link>
       </ScrollView>
     </SafeAreaView>
   );
@@ -119,4 +129,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   signOutText: { ...fonts.body, color: colors.danger },
+  deleteRow: { padding: 14, alignItems: "center" },
+  deleteText: { ...fonts.body, color: colors.inkMuted },
 });
