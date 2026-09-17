@@ -130,11 +130,13 @@ export default async function SettingsPage() {
       <section className="mb-6 flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Account</h2>
 
-        {/* Goes to the explanation, not straight to a mail client. Deletion is
-            irreversible and takes the Tags on the counter with it; the page
-            says so, and carries the mailto once somebody has read it. */}
+        {/* Goes to the deletion screen, which does the deletion. It used to
+            open a mail client: a person had to ask us and then wait to be
+            believed, and an app that creates accounts has to let someone close
+            one from inside it. /delete-account stays for anyone already locked
+            out, and for the store listings that need a public URL. */}
         <Link
-          href="/delete-account"
+          href="/settings/delete"
           className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
         >
           <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">

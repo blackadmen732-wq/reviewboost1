@@ -17,16 +17,17 @@ export const metadata: Metadata = {
  * account — which is exactly when people need it and exactly when a link buried
  * inside Settings is useless.
  *
- * This page describes the process that exists today: an emailed request,
- * confirmed before anything is removed. It does not promise a self-service
- * button, because there is not one yet, and a deletion page is the last place
- * to describe a feature optimistically.
+ * It now describes a real self-service route, because there is one: Settings
+ * then Delete account, which cancels the subscription and removes everything
+ * without anybody having to ask us first. Email survives as the path for
+ * somebody who can no longer sign in, which is a smaller case than it used to
+ * be but not an empty one.
  */
 export default function DeleteAccountPage() {
   return (
     <PublicArticle
       title="Delete your account"
-      lede="What to send, what goes, and what happens to the Tags on your counter."
+      lede="How to do it, what goes, and what happens to the Tags on your counter."
     >
       <h2>Cancelling and deleting are different</h2>
       <p>
@@ -39,7 +40,25 @@ export default function DeleteAccountPage() {
         the way to pause.
       </p>
 
-      <h2>How to ask</h2>
+      <h2>Delete it yourself</h2>
+      <p>
+        Sign in, open{" "}
+        <Link
+          href="/settings/delete"
+          className="font-medium text-ink underline underline-offset-2 hover:no-underline"
+        >
+          Settings then Delete account
+        </Link>
+        , and type your business name to confirm. It happens immediately: your
+        subscription is cancelled, and the business, its Tags and every rating
+        are removed. Nobody has to approve it and there is no waiting period.
+      </p>
+      <p>
+        Only an owner can do this. If you are on someone else&rsquo;s team and
+        want your own access removed, ask an owner to remove you.
+      </p>
+
+      <h2>If you cannot sign in</h2>
       <p>
         Email{" "}
         <a
@@ -48,36 +67,36 @@ export default function DeleteAccountPage() {
         >
           privacy@reviewboost.fit
         </a>{" "}
-        from the address you signed in with, with the subject &quot;Delete my
-        account&quot;. Sending from that address is how we know the request is
-        yours — we will not act on a request to delete an account from somebody
+        from the address you signed in with. Sending from that address is how we
+        know the request is yours — we will not delete an account for somebody
         who does not control its email.
-      </p>
-      <p>
-        We confirm by email before anything is removed, and tell you what was
-        deleted once it is done.
       </p>
 
       <h2>What happens to your Tags</h2>
       <p>
         They stop working. The page a customer opens when they scan or tap is
         tied to the account, so once the account is gone the code on the counter
-        leads nowhere. Take your Tags down before you ask, or expect to.
+        leads nowhere. Take your Tags down first, or expect to.
       </p>
 
-      <h2>If you have an active subscription</h2>
+      <h2>Your subscription</h2>
       <p>
-        Cancel it first. Deleting the account does not by itself end a
-        subscription you started through Stripe, and we would rather you stopped
-        the billing yourself than trusted us to notice.
+        Deleting cancels it. That happens before anything is removed, and if the
+        cancellation fails nothing is deleted at all — you would be told to
+        cancel from Billing and try again. A business still being charged for an
+        account that no longer exists is the one outcome worth refusing.
+      </p>
+      <p>
+        Invoices already issued are kept. Both sides are required to keep
+        records of money that has moved, so Stripe still holds those.
       </p>
 
       <h2>If other people use the account</h2>
       <p>
-        An organization can have more than one member. Deleting your own login is
-        not the same as deleting the business, and the last owner leaving is a
-        different thing again — say which you mean in the email and we will
-        confirm before acting.
+        Deleting the business deletes it for everyone on the team, and their
+        access goes with it. Your own sign-in is removed too, unless you own
+        another business on ReviewBoost — in that case it survives, because it
+        is still in use.
       </p>
 
       <p>

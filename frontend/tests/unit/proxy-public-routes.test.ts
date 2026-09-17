@@ -184,13 +184,16 @@ describe("the protected list matches the real app", () => {
   });
 
   it("protects the owner pages that are not in the nav", () => {
-    for (const pathname of ["/customer-page", "/select-org", "/onboarding", "/settings/billing", "/stands/abc", "/praise", "/reviews", "/customers"]) {
+    for (const pathname of ["/customer-page", "/select-org", "/onboarding", "/settings/billing", "/settings/delete", "/stands/abc", "/praise", "/reviews", "/customers"]) {
       expect(isOwnerPath(pathname), `${pathname} should be protected`).toBe(true);
     }
   });
 
   it("leaves the public site and the customer flow alone", () => {
-    for (const pathname of ["/", "/pricing", "/privacy", "/terms", "/login", "/support", "/q/abc123"]) {
+    // /goodbye is where a deletion lands. It must render without an auth
+    // round-trip: the login it would have used has just been removed, so
+    // classifying it as owner-only would redirect straight back to /login.
+    for (const pathname of ["/", "/pricing", "/privacy", "/terms", "/login", "/support", "/goodbye", "/delete-account", "/q/abc123"]) {
       expect(isOwnerPath(pathname), `${pathname} should be public`).toBe(false);
     }
   });

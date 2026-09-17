@@ -74,17 +74,37 @@ describe("robots and the sitemap cannot disagree", () => {
     expect(PUBLIC_ROUTES as readonly string[]).not.toContain("/home");
   });
 
-  it("publishes every public page that exists", () => {
+  it("publishes every public page that exists, or says why not", () => {
     // A page added under (public) without being listed is a page no crawler
     // will ever find.
+    //
+    // The exception is a page that opts out in its own metadata. /goodbye is
+    // the first: it is public only because the account that would have been
+    // needed to see it no longer exists, and a deletion confirmation in search
+    // results would be nonsense. Requiring the opt-out to be declared in the
+    // file keeps "deliberately unlisted" and "forgotten" apart — the second
+    // still fails here.
     const dir = join(ROOT, "app/(public)");
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
+
+      const source = readFileSync(join(dir, entry.name, "page.tsx"), "utf8");
+      const optsOut = /robots:\s*\{[^}]*index:\s*false/.test(source);
+      if (optsOut) continue;
+
       expect(
         PUBLIC_ROUTES as readonly string[],
         `/${entry.name} exists but is not in PUBLIC_ROUTES`,
       ).toContain(`/${entry.name}`);
     }
+  });
+
+  it("keeps a noindex page out of robots and the sitemap too", () => {
+    // Declaring noindex in metadata and then listing the route anyway would
+    // put it in the sitemap while telling crawlers to ignore it — two answers
+    // to the same question.
+    expect(PUBLIC_ROUTES as readonly string[]).not.toContain("/goodbye");
+    expect(sitemap().map((entry) => entry.url)).not.toContain(absoluteUrl("/goodbye"));
   });
 });
 

@@ -93,10 +93,16 @@ export default function PrivacyPage() {
       <p>We do not sell data. We do not share data with advertisers.</p>
 
       <h2>Data retention</h2>
+      {/* "all other data is deleted within 30 days" described a queue that did
+          not exist. Deletion is a single cascading statement, so the live
+          database is clear the moment it returns; what takes time is backups
+          ageing out, and that is the honest thing to say. */}
       <p>
-        We keep your account data for as long as your account is open. After account
-        deletion we retain records required by law (typically billing records) for up to
-        seven years; all other data is deleted within 30 days.
+        We keep your account data for as long as your account is open. Deleting your
+        account removes it from our live systems immediately. Encrypted backups are
+        overwritten on their own schedule and are not used to restore deleted accounts.
+        Records required by law — typically billing records held by Stripe — are kept for
+        up to seven years.
       </p>
       <p>
         Customer ratings and notes are kept for as long as your account exists. Deleting
@@ -114,8 +120,9 @@ export default function PrivacyPage() {
       </p>
       <p>
         To delete your account from inside the app, go to{" "}
-        <strong>Settings → Delete account</strong>. Your data and all associated customer
-        data will be permanently deleted within 30 days.
+        <strong>Settings → Delete account</strong> and type your business name to confirm.
+        Your business, its Tags and every rating are removed when you confirm, and your
+        subscription is cancelled at the same time.
       </p>
 
       <h2>Cookies and local storage</h2>

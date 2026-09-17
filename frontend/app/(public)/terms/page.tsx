@@ -99,12 +99,14 @@ export default function TermsPage() {
         described in the Privacy Policy.
       </p>
       <p>
-        You can ask us to delete your account and everything in it — see{" "}
+        You can delete your account and everything in it yourself, from Settings —
+        see{" "}
         <Link href="/delete-account" className="text-brand underline underline-offset-4">
           Delete your account
         </Link>
         . There is no self-service export today. If you need your ratings in a
-        file, ask and we will send them.
+        file, ask before you delete, because afterwards there is nothing left to
+        send.
       </p>
 
       <h2>Availability</h2>
