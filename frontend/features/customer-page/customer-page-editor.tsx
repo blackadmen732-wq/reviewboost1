@@ -41,9 +41,20 @@ export function CustomerPageEditor({
   // Editing is done by merging changes into this rather than tracking fields
   // separately, so a save never drops a field the owner set in a prior session.
   const [draft, setDraft] = useState<CustomerPageContent>({});
-  // heroUrl is display-only: the confirmed public URL for the preview.
+  // heroUrl is display-only: whatever image is currently shown in the preview.
+  // It is NOT proof that the image is safe to publish — see heroConfirmed.
   const [heroUrl, setHeroUrl] = useState<string | null>(null);
+  // heroConfirmed tracks whether the image currently in heroUrl has finished
+  // server-side confirmation (or is the already-published image loaded on
+  // mount). It goes false the instant a new file is picked and only becomes
+  // true again once that specific upload is confirmed. Publish reads this,
+  // not uploadState, because the failure state must keep blocking Publish
+  // even after `uploading` becomes false.
+  const [heroConfirmed, setHeroConfirmed] = useState(true);
   const [loaded, setLoaded] = useState(false);
+  // The active blob: URL for the local file preview, so it can be revoked
+  // when replaced or on unmount instead of leaking.
+  const localPreviewUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -80,9 +91,19 @@ export function CustomerPageEditor({
 
     // Show the picked file immediately — the owner should see their photo in
     // the preview the instant they choose it, not after the upload pipeline
-    // finishes. The draft's heroAssetId is only recorded once the upload is
-    // confirmed server-side, below.
-    setHeroUrl(URL.createObjectURL(file));
+    // finishes. But this image is NOT yet safe to publish: heroConfirmed goes
+    // false here and only flips back to true once this exact upload is
+    // confirmed server-side below. Publish reads heroConfirmed, so it stays
+    // disabled for the entire signing/uploading/confirming/error window, even
+    // though the preview already shows the new photo.
+    const previousLocalUrl = localPreviewUrlRef.current;
+    const localUrl = URL.createObjectURL(file);
+    localPreviewUrlRef.current = localUrl;
+    setHeroUrl(localUrl);
+    setHeroConfirmed(false);
+    // Revoke the previous local blob now that nothing references it — the
+    // preview element has already re-rendered onto the new URL above.
+    if (previousLocalUrl) URL.revokeObjectURL(previousLocalUrl);
 
     // Step 1: get signed upload ticket
     const beginRes = await fetch("/api/v1/customer-page/assets", {
@@ -132,9 +153,18 @@ export function CustomerPageEditor({
     }
 
     // Record the confirmed assetId in the draft. The preview URL was already
-    // set to the local file the moment it was chosen, above.
+    // set to the local file the moment it was chosen, above. Only now is it
+    // safe to let Publish go through with this image.
     setDraft((prev) => ({ ...prev, heroAssetId: ticket.assetId }));
     setUploadState("done");
+    setHeroConfirmed(true);
+  }, []);
+
+  // Revoke the last local blob URL on unmount so it isn't leaked.
+  useEffect(() => {
+    return () => {
+      if (localPreviewUrlRef.current) URL.revokeObjectURL(localPreviewUrlRef.current);
+    };
   }, []);
 
   const handleFileChange = useCallback(
@@ -249,7 +279,12 @@ export function CustomerPageEditor({
             className="hidden"
             onChange={handleFileChange}
           />
-          {uploadError && <p className="mt-1 text-xs text-red-600">{uploadError}</p>}
+          {uploadError && (
+            <p className="mt-1 text-xs font-medium text-red-600">
+              Upload failed — this image has not been saved. {uploadError} The photo shown below
+              is only on your screen; pick a photo again or retry before publishing.
+            </p>
+          )}
         </div>
 
         {/* The tagline input lived here. V1 is deliberately upload → preview →
@@ -273,7 +308,7 @@ export function CustomerPageEditor({
         <div>
           <button
             type="button"
-            disabled={publishing || uploading}
+            disabled={publishing || uploading || !heroConfirmed}
             onClick={() => void publish()}
             className="flex h-11 w-full items-center justify-center rounded-lg bg-[color:var(--rb-action)] px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60 sm:w-auto"
           >

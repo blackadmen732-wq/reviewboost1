@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/browser", () => ({
   supabaseBrowser: () => ({
@@ -58,7 +58,7 @@ describe("Customer page editor", () => {
     // owner to hold a draft/published model in their head just to decide which
     // button meant "done" — and publish() saves first anyway, so the draft step
     // was always implicit. One action, and no tagline field.
-    expect(screen.getByRole("button", { name: /add photo|replace photo/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /upload photo|replace photo/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /^publish/i })).toBeVisible();
     expect(screen.queryByRole("button", { name: /save draft/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /go live|update live/i })).toBeNull();
@@ -180,5 +180,174 @@ describe("Customer page publish", () => {
 
     await waitFor(() => expect(screen.getByText(/storage is unavailable/i)).toBeVisible());
     expect(screen.queryByText(/page is live/i)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The preview is what the customer receives, so Publish must never be
+ * pressable while the previewed image has not finished server confirmation.
+ * A picked photo appears in the preview instantly (good), but that alone must
+ * not unblock Publish until the upload pipeline confirms it — otherwise
+ * Publish can go out for a *different*, previously-confirmed asset while the
+ * owner is staring at their new, unconfirmed photo.
+ */
+describe("Customer page hero upload safety", () => {
+  function mockUploadFlow(overrides: {
+    beginOk?: boolean;
+    putOk?: boolean;
+    confirmOk?: boolean;
+  } = {}) {
+    const { beginOk = true, putOk = true, confirmOk = true } = overrides;
+    const calls: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      calls.push(`${method} ${url}`);
+
+      if (method === "GET" && url.includes("/api/v1/customer-page")) {
+        return new Response(JSON.stringify({ data: { draft: {}, published: null } }), {
+          status: 200,
+        });
+      }
+      if (method === "POST" && url.includes("/assets")) {
+        return beginOk
+          ? new Response(
+              JSON.stringify({ data: { assetId: "asset-1", path: "p/1.jpg", token: "tok" } }),
+              { status: 200 },
+            )
+          : new Response(JSON.stringify({ error: { message: "Could not start upload." } }), {
+              status: 500,
+            });
+      }
+      if (method === "PUT" && url.includes("storage")) {
+        return putOk
+          ? new Response(null, { status: 200 })
+          : new Response(null, { status: 500 });
+      }
+      if (method === "PUT" && url.includes("/assets")) {
+        return confirmOk
+          ? new Response(JSON.stringify({ data: {} }), { status: 200 })
+          : new Response(JSON.stringify({ error: { message: "Could not verify upload." } }), {
+              status: 500,
+            });
+      }
+      // customer-page save/publish, unused directly in these tests.
+      return new Response(JSON.stringify({ data: {} }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return calls;
+  }
+
+  // jsdom does not implement URL.createObjectURL/revokeObjectURL at all, so
+  // there is nothing to spy on — assign them directly rather than replacing
+  // the whole URL global (which would drop its constructor/instanceof
+  // behavior that fetch internals rely on).
+  //
+  // These are installed once for the file (not torn down per test) because
+  // @testing-library/react's global `afterEach(cleanup)` — registered in
+  // tests/setup.ts — runs AFTER this describe block's own afterEach (outer
+  // hooks run after inner ones). Deleting the polyfill in a local afterEach
+  // would remove it before that cleanup unmounts the component, and the
+  // component's unmount effect calls URL.revokeObjectURL.
+  beforeAll(() => {
+    (URL as unknown as { createObjectURL: (obj: unknown) => string }).createObjectURL = vi.fn(
+      () => "blob:local-preview",
+    );
+    (URL as unknown as { revokeObjectURL: (url: string) => void }).revokeObjectURL = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function renderAndPickPhoto() {
+    render(<CustomerPageEditor businessName="Mario’s Pizza" />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^publish/i })).toBeInTheDocument(),
+    );
+    const file = new File(["x"], "hero.jpg", { type: "image/jpeg" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+  }
+
+  it("shows the selected photo immediately, before the upload finishes", async () => {
+    mockUploadFlow();
+    await renderAndPickPhoto();
+
+    await waitFor(() =>
+      expect(document.querySelector('[data-hero-layer] img')?.getAttribute("src")).toBe(
+        "blob:local-preview",
+      ),
+    );
+
+    // Drain the rest of the (successful) upload chain before the test ends,
+    // so no pending promise is left running once fetch gets unstubbed.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^publish/i })).toBeEnabled(),
+    );
+  });
+
+  it("keeps Publish disabled while the upload is pending", async () => {
+    mockUploadFlow();
+    await renderAndPickPhoto();
+
+    // Immediately after picking, before any network response resolves.
+    expect(screen.getByRole("button", { name: /^publish/i })).toBeDisabled();
+
+    // Drain the rest of the (successful) upload chain before the test ends,
+    // so no pending promise is left running once fetch gets unstubbed.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^publish/i })).toBeEnabled(),
+    );
+  });
+
+  it("keeps Publish disabled after upload confirmation fails", async () => {
+    mockUploadFlow({ confirmOk: false });
+    await renderAndPickPhoto();
+
+    await waitFor(() => expect(screen.getByText(/upload failed/i)).toBeVisible());
+    expect(screen.getByRole("button", { name: /^publish/i })).toBeDisabled();
+  });
+
+  it("keeps Publish disabled after the storage upload itself fails", async () => {
+    mockUploadFlow({ putOk: false });
+    await renderAndPickPhoto();
+
+    await waitFor(() => expect(screen.getByText(/upload failed/i)).toBeVisible());
+    expect(screen.getByRole("button", { name: /^publish/i })).toBeDisabled();
+  });
+
+  it("enables Publish once the upload is fully confirmed", async () => {
+    mockUploadFlow();
+    await renderAndPickPhoto();
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^publish/i })).toBeEnabled(),
+    );
+  });
+
+  it("does not let Publish go through for an old asset while a new, unconfirmed image is shown", async () => {
+    // A previously published image already exists (heroConfirmed starts true).
+    // Picking a replacement must immediately re-block Publish, even though
+    // the old confirmed asset would otherwise still be sitting in the draft.
+    const calls = mockUploadFlow({ confirmOk: false });
+    render(<CustomerPageEditor businessName="Mario’s Pizza" />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^publish/i })).toBeInTheDocument(),
+    );
+    // Starts enabled: no pending replacement yet.
+    expect(screen.getByRole("button", { name: /^publish/i })).toBeEnabled();
+
+    const file = new File(["x"], "hero.jpg", { type: "image/jpeg" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    // Blocked the instant the new (unconfirmed) photo is shown...
+    expect(screen.getByRole("button", { name: /^publish/i })).toBeDisabled();
+    // ...and stays blocked once confirmation comes back as a failure, so the
+    // owner can never press Publish while this unconfirmed image is visible.
+    await waitFor(() => expect(screen.getByText(/upload failed/i)).toBeVisible());
+    expect(screen.getByRole("button", { name: /^publish/i })).toBeDisabled();
+    expect(calls.some((call) => call.startsWith("POST /api/v1/customer-page\""))).toBe(false);
   });
 });
