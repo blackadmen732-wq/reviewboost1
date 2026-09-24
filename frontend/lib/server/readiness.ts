@@ -13,6 +13,7 @@ import {
   previousTokenDigestKey,
   type DeploymentTier,
 } from "@/lib/server/env";
+import { EXPECTED_MIGRATIONS } from "@/lib/server/schema-manifest";
 import { getProviderRate, getSmsProvider } from "@/lib/server/sms/provider";
 
 /**
@@ -180,6 +181,7 @@ export interface LiveProbe {
   priceCatalog(): Promise<Array<{ stripe_price_id: string; plan_id: string }>>;
   bucket(name: string): Promise<{ exists: boolean; public: boolean }>;
   smsHealth(): Promise<boolean>;
+  appliedMigrations(): Promise<string[]>;
 }
 
 export async function checkLive(probe: LiveProbe, report: ReadinessReport): Promise<ReadinessReport> {
@@ -218,6 +220,21 @@ export async function checkLive(probe: LiveProbe, report: ReadinessReport): Prom
       subsystem: "database",
       problem: "cannot read rpc_billing_price_catalog: the database is unreachable or behind this build's migrations",
     });
+  }
+
+  // Every migration this build was written against must already be applied.
+  // This is the mechanical form of "the database moves first".
+  try {
+    const applied = new Set(await probe.appliedMigrations());
+    const missing = EXPECTED_MIGRATIONS.filter((name) => !applied.has(name));
+    if (missing.length > 0) {
+      problems.push({
+        subsystem: "database",
+        problem: `database is missing ${missing.length} migration(s) this build requires: ${missing.slice(0, 5).join(", ")}${missing.length > 5 ? ", ..." : ""}`,
+      });
+    }
+  } catch {
+    problems.push({ subsystem: "database", problem: "cannot read the migration ledger (rpc_applied_migrations)" });
   }
 
   try {

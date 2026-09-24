@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { EXPECTED_MIGRATIONS } from "@/lib/server/schema-manifest";
+
 vi.mock("server-only", () => ({}));
 
 /**
@@ -286,6 +288,7 @@ describe("live checks", () => {
     ],
     bucket: async () => ({ exists: true, public: true }),
     smsHealth: async () => true,
+    appliedMigrations: async () => [...EXPECTED_MIGRATIONS],
   };
 
   async function live(probe: Partial<typeof healthy>) {
@@ -322,6 +325,27 @@ describe("live checks", () => {
       },
     });
     expect(problemsOf(report)).toMatch(/behind this build's migrations/);
+  });
+
+  it("fails when the database lacks a migration this build requires", async () => {
+    const report = await live({
+      appliedMigrations: async () => EXPECTED_MIGRATIONS.filter((n) => n !== "grandfather_pre_billing_organizations"),
+    });
+    expect(problemsOf(report)).toMatch(/missing 1 migration\(s\).*grandfather_pre_billing_organizations/);
+  });
+
+  it("fails when the hosted ledger has only the first 36 migrations (production today)", async () => {
+    const report = await live({ appliedMigrations: async () => EXPECTED_MIGRATIONS.slice(0, 36) });
+    expect(problemsOf(report)).toMatch(/missing 28 migration\(s\)/);
+  });
+
+  it("fails closed when the ledger cannot be read", async () => {
+    const report = await live({
+      appliedMigrations: async () => {
+        throw new Error("no schema");
+      },
+    });
+    expect(problemsOf(report)).toMatch(/cannot read the migration ledger/);
   });
 
   it("fails when the Customer Page bucket is missing", async () => {

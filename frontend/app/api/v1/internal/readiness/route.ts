@@ -35,6 +35,11 @@ const probe: LiveProbe = {
     if (error || !data) return { exists: false, public: false };
     return { exists: true, public: Boolean(data.public) };
   },
+  async appliedMigrations() {
+    const { data, error } = await serviceRoleClient().rpc("rpc_applied_migrations");
+    if (error) throw new Error("ledger");
+    return ((data ?? []) as unknown[]).map(String);
+  },
   async smsHealth() {
     const { error } = await serviceRoleClient().rpc("rpc_sms_health");
     return !error;
