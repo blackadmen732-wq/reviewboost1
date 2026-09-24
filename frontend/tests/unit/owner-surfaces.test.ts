@@ -72,9 +72,12 @@ describe("the owner surfaces show real state", () => {
 
     // 150 is Starter's included allowance. A page that knows it is a page that
     // will show it to a business on Growth, or to one that has already spent it.
-    expect(composer).not.toMatch(/\b150\b/);
-    expect(composer).not.toMatch(/\b500\b/);
-    expect(composer).not.toMatch(/\b1500\b/);
+    // The numbers are matched as standalone numeric literals, not inside a
+    // hyphenated utility class — `duration-150` is a transition timing, not an
+    // allowance, and must not trip the guard.
+    for (const allowance of ["150", "500", "1500"]) {
+      expect(composer).not.toMatch(new RegExp(`(?<![\\w-])${allowance}(?![\\w-])`));
+    }
     // Balances arrive as props, from the ledger.
     expect(composer).toMatch(/balance\.monthly/);
     expect(composer).toMatch(/balance\.purchased/);

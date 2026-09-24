@@ -98,7 +98,13 @@ describe.each(["light", "dark"] as const)("%s theme", (theme) => {
   it("brand green as a foreground is still not good enough for text", () => {
     // Documents *why* `--rb-brand-text` exists, so a future edit that "tidies
     // up" by collapsing the two tokens fails here with the reason attached.
-    expect(contrast(brand(), brandSoft())).toBeLessThan(AA_TEXT);
+    // This premise holds in light, where brand green is too light to read on
+    // its soft tint. In dark the brand green is bright enough to clear AA on
+    // its soft tint, so the dedicated text token is a refinement, not a fix —
+    // the assertion is scoped to where the failure it guards actually lives.
+    if (theme === "light") {
+      expect(contrast(brand(), brandSoft())).toBeLessThan(AA_TEXT);
+    }
   });
 
   it("body and muted text are readable", () => {
@@ -122,27 +128,30 @@ describe("brand migration", () => {
   });
 
   it("uses the agreed brand green", () => {
-    expect(token("rb-brand", "light").toLowerCase()).toBe("#00a86b");
+    expect(token("rb-brand", "light").toLowerCase()).toBe("#0a9d5f");
   });
 
-  it("locks the constitution light palette", () => {
-    expect(token("rb-canvas", "light").toLowerCase()).toBe("#f8f5f0");
+  it("locks the 2026 light palette", () => {
+    expect(token("rb-canvas", "light").toLowerCase()).toBe("#f4f5f3");
     expect(token("rb-surface", "light").toLowerCase()).toBe("#ffffff");
-    expect(token("rb-quiet", "light").toLowerCase()).toBe("#f2efe9");
-    expect(token("rb-ink", "light").toLowerCase()).toBe("#171a18");
-    expect(token("rb-muted", "light").toLowerCase()).toBe("#5d655f");
-    expect(token("rb-border", "light").toLowerCase()).toBe("#d8ded9");
-    expect(token("rb-action", "light").toLowerCase()).toBe("#007a4d");
-    expect(token("rb-action-hover", "light").toLowerCase()).toBe("#006b43");
-    expect(token("rb-action-pressed", "light").toLowerCase()).toBe("#005b39");
+    expect(token("rb-quiet", "light").toLowerCase()).toBe("#eceee9");
+    expect(token("rb-ink", "light").toLowerCase()).toBe("#131815");
+    expect(token("rb-muted", "light").toLowerCase()).toBe("#5b655e");
+    expect(token("rb-border", "light").toLowerCase()).toBe("#e2e6e1");
+    expect(token("rb-action", "light").toLowerCase()).toBe("#131815");
+    expect(token("rb-action-hover", "light").toLowerCase()).toBe("#000000");
+    expect(token("rb-action-pressed", "light").toLowerCase()).toBe("#000000");
     expect(token("rb-on-action", "light").toLowerCase()).toBe("#ffffff");
-    expect(token("rb-brand-soft", "light").toLowerCase()).toBe("#ddf5ea");
-    expect(token("rb-star", "light").toLowerCase()).toBe("#bf7d00");
-    expect(token("rb-star-soft", "light").toLowerCase()).toBe("#fff3d0");
+    expect(token("rb-brand-soft", "light").toLowerCase()).toBe("#e1f4ea");
+    expect(token("rb-star", "light").toLowerCase()).toBe("#c07f14");
+    expect(token("rb-star-soft", "light").toLowerCase()).toBe("#fdf3dd");
     expect(token("rb-focus", "light").toLowerCase()).toBe("#005fcc");
   });
 
-  it("uses action green for white-text buttons, not brand green", () => {
+  it("uses ink for the filled CTA, not brand green", () => {
+    // The one filled button in the product is ink, not green. Green is the
+    // brand's voice (logo, checks, success), never a button colour — so the
+    // action fill must carry a white label while brand green must not.
     expect(contrast("#FFFFFF", token("rb-action", "light"))).toBeGreaterThanOrEqual(AA_TEXT);
     expect(contrast("#FFFFFF", token("rb-brand", "light"))).toBeLessThan(AA_TEXT);
   });
@@ -166,7 +175,7 @@ describe("brand migration", () => {
   });
 
   it("locks control and card radii", () => {
-    expect(CSS).toMatch(/--radius-control:\s*12px/);
+    expect(CSS).toMatch(/--radius-control:\s*10px/);
     expect(CSS).toMatch(/--radius-card:\s*16px/);
   });
 });
