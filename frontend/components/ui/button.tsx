@@ -16,27 +16,27 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
+        // The one filled button in the product is ink, not green. Green is
+        // the brand's voice; the CTA is the product's hand — quiet, black,
+        // unmistakable. `primary` and `action` are the same fill: two names
+        // kept so existing call sites read as they always did.
         primary:
-          // Customer flow still uses this variant. Brand green cannot carry a
-          // white label (3.08:1). Owner CTAs use `action` instead.
-          "border-brand bg-brand text-on-brand shadow-[var(--shadow-button)] hover:border-brand-hover hover:bg-brand-hover hover:shadow-[var(--shadow-button-hover)] active:bg-brand-active",
+          "border-action bg-action text-on-action shadow-[var(--shadow-button)] hover:border-action-hover hover:bg-action-hover hover:shadow-[var(--shadow-button-hover)] active:bg-action-pressed",
         action:
-          // Constitution Action green. White on #007A4D is ~5.4:1 — AA for
-          // normal text. Brand green (#00A86B) is never used here.
-          "border-action bg-action text-on-action shadow-[var(--shadow-button)] hover:border-action-hover hover:bg-action-hover hover:shadow-[var(--shadow-button-hover)] active:bg-action-pressed focus-visible:ring-[color:var(--rb-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+          "border-action bg-action text-on-action shadow-[var(--shadow-button)] hover:border-action-hover hover:bg-action-hover hover:shadow-[var(--shadow-button-hover)] active:bg-action-pressed",
         secondary:
           "border-border bg-surface text-ink shadow-[var(--shadow-control)] hover:border-[color:var(--rb-border-strong)] hover:bg-quiet",
         outline:
-          "border-[color:var(--rb-border-strong)] bg-transparent text-ink hover:border-brand hover:bg-brand-soft",
+          "border-[color:var(--rb-border-strong)] bg-transparent text-ink hover:border-[color:var(--rb-ink)] hover:bg-quiet",
         ghost: "border-transparent bg-transparent text-ink hover:bg-quiet",
         destructive:
           "border-danger bg-danger text-white shadow-[var(--shadow-control)] hover:brightness-95",
       },
       size: {
-        sm: "min-h-11 px-4 text-sm",
-        default: "min-h-14 text-base",
-        lg: "min-h-16 rounded-[var(--radius-control)] px-6 text-[1.0625rem]",
-        icon: "h-12 min-h-12 w-12 px-0",
+        sm: "min-h-10 px-4 text-sm",
+        default: "min-h-12 text-[0.9375rem]",
+        lg: "min-h-13 px-6 text-base",
+        icon: "h-11 min-h-11 w-11 px-0",
       },
     },
     defaultVariants: { variant: "primary", size: "default" },

@@ -8,7 +8,9 @@ import { DESKTOP_NAV, isActive } from "@/features/dashboard/nav-items";
 import { cn } from "@/lib/utils/cn";
 
 /**
- * Desktop navigation. Quiet on purpose — the page is the product.
+ * Desktop navigation. A white rail on the neutral canvas — quiet on purpose,
+ * because the page is the product. The active destination is a soft pill;
+ * everything else is plain text that darkens on hover.
  */
 export function DesktopSidebar({
   unreadCount = 0,
@@ -22,9 +24,9 @@ export function DesktopSidebar({
   return (
     <aside
       aria-label="Main"
-      className="fixed inset-y-0 left-0 z-40 hidden w-[220px] flex-col border-r border-border bg-canvas lg:flex"
+      className="fixed inset-y-0 left-0 z-40 hidden w-[240px] flex-col border-r border-border bg-surface lg:flex"
     >
-      <div className="flex h-[72px] items-center px-3">
+      <div className="flex h-20 items-center px-5">
         <Link
           href="/home"
           aria-label="ReviewBoost home"
@@ -35,7 +37,7 @@ export function DesktopSidebar({
       </div>
 
       <nav className="flex-1 px-3 py-2">
-        <ul className="flex flex-col gap-0.5">
+        <ul className="flex flex-col gap-1">
           {DESKTOP_NAV.map((item) => {
             const active = isActive(pathname, item.href);
             const Icon = item.icon;
@@ -47,10 +49,12 @@ export function DesktopSidebar({
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex min-h-14 items-center gap-3 rounded-[var(--radius-control)] px-3",
+                    "flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3",
                     "text-[0.9375rem] transition-colors duration-150",
                     "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
-                    active ? "font-semibold text-ink" : "font-medium text-muted hover:text-ink",
+                    active
+                      ? "bg-quiet font-semibold text-ink"
+                      : "font-medium text-muted hover:bg-quiet/60 hover:text-ink",
                   )}
                 >
                   <Icon className="size-5" strokeWidth={active ? 2.25 : 1.75} aria-hidden="true" />
@@ -72,7 +76,15 @@ export function DesktopSidebar({
       </nav>
 
       <div className="border-t border-border px-5 py-4">
-        <p className="truncate text-sm font-medium text-ink">{businessName ?? "Your business"}</p>
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="grid size-9 shrink-0 place-items-center rounded-full bg-quiet text-sm font-semibold text-ink"
+          >
+            {(businessName ?? "Y").trim().charAt(0).toUpperCase()}
+          </span>
+          <p className="truncate text-sm font-medium text-ink">{businessName ?? "Your business"}</p>
+        </div>
       </div>
     </aside>
   );

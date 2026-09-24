@@ -258,14 +258,12 @@ export function CustomerPageEditor({
       <div className="customer-page-editor__rail flex flex-col gap-4">
         {/* Photo upload */}
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6b635b]">
-            Cover photo
-          </p>
+          <p className="rb-section-label mb-2">Cover photo</p>
           <button
             type="button"
             disabled={uploading}
             onClick={() => fileInputRef.current?.click()}
-            className="flex h-10 items-center gap-2 rounded-lg border border-[color:var(--rb-border)] bg-white px-4 text-sm font-medium text-[#1a1712] hover:bg-[#faf9f7] disabled:opacity-60"
+            className="flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-border bg-surface px-4 text-sm font-medium text-ink shadow-[var(--shadow-control)] transition-colors hover:border-[color:var(--rb-border-strong)] hover:bg-quiet disabled:opacity-60"
           >
             {uploading ? (
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -280,7 +278,7 @@ export function CustomerPageEditor({
             onChange={handleFileChange}
           />
           {uploadError && (
-            <p className="mt-1 text-xs font-medium text-red-600">
+            <p className="mt-2 text-xs font-medium text-danger">
               Upload failed — this image has not been saved. {uploadError} The photo shown below
               is only on your screen; pick a photo again or retry before publishing.
             </p>
@@ -295,7 +293,7 @@ export function CustomerPageEditor({
         {/* Status */}
         {statusMsg && (
           <p
-            className={`text-sm ${statusMsg.includes("live") || statusMsg.includes("saved") ? "text-green-700" : "text-red-600"}`}
+            className={`text-sm font-medium ${statusMsg.includes("live") || statusMsg.includes("saved") ? "text-brand-text" : "text-danger"}`}
           >
             {statusMsg}
           </p>
@@ -310,7 +308,7 @@ export function CustomerPageEditor({
             type="button"
             disabled={publishing || uploading || !heroConfirmed}
             onClick={() => void publish()}
-            className="flex h-11 w-full items-center justify-center rounded-lg bg-[color:var(--rb-action)] px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60 sm:w-auto"
+            className="flex min-h-12 w-full items-center justify-center rounded-[var(--radius-control)] border border-action bg-action px-5 text-[0.9375rem] font-semibold text-on-action shadow-[var(--shadow-button)] transition-[background-color,box-shadow] duration-150 hover:border-action-hover hover:bg-action-hover hover:shadow-[var(--shadow-button-hover)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 motion-reduce:active:scale-100 sm:w-auto"
           >
             {publishing ? "Publishing…" : "Publish"}
           </button>
@@ -320,9 +318,7 @@ export function CustomerPageEditor({
       {/* Live preview — the real customer page, in phone chrome. Large stage
           on desktop; stacked above the rail on mobile. */}
       <div className="customer-page-editor__stage">
-        <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted">
-          What your customers see
-        </p>
+        <p className="rb-section-label mb-3">What your customers see</p>
         <PhoneFrame label={`${businessName} customer page preview`}>
           <CustomerVisitView
             heroUrl={heroUrl ?? null}

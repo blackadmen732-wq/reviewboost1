@@ -1,13 +1,11 @@
 "use client";
 
-import { LogOut } from "lucide-react";
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
- * Sign out.
+ * Sign out, as a settings row.
  *
  * Not behind a confirmation. Signing out is trivially reversible — the worst
  * case is typing an email and a six-digit code — and a confirmation dialog on a
@@ -21,10 +19,9 @@ export function SignOutButton() {
   const [busy, setBusy] = useState(false);
 
   return (
-    <Button
-      variant="secondary"
-      loading={busy}
-      loadingLabel="Signing out…"
+    <button
+      type="button"
+      disabled={busy}
       onClick={async () => {
         setBusy(true);
         await supabaseBrowser().auth.signOut();
@@ -38,9 +35,11 @@ export function SignOutButton() {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- see above
         window.location.assign("/login");
       }}
+      className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors duration-150 hover:bg-quiet/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[color:var(--rb-focus-soft)] disabled:opacity-60"
     >
-      <LogOut className="size-5" aria-hidden="true" />
-      Sign out
-    </Button>
+      <span className="text-base font-medium text-ink">
+        {busy ? "Signing out…" : "Sign out"}
+      </span>
+    </button>
   );
 }

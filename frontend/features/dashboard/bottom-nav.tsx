@@ -7,7 +7,8 @@ import { MOBILE_NAV, isActive } from "@/features/dashboard/nav-items";
 import { cn } from "@/lib/utils/cn";
 
 /**
- * Phone tabs. Four items, never five.
+ * Phone tabs. Four items, never five. The active tab's icon sits in a soft
+ * pill — the one persistent landmark on the screen.
  */
 export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
   const pathname = usePathname();
@@ -34,12 +35,17 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2",
-                  "text-xs font-medium transition-colors duration-150",
+                  "text-xs transition-colors duration-150",
                   "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
-                  active ? "text-ink" : "text-muted hover:text-ink",
+                  active ? "font-semibold text-ink" : "font-medium text-muted hover:text-ink",
                 )}
               >
-                <span className="relative">
+                <span
+                  className={cn(
+                    "relative grid place-items-center rounded-full px-4 py-1 transition-colors duration-150",
+                    active && "bg-quiet",
+                  )}
+                >
                   <Icon
                     className="size-6"
                     strokeWidth={active ? 2.25 : 1.75}
@@ -47,7 +53,7 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
                   />
                   {badge > 0 ? (
                     <span
-                      className="absolute -right-2 -top-1 grid min-w-5 place-items-center rounded-full bg-ink px-1 text-[0.6875rem] font-semibold text-canvas"
+                      className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-ink px-1 text-[0.6875rem] font-semibold text-canvas"
                       aria-label={`${badge} unread`}
                     >
                       {badge > 9 ? "9+" : badge}

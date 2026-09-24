@@ -30,34 +30,37 @@
 
 :root {
   color-scheme: light dark;
-  /* Locked 2026-09-09 constitution palette. Brand green is identity, never
-     a white-label button. Action green is the only filled CTA green. */
-  --rb-canvas: #f8f5f0;
+  /* 2026 redesign — "quiet confidence".
+     Neutral canvas, white surfaces, near-black ink. The one filled CTA is
+     ink, not green: green is the brand's voice (logo, checks, success, NFC),
+     not a button colour. Gold belongs to stars and nothing else. */
+  --rb-canvas: #f4f5f3;
   --rb-surface: #ffffff;
-  --rb-quiet: #f2efe9;
-  --rb-ink: #171a18;
-  --rb-muted: #5d655f;
-  --rb-border: #d8ded9;
-  --rb-border-strong: #b7c0ba;
-  --rb-brand: #00a86b;
-  --rb-brand-hover: #009a61;
-  --rb-brand-active: #008f5b;
-  --rb-brand-soft: #ddf5ea;
-  --rb-brand-text: #007a4d;
-  --rb-on-brand: #0d2118;
-  --rb-action: #007a4d;
-  --rb-action-hover: #006b43;
-  --rb-action-pressed: #005b39;
+  --rb-quiet: #eceee9;
+  --rb-ink: #131815;
+  --rb-muted: #5b655e;
+  --rb-border: #e2e6e1;
+  --rb-border-strong: #c3cbc3;
+  --rb-brand: #0a9d5f;
+  --rb-brand-hover: #088c54;
+  --rb-brand-active: #077a49;
+  --rb-brand-soft: #e1f4ea;
+  --rb-brand-text: #077347;
+  --rb-on-brand: #06231a;
+  --rb-action: #131815;
+  --rb-action-hover: #000000;
+  --rb-action-pressed: #000000;
   --rb-on-action: #ffffff;
-  --rb-star: #bf7d00;
-  --rb-star-soft: #fff3d0;
+  --rb-star: #e9a23b;
+  --rb-star-empty: #d4d9d4;
+  --rb-star-soft: #fdf3dd;
   --rb-warning: #9a6417;
-  --rb-danger: #b33a3a;
-  --rb-danger-soft: #faeaea;
+  --rb-danger: #c03636;
+  --rb-danger-soft: #faecec;
   --rb-info: #356d8c;
   --rb-focus: #005fcc;
-  --rb-focus-soft: rgb(0 95 204 / 28%);
-  --radius-control: 12px;
+  --rb-focus-soft: rgb(0 95 204 / 24%);
+  --radius-control: 10px;
   --radius-card: 16px;
   --rb-space-1: 4px;
   --rb-space-2: 8px;
@@ -76,101 +79,104 @@
   --rb-text-small: 0.875rem;
   --rb-text-body: 1rem;
   --rb-text-title: 1.5rem;
-  --rb-text-display: 1.75rem;
+  --rb-text-display: 2.5rem;
   --rb-row: 56px;
   --rb-content: 800px;
   --rb-motion-fast: 150ms;
   --rb-motion-page: 180ms;
   --rb-logo-clearspace: 0.25;
-  --shadow-control: 0 1px 0 rgb(23 26 24 / 4%);
-  --shadow-button: 0 1px 0 rgb(0 91 57 / 18%);
-  --shadow-button-hover: 0 1px 0 rgb(0 91 57 / 24%);
-  --shadow-card: none;
-  --shadow-float: 0 -1px 0 rgb(23 26 24 / 8%);
+  --shadow-control: 0 1px 2px rgb(19 24 21 / 5%);
+  --shadow-button: 0 1px 2px rgb(19 24 21 / 16%);
+  --shadow-button-hover: 0 2px 6px rgb(19 24 21 / 20%);
+  --shadow-card: 0 1px 2px rgb(19 24 21 / 4%), 0 12px 32px -16px rgb(19 24 21 / 10%);
+  --shadow-float: 0 -8px 24px rgb(19 24 21 / 8%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --rb-canvas: #14120f;
-    --rb-surface: #1c1915;
-    --rb-quiet: #262119;
-    --rb-ink: #f7f4ee;
-    --rb-muted: #b5aea2;
-    --rb-border: #332e26;
-    --rb-border-strong: #4f483c;
-    --rb-brand: #00a86b;
-    --rb-brand-hover: #17c07f;
-    --rb-brand-active: #21cf8c;
-    --rb-brand-soft: #123b2c;
-    --rb-brand-text: #4fd69b;
+    --rb-canvas: #0e1210;
+    --rb-surface: #161b18;
+    --rb-quiet: #1f2521;
+    --rb-ink: #f0f4f1;
+    --rb-muted: #98a39c;
+    --rb-border: #262d29;
+    --rb-border-strong: #3a443e;
+    --rb-brand: #2bc47f;
+    --rb-brand-hover: #3dd391;
+    --rb-brand-active: #55dda1;
+    --rb-brand-soft: #133326;
+    --rb-brand-text: #5fdca4;
     --rb-on-brand: #06231a;
-    --rb-action: #1a9a64;
-    --rb-action-hover: #17c07f;
-    --rb-action-pressed: #21cf8c;
-    --rb-on-action: #06231a;
-    --rb-star: #f7b928;
+    --rb-action: #f0f4f1;
+    --rb-action-hover: #ffffff;
+    --rb-action-pressed: #ffffff;
+    --rb-on-action: #0e1210;
+    --rb-star: #f0b23e;
+    --rb-star-empty: #3a443e;
     --rb-star-soft: #3d2e12;
     --rb-danger: #f08a8a;
     --rb-danger-soft: #452323;
     --rb-info: #8bc2df;
     --rb-focus: #4d8eff;
     --rb-focus-soft: rgb(77 142 255 / 34%);
-    --shadow-control: 0 1px 0 rgb(0 0 0 / 40%);
-    --shadow-button: 0 1px 0 rgb(0 0 0 / 40%);
-    --shadow-button-hover: 0 1px 0 rgb(0 0 0 / 50%);
-    --shadow-card: none;
-    --shadow-float: 0 -1px 0 rgb(0 0 0 / 50%);
+    --shadow-control: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-button: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-button-hover: 0 2px 6px rgb(0 0 0 / 50%);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 30%), 0 12px 32px -16px rgb(0 0 0 / 45%);
+    --shadow-float: 0 -8px 24px rgb(0 0 0 / 45%);
   }
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --rb-canvas: #f8f5f0;
+  --rb-canvas: #f4f5f3;
   --rb-surface: #ffffff;
-  --rb-quiet: #f2efe9;
-  --rb-ink: #171a18;
-  --rb-muted: #5d655f;
-  --rb-border: #d8ded9;
-  --rb-border-strong: #b7c0ba;
-  --rb-brand: #00a86b;
-  --rb-brand-hover: #009a61;
-  --rb-brand-active: #008f5b;
-  --rb-brand-soft: #ddf5ea;
-  --rb-brand-text: #007a4d;
-  --rb-on-brand: #0d2118;
-  --rb-action: #007a4d;
-  --rb-action-hover: #006b43;
-  --rb-action-pressed: #005b39;
+  --rb-quiet: #eceee9;
+  --rb-ink: #131815;
+  --rb-muted: #5b655e;
+  --rb-border: #e2e6e1;
+  --rb-border-strong: #c3cbc3;
+  --rb-brand: #0a9d5f;
+  --rb-brand-hover: #088c54;
+  --rb-brand-active: #077a49;
+  --rb-brand-soft: #e1f4ea;
+  --rb-brand-text: #077347;
+  --rb-on-brand: #06231a;
+  --rb-action: #131815;
+  --rb-action-hover: #000000;
+  --rb-action-pressed: #000000;
   --rb-on-action: #ffffff;
-  --rb-star: #bf7d00;
-  --rb-star-soft: #fff3d0;
-  --rb-danger: #b33a3a;
-  --rb-danger-soft: #faeaea;
+  --rb-star: #e9a23b;
+  --rb-star-empty: #d4d9d4;
+  --rb-star-soft: #fdf3dd;
+  --rb-danger: #c03636;
+  --rb-danger-soft: #faecec;
   --rb-info: #356d8c;
   --rb-focus: #005fcc;
-  --rb-focus-soft: rgb(0 95 204 / 28%);
+  --rb-focus-soft: rgb(0 95 204 / 24%);
 }
 :root[data-theme="dark"],
 .dark {
   color-scheme: dark;
-  --rb-canvas: #14120f;
-  --rb-surface: #1c1915;
-  --rb-quiet: #262119;
-  --rb-ink: #f7f4ee;
-  --rb-muted: #b5aea2;
-  --rb-border: #332e26;
-  --rb-border-strong: #4f483c;
-  --rb-brand: #00a86b;
-  --rb-brand-hover: #17c07f;
-  --rb-brand-active: #21cf8c;
-  --rb-brand-soft: #123b2c;
-  --rb-brand-text: #4fd69b;
+  --rb-canvas: #0e1210;
+  --rb-surface: #161b18;
+  --rb-quiet: #1f2521;
+  --rb-ink: #f0f4f1;
+  --rb-muted: #98a39c;
+  --rb-border: #262d29;
+  --rb-border-strong: #3a443e;
+  --rb-brand: #2bc47f;
+  --rb-brand-hover: #3dd391;
+  --rb-brand-active: #55dda1;
+  --rb-brand-soft: #133326;
+  --rb-brand-text: #5fdca4;
   --rb-on-brand: #06231a;
-  --rb-action: #1a9a64;
-  --rb-action-hover: #17c07f;
-  --rb-action-pressed: #21cf8c;
-  --rb-on-action: #06231a;
-  --rb-star: #f7b928;
+  --rb-action: #f0f4f1;
+  --rb-action-hover: #ffffff;
+  --rb-action-pressed: #ffffff;
+  --rb-on-action: #0e1210;
+  --rb-star: #f0b23e;
+  --rb-star-empty: #3a443e;
   --rb-star-soft: #3d2e12;
   --rb-danger: #f08a8a;
   --rb-danger-soft: #452323;
@@ -266,15 +272,75 @@
   border: 0;
 }
 
+/* --------------------------------------------------------------------------
+   Shared product primitives (2026 redesign)
+
+   The owner app is built from a small set of shapes, used everywhere:
+   the card, the divided row-list, the section label, the display heading.
+   Screens compose these instead of inventing one-off chrome.
+   -------------------------------------------------------------------------- */
+
+/* The one card. White, hairline, a shadow you feel rather than see. */
+.rb-card {
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* Rows that belong together, in one container with hairline dividers —
+   the way a first-party app groups a list, instead of a field of cards. */
+.rb-list {
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.rb-list > * + * {
+  border-top: 1px solid var(--rb-border);
+}
+
+/* The small caps label that names a section. Quiet, never a heading. */
+.rb-section-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  color: var(--rb-muted);
+}
+
+/* Page titles: large, tight, confident. One per screen. */
+.rb-display {
+  margin: 0;
+  color: var(--rb-ink);
+  font-size: var(--rb-text-display);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
+  text-wrap: balance;
+}
+
+.rb-title {
+  margin: 0;
+  color: var(--rb-ink);
+  font-size: var(--rb-text-title);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
 .inline-notice {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
   gap: 12px;
   width: 100%;
   border: 1px solid var(--rb-border);
-  border-radius: var(--radius-control);
+  border-radius: 14px;
   padding: 14px 16px;
-  background: var(--rb-quiet);
+  background: var(--rb-surface);
+  box-shadow: var(--shadow-control);
   color: var(--rb-ink);
   text-align: start;
 }

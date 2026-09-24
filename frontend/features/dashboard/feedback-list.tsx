@@ -6,7 +6,9 @@ import { relativeDay } from "@/lib/utils/relative-day";
 import { cn } from "@/lib/utils/cn";
 
 /**
- * Calm inbox rows. Gold is stars only. No sentiment colour.
+ * The inbox. Ratings are the centerpiece: stars first, large enough to read
+ * at arm's length, the note directly under them. Gold is stars only — an
+ * unread dot is green, the one other signal colour the product allows itself.
  */
 
 export interface FeedbackItem {
@@ -21,23 +23,23 @@ export interface FeedbackItem {
 
 export function FeedbackList({ items }: { items: FeedbackItem[] }) {
   return (
-    <ul className="divide-y divide-border border-y border-border">
+    <ul className="rb-list">
       {items.map((item) => (
         <li key={item.id}>
           <Link
             href={`/feedback/${item.id}`}
             className={cn(
-              "flex min-h-14 items-start gap-3 py-4",
-              "transition-colors duration-150 hover:bg-quiet/60",
-              "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
+              "flex items-start gap-3 px-5 py-4",
+              "transition-colors duration-150 hover:bg-quiet/50",
+              "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[color:var(--rb-focus-soft)]",
             )}
           >
             <div className="min-w-0 flex-1">
-              <div className="mb-1 flex items-center gap-2">
-                <Stars rating={item.rating} />
+              <div className="flex items-center gap-2.5">
+                <Stars rating={item.rating} size="md" />
 
                 {item.isRead ? null : (
-                  <span className="size-1.5 rounded-full bg-ink" aria-label="Unread" role="img" />
+                  <span className="size-2 rounded-full bg-brand" aria-label="Unread" role="img" />
                 )}
 
                 {item.isResolved ? (
@@ -55,14 +57,14 @@ export function FeedbackList({ items }: { items: FeedbackItem[] }) {
               {item.note ? (
                 <p
                   className={cn(
-                    "line-clamp-2 whitespace-pre-wrap text-base leading-relaxed",
+                    "mt-1.5 line-clamp-2 whitespace-pre-wrap text-base leading-relaxed",
                     item.isRead ? "text-muted" : "text-ink",
                   )}
                 >
                   {item.note}
                 </p>
               ) : (
-                <p className="text-base italic text-muted">Rating only, no message</p>
+                <p className="mt-1.5 text-base italic text-muted">Rating only, no message</p>
               )}
             </div>
 

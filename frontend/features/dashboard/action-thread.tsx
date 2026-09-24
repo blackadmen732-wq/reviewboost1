@@ -96,9 +96,9 @@ export function ActionThread({
       </p>
 
       {actions.length > 0 ? (
-        <ol className="mb-6 divide-y divide-border border-y border-border">
+        <ol className="rb-list mb-6">
           {actions.map((action) => (
-            <li key={action.noteId} className="py-4">
+            <li key={action.noteId} className="px-5 py-4">
               <div className="mb-1.5 flex items-center gap-2">
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
                   {action.authorName}

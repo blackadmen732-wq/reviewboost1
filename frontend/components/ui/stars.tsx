@@ -48,7 +48,7 @@ export function Stars({
             SIZES[size],
             position <= rating
               ? "fill-[color:var(--rb-star)] text-[color:var(--rb-star)]"
-              : "text-[color:var(--rb-border-strong)]",
+              : "fill-[color:var(--rb-star-empty)] text-[color:var(--rb-star-empty)]",
           )}
           aria-hidden="true"
         />

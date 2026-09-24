@@ -64,17 +64,17 @@ export function ReviewBoostLogo({
            `aria-hidden` on the halves with a single readable label keeps a
            screen reader from announcing it as two words.
 
-           The green here is the ACTION green (#007A4D), not the brand green
-           (#00A86B), and that is deliberate. A logotype rendered as an image is
-           exempt from WCAG contrast; this is live text, which is not. Brand
-           green on white measures 3.08:1 — below the 4.5:1 floor for normal
-           text, and the "Powered by ReviewBoost" footer sets it at 13px. The
-           action green measures 5.4:1 on white and 4.96:1 on the warm canvas.
-           The mark itself keeps the brand green, because a graphic may. */
+           The green here is the brand TEXT green, not the raw brand green,
+           and that is deliberate. A logotype rendered as an image is exempt
+           from WCAG contrast; this is live text, which is not. Brand green on
+           white measures below the 4.5:1 floor for normal text, and the
+           "Powered by ReviewBoost" footer sets it at 13px. The text green
+           clears AA on white and on the canvas. The mark itself keeps the
+           brand green, because a graphic may. */
         <span className={cn("font-semibold", WORD[size])}>
           <span className="sr-only">ReviewBoost</span>
           <span aria-hidden="true">Review</span>
-          <span aria-hidden="true" className="text-[color:var(--rb-action)]">
+          <span aria-hidden="true" className="text-[color:var(--rb-brand-text)]">
             Boost
           </span>
         </span>

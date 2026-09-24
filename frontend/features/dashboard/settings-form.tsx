@@ -116,14 +116,14 @@ export function EditableRow({
     const isEmpty = !value;
 
     return (
-      <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
+      <div className="flex items-start gap-4 px-5 py-4">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-muted">{label}</p>
           {/* break-words, not truncate: a Google URL is long and unrecognisable
               when cut off, and the point of showing it is recognition. */}
           <p
             className={cn(
-              "break-words text-base font-medium",
+              "mt-0.5 break-words text-base font-medium",
               isEmpty && warnWhenEmpty ? "text-muted" : "text-ink",
             )}
           >
@@ -155,7 +155,7 @@ export function EditableRow({
   }
 
   return (
-    <div className="rounded-[var(--radius-card)] border border-brand bg-surface p-4">
+    <div className="bg-quiet/50 px-5 py-4">
       <label className="block text-sm font-medium text-muted" htmlFor={`setting-${field}`}>
         {label}
       </label>

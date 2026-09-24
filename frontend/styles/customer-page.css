@@ -75,30 +75,32 @@ html:has(.customer-live) {
  * The hero above is dark artwork in both modes for the same reason: this is a
  * printed-feeling page a customer sees once, not a themed surface. */
 .visit-card {
-  --rb-canvas: #f8f5f0;
+  --rb-canvas: #f4f5f3;
   --rb-surface: #ffffff;
-  --rb-quiet: #f2efe9;
-  --rb-ink: #171a18;
-  --rb-muted: #5d655f;
-  --rb-border: #d8ded9;
-  --rb-border-strong: #b7c0ba;
-  --rb-brand-hover: #009a61;
-  --rb-brand-active: #008f5b;
-  --rb-brand-soft: #ddf5ea;
-  --rb-brand-text: #007a4d;
-  --rb-on-brand: #0d2118;
-  --rb-action: #007a4d;
-  --rb-action-hover: #006b43;
-  --rb-action-pressed: #005b39;
+  --rb-quiet: #eceee9;
+  --rb-ink: #131815;
+  --rb-muted: #5b655e;
+  --rb-border: #e2e6e1;
+  --rb-border-strong: #c3cbc3;
+  --rb-brand: #0a9d5f;
+  --rb-brand-hover: #088c54;
+  --rb-brand-active: #077a49;
+  --rb-brand-soft: #e1f4ea;
+  --rb-brand-text: #077347;
+  --rb-on-brand: #06231a;
+  --rb-action: #131815;
+  --rb-action-hover: #000000;
+  --rb-action-pressed: #000000;
   --rb-on-action: #ffffff;
-  --rb-star: #bf7d00;
-  --rb-star-soft: #fff3d0;
-  --rb-danger: #b33a3a;
-  --rb-danger-soft: #faeaea;
+  --rb-star: #e9a23b;
+  --rb-star-empty: #d4d9d4;
+  --rb-star-soft: #fdf3dd;
+  --rb-danger: #c03636;
+  --rb-danger-soft: #faecec;
   --rb-info: #356d8c;
   --rb-focus: #005fcc;
-  --rb-focus-soft: rgb(0 95 204 / 28%);
-  color: #171a18;
+  --rb-focus-soft: rgb(0 95 204 / 24%);
+  color: #131815;
 }
 
 .visit-card {
@@ -270,17 +272,23 @@ html:has(.customer-live) {
 
 .visit-star__label {
   display: grid;
-  width: clamp(44px, 13vw, 52px);
-  height: clamp(44px, 13vw, 52px);
+  width: clamp(48px, 14vw, 56px);
+  height: clamp(48px, 14vw, 56px);
   place-items: center;
-  color: #c5c5c5;
+  color: var(--rb-ink);
   cursor: pointer;
+  transition: transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.visit-star__input:active + .visit-star__label {
+  transform: scale(0.92);
 }
 
 .visit-star__label svg {
-  width: clamp(38px, 11vw, 44px);
-  height: clamp(38px, 11vw, 44px);
+  width: clamp(40px, 12vw, 48px);
+  height: clamp(40px, 12vw, 48px);
   fill: transparent;
+  transition: fill 150ms ease, color 150ms ease;
 }
 
 .visit-star__label[data-filled="true"] {
@@ -396,6 +404,7 @@ html:has(.customer-live) {
   padding: 32px 24px 28px;
   background: var(--rb-surface);
   border-radius: 28px 28px 0 0;
+  box-shadow: 0 -16px 48px rgb(19 24 21 / 22%);
 }
 
 /* The stage between the card and the controls. It carries whichever figure the
@@ -538,13 +547,12 @@ html:has(.customer-live) {
 }
 
 .nfc-glyph--success {
-  /* The action green every confirming control in the product uses, so success
-     reads as ReviewBoost rather than as a system alert. */
-  color: var(--rb-action);
+  /* Brand green: success is the one moment the brand gets to speak. */
+  color: var(--rb-brand);
 }
 
 .nfc-glyph--success .nfc-glyph__glow {
-  background: color-mix(in srgb, var(--rb-action) 14%, transparent);
+  background: var(--rb-brand-soft);
 }
 
 .nfc-glyph--error {
@@ -593,4 +601,8 @@ html:has(.customer-live) {
   .nfc-glyph__wave { opacity: 1; }
   .nfc-check__ring,
   .nfc-check__tick { stroke-dashoffset: 0; }
+
+  .visit-star__input:active + .visit-star__label {
+    transform: none;
+  }
 }

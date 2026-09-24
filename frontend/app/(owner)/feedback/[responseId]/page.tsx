@@ -35,28 +35,26 @@ export default async function FeedbackDetailPage({
     <OwnerShell businessName={organization.name}>
       <Link
         href="/feedback"
-        className="mb-8 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        className="mb-10 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
         All feedback
       </Link>
 
       <article className="max-w-[36rem]">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <Stars rating={review.rating} size="md" />
-          <time dateTime={review.submittedAt} className="shrink-0 text-sm text-muted">
-            {relativeDay(review.submittedAt)}
-          </time>
-        </div>
+        <Stars rating={review.rating} size="lg" />
+        <time dateTime={review.submittedAt} className="mt-3 block text-sm text-muted">
+          {relativeDay(review.submittedAt)}
+        </time>
 
         {review.note ? (
-          <p className="whitespace-pre-wrap text-lg leading-relaxed text-ink">{review.note}</p>
+          <p className="mt-6 whitespace-pre-wrap text-xl leading-relaxed text-ink">{review.note}</p>
         ) : (
-          <p className="text-base italic text-muted">They gave a rating without writing anything.</p>
+          <p className="mt-6 text-base italic text-muted">They gave a rating without writing anything.</p>
         )}
       </article>
 
-      <div className="mt-8 flex items-center justify-between gap-3">
+      <div className="mt-10 flex items-center justify-between gap-3 border-t border-border pt-6">
         <p className="text-sm text-muted">{review.isResolved ? "Sorted" : "Not sorted yet"}</p>
         <ResolveButton responseId={review.responseId} isResolved={review.isResolved} />
       </div>

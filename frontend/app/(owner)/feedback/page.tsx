@@ -34,7 +34,11 @@ export default async function FeedbackPage({
     <OwnerShell unreadCount={counts.unread} businessName={organization.name}>
       <PageHeader title="Feedback" description="Ratings and messages from your customers." />
 
-      <div className="mb-8 flex gap-6" role="group" aria-label="Filter feedback">
+      <div
+        className="mb-8 inline-flex w-fit items-center gap-1 rounded-full border border-border bg-surface p-1 shadow-[var(--shadow-control)]"
+        role="group"
+        aria-label="Filter feedback"
+      >
         <FilterTab href="/feedback" label="Needs you" active={!showAll} />
         <FilterTab href="/feedback?show=all" label="Everything" active={showAll} />
       </div>
@@ -74,11 +78,11 @@ function FilterTab({ href, label, active }: { href: string; label: string; activ
       href={href}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "inline-flex min-h-11 items-center border-b-2 text-sm transition-colors duration-150",
+        "inline-flex min-h-9 items-center rounded-full px-4 text-sm transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
         active
-          ? "border-ink font-semibold text-ink"
-          : "border-transparent font-medium text-muted hover:text-ink",
+          ? "bg-ink font-semibold text-canvas"
+          : "font-medium text-muted hover:text-ink",
       )}
     >
       {label}

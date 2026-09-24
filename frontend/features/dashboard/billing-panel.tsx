@@ -198,27 +198,27 @@ export function BillingPanel({ billing }: { billing: Billing }) {
       ) : null}
 
       {currentPlan ? (
-        <section className="rounded-[var(--radius-card)] border border-border bg-surface p-4">
-          <h2 className="text-sm font-medium text-muted">Your plan</h2>
-          <p className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-ink">
+        <section className="rb-card p-5">
+          <h2 className="rb-section-label">Your plan</h2>
+          <p className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-ink">
             {currentPlan.name}
           </p>
-          <dl className="mt-3 grid gap-1 text-sm text-muted sm:grid-cols-3">
-            <div className="flex gap-2">
-              <dt>Places</dt>
-              <dd className="font-medium text-ink">{currentPlan.locations}</dd>
+          <dl className="mt-4 grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-3">
+            <div>
+              <dt className="text-muted">Places</dt>
+              <dd className="mt-0.5 font-semibold text-ink">{currentPlan.locations}</dd>
             </div>
-            <div className="flex gap-2">
-              <dt>Tags</dt>
-              <dd className="font-medium text-ink">{currentPlan.tags}</dd>
+            <div>
+              <dt className="text-muted">Tags</dt>
+              <dd className="mt-0.5 font-semibold text-ink">{currentPlan.tags}</dd>
             </div>
-            <div className="flex gap-2">
-              <dt>Messages a month</dt>
-              <dd className="font-medium text-ink">{currentPlan.sms}</dd>
+            <div>
+              <dt className="text-muted">Messages a month</dt>
+              <dd className="mt-0.5 font-semibold text-ink">{currentPlan.sms}</dd>
             </div>
           </dl>
-          <p className="mt-3 text-sm text-muted">
-            You have <span className="font-medium text-ink">{billing.smsBalance.total}</span>{" "}
+          <p className="mt-4 border-t border-border pt-4 text-sm text-muted">
+            You have <span className="font-semibold text-ink">{billing.smsBalance.total}</span>{" "}
             {billing.smsBalance.total === 1 ? "message" : "messages"} left —{" "}
             {billing.smsBalance.monthly} included and {billing.smsBalance.purchased} purchased.
           </p>
@@ -227,27 +227,24 @@ export function BillingPanel({ billing }: { billing: Billing }) {
 
       {needsCheckout ? (
         <section aria-labelledby="plans-heading">
-          <h2 id="plans-heading" className="mb-1 text-base font-semibold text-ink">
+          <h2 id="plans-heading" className="rb-title mb-1">
             Choose a plan
           </h2>
-          <p className="mb-4 text-sm text-muted">
+          <p className="mb-5 text-sm text-muted">
             Seven days free. A card is needed to start, and you are not charged until the
             trial ends.
           </p>
-          <ul className="grid gap-3 sm:grid-cols-3">
+          <ul className="grid gap-4 sm:grid-cols-3">
             {PLANS.map((plan) => (
-              <li
-                key={plan.id}
-                className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-4"
-              >
+              <li key={plan.id} className="rb-card flex flex-col gap-4 p-5">
                 <div>
                   <p className="text-base font-semibold text-ink">{plan.name}</p>
-                  <p className="text-2xl font-semibold tracking-[-0.02em] text-ink">
+                  <p className="mt-1 text-3xl font-semibold tracking-[-0.03em] text-ink">
                     ${plan.priceUsd}
                     <span className="text-sm font-normal text-muted"> a month</span>
                   </p>
                 </div>
-                <ul className="flex flex-col gap-1 text-sm text-muted">
+                <ul className="flex flex-col gap-1.5 text-sm text-muted">
                   <li>
                     {plan.locations} {plan.locations === 1 ? "place" : "places"}
                   </li>
@@ -258,6 +255,7 @@ export function BillingPanel({ billing }: { billing: Billing }) {
                 </ul>
                 <Button
                   type="button"
+                  className="mt-auto"
                   onClick={() => void act({ action: "checkout", planId: plan.id }, plan.id)}
                   loading={busy === plan.id}
                   loadingLabel="Opening…"

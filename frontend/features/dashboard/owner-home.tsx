@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -13,9 +14,10 @@ import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page"
 /**
  * Owner Home. One question: do I need to do anything?
  *
- * Muscle memory (SoT v1.7): do not move these slots —
- * business name, one number, one warning, one green action, then
- * unread rows and Tags status. Same position, color, word.
+ * The screen is built around the answer, not around data. When something
+ * needs the owner, that thing is the page — one statement, one action. When
+ * nothing does, the page is deliberately almost empty: a business that is
+ * running well should feel like it.
  */
 
 export function OwnerHome({
@@ -41,16 +43,19 @@ export function OwnerHome({
     ((nextGoal === "destination" && model.primary?.label === "Add Google link") ||
       (nextGoal === "firstTag" && model.primary?.label === "Create a Tag"));
 
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
     <div className="flex flex-col">
       <header className="mb-10">
-        <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
-          {businessName}
-        </h1>
+        <p className="rb-section-label">{today}</p>
+        <h1 className="rb-display mt-3">{businessName}</h1>
         {model.headline ? (
-          <p className="mt-3 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {model.headline}
-          </p>
+          <p className="mt-4 max-w-[44ch] text-lg leading-relaxed text-muted">{model.headline}</p>
         ) : null}
       </header>
 
@@ -72,16 +77,12 @@ function EmptyHome({ model, hidePrimaryButton }: { model: HomeModel; hidePrimary
     <section className="max-w-[36rem]">
       {blocker ? (
         <>
-          <p className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {blocker.title}
-          </p>
+          <h2 className="rb-title">{blocker.title}</h2>
           <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{blocker.body}</p>
         </>
       ) : (
         <>
-          <p className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            No ratings yet.
-          </p>
+          <h2 className="rb-title">No ratings yet.</h2>
           <p className="mt-3 max-w-[34ch] text-base leading-relaxed text-muted">
             Your tag is ready. Put it where people pay.
           </p>
@@ -115,26 +116,23 @@ function ActiveHome({
   const firstAttention = model.attentions[0] ?? null;
 
   return (
-    <div className="flex flex-col gap-12">
+    <div className="flex flex-col gap-14">
       <section className="max-w-[36rem]">
         {firstAttention ? (
           <>
-            <p className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-              {firstAttention.title}
-            </p>
-            <p className="mt-2 max-w-[40ch] text-base leading-relaxed text-muted">
+            <h2 className="rb-title">{firstAttention.title}</h2>
+            <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">
               {firstAttention.body}
             </p>
           </>
         ) : (
-          <>
-            <p className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-              Nothing needs you
-            </p>
-            <p className="mt-2 text-base leading-relaxed text-muted">
+          <div className="py-6">
+            <CalmGlyph />
+            <h2 className="rb-title mt-6">Nothing needs you.</h2>
+            <p className="mt-3 max-w-[36ch] text-base leading-relaxed text-muted">
               You can close this and get back to work.
             </p>
-          </>
+          </div>
         )}
 
         {model.primary && !hidePrimaryButton ? (
@@ -148,15 +146,48 @@ function ActiveHome({
 
       {unreadItems.length > 0 ? (
         <section>
-          <h2 className="mb-4 text-sm font-medium text-muted">Unread feedback</h2>
+          <h2 className="rb-section-label mb-4">Unread feedback</h2>
           <FeedbackList items={unreadItems} />
         </section>
       ) : null}
 
       <section>
-        <h2 className="mb-1 text-sm font-medium text-muted">Tags</h2>
-        <p className="text-base text-ink">{tagStatusLine(model.tagStatus)}</p>
+        <h2 className="rb-section-label mb-4">Tags</h2>
+        <Link
+          href="/stands"
+          className="group flex items-center justify-between gap-4 rounded-[var(--radius-card)] border border-border bg-surface px-5 py-4 shadow-[var(--shadow-card)] transition-colors duration-150 hover:bg-quiet/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
+          <p className="text-base text-ink">{tagStatusLine(model.tagStatus)}</p>
+          <ChevronRight
+            className="size-5 shrink-0 text-[color:var(--rb-border-strong)] transition-transform duration-150 group-hover:translate-x-0.5"
+            aria-hidden="true"
+          />
+        </Link>
       </section>
     </div>
+  );
+}
+
+/**
+ * The calm state deserves a focal point, not just smaller text. One soft
+ * green check — the same family as the NFC success glyph — says "done"
+ * without a word of chrome.
+ */
+function CalmGlyph() {
+  return (
+    <span
+      aria-hidden="true"
+      className="grid size-14 place-items-center rounded-full bg-brand-soft"
+    >
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" className="text-brand-text">
+        <path
+          d="M5 12.5 9.5 17 19 7"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
   );
 }

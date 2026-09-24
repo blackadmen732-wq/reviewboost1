@@ -24,8 +24,8 @@ export function OwnerShell({
     <div className="min-h-dvh bg-canvas">
       <DesktopSidebar unreadCount={unreadCount} businessName={businessName} />
 
-      <div className="lg:pl-[220px]">
-        <main className="mx-auto w-full max-w-[var(--rb-content)] px-5 pb-28 pt-10 lg:px-8 lg:pb-16 lg:pt-12">
+      <div className="lg:pl-[240px]">
+        <main className="mx-auto w-full max-w-[var(--rb-content)] px-5 pb-28 pt-8 lg:px-8 lg:pb-16 lg:pt-14">
           <PageTransition>{children}</PageTransition>
         </main>
       </div>

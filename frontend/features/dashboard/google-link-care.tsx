@@ -15,7 +15,6 @@ import {
   googleLinkState,
   openGoogleReviewUrl,
 } from "@/features/dashboard/google-link-copy";
-import { GoogleLinkHelp } from "@/features/dashboard/settings-form";
 import { isValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
@@ -116,9 +115,9 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
   }
 
   return (
-    <div className="flex flex-col gap-4" data-google-link-state={savedState}>
+    <div data-google-link-state={savedState}>
       {editing ? (
-        <div className="rounded-[var(--radius-card)] border border-brand bg-surface p-4">
+        <div className="bg-quiet/50 px-5 py-4">
           <label className="block text-sm font-medium text-muted" htmlFor="setting-googleReviewUrl">
             Google link
           </label>
@@ -183,11 +182,11 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
           </div>
         </div>
       ) : (
-        <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
+        <div className="flex items-start gap-4 px-5 py-4">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-muted">Google link</p>
             <p
-              className={`break-words text-base font-medium ${savedState === "valid" ? "text-ink" : "text-muted"}`}
+              className={`mt-0.5 break-words text-base font-medium ${savedState === "valid" ? "text-ink" : "text-muted"}`}
             >
               {googleLinkDisplay(value)}
             </p>
@@ -223,20 +222,23 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
         </div>
       )}
 
-      {!editing ? <p className="max-w-[42ch] text-sm leading-relaxed text-muted">{GOOGLE_LINK_BLAST}</p> : null}
+      {!editing ? (
+        <div className="flex flex-col items-start gap-3 px-5 pb-5">
+          <p className="max-w-[42ch] text-sm leading-relaxed text-muted">{GOOGLE_LINK_BLAST}</p>
 
-      {!editing && savedState !== "missing" ? (
-        <Button
-          variant="secondary"
-          className="w-auto"
-          onClick={() => refuseOrOpen(value ?? "", speakRefusal)}
-        >
-          <ExternalLink className="size-4" aria-hidden="true" />
-          Open
-        </Button>
+          {savedState !== "missing" ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-auto"
+              onClick={() => refuseOrOpen(value ?? "", speakRefusal)}
+            >
+              <ExternalLink className="size-4" aria-hidden="true" />
+              Open
+            </Button>
+          ) : null}
+        </div>
       ) : null}
-
-      <GoogleLinkHelp />
     </div>
   );
 }

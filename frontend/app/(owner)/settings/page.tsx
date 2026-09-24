@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { Eye, LifeBuoy, Mail, Shield, Trash2 } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { AppShell } from "@/features/dashboard/app-shell";
 import { GoogleLinkCare } from "@/features/dashboard/google-link-care";
 import { EditableRow, GoogleLinkHelp } from "@/features/dashboard/settings-form";
@@ -16,20 +17,18 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * Settings.
+ * Settings, the way a first-party app does them: a short list of named
+ * groups, each a single surface with hairline rows — never a wall of
+ * separate cards.
  *
- * Editable now, where it was read-only before. That mattered most for the Google
- * link: paste it wrong during setup and every printed code in the building leads
- * nowhere, with no way to fix it from inside the app. A business that cannot
- * correct its own address is a business that leaves.
+ * Each editable row reads as plain text until asked to change — see
+ * `settings-form.tsx` for why a wall of live inputs is the wrong shape for
+ * this audience.
  *
- * Each row reads as plain text until asked to change — see `settings-form.tsx`
- * for why a wall of live inputs is the wrong shape for this audience.
- *
- * Time zone is deliberately absent. It decides when "today" starts, it was set
- * correctly at signup from the browser, and exposing it invites someone to
- * change it by accident and then wonder why their daily counts moved. It belongs
- * behind support, not on the main screen.
+ * Time zone is deliberately absent. It decides when "today" starts, it was
+ * set correctly at signup from the browser, and exposing it invites someone
+ * to change it by accident and then wonder why their daily counts moved. It
+ * belongs behind support, not on the main screen.
  */
 export default async function SettingsPage() {
   const { user, organization } = await requireOwner("/settings");
@@ -37,125 +36,164 @@ export default async function SettingsPage() {
 
   return (
     <AppShell businessName={organization.name}>
-      <h1 className="mb-6 text-2xl font-semibold tracking-[-0.02em] text-ink">Settings</h1>
+      <PageHeader title="Settings" />
 
-      <section className="mb-6 flex flex-col gap-3">
-        <EditableRow
-          field="businessName"
-          label="Business"
-          value={organization.name}
-          placeholder="The Corner Cafe"
-        />
-
-        <EditableRow
-          field="locationName"
-          label="Place"
-          value={location?.name ?? null}
-          placeholder="High Street"
-          {...(location ? { context: { locationId: location.locationId } } : {})}
-        />
-
-        <div>
-          {/* The Google link gets its own care UX — paste, Test, Open, Save —
-              because this is the one field whose silent mistake sends every
-              customer from every Tag to the wrong page. Changing it takes
-              effect on the next scan; printed codes and NFC tags are untouched. */}
-          <GoogleLinkCare value={location?.destination?.url ?? null} />
-          <GoogleLinkHelp />
-        </div>
-
-        {/* Not editable. Changing the sign-in address is an account-recovery
-            operation, not a setting — done carelessly it locks someone out of
-            their own business with no way back in. */}
-        <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <Mail className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-muted">Signed in as</p>
-            <p className="break-words text-base font-medium text-ink">{user.email ?? "—"}</p>
+      <div className="flex flex-col gap-10">
+        <section aria-labelledby="settings-business">
+          <GroupLabel id="settings-business">Business</GroupLabel>
+          <div className="rb-list">
+            <EditableRow
+              field="businessName"
+              label="Business"
+              value={organization.name}
+              placeholder="The Corner Cafe"
+            />
+            <EditableRow
+              field="locationName"
+              label="Place"
+              value={location?.name ?? null}
+              placeholder="High Street"
+              {...(location ? { context: { locationId: location.locationId } } : {})}
+            />
+            {/* Not editable. Changing the sign-in address is an
+                account-recovery operation, not a setting — done carelessly it
+                locks someone out of their own business with no way back in. */}
+            <div className="px-5 py-4">
+              <p className="text-sm font-medium text-muted">Signed in as</p>
+              <p className="mt-0.5 break-words text-base font-medium text-ink">
+                {user.email ?? "—"}
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* A real person to contact, and a plain answer about customer data. A
-          barber deciding whether to put our code on their counter wants to know
-          who is behind it — a faceless product is one they will not recommend to
-          the shop next door. */}
-      <section className="mb-6 flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Help</h2>
-
-        <a
-          href="mailto:help@reviewboost.fit"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft">
-            <LifeBuoy className="size-5 text-brand-text" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Ask us anything</p>
-            <p className="text-sm text-muted">Questions about Tags, billing or your Google link.</p>
+        <section aria-labelledby="settings-google">
+          <GroupLabel id="settings-google">Google review link</GroupLabel>
+          <div className="rb-list">
+            {/* The Google link gets its own care UX — paste, Test, Open, Save —
+                because this is the one field whose silent mistake sends every
+                customer from every Tag to the wrong page. Changing it takes
+                effect on the next scan; printed codes and NFC tags are
+                untouched. */}
+            <GoogleLinkCare value={location?.destination?.url ?? null} />
           </div>
-        </a>
-
-        {/* Seeing exactly what a customer sees is the single thing that makes an
-            owner comfortable putting this on their counter. */}
-        <Link
-          href="/stands"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <Eye className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">See what customers see</p>
-            <p className="text-sm text-muted">Scan your own code to try it.</p>
+          <div className="mt-2 px-1">
+            <GoogleLinkHelp />
           </div>
-        </Link>
+        </section>
 
-        <Link
-          href="/privacy"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <Shield className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Privacy policy</p>
-            <p className="text-sm text-muted">What we collect and how to delete your account.</p>
+        <section aria-labelledby="settings-customer-page">
+          <GroupLabel id="settings-customer-page">Customer page</GroupLabel>
+          <div className="rb-list">
+            <LinkRow
+              href="/customer-page"
+              title="Artwork and preview"
+              description="The photo and page customers see when they scan."
+            />
           </div>
-        </Link>
-      </section>
+        </section>
 
-      <section className="mb-6 flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Account</h2>
-
-        {/* Goes to the deletion screen, which does the deletion. It used to
-            open a mail client: a person had to ask us and then wait to be
-            believed, and an app that creates accounts has to let someone close
-            one from inside it. /delete-account stays for anyone already locked
-            out, and for the store listings that need a public URL. */}
-        <Link
-          href="/settings/delete"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <Trash2 className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Delete account</p>
-            {/* No timeframe. "within 30 days" was a retention commitment nobody
-                had agreed to operationally, and a deletion promise is the worst
-                place to be approximately right. */}
-            <p className="text-sm text-muted">
-              Removes your account, your Tags and your ratings. Cancelling is the
-              way to stop billing without losing anything.
-            </p>
+        <section aria-labelledby="settings-billing">
+          <GroupLabel id="settings-billing">Billing</GroupLabel>
+          <div className="rb-list">
+            <LinkRow
+              href="/settings/billing"
+              title="Plan and messages"
+              description="Your subscription, and the texts it includes."
+            />
           </div>
-        </Link>
-      </section>
+        </section>
 
-      <SignOutButton />
+        {/* A real person to contact, and a plain answer about customer data.
+            A barber deciding whether to put our code on their counter wants to
+            know who is behind it — a faceless product is one they will not
+            recommend to the shop next door. */}
+        <section aria-labelledby="settings-help">
+          <GroupLabel id="settings-help">Help</GroupLabel>
+          <div className="rb-list">
+            <LinkRow
+              href="mailto:help@reviewboost.fit"
+              title="Ask us anything"
+              description="Questions about Tags, billing or your Google link."
+            />
+            {/* Seeing exactly what a customer sees is the single thing that
+                makes an owner comfortable putting this on their counter. */}
+            <LinkRow
+              href="/stands"
+              title="See what customers see"
+              description="Scan your own code to try it."
+            />
+            <LinkRow
+              href="/privacy"
+              title="Privacy policy"
+              description="What we collect and how to delete your account."
+            />
+          </div>
+        </section>
+
+        <section aria-labelledby="settings-account">
+          <GroupLabel id="settings-account">Account</GroupLabel>
+          <div className="rb-list">
+            {/* Goes to the deletion screen, which does the deletion. It used
+                to open a mail client: a person had to ask us and then wait to
+                be believed, and an app that creates accounts has to let
+                someone close one from inside it. */}
+            <LinkRow
+              href="/settings/delete"
+              title="Delete account"
+              description="Removes your account, your Tags and your ratings."
+              danger
+            />
+            <SignOutButton />
+          </div>
+        </section>
+      </div>
     </AppShell>
+  );
+}
+
+function GroupLabel({ id, children }: { id: string; children: string }) {
+  return (
+    <h2 id={id} className="rb-section-label mb-3 px-1">
+      {children}
+    </h2>
+  );
+}
+
+function LinkRow({
+  href,
+  title,
+  description,
+  danger = false,
+}: {
+  href: string;
+  title: string;
+  description: string;
+  danger?: boolean;
+}) {
+  const external = href.startsWith("mailto:");
+  const inner = (
+    <>
+      <div className="min-w-0 flex-1">
+        <p className={danger ? "text-base font-medium text-danger" : "text-base font-medium text-ink"}>
+          {title}
+        </p>
+        <p className="mt-0.5 text-sm leading-relaxed text-muted">{description}</p>
+      </div>
+      <ChevronRight className="size-5 shrink-0 self-center text-[color:var(--rb-border-strong)]" aria-hidden="true" />
+    </>
+  );
+
+  const className =
+    "flex items-center gap-4 px-5 py-4 transition-colors duration-150 hover:bg-quiet/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[color:var(--rb-focus-soft)]";
+
+  return external ? (
+    <a href={href} className={className}>
+      {inner}
+    </a>
+  ) : (
+    <Link href={href} className={className}>
+      {inner}
+    </Link>
   );
 }
