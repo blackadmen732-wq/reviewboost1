@@ -114,16 +114,16 @@ Never `apply_migration` through MCP (it re-stamps versions), never a raw ledger
    `supabase db advisors --linked --type security --fail-on error`;
    seed `billing_plan_prices` (§4); then the readiness gate (§5).
 
-### The launch decision this upgrade forces — the trial cliff
+### The trial cliff — resolved by grandfathering
 
-`20260915000400_entitlements` + `20260915001200_trial_requires_checkout` make
-every organization that exists at migration time `trialing` with **no plan and
-a trial ending 7 days after the migration**. After that plus one day of grace,
-a business that has not checked out is `suspended` and **its printed Tags stop
-opening**. This is asserted in `hosted_upgrade_test.sql` §5 so it cannot be
-missed. Whether live businesses should instead be grandfathered (a longer
-trial, or a manual entitlement) is a business decision; if so it needs a
-forward migration before step 6, not an edit.
+`20260915000400` + `20260915001200` would have made every organization that
+exists at migration time a 7-day planless trial, after which its printed Tags
+stop opening. `20260924000400_grandfather_pre_billing_organizations` instead
+marks exactly those organizations `legacy`: door open, no plan, no trial
+clock, setup allowance (1 location, 1 Tag, no SMS), never touched by the trial
+sweeper; checkout moves them onto normal billing. New organizations follow the
+billing rules. Proven in `hosted_upgrade_test.sql` §5 (34 assertions total).
+Production today has **2** organizations that would be grandfathered.
 
 ## 3. Truth matrix
 

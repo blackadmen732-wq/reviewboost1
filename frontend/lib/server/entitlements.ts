@@ -31,6 +31,9 @@ export const ENTITLEMENT_STATUSES = [
   "past_due",
   "cancelled",
   "suspended",
+  // Predates billing (20260924000400): serves customers with the setup
+  // allowance, has no plan and no trial clock.
+  "legacy",
 ] as const;
 export type EntitlementStatus = (typeof ENTITLEMENT_STATUSES)[number];
 
@@ -75,6 +78,7 @@ function limitsFor(planId: PlanId | null, status: EntitlementStatus): PlanLimits
   // no service at all, because `allowsService` still says no. A business
   // suspended at the end of dunning has a plan, and gets none of this.
   if (status === "suspended" && planId === null) return TRIAL_LIMITS;
+  if (status === "legacy") return TRIAL_LIMITS;
   if (status !== "active") return NOTHING;
   if (planId === null) return NOTHING;
   return PLANS[planId];
@@ -101,7 +105,7 @@ export function monthlySmsSegments(planId: PlanId | null): number {
  * the same physical Tag.
  */
 export function allowsService(status: EntitlementStatus): boolean {
-  return status === "trialing" || status === "active" || status === "past_due";
+  return status === "trialing" || status === "active" || status === "past_due" || status === "legacy";
 }
 
 /** A trial that ended more than this long ago is over, whatever the row says. */

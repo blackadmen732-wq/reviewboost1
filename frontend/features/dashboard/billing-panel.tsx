@@ -7,7 +7,7 @@ import { InlineNotice } from "@/components/ui/inline-notice";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 type PlanId = "starter" | "growth" | "pro";
-type Status = "trialing" | "active" | "past_due" | "cancelled" | "suspended";
+type Status = "trialing" | "active" | "past_due" | "cancelled" | "suspended" | "legacy";
 
 interface Billing {
   planId: PlanId | null;
@@ -109,6 +109,14 @@ function describe(billing: Billing): { title: string; body: string; tone: "info"
         body: "Your Tags are not serving customers. Everything — your codes, your ratings, your settings — is still here, and the same Tags start working again the moment you subscribe.",
         tone: "error",
       };
+    case "legacy":
+      // Joined before billing existed. Nothing changed for them, and nothing
+      // is about to: say so plainly, and offer a plan without pressure.
+      return {
+        title: "Your Tags are working",
+        body: "You joined before plans existed, so your Tags keep working as they are. Choose a plan below whenever you want more Tags, locations or Text Requests.",
+        tone: "info",
+      };
     case "suspended":
       // Suspended with no plan is not a punishment: it is every business that
       // has not been through checkout yet, including one that signed up a
@@ -145,6 +153,7 @@ export function BillingPanel({ billing }: { billing: Billing }) {
     billing.status === null ||
     billing.status === "cancelled" ||
     billing.status === "suspended" ||
+    billing.status === "legacy" ||
     (billing.status === "trialing" && billing.planId === null);
 
   async function act(body: Record<string, unknown>, key: string) {

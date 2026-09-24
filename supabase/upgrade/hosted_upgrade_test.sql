@@ -11,7 +11,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(30);
+select plan(34);
 
 -- ============================================================
 -- 1. NOTHING WAS LOST
@@ -119,41 +119,51 @@ select is((select destination_url from app.resolve_public_stand('legacy-token-ha
           'a Tag printed before the upgrade resolves to its own destination afterwards');
 
 -- ============================================================
--- 5. WHAT A BUSINESS THAT IS ALREADY LIVE BECOMES
+-- 5. A BUSINESS THAT IS ALREADY LIVE KEEPS WORKING
 -- ============================================================
 
--- There was no billing before. Every existing business is placed on a real,
--- finite trial — not called a paid plan it never bought, and not left on a
--- trial with no end (a permanent free plan).
-select is((select count(*)::int from public.entitlement_snapshots
-            where org_id in ('00000000-0e10-0000-0000-000000000001',
-                             '00000000-0e10-0000-0000-000000000002',
-                             '00000000-0e10-0000-0000-000000000003')),
-          3, 'every existing business has an entitlement after the upgrade');
-
+-- Billing arrived after these businesses printed their Tags. They are
+-- grandfathered (20260924000400): `legacy`, no invented plan, no trial clock,
+-- and a door that stays open.
 select is((select count(*)::int from public.entitlement_snapshots
             where org_id in ('00000000-0e10-0000-0000-000000000001',
                              '00000000-0e10-0000-0000-000000000002',
                              '00000000-0e10-0000-0000-000000000003')
-              and status = 'trialing' and plan_id is null),
-          3, 'existing businesses are trialing with no invented plan');
+              and status = 'legacy' and plan_id is null and trial_ends_at is null),
+          3, 'every business that predates billing is grandfathered, with no plan and no clock');
 
-select ok((select bool_and(trial_ends_at between now() + interval '6 days' and now() + interval '8 days')
-             from public.entitlement_snapshots
-            where org_id in ('00000000-0e10-0000-0000-000000000001',
-                             '00000000-0e10-0000-0000-000000000002',
-                             '00000000-0e10-0000-0000-000000000003')),
-          'the trial ends seven days after the migration runs — a real date, not never');
+select is(app.entitlement_allows_service('legacy'), true,
+          'a grandfathered business''s Tags keep serving customers');
+select is(app.entitlement_effective_status('legacy', null), 'legacy',
+          'no date can turn a grandfathered business into a suspended one');
 
--- THE CLIFF. Recorded as a test so it cannot be forgotten: once that trial
--- lapses (plus the one-day grace), a business that has not checked out is
--- suspended and its public door closes, including for Tags printed before
--- billing existed. Whether that is acceptable for the businesses live today
--- is a launch decision; this asserts what the code does.
-select is(app.entitlement_effective_status('trialing', now() - interval '2 days'),
-          'suspended', 'an existing business that never checks out is suspended after its trial');
-select is(app.entitlement_allows_service('suspended'), false,
-          'and a suspended business''s public door is closed');
+select is(public.rpc_entitlements_expire_trials(), 0,
+          'the trial sweeper finds nothing to expire among existing businesses');
+select is((select count(*)::int from public.entitlement_snapshots where status = 'legacy'), 3,
+          'and they are all still grandfathered after it runs');
+
+select is(app.entitlement_tag_limit(null, 'legacy'), 1,
+          'grandfathering keeps what a business has; it is not a free plan to grow on');
+
+-- New businesses are not grandfathered: they follow the billing rules.
+insert into public.organizations (id, name, slug, status)
+values ('00000000-0e10-0000-0000-000000000009', 'Post Billing Co', 'post-billing-co', 'active');
+select isnt((select status from public.entitlement_snapshots
+              where org_id = '00000000-0e10-0000-0000-000000000009'),
+            'legacy', 'a business created after billing is not grandfathered');
+
+-- Checking out moves a grandfathered business onto normal billing.
+insert into public.billing_plan_prices (stripe_price_id, plan_id) values ('price_hostedstarter', 'starter');
+select is(public.rpc_billing_apply_subscription(
+              '00000000-0e10-0000-0000-000000000001', 'sub_legacy1', 'price_hostedstarter', null,
+              'trialing', false, now(), now() + interval '7 days', now() + interval '7 days',
+              'evt_legacy_1', now()),
+          'applied', 'a grandfathered business can check out');
+select is((select status || '/' || plan_id from public.entitlement_snapshots
+            where org_id = '00000000-0e10-0000-0000-000000000001'),
+          'trialing/starter', 'and from then on it is an ordinary subscriber');
+delete from public.billing_subscriptions where org_id = '00000000-0e10-0000-0000-000000000001';
+delete from public.billing_plan_prices where stripe_price_id = 'price_hostedstarter';
 
 -- ============================================================
 -- 6. NO MONEY APPEARED FROM NOWHERE

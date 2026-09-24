@@ -1047,7 +1047,7 @@ export const listRecentTextRequests = cache(
 
 export interface OwnerBilling {
   planId: "starter" | "growth" | "pro" | null;
-  status: "trialing" | "active" | "past_due" | "cancelled" | "suspended" | null;
+  status: "trialing" | "active" | "past_due" | "cancelled" | "suspended" | "legacy" | null;
   cancelAtPeriodEnd: boolean;
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
