@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
+import { withHeartbeat } from "@/lib/server/heartbeat";
 import { handle, json } from "@/lib/server/http";
 import { logger } from "@/lib/server/logger";
 import { serviceRoleClient } from "@/lib/server/supabase";
@@ -60,7 +61,13 @@ async function handleRequest(request: NextRequest): Promise<Response> {
       throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
     }
 
-    const summary = await runMaintenance(requestId);
+    const summary = await withHeartbeat("maintenance", async () => {
+      const result = await runMaintenance(requestId);
+      const failed = Object.entries(result)
+        .filter(([, value]) => value === "failed")
+        .map(([step]) => step);
+      return { result, failure: failed.length > 0 ? `failed: ${failed.join(",")}` : null };
+    });
     logger.info("maintenance.completed", { requestId, ...summary });
     return json(request, requestId, 200, { data: summary, requestId });
   });
