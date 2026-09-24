@@ -20,6 +20,41 @@ refuses `*.supabase.co`, `api.supabase.com`, `api.vercel.com`, `api.stripe.com`,
 credential was attached. **Nothing below is STAGING VERIFIED or LIVE VERIFIED.**
 Hosted facts are the last recorded ones and are marked as such.
 
+## 0. Live inspection — 2026-09-24 (Supabase + Vercel connectors, read-only)
+
+Direct egress from the session is still blocked; these facts come from the
+Supabase and Vercel connectors. Nothing in production was changed.
+
+**Supabase `reviewboost` (`zoyqikgqfqulwkihjbev`, us-east-1, Postgres 17.6, org on the FREE plan)**
+
+| Fact | Value |
+|---|---|
+| Migration ledger | **36** rows. Names match the repo's first 36 exactly |
+| Version divergence | **3**, not 2: `nfc_provisioning` 20260831000100 → hosted 20260901112609; `revoke_anon_nfc_provision` 20260901120000 → 20260901163415; `restore_rpc_create_organization_definer` 20260901213000 → 20260902004620 |
+| Schema drift vs a local build of the first 36 | **None** for functions, columns, constraints, indexes, policies, RLS (identical hashes). `anon` and `authenticated` grants identical. Only `service_role` has extra grants from Supabase platform defaults |
+| Data | 2 organizations (both active), 2 members, 2 locations, 2 active Tags (key version 1, none NFC-provisioned), **0** sessions, **0** responses, **0** clicks, 3 auth users, **0** Storage buckets |
+| API traffic, last 24 h | none (only `postgres_logs` events) |
+| pg_cron | installed; 2 jobs from `20260813000100` (`cleanup-rate-limits` hourly, `cleanup-idempotency` hourly), all runs succeeded |
+| pg_net | available, not installed |
+| Security advisor | 23× WARN authenticated-callable SECURITY DEFINER (the reviewed class, see SECURITY_REVIEW.md), 2× INFO RLS-no-policy, 1× WARN leaked-password protection off (auth is passwordless OTP) |
+| Backups | **None.** Free-plan projects are not backed up by Supabase; daily backups start at Pro, PITR is a Pro+ add-on |
+| Branching / second project | Not available: branching needs a paid plan, and the account is at its 2-active-free-project limit |
+
+**Vercel (team `blackadmen732-2273s-projects`)**
+
+| Fact | Value |
+|---|---|
+| Canonical project | `reviewboost1` (`prj_p5Z9dc5zGK94SouscQNGLJOvsIWv`) — serves `reviewboost.fit`, `www.reviewboost.fit` |
+| Production deployment | `main@0155948` (READY) |
+| **Production code vs database** | **Mismatched.** `main` carries 58 migrations' worth of code (billing, entitlements, Customer Page, SMS) against a 36-migration database. No traffic yet, so no user has hit it |
+| Previews | every push to `claude/festive-thompson-i28bpq` builds READY (latest `e0e7fc0`) |
+| Duplicate project | `reviewboost1-od3w` also builds every push and deploys `main` to production, with only the two public Supabase variables and no domain. Recommend disconnecting it |
+| Production env (names only) | set: `PUBLIC_FRONTEND_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `CUSTOMER_NOTE_ENCRYPTION_KEY`, Stripe integration vars. **Missing**: `TOKEN_DIGEST_KEY`, `TOKEN_DIGEST_KEY_VERSION`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER/GROWTH/PRO`, `SMS_PROVIDER`, `TWILIO_*`, `SMS_PUBLIC_WEBHOOK_BASE_URL`, `SMS_RATE_PER_SEGMENT_MICROS`, `CRON_SECRET` |
+| Preview env | no Supabase variables at all; a variable named `PUBLIC_FRONTEND_URL4` (typo) |
+| Environment separation | **None for Stripe**: the Stripe integration injects one `STRIPE_SECRET_KEY` (and `STRIPE_MCP_KEY`) into production, preview and development; Vercel flags them `readable-secret`. The readiness gate rejects this (live key on non-production, or test key on production) |
+| Crons | `vercel.json` daily floor (dispatch 19:00 UTC, maintenance 08:00 UTC) |
+| Runtime errors | not readable through the connector (403) |
+
 ## 1. Source of truth
 
 | Fact | Value | Evidence |
@@ -100,8 +135,8 @@ Never `apply_migration` through MCP (it re-stamps versions), never a raw ledger
    diff stops the release until explained.
 4. **Ledger repair (ledger only, runs no SQL):**
    ```bash
-   supabase migration repair --status reverted 20260901112609 20260901163415
-   supabase migration repair --status applied  20260831000100 20260901120000
+   supabase migration repair --status reverted 20260901112609 20260901163415 20260902004620
+   supabase migration repair --status applied  20260831000100 20260901120000 20260901213000
    supabase migration list --linked   # 36 local = 36 remote, 26 local-only
    ```
 5. **Dry run:** `supabase db push --linked --dry-run` must list exactly the 26
@@ -130,8 +165,8 @@ Production today has **2** organizations that would be grandfathered.
 | Area | State | Evidence / what is missing |
 |---|---|---|
 | One canonical head, CI green at it | TESTED for #67 head; this branch's head: see CI on the latest commit | GitHub checks |
-| Hosted migration history reconciled | **BLOCKED** — plan in §2; needs Supabase access | |
-| Hosted schema matches application | **BLOCKED** — step 3 drift check | |
+| Hosted migration history reconciled | **BLOCKED** — ledger read and 3 renames identified (§0); repair not run (needs CLI access and your go-ahead) | |
+| Hosted schema matches application | **FAILED** today (production runs `main`, 58-migration code, on a 36-migration DB). Drift check vs the first 36: **LIVE VERIFIED — no drift** | §0 |
 | Populated production-style upgrade | TESTED (hosted-schema fixture) | `supabase/upgrade/hosted_*` |
 | Tenant isolation | TESTED | `cross_org_isolation_test.sql`, `praise_isolation_test.sql`, `column_security_test.sql`, `privilege_surface_test.sql` |
 | Concurrency | TESTED at the database (SKIP LOCKED leases, idempotent grants: 50× invoice redelivery = one grant, inbox row locks) | `billing_sms_credit_test.sql`, `text_requests_test.sql`. No parallel-session race test beyond these |
@@ -140,19 +175,19 @@ Production today has **2** organizations that would be grandfathered.
 | Production config gate | TESTED | `lib/server/readiness.ts`, `readiness.test.ts` (41), `/api/v1/internal/readiness`, `scripts/release/check-readiness.mjs` |
 | Independent encryption and digest keys in production | TESTED | `readiness.test.ts` "key separation" |
 | Fake SMS impossible in production; real SMS impossible in preview | TESTED | `readiness.test.ts` "no fake SMS" |
-| Scheduler cadence (1 min / 15 min) | **BLOCKED** — `vercel.json` is once-daily; per-minute needs Vercel Pro or an external scheduler (owner decision). Missed runs are now *detected*: TESTED | `worker_heartbeats`, `scheduler-health.test.ts` |
+| Scheduler cadence (1 min / 15 min) | IMPLEMENTED, not applied — `supabase/ops/production_scheduler.sql` (pg_cron is already installed in production; pg_net is free). Needs `CRON_SECRET` set in Vercel and your go-ahead. Missed runs are detected: TESTED | `worker_heartbeats`, `scheduler-health.test.ts` |
 | Backlog drain after downtime | IMPLEMENTED + TESTED (drain loop, 20×25 per invocation); rate **not measured** on real infrastructure | |
 | Real Stripe test-mode flow | **BLOCKED** — no Stripe credentials or egress | §6 script |
 | Real Twilio flow | **BLOCKED** — no Twilio account, phone, or egress | §6 script |
 | Webhook retry / out-of-order | TESTED at DB and handler; not against Stripe | |
 | Monitoring and alerts active | **BLOCKED** — thresholds defined (OPERATIONS.md); no monitor exists yet | |
-| Backups active | **BLOCKED** — plan-dependent, unverified | OPERATIONS.md |
+| Backups active | **FAILED** — LIVE VERIFIED that the Free plan has no automated backups. Needs Pro, or a scheduled off-site `supabase db dump` | OPERATIONS.md |
 | Restore drill | **BLOCKED** — not performed; RPO/RTO undefined until it is | OPERATIONS.md |
 | Storage recovery | **BLOCKED** — procedure written, not drilled; bucket not created by any migration | OPERATIONS.md |
 | Security advisor findings reviewed | TESTED on local head; hosted advisor **BLOCKED** | SECURITY_REVIEW.md |
 | Service-role usage contained | TESTED (static guard) | `service-role-containment.test.ts` |
 | Security docs match reality | TESTED for MFA claims | `mfa-claims.test.ts`; SYSTEM_CONTEXT §9 corrected |
-| MFA / step-up on sensitive operations | **NOT IMPLEMENTED** — owner decision (§7) | |
+| MFA / step-up on sensitive operations | NOT IMPLEMENTED, not claimed — design in MFA_DESIGN.md | |
 | Dependency vulnerabilities (web) | TESTED — 0 prod advisories after upgrading next/sharp/fast-uri; CI blocks on high | `ci.yml` dependency-audit |
 | Dependency vulnerabilities (mobile) | TESTED — `@xmldom/xmldom` 0.8.15/0.9.12 and `js-yaml` 4.3.2 patched in range (mobile tsc + 79 tests pass). Remaining 5 highs are one root, `image-size` inside Metro (build-time bundler reading our own assets, not shipped) — not reachable; clears with the next Expo SDK | see §9 |
 | Load tests | **BLOCKED** — need a staging deployment; not performed | SCALING.md |
