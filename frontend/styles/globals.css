@@ -233,6 +233,27 @@
     color: var(--rb-ink);
   }
 }
+/* Marketing-site motion: one subtle rise-and-fade on scroll entry, applied
+   sparingly by <Reveal>. Disabled entirely under reduced motion, where the
+   content simply appears in its final position. */
+.rb-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.rb-reveal[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rb-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
