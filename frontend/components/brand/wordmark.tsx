@@ -62,31 +62,3 @@ export function Wordmark({
     </span>
   );
 }
-
-/**
- * The monogram, for square spaces.
- *
- * A full wordmark does not survive an app icon. At 60 x 60 physical pixels
- * "ReviewBoost" is roughly 4pt type — an unreadable smudge, and every icon
- * guideline says so. So the square lockup is a "B": the letter carrying the
- * weight and the colour in the wordmark, which keeps the two recognisably
- * related rather than being a different mark entirely.
- *
- * Used for the favicon, the app icon, and anywhere the brand needs to sit in a
- * square.
- */
-export function Monogram({ className }: { className?: string | undefined }) {
-  return (
-    <span
-      className={cn(
-        "grid aspect-square place-items-center rounded-[22%] bg-brand font-bold text-on-brand",
-        className,
-      )}
-    >
-      <span aria-hidden="true" className="translate-y-[-0.02em] tracking-[-0.04em]">
-        B
-      </span>
-      <span className="sr-only">ReviewBoost</span>
-    </span>
-  );
-}

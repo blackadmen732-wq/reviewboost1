@@ -85,3 +85,76 @@ describe("the shipped icon is the owner's app icon", () => {
     expect(app).not.toContain("apple-icon.tsx");
   });
 });
+
+/**
+ * A letter in a coloured tile is not the logo.
+ *
+ * The install prompt shipped `<span className="… bg-brand …">B</span>` long
+ * after the real mark existed, and `wordmark.tsx` exported the same tile as a
+ * "Monogram". Both matched the placeholder that `logo-mark.tsx` replaced.
+ *
+ * The check is narrow on purpose: it flags an element whose *entire* text is
+ * "B" or "RB" (the substitute-logo shape), not copy that happens to contain
+ * the letter. Comments are stripped so documentation can describe the bug.
+ */
+const PLACEHOLDER_TILE = [
+  />\s*(?:B|RB)\s*<\//, // <span …>B</span>
+  />\s*\{\s*["'`](?:B|RB)["'`]\s*\}\s*<\//, // <span …>{"B"}</span>
+];
+
+function withoutComments(source: string): string {
+  return source.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
+
+function hasPlaceholderTile(source: string): boolean {
+  const code = withoutComments(source);
+  return PLACEHOLDER_TILE.some((pattern) => pattern.test(code));
+}
+
+function tsxUnder(dir: string): string[] {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir, { recursive: true, encoding: "utf8" });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((entry) => entry.endsWith(".tsx") && !entry.includes("node_modules"))
+    .map((entry) => join(dir, entry));
+}
+
+describe("no letter tile stands in for the mark", () => {
+  it("no screen or component renders a placeholder letter tile", () => {
+    const files = [
+      ...tsxUnder(join(REPO, "frontend/app")),
+      ...tsxUnder(join(REPO, "frontend/features")),
+      ...tsxUnder(join(REPO, "frontend/components")),
+      ...tsxUnder(join(REPO, "apps/mobile/app")),
+      ...tsxUnder(join(REPO, "apps/mobile/components")),
+    ];
+    expect(files.length).toBeGreaterThan(0);
+
+    const offenders = files
+      .filter((file) => hasPlaceholderTile(readFileSync(file, "utf8")))
+      .map((file) => file.slice(REPO.length + 1));
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("the install prompt shows the canonical mark", () => {
+    const source = read("frontend/features/dashboard/install-prompt.tsx");
+    expect(source).toMatch(/from "@\/components\/brand\/reviewboost-logo"/);
+    expect(source).toMatch(/<ReviewBoostLogo\b/);
+  });
+
+  it("catches the tile and nothing that merely contains the letter", () => {
+    expect(hasPlaceholderTile(`<span className="bg-brand">B</span>`)).toBe(true);
+    expect(hasPlaceholderTile(`<span className="bg-brand">\n  B\n</span>`)).toBe(true);
+    expect(hasPlaceholderTile(`<div>{"RB"}</div>`)).toBe(true);
+
+    expect(hasPlaceholderTile(`<p>Bring your team</p>`)).toBe(false);
+    expect(hasPlaceholderTile(`<span>Plan B</span>`)).toBe(false);
+    expect(hasPlaceholderTile(`<Button>Boost</Button>`)).toBe(false);
+    expect(hasPlaceholderTile(`{/* it used to be <span>B</span> */}`)).toBe(false);
+  });
+});
