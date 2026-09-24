@@ -52,7 +52,7 @@ const en: CustomerMessages = {
   loadErrorBody: "Check your connection and try again.",
   tryAgain: "Try again",
   ratingHeading: "How was your visit?",
-  ratingSupport: "Tap a star to continue to Google.",
+  ratingSupport: "Tap a star to continue to Google",
   ratingGroup: "Rate your visit from 1 to 5 stars",
   ratingSpoken: {
     1: "1 star — Not good",
@@ -91,7 +91,7 @@ const es: CustomerMessages = {
   loadErrorBody: "Revisa tu conexión e inténtalo de nuevo.",
   tryAgain: "Intentar de nuevo",
   ratingHeading: "¿Cómo estuvo tu visita?",
-  ratingSupport: "Toca una estrella para continuar a Google.",
+  ratingSupport: "Toca una estrella para continuar a Google",
   ratingGroup: "Califica tu visita de 1 a 5 estrellas",
   ratingSpoken: {
     1: "1 estrella — No estuvo bien",
@@ -130,7 +130,7 @@ const ht: CustomerMessages = {
   loadErrorBody: "Verifye koneksyon ou epi eseye ankò.",
   tryAgain: "Eseye ankò",
   ratingHeading: "Kijan vizit ou te ye?",
-  ratingSupport: "Peze yon etwal pou kontinye sou Google.",
+  ratingSupport: "Peze yon etwal pou kontinye sou Google",
   ratingGroup: "Bay vizit ou ant 1 ak 5 etwal",
   ratingSpoken: {
     1: "1 etwal — Pa bon",

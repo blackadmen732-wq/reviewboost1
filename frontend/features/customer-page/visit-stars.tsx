@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { Star } from "lucide-react";
 
 import type { CustomerMessages, RatingValue } from "@/lib/i18n/customer-messages";
@@ -7,8 +8,10 @@ import type { CustomerMessages, RatingValue } from "@/lib/i18n/customer-messages
 const ratings: RatingValue[] = [1, 2, 3, 4, 5];
 
 /**
- * Five stars as the customer sees them on the visit card (Mario SoT).
- * Outline until chosen. Gold only when filled.
+ * Five stars as the customer sees them on the visit sheet.
+ * Outline until chosen; gold only when filled. `--star-index` staggers the
+ * fill left to right, and `data-busy` lets the unchosen stars step back while
+ * the rating saves — owner preview is disabled too, but it is never busy.
  */
 
 export function VisitStars({
@@ -25,7 +28,11 @@ export function VisitStars({
   preview?: boolean;
 }) {
   return (
-    <fieldset className="visit-stars" disabled={disabled || preview}>
+    <fieldset
+      className="visit-stars"
+      disabled={disabled || preview}
+      data-busy={disabled && !preview ? "" : undefined}
+    >
       <legend className="sr-only">{messages.ratingGroup}</legend>
       <div className="visit-stars__row">
         {ratings.map((rating) => {
@@ -43,8 +50,13 @@ export function VisitStars({
                 onChange={() => onChange?.(rating)}
                 aria-label={messages.ratingSpoken[rating]}
               />
-              <label className="visit-star__label" htmlFor={`visit-rating-${rating}`} data-filled={selected || undefined}>
-                <Star aria-hidden="true" strokeWidth={1.25} />
+              <label
+                className="visit-star__label"
+                htmlFor={`visit-rating-${rating}`}
+                data-filled={selected || undefined}
+                style={{ "--star-index": rating - 1 } as CSSProperties}
+              >
+                <Star aria-hidden="true" strokeWidth={2} />
               </label>
             </span>
           );

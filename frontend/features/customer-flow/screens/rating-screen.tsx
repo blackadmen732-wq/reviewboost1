@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
-import { CustomerActionBar } from "@/features/customer-flow/customer-action-bar";
 import { VisitStars } from "@/features/customer-page/visit-stars";
 import type { SubmissionStatus } from "@/features/customer-flow/customer-flow-state";
 import type {
@@ -24,8 +23,12 @@ interface RatingScreenProps {
  * One tap. Choosing a star submits it.
  *
  * There is no confirm step, because a confirm step is where a flow starts
- * deciding things about the customer. The only buttons that can appear here
- * are recovery from a failed submit — never a gate in front of one.
+ * deciding things about the customer. The only button that can appear here
+ * is recovery from a failed submit — never a gate in front of one.
+ *
+ * The status line is always rendered, empty until a save is in flight, so it
+ * holds its space under the stars and is a live region before it has anything
+ * to say — "Sending…" appearing moves nothing and is announced when it does.
  */
 export function RatingScreen({
   messages,
@@ -58,35 +61,47 @@ export function RatingScreen({
       />
 
       <div className="rating-actions" data-rating-actions>
-        {isSubmitting ? (
-          <p className="customer-support" role="status">
-            {messages.sending}
+        {hasError || isOffline ? null : (
+          <p
+            className="visit-status"
+            role="status"
+            data-visible={isSubmitting || undefined}
+          >
+            {isSubmitting ? (
+              <>
+                <span className="visit-status__spinner" aria-hidden="true" />
+                {messages.sending}
+              </>
+            ) : null}
           </p>
-        ) : null}
+        )}
 
         {hasError ? (
-          <InlineNotice
-            id="feedback-status"
-            kind="error"
-            title={messages.submitErrorHeading}
-            blocking
-          >
-            <p>{messages.submitErrorBody}</p>
-          </InlineNotice>
+          <div className="visit-retry">
+            <InlineNotice
+              id="feedback-status"
+              kind="error"
+              title={messages.submitErrorHeading}
+              blocking
+            >
+              <p>{messages.submitErrorBody}</p>
+            </InlineNotice>
+            <Button
+              type="button"
+              className="visit-retry__button"
+              onClick={onRetry}
+            >
+              {messages.tryAgain}
+            </Button>
+          </div>
         ) : null}
 
         {isOffline ? (
-          <InlineNotice id="feedback-status" kind="offline">
-            <p>{messages.offline}</p>
-          </InlineNotice>
-        ) : null}
-
-        {hasError ? (
-          <CustomerActionBar>
-            <Button type="button" size="lg" onClick={onRetry}>
-              {messages.tryAgain}
-            </Button>
-          </CustomerActionBar>
+          <div className="visit-retry">
+            <InlineNotice id="feedback-status" kind="offline">
+              <p>{messages.offline}</p>
+            </InlineNotice>
+          </div>
         ) : null}
       </div>
     </section>

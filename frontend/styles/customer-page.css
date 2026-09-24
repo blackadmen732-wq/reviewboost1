@@ -9,16 +9,28 @@ html:has(.customer-live) {
   scrollbar-gutter: auto;
 }
 
-/* Shared customer visit view — owner preview and live /q are this tree.
-   Canvas is 390/844 (Mario SoT). Hero 56% / card 44%. The card never moves;
-   its rounded lip overlaps the photo like a sheet pulled up over it.
+/* ------------------------------------------------------------------------
+   The customer visit view — owner preview and live /q are this one tree.
+
+   Two layers, and only one of them is designed here.
+
+   The hero is the business's own uploaded artwork. ReviewBoost's job there is
+   crop, scale and loading — nothing is drawn over it but the language control.
+
+   The sheet is the product: the same component under a pizzeria, a barber, an
+   HVAC van. It is sized to its content with a 41% floor, so on a tall phone
+   it sits in the lower ~40% like a native sheet, and on a short one it takes
+   what the stars and footer need and the artwork gives way — never the other
+   way round. Nothing inside it is clipped at any size, which is why there is
+   no longer a separate layout for the handoff screen.
 
    The stage is the query container for everything inside the card. A preview
    phone can be 240px wide while the browser window is 1400px — sizing in vw
-   tracks the window and blows the card's type past its edges in every
-   preview, while cqw keeps preview and live in the same proportions. Every
-   cqw declaration keeps its vw predecessor as the fallback for browsers
-   without container queries. */
+   tracks the window and blows the type past the card's edges in every
+   preview, while cqw keeps preview and live in the same proportions. Where a
+   declaration is written twice, the vw line is the fallback for browsers
+   without container queries.
+   ------------------------------------------------------------------------ */
 
 .visit-stage {
   container-type: inline-size;
@@ -33,11 +45,12 @@ html:has(.customer-live) {
 
 .visit-hero {
   position: relative;
-  /* Grows into whatever the fixed card leaves — including the 28px strip
-     under the card's lip, so the photo shows through the rounded corners
-     instead of a white notch. */
+  /* Grows into whatever the sheet leaves — including the strip under the
+     sheet's lip, so the artwork shows through the rounded corners instead of
+     a white notch. The floor keeps a sliver of the business visible even when
+     an error or the handoff makes the sheet tall on a small phone. */
   flex: 1 1 0;
-  min-height: 0;
+  min-height: 96px;
   overflow: hidden;
   background: #1a1a1a;
 }
@@ -70,8 +83,8 @@ html:has(.customer-live) {
   color: #fff;
 }
 
-/* The Mario card is a fixed light surface in both themes — so every colour
- * inside it is a light-theme colour.
+/* The sheet is a fixed light surface in both themes — so every colour inside
+ * it is a light-theme colour.
  *
  * The card hardcodes #fff while its contents inherited the themed tokens. Under
  * prefers-color-scheme: dark that put #f7f4ee text on white at 1.09:1 — on a
@@ -81,10 +94,7 @@ html:has(.customer-live) {
  * and error notices inside the card kept the dark --rb-danger-soft (#452323)
  * behind newly-dark text, at 1.26:1. A half-pinned palette is two themes in one
  * box. So the whole set is pinned, and anything added to the card inherits a
- * consistent light palette rather than whichever tokens someone remembered.
- *
- * The hero above is dark artwork in both modes for the same reason: this is a
- * printed-feeling page a customer sees once, not a themed surface. */
+ * consistent light palette rather than whichever tokens someone remembered. */
 .visit-card {
   --rb-canvas: #f4f5f3;
   --rb-surface: #ffffff;
@@ -103,88 +113,42 @@ html:has(.customer-live) {
   --rb-action-hover: #000000;
   --rb-action-pressed: #000000;
   --rb-on-action: #ffffff;
+  /* Stars. The outline clears 3:1 against white as a graphic should; the
+     chosen star's edge is the darker amber so the gold still has a boundary
+     on white, with the brighter gold as its fill. */
   --rb-star: #c07f14;
+  --rb-star-fill: #f4b12a;
+  --rb-star-soft: #fdf1d6;
+  --rb-star-outline: #535b55;
+  --rb-star-rest: #f6f7f5;
   --rb-star-empty: #d4d9d4;
-  --rb-star-soft: #fdf3dd;
   --rb-danger: #c03636;
   --rb-danger-soft: #faecec;
   --rb-info: #356d8c;
   --rb-focus: #005fcc;
   --rb-focus-soft: rgb(0 95 204 / 24%);
+  --visit-radius: clamp(22px, 8.5cqw, 34px);
   color: #131815;
 }
 
 .visit-card {
-  display: flex;
-  flex: 0 0 44%;
-  flex-direction: column;
-  height: 44%;
-  max-height: 44%;
+  position: relative;
   z-index: 2;
-  /* The sheet lip: pulled up over the hero so the top corners round against
-     the photo. The hero grows to fill the space this margin frees. */
-  margin-top: -28px;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  min-height: 41%;
+  /* The lip: pulled up over the hero by exactly its own corner radius, so
+     the corners round against the artwork rather than against white. */
+  margin-top: -32px;
+  margin-top: calc(-1 * var(--visit-radius));
+  border-radius: 32px 32px 0 0;
+  border-radius: var(--visit-radius) var(--visit-radius) 0 0;
+  padding: 36px 20px max(14px, env(safe-area-inset-bottom, 0px));
+  padding: 9cqw 5cqw max(3.6cqw, env(safe-area-inset-bottom, 0px));
   background: #fff;
-  border-radius: 36px 36px 0 0;
-  border-radius: clamp(20px, 8cqw, 32px) clamp(20px, 8cqw, 32px) 0 0;
-  padding: 32px 24px 14px;
-  padding: 8cqw 5.5cqw 3.5cqw;
-  overflow: hidden;
-}
-
-/* 56/44 is the *rating* geometry: the stars sit at a fixed height so the page
- * cannot reflow under the customer's thumb while they choose.
- *
- * The handoff screen is a different shape — a heading, two lines of status and
- * the "Open the review page" link. Pinned at 44% of a fixed-height stage, its
- * content ran to 353px inside a 169px box, so that link was reachable only by
- * scrolling a region most people will not realise scrolls. It is the fallback
- * for when the automatic redirect does not fire, which makes it the last thing
- * that may be hidden.
- *
- * So once the rating is taken, the stage stops being a fixed canvas: it grows
- * with its content and the page scrolls normally. Nothing is clipped at any
- * size, and the rating screen keeps the geometry that matters to it. */
-.customer-live:has([data-flow-screen="handoff"]),
-.customer-live:has([data-flow-screen="blocking"]) {
-  align-items: start;
-}
-
-.customer-live:has([data-flow-screen="handoff"]) .visit-stage,
-.customer-live:has([data-flow-screen="blocking"]) .visit-stage {
-  height: auto;
-  min-height: 100dvh;
-  max-height: none;
-}
-
-/* Flex is what squeezes: the column keeps dividing a fixed height however the
-   card is sized. On these screens the stage is ordinary block flow instead, so
-   the card is exactly as tall as its content and the page scrolls if it must. */
-.visit-stage:has([data-flow-screen="handoff"]),
-.visit-stage:has([data-flow-screen="blocking"]) {
-  display: block;
-  height: auto;
-  min-height: 100dvh;
-  overflow: visible;
-}
-
-.visit-stage:has([data-flow-screen="handoff"]) .visit-card,
-.visit-stage:has([data-flow-screen="blocking"]) .visit-card {
-  display: block;
-  height: auto;
-  max-height: none;
-  overflow: visible;
-}
-
-.visit-stage:has([data-flow-screen="handoff"]) .visit-hero,
-.visit-stage:has([data-flow-screen="blocking"]) .visit-hero {
-  height: 32vh;
-  min-height: 160px;
-}
-
-.visit-stage:has([data-flow-screen="handoff"]) .visit-card__body,
-.visit-stage:has([data-flow-screen="blocking"]) .visit-card__body {
-  overflow: visible;
+  /* Depth that reads on light artwork as well as dark. */
+  box-shadow: 0 -18px 40px -22px rgb(0 0 0 / 55%);
 }
 
 .visit-card__copy {
@@ -195,13 +159,13 @@ html:has(.customer-live) {
 .visit-heading {
   margin: 0;
   color: var(--rb-ink);
-  font-size: clamp(1.85rem, 7.6vw, 2.35rem);
-  /* One line at the 390px canvas, proportionally smaller in a narrow
-     preview phone. */
-  font-size: clamp(1.125rem, 8.5cqw, 2.35rem);
-  font-weight: 720;
-  letter-spacing: -0.035em;
+  font-size: clamp(1.75rem, 8.4vw, 2.5rem);
+  /* One confident line at every phone width: ~76% of the sheet. */
+  font-size: clamp(1.125rem, 9.4cqw, 2.5rem);
+  font-weight: 750;
+  letter-spacing: -0.045em;
   line-height: 1.05;
+  text-wrap: balance;
 }
 
 .visit-heading:focus {
@@ -210,57 +174,70 @@ html:has(.customer-live) {
 
 .visit-support {
   margin: 12px 0 0;
-  margin: clamp(8px, 3cqw, 12px) 0 0;
+  margin: clamp(8px, 3.2cqw, 14px) 0 0;
   color: var(--rb-muted);
-  font-size: 0.72rem;
-  font-size: clamp(0.42rem, 2.7cqw, 0.75rem);
-  font-weight: 620;
-  letter-spacing: 0.15em;
+  font-size: 0.75rem;
+  font-size: clamp(0.5rem, 3.3cqw, 0.8125rem);
+  font-weight: 560;
+  letter-spacing: 0.16em;
+  line-height: 1.4;
   text-transform: uppercase;
 }
 
 .visit-card__body {
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
   min-height: 0;
-  margin-top: 20px;
-  margin-top: clamp(12px, 5cqw, 24px);
-  overflow: auto;
+  margin-top: 32px;
+  margin-top: clamp(14px, 8.5cqw, 40px);
+}
+
+.visit-card .flow-screen {
+  gap: 0;
 }
 
 .visit-footer {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  margin-top: 12px;
-  margin-top: clamp(8px, 3cqw, 14px);
-  gap: 4px;
+  gap: 2px;
+  margin-top: auto;
+  padding-top: 14px;
+  padding-top: clamp(8px, 4cqw, 18px);
 }
 
 .visit-footer__line {
   margin: 0;
   color: var(--rb-muted);
-  font-size: 0.58rem;
-  font-size: clamp(0.4rem, 2.2cqw, 0.6rem);
-  font-weight: 620;
-  letter-spacing: 0.12em;
+  font-size: 0.5625rem;
+  font-size: clamp(0.4rem, 2.35cqw, 0.625rem);
+  font-weight: 560;
+  letter-spacing: 0.16em;
   text-align: center;
   text-transform: uppercase;
 }
 
+/* --------------------------------------------------------------- stars --- */
+
 .visit-stars {
+  min-width: 0;
   margin: 0;
   border: 0;
   padding: 0;
 }
 
-/* Five stars, on a 320px phone as much as a 430px one. Fixed 52px targets with
-   an 18px gap needed 332px of card and clipped the fifth star below that. */
+/* Five stars across almost the full sheet: each cell is 16.8% of the stage —
+   54px on a 320px phone, 66px at 390, capped at 72px — so the targets stay
+   well above 44px with the fifth star always inside the card. The cells sit
+   nearly edge to edge; the star glyph's own shape provides the air between
+   them, so a thumb has a wide target without the row looking crowded. */
 .visit-stars__row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(6px, 3.5vw, 18px);
-  gap: clamp(6px, 3.5cqw, 18px);
+  gap: 4px;
+  gap: clamp(2px, 1.2cqw, 8px);
 }
 
 .visit-star {
@@ -289,49 +266,279 @@ html:has(.customer-live) {
   appearance: none;
   opacity: 0;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .visit-star__input:disabled {
   cursor: default;
 }
 
+/* The label never transforms — the glyph inside it does. That keeps the hit
+   area still under a moving thumb, and lets reduced motion be checked on the
+   element that owns the target. */
 .visit-star__label {
   display: grid;
-  width: clamp(48px, 14vw, 56px);
-  width: clamp(34px, 14cqw, 58px);
-  height: clamp(48px, 14vw, 56px);
-  height: clamp(34px, 14cqw, 58px);
+  width: clamp(44px, 16.8vw, 72px);
+  width: clamp(34px, 16.8cqw, 72px);
+  height: clamp(44px, 16.8vw, 72px);
+  height: clamp(34px, 16.8cqw, 72px);
   place-items: center;
-  color: var(--rb-ink);
+  border-radius: 16px;
+  color: var(--rb-star-outline);
   cursor: pointer;
-  transition: transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.visit-star__input:active + .visit-star__label {
-  transform: scale(0.92);
 }
 
 .visit-star__label svg {
-  width: clamp(40px, 12vw, 48px);
-  width: clamp(30px, 13cqw, 54px);
-  height: clamp(40px, 12vw, 48px);
-  height: clamp(30px, 13cqw, 54px);
-  fill: transparent;
-  transition: fill 150ms ease, color 150ms ease;
+  width: 100%;
+  height: 100%;
+  fill: var(--rb-star-rest);
+  filter: drop-shadow(0 2px 2px rgb(19 24 21 / 10%))
+    drop-shadow(0 6px 8px rgb(19 24 21 / 7%));
+  transform-origin: 50% 55%;
+  transition:
+    fill 180ms ease,
+    color 180ms ease,
+    opacity 220ms ease,
+    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* A fixed on-screen line weight, whatever size the glyph is drawn at. */
+.visit-star__label svg path,
+.visit-star__label svg polygon {
+  vector-effect: non-scaling-stroke;
+}
+
+/* Chosen: the stars fill left to right in a quick stagger, each landing with
+   a small overshoot, and the one that was tapped lands hardest. The fill and
+   the pop share the delay so each star changes colour as it moves.
+   `backwards` rather than `both`: once finished, the animation must let go
+   of `transform` so hover and press still work on a filled star. */
 .visit-star__label[data-filled="true"] {
   color: var(--rb-star);
 }
 
 .visit-star__label[data-filled="true"] svg {
-  fill: currentColor;
+  fill: var(--rb-star-fill);
+  filter: drop-shadow(0 3px 6px rgb(192 127 20 / 28%));
+  transition-delay: calc(var(--star-index, 0) * 45ms);
+  animation: visit-star-fill 420ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation-delay: calc(var(--star-index, 0) * 45ms);
+}
+
+.visit-star__input:checked + .visit-star__label[data-filled="true"] svg {
+  animation-name: visit-star-chosen;
+  animation-duration: 520ms;
+}
+
+@keyframes visit-star-fill {
+  0% { transform: scale(0.84); }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+@keyframes visit-star-chosen {
+  0% { transform: scale(0.8); }
+  55% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* Press. Quick in, so the finger feels it land. */
+.visit-star__input:not(:disabled):active + .visit-star__label svg {
+  transform: scale(0.88);
+  transition-duration: 90ms;
+}
+
+/* While the rating saves, the stars that were not chosen step back so the
+   choice reads at a glance. Owner preview is disabled too, but never busy. */
+.visit-stars[data-busy] .visit-star__label:not([data-filled="true"]) svg {
+  opacity: 0.35;
+}
+
+/* Pointer hover previews the rating it would give: every star up to the one
+   under the cursor warms, and that one lifts. Touch never gets this — a
+   sticky hover on a phone would look like a rating that was never made. */
+@media (hover: hover) and (pointer: fine) {
+  .visit-star:has(.visit-star__input:not(:disabled):hover) .visit-star__label,
+  .visit-star:has(~ .visit-star .visit-star__input:not(:disabled):hover) .visit-star__label {
+    color: var(--rb-star);
+  }
+
+  .visit-star:has(.visit-star__input:not(:disabled):hover) .visit-star__label:not([data-filled="true"]) svg,
+  .visit-star:has(~ .visit-star .visit-star__input:not(:disabled):hover) .visit-star__label:not([data-filled="true"]) svg {
+    fill: var(--rb-star-soft);
+  }
+
+  .visit-star__input:not(:disabled):hover + .visit-star__label svg {
+    transform: translateY(-2px) scale(1.06);
+  }
+
+  .visit-star__input:not(:disabled):hover:active + .visit-star__label svg {
+    transform: scale(0.9);
+  }
 }
 
 .visit-star__input:focus-visible + .visit-star__label {
   outline: 2px solid var(--rb-focus);
-  outline-offset: 3px;
-  border-radius: 8px;
+  outline-offset: 0;
+}
+
+/* ------------------------------------------------------ status + retry --- */
+
+/* One reserved line under the stars. It is always in the layout, so "Sending…"
+   appearing moves nothing, and it only fades in after a beat so a fast save
+   never flashes it at all. */
+.visit-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 24px;
+  margin: 16px 0 0;
+  margin: clamp(10px, 4.5cqw, 20px) 0 0;
+  color: var(--rb-muted);
+  font-size: 0.875rem;
+  font-size: clamp(0.75rem, 3.6cqw, 0.9375rem);
+  font-weight: 540;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.visit-status[data-visible] {
+  animation: visit-fade-up 220ms ease 180ms backwards;
+}
+
+.visit-status__spinner {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--rb-border);
+  border-top-color: var(--rb-ink);
+  border-radius: 999px;
+  animation: visit-spin 700ms linear infinite;
+}
+
+.visit-retry {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  animation: visit-fade-up 220ms ease backwards;
+}
+
+.visit-card .inline-notice {
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: none;
+}
+
+.visit-card .inline-notice > svg {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+
+.visit-card .inline-notice__title {
+  font-size: 0.9375rem;
+  line-height: 1.35;
+}
+
+.visit-card .inline-notice__body {
+  color: var(--rb-muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.visit-retry__button {
+  min-width: 148px;
+  border-radius: 999px;
+}
+
+/* --------------------------------------------------------------- handoff --- */
+
+/* The same sheet, the stars' place taken by a confirmation. It is sized to
+   fit the rating sheet's footprint on a standard phone, so the artwork above
+   does not jump when the page turns over to Google. */
+.visit-handoff {
+  align-items: center;
+  text-align: center;
+}
+
+.visit-handoff__mark {
+  display: grid;
+  width: 52px;
+  width: clamp(40px, 13.5cqw, 56px);
+  height: 52px;
+  height: clamp(40px, 13.5cqw, 56px);
+  place-items: center;
+  border-radius: 999px;
+  background: var(--rb-brand);
+  color: var(--rb-surface);
+  box-shadow: 0 8px 18px -8px rgb(10 157 95 / 60%);
+  animation: visit-mark-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+.visit-handoff__mark svg {
+  width: 52%;
+  height: 52%;
+}
+
+.visit-handoff__mark svg path,
+.visit-handoff__mark svg polyline {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 0;
+  animation: visit-draw 320ms ease-out 200ms backwards;
+}
+
+.visit-handoff .visit-heading {
+  margin-top: 16px;
+  margin-top: clamp(10px, 4.2cqw, 18px);
+  font-size: clamp(1.5rem, 7.4vw, 2.125rem);
+  font-size: clamp(1rem, 8.2cqw, 2.125rem);
+}
+
+.visit-handoff__sent {
+  margin: 8px 0 0;
+  color: var(--rb-muted);
+  font-size: 0.9375rem;
+  font-size: clamp(0.8125rem, 3.9cqw, 1rem);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.visit-handoff .visit-status {
+  margin-top: 10px;
+  margin-top: clamp(8px, 3cqw, 14px);
+}
+
+.visit-handoff__link {
+  gap: 8px;
+  min-height: 48px;
+  margin-top: 14px;
+  margin-top: clamp(10px, 3.8cqw, 18px);
+  border-radius: 999px;
+  padding-inline: 22px;
+  font-weight: 600;
+}
+
+@keyframes visit-fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes visit-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes visit-mark-in {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes visit-draw {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
 }
 
 .phone-frame {
@@ -382,11 +589,17 @@ html:has(.customer-live) {
  * the stage kept the ratio by shrinking its own width, leaving white bars down
  * both sides and squeezing the five stars until the fifth clipped off the card.
  * The 390/844 canvas is the *preview's* geometry, inside phone chrome. Here the
- * viewport is the phone, so the split is what matters, not the ratio. */
+ * viewport is the phone, so the split is what matters, not the ratio.
+ *
+ * The sheet sizes to its content and the artwork gives way, down to its floor.
+ * Past that — an error notice on a 320×480 phone — the stage scrolls rather
+ * than clip the one control the customer needs. */
 .customer-live .visit-stage {
   width: 100%;
   height: 100dvh;
   max-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .customer-page-editor {
@@ -631,7 +844,26 @@ html:has(.customer-live) {
   .nfc-check__ring,
   .nfc-check__tick { stroke-dashoffset: 0; }
 
-  .visit-star__input:active + .visit-star__label {
+  /* The stars still fill and the check still shows — only the movement goes.
+     The spinner keeps a slow turn: it is the one sign the save is working. */
+  .visit-star__label svg,
+  .visit-star__label[data-filled="true"] svg,
+  .visit-star__input:not(:disabled):active + .visit-star__label svg,
+  .visit-star__input:not(:disabled):hover + .visit-star__label svg {
+    animation: none;
     transform: none;
+    transition-delay: 0ms;
+  }
+
+  .visit-status[data-visible],
+  .visit-retry,
+  .visit-handoff__mark,
+  .visit-handoff__mark svg path,
+  .visit-handoff__mark svg polyline {
+    animation: none;
+  }
+
+  .visit-status__spinner {
+    animation-duration: 1600ms;
   }
 }
