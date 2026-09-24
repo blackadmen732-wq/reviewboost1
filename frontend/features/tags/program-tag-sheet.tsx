@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { NfcCard } from "@/features/tags/nfc-card";
-import { ReaderIndicator, SuccessCheck } from "@/features/tags/nfc-visuals";
+import { ErrorGlyph, NfcHeader, ReaderIndicator, SuccessCheck } from "@/features/tags/nfc-visuals";
 import {
   DONE_DWELL_MS,
   isWorking,
@@ -253,11 +253,13 @@ export function ProgramTagSheet({
   return (
     <div className="nfc-sheet" role="dialog" aria-modal="true" aria-labelledby="nfc-title">
       <div className="nfc-sheet__panel" data-nfc-phase={phase} data-nfc-scene={scene}>
+        <NfcHeader />
         <NfcCard working={working} status={working ? "READY TO SCAN" : "NFC TAG"} />
 
         <div className="nfc-sheet__stage">
           {scene === "done" ? <SuccessCheck /> : null}
-          {working ? <ReaderIndicator /> : null}
+          {scene === "unreadable" ? <ErrorGlyph /> : null}
+          {scene === "start" || scene === "waiting" ? <ReaderIndicator active={working} /> : null}
 
           <p className="nfc-sheet__title" id="nfc-title" aria-live="polite">
             {copy.title}

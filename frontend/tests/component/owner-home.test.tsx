@@ -18,7 +18,22 @@ vi.mock("next/link", () => ({
 }));
 
 import { OwnerHome } from "@/features/dashboard/owner-home";
-import { deriveHomeModel, type HomeCounts, type HomeStand } from "@/features/dashboard/home-model";
+import {
+  deriveHomeModel,
+  deriveSetupChecklist,
+  type HomeCounts,
+  type HomeStand,
+} from "@/features/dashboard/home-model";
+
+// These tests are about the empty/active Home states themselves, not the
+// setup checklist, so the fixture is fully complete and renders nothing —
+// see home-setup-checklist.test.tsx for checklist-specific coverage.
+const completeChecklist = deriveSetupChecklist({
+  subscriptionComplete: true,
+  hasGoogleLink: true,
+  customerPagePublished: true,
+  hasFirstTag: true,
+});
 
 const emptyCounts: HomeCounts = {
   ratingsToday: 0,
@@ -49,7 +64,14 @@ describe("OwnerHome", () => {
       hasLocation: true,
     });
 
-    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+    render(
+      <OwnerHome
+        businessName="Oak & Vine"
+        model={model}
+        checklist={completeChecklist}
+        unreadItems={[]}
+      />,
+    );
 
     expect(screen.getByRole("heading", { name: "Oak & Vine" })).toBeVisible();
     expect(screen.getByText("No tag yet")).toBeVisible();
@@ -67,7 +89,14 @@ describe("OwnerHome", () => {
       hasLocation: true,
     });
 
-    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+    render(
+      <OwnerHome
+        businessName="Oak & Vine"
+        model={model}
+        checklist={completeChecklist}
+        unreadItems={[]}
+      />,
+    );
 
     expect(screen.getByText("No tag yet")).toBeVisible();
     expect(screen.getByRole("link", { name: "Create a Tag" })).toHaveAttribute("href", "/stands");
@@ -82,7 +111,14 @@ describe("OwnerHome", () => {
       hasLocation: true,
     });
 
-    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+    render(
+      <OwnerHome
+        businessName="Oak & Vine"
+        model={model}
+        checklist={completeChecklist}
+        unreadItems={[]}
+      />,
+    );
 
     expect(screen.getByText("Google link is missing")).toBeVisible();
     expect(screen.getByRole("link", { name: "Add Google link" })).toHaveAttribute(
@@ -100,7 +136,14 @@ describe("OwnerHome", () => {
       hasLocation: true,
     });
 
-    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+    render(
+      <OwnerHome
+        businessName="Oak & Vine"
+        model={model}
+        checklist={completeChecklist}
+        unreadItems={[]}
+      />,
+    );
 
     expect(screen.getByText("Tag is not programmed yet")).toBeVisible();
     expect(screen.getByRole("link", { name: "Print your code" })).toBeVisible();
@@ -115,7 +158,14 @@ describe("OwnerHome", () => {
       hasLocation: true,
     });
 
-    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+    render(
+      <OwnerHome
+        businessName="Oak & Vine"
+        model={model}
+        checklist={completeChecklist}
+        unreadItems={[]}
+      />,
+    );
 
     expect(screen.getByText("No ratings yet.")).toBeVisible();
     expect(screen.getByText("Your tag is ready. Put it where people pay.")).toBeVisible();
@@ -134,6 +184,7 @@ describe("OwnerHome", () => {
       <OwnerHome
         businessName="Oak & Vine"
         model={model}
+        checklist={completeChecklist}
         unreadItems={[
           {
             id: "r1",

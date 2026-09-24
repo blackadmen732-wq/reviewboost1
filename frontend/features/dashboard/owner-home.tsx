@@ -2,8 +2,10 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { FeedbackList, type FeedbackItem } from "@/features/dashboard/feedback-list";
+import { HomeSetupChecklist } from "@/features/dashboard/home-setup-checklist";
 import {
   type HomeModel,
+  type SetupChecklist,
   tagStatusLine,
 } from "@/features/dashboard/home-model";
 import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page";
@@ -19,12 +21,26 @@ import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page"
 export function OwnerHome({
   businessName,
   model,
+  checklist,
   unreadItems,
 }: {
   businessName: string;
   model: HomeModel;
+  checklist: SetupChecklist;
   unreadItems: FeedbackItem[];
 }) {
+  // The setup checklist and Home's own attention/primary system both reach
+  // for "Add Google link" and "Create a Tag" once those goals are missing.
+  // Rather than let both render a button for the same action, the checklist
+  // wins while it is visible and the goal is still open — Home's own button
+  // resumes once that goal drops out of the checklist.
+  const nextGoal = checklist.nextIncomplete?.id;
+  const checklistShowing = checklist.completeCount < checklist.total;
+  const hidePrimaryButton =
+    checklistShowing &&
+    ((nextGoal === "destination" && model.primary?.label === "Add Google link") ||
+      (nextGoal === "firstTag" && model.primary?.label === "Create a Tag"));
+
   return (
     <div className="flex flex-col">
       <header className="mb-10">
@@ -38,16 +54,18 @@ export function OwnerHome({
         ) : null}
       </header>
 
+      <HomeSetupChecklist checklist={checklist} />
+
       {model.kind === "empty" ? (
-        <EmptyHome model={model} />
+        <EmptyHome model={model} hidePrimaryButton={hidePrimaryButton} />
       ) : (
-        <ActiveHome model={model} unreadItems={unreadItems} />
+        <ActiveHome model={model} unreadItems={unreadItems} hidePrimaryButton={hidePrimaryButton} />
       )}
     </div>
   );
 }
 
-function EmptyHome({ model }: { model: HomeModel }) {
+function EmptyHome({ model, hidePrimaryButton }: { model: HomeModel; hidePrimaryButton: boolean }) {
   const blocker = model.attentions[0] ?? null;
 
   return (
@@ -70,7 +88,7 @@ function EmptyHome({ model }: { model: HomeModel }) {
         </>
       )}
 
-      {model.primary ? (
+      {model.primary && !hidePrimaryButton ? (
         <div className="mt-8 max-w-xs">
           <Button asChild variant="action" size="lg">
             <Link href={model.primary.href}>{model.primary.label}</Link>
@@ -88,9 +106,11 @@ function EmptyHome({ model }: { model: HomeModel }) {
 function ActiveHome({
   model,
   unreadItems,
+  hidePrimaryButton,
 }: {
   model: HomeModel;
   unreadItems: FeedbackItem[];
+  hidePrimaryButton: boolean;
 }) {
   const firstAttention = model.attentions[0] ?? null;
 
@@ -117,7 +137,7 @@ function ActiveHome({
           </>
         )}
 
-        {model.primary ? (
+        {model.primary && !hidePrimaryButton ? (
           <div className="mt-8 max-w-xs">
             <Button asChild variant="action" size="lg">
               <Link href={model.primary.href}>{model.primary.label}</Link>

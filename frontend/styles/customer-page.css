@@ -430,108 +430,129 @@ html:has(.customer-live) {
   gap: 12px;
 }
 
-/* ---------------------------------------------------------- NFC card ----- */
+/* ------------------------------------------------------------- header --- */
 
-.nfc-card {
-  position: relative;
-  overflow: hidden;
-  padding: 16px 18px 20px;
-  border-radius: 18px;
-  /* Near-black rather than the warm canvas: the card is a physical object in
-     the owner's hand, and the contrast makes the arcs legible at arm's length. */
-  background: #10130F;
-  color: #FFFFFF;
-}
-
-.nfc-card__head {
+.nfc-header {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  justify-content: center;
 }
 
-.nfc-card__name {
+/* -------------------------------------------------------- status line --- */
+
+.nfc-status {
   display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-}
-
-.nfc-card__word {
-  font-size: 1.0625rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-.nfc-card__word-accent {
-  /* The brand green, not the darker action green: this is identity, not a CTA. */
-  color: var(--rb-brand);
-}
-
-.nfc-card__kind {
-  color: rgb(255 255 255 / 62%);
-  font-size: 0.8125rem;
-}
-
-.nfc-card__status {
-  margin-left: auto;
-  padding-top: 2px;
-  color: rgb(255 255 255 / 62%);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--rb-muted);
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.08em;
 }
 
-.nfc-card__waves {
-  display: flex;
-  justify-content: center;
-  padding-top: 6px;
-  color: var(--rb-brand);
+.nfc-status__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rb-border-strong);
 }
 
-.nfc-card__wave {
-  opacity: 0.25;
-}
-
-.nfc-card[data-working="true"] .nfc-card__wave {
+.nfc-status[data-working="true"] .nfc-status__dot {
+  background: var(--rb-brand);
   animation: nfc-wave 1.8s ease-in-out infinite;
 }
 
 @keyframes nfc-wave {
-  0%, 100% { opacity: 0.18; }
+  0%, 100% { opacity: 0.35; }
   45% { opacity: 1; }
 }
 
-/* ------------------------------------------------------ reader + check --- */
+/* --------------------------------------------------------- glyph family --- */
 
-.nfc-reader {
+/* One shared composition for the ready, writing, success and error states:
+   a soft glow behind a fixed-size circle, with only the icon and color
+   changing between them. Sizing and centering follow the approved
+   ready/writing/success/error reference; the colors are ours. */
+.nfc-glyph {
   position: relative;
   display: grid;
+  width: 148px;
+  height: 148px;
   place-items: center;
   color: var(--rb-brand);
 }
 
-.nfc-reader__halo {
+.nfc-glyph__glow {
   position: absolute;
-  width: 116px;
-  height: 116px;
-  border: 3px solid currentColor;
+  inset: 0;
   border-radius: 50%;
-  opacity: 0.9;
+  background: var(--rb-brand-soft);
 }
 
-.nfc-card[data-working="true"] ~ * .nfc-reader__halo,
-.nfc-sheet__panel[data-nfc-scene="waiting"] .nfc-reader__halo {
+.nfc-glyph__ring {
+  position: absolute;
+  inset: 16px;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+  opacity: 0.55;
+}
+
+.nfc-glyph[data-active="true"] .nfc-glyph__ring {
   animation: nfc-halo 2s ease-in-out infinite;
 }
 
 @keyframes nfc-halo {
-  0%, 100% { transform: scale(1); opacity: 0.55; }
-  50% { transform: scale(1.08); opacity: 1; }
+  0%, 100% { transform: scale(1); opacity: 0.45; }
+  50% { transform: scale(1.06); opacity: 0.85; }
 }
 
-.nfc-check {
+/* The one honest signal that the phone is doing something: a spinning arc,
+   never a percentage. Web NFC reports no distance and no progress, so
+   nothing here may imply how far along a write is. */
+.nfc-glyph__arc {
+  position: absolute;
+  inset: 16px;
+  border: 3px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: nfc-spin 1.1s linear infinite;
+}
+
+@keyframes nfc-spin {
+  to { transform: rotate(360deg); }
+}
+
+.nfc-glyph__icon {
+  position: relative;
+  z-index: 1;
+}
+
+.nfc-glyph__wave {
+  opacity: 0.25;
+  animation: nfc-wave-arc 1.8s ease-in-out infinite;
+}
+
+@keyframes nfc-wave-arc {
+  0%, 100% { opacity: 0.2; }
+  45% { opacity: 1; }
+}
+
+.nfc-glyph--success {
   /* The action green every confirming control in the product uses, so success
      reads as ReviewBoost rather than as a system alert. */
   color: var(--rb-action);
+}
+
+.nfc-glyph--success .nfc-glyph__glow {
+  background: color-mix(in srgb, var(--rb-action) 14%, transparent);
+}
+
+.nfc-glyph--error {
+  color: var(--rb-danger);
+}
+
+.nfc-glyph--error .nfc-glyph__glow {
+  background: var(--rb-danger-soft);
 }
 
 .nfc-check__ring,
@@ -556,17 +577,20 @@ html:has(.customer-live) {
 }
 
 /* Motion here is instructional, never decorative — but somebody who has asked
-   for less of it still needs to see the arcs, the halo and the check, so they
+   for less of it still needs to see the arc, the halo and the check, so they
    are shown in their finished state rather than removed. */
 @media (prefers-reduced-motion: reduce) {
-  .nfc-card[data-working="true"] .nfc-card__wave,
-  .nfc-sheet__panel[data-nfc-scene="waiting"] .nfc-reader__halo,
+  .nfc-status[data-working="true"] .nfc-status__dot,
+  .nfc-glyph[data-active="true"] .nfc-glyph__ring,
+  .nfc-glyph__arc,
+  .nfc-glyph__wave,
   .nfc-check__ring,
   .nfc-check__tick {
     animation: none;
   }
 
-  .nfc-card[data-working="true"] .nfc-card__wave { opacity: 1; }
+  .nfc-status[data-working="true"] .nfc-status__dot { opacity: 1; }
+  .nfc-glyph__wave { opacity: 1; }
   .nfc-check__ring,
   .nfc-check__tick { stroke-dashoffset: 0; }
 }

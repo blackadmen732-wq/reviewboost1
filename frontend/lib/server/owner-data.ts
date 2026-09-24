@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
 import { tryDecrypt } from "@/lib/server/crypto";
+import { readCustomerPage } from "@/lib/server/customer-page-service";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
 import { logger } from "@/lib/server/logger";
@@ -735,6 +736,32 @@ export const listLocations = cache(async (orgId: string): Promise<OwnerLocation[
     name: row.name as string,
     destination: locationDestination(row),
   }));
+});
+
+/**
+ * Whether the organization-level Customer Page has ever been published.
+ *
+ * Calls the existing `readCustomerPage` read path rather than querying
+ * `customer_page_profiles` again here, so "published" means exactly what the
+ * editor and the public page already agree it means. Organization scope only
+ * (`locationId: null`) — the setup checklist asks about the business's one
+ * Customer Page, not a per-location breakdown.
+ */
+export const hasPublishedCustomerPage = cache(async (orgId: string): Promise<boolean> => {
+  const supabase = await supabaseServer();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const state = await readCustomerPage(
+    { userId: user.id, db: supabase },
+    orgId,
+    null,
+    crypto.randomUUID(),
+  );
+  return state.publishedAt !== null;
 });
 
 export function ownerGoogleLinkFlags(url: string | null | undefined): {

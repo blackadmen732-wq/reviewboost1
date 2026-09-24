@@ -219,6 +219,84 @@ export function ratingsHeadline(counts: Pick<HomeCounts, "ratingsThisWeek" | "ra
   return `${thisWeek} ${word} this week, down ${Math.abs(delta)}`;
 }
 
+// --------------------------------------------------------- setup checklist ----
+
+export type SetupChecklistItemId = "subscription" | "destination" | "customerPage" | "firstTag";
+
+export interface SetupChecklistItem {
+  id: SetupChecklistItemId;
+  label: string;
+  complete: boolean;
+  href: string;
+}
+
+export interface SetupChecklist {
+  items: SetupChecklistItem[];
+  completeCount: number;
+  total: 4;
+  nextIncomplete: SetupChecklistItem | null;
+}
+
+/**
+ * The four things a business needs before ReviewBoost is actually working —
+ * fixed at exactly four, in a fixed dependency order (billing gates
+ * everything else). NFC programming is deliberately absent: it lives inside
+ * Tag Detail as an optional action, not a setup goal, because a Tag already
+ * works — a customer can tap the printed code — before anyone programs a
+ * physical chip.
+ *
+ * Copy is written to stay plan-agnostic. Only the Starter plan carries a
+ * trial, so "Choose a plan to get started" never claims one on behalf of
+ * every plan.
+ */
+export function deriveSetupChecklist({
+  subscriptionComplete,
+  hasGoogleLink,
+  customerPagePublished,
+  hasFirstTag,
+}: {
+  subscriptionComplete: boolean;
+  hasGoogleLink: boolean;
+  customerPagePublished: boolean;
+  hasFirstTag: boolean;
+}): SetupChecklist {
+  const items: SetupChecklistItem[] = [
+    {
+      id: "subscription",
+      label: subscriptionComplete ? "Subscription active" : "Choose a plan to get started",
+      complete: subscriptionComplete,
+      href: "/settings/billing",
+    },
+    {
+      id: "destination",
+      label: hasGoogleLink ? "Google review link connected" : "Add your Google review link",
+      complete: hasGoogleLink,
+      href: "/settings",
+    },
+    {
+      id: "customerPage",
+      label: customerPagePublished ? "Customer Page published" : "Publish your Customer Page",
+      complete: customerPagePublished,
+      href: "/customer-page",
+    },
+    {
+      id: "firstTag",
+      label: hasFirstTag ? "First Tag created" : "Create your first Tag",
+      complete: hasFirstTag,
+      href: "/stands",
+    },
+  ];
+
+  const completeCount = items.filter((item) => item.complete).length;
+
+  return {
+    items,
+    completeCount,
+    total: 4,
+    nextIncomplete: items.find((item) => !item.complete) ?? null,
+  };
+}
+
 export function tagStatusLine(status: TagStatus): string {
   if (status.total === 0) return "No tags yet";
   if (status.live === 0) {
