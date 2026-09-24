@@ -154,7 +154,7 @@ Production today has **2** organizations that would be grandfathered.
 | Security docs match reality | TESTED for MFA claims | `mfa-claims.test.ts`; SYSTEM_CONTEXT §9 corrected |
 | MFA / step-up on sensitive operations | **NOT IMPLEMENTED** — owner decision (§7) | |
 | Dependency vulnerabilities (web) | TESTED — 0 prod advisories after upgrading next/sharp/fast-uri; CI blocks on high | `ci.yml` dependency-audit |
-| Dependency vulnerabilities (mobile) | **FAILED** — 7 high in production deps; reported, not blocking | `npm audit --omit=dev` in `apps/mobile` |
+| Dependency vulnerabilities (mobile) | TESTED — `@xmldom/xmldom` 0.8.15/0.9.12 and `js-yaml` 4.3.2 patched in range (mobile tsc + 79 tests pass). Remaining 5 highs are one root, `image-size` inside Metro (build-time bundler reading our own assets, not shipped) — not reachable; clears with the next Expo SDK | see §9 |
 | Load tests | **BLOCKED** — need a staging deployment; not performed | SCALING.md |
 | Production smoke-test runbook | IMPLEMENTED | §5 |
 
@@ -275,3 +275,14 @@ maintenance; dead-letter releasing credit.
 | Service role | last table read moved to an RPC; two needless bypasses removed; static guard |
 | Claims | TOTP/lockout claims corrected; MFA-claim guard |
 | Logs | PostgREST `details` and phone numbers kept out |
+
+## 9. Mobile advisories (investigated 2026-09-24)
+
+| Package | Advisory | Where it runs | Reachable in the shipped app? | Action |
+|---|---|---|---|---|
+| `@xmldom/xmldom` 0.8.14 / 0.9.11 | XML injection / DoS family (GHSA-6gmq-8vp8-gcm6 et al.) | Expo CLI plist and config-plugin XML, at prebuild, on our own files | No | Patched to 0.8.15 / 0.9.12 (in range) |
+| `js-yaml` 4.3.1 | merge-key CPU DoS (GHSA-2883-xcg3-v3hh) | `@expo/xcpretty`, build log formatting | No | Patched to 4.3.2 (in range) |
+| `image-size` 1.2.1 (via `metro`, `metro-config`, `metro-transform-worker`, `@expo/metro`) | ICNS / JXL / HEIF parser infinite loop (GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq) | Metro bundler measuring our own image assets on a build machine | No — build tooling, trusted input | No in-range fix (metro 0.84.x requires image-size ^1). Clears when Expo's Metro moves to image-size 2; do not force-override (image-size 2 changed its API) |
+
+`npm audit fix --omit=dev` was tried and rejected: it removed dev dependencies
+from the lockfile and moved ~90 Expo/React Native packages.
