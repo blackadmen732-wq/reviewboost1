@@ -111,6 +111,46 @@ async function orgForCustomer(customerId: string | null): Promise<string | null>
   return typeof data === "string" ? data : null;
 }
 
+/**
+ * What went wrong, in words an operator reading the inbox can act on. A
+ * Supabase RPC error is a plain object, not an `Error`, so `String(error)`
+ * records "[object Object]" for every database failure — including the
+ * `unknown_price` that tells someone exactly which row to add.
+ */
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const { message, code, details } = error as { message?: unknown; code?: unknown; details?: unknown };
+    const parts = [message, code ? `(${String(code)})` : null, details]
+      .filter((part) => typeof part === "string" && part.length > 0);
+    if (parts.length > 0) return parts.join(" ");
+  }
+  return String(error);
+}
+
+/**
+ * An event for a price the database does not map, or whose plan the two
+ * sides disagree on, is an operator problem, not a transient one: it will
+ * fail on every retry until someone edits `billing_plan_prices` or the
+ * deployment's STRIPE_PRICE_* variables. Logged at error level with a stable
+ * event name so an alert can key on it.
+ */
+function reportUnknownPrice(
+  error: { message?: string },
+  event: Stripe.Event,
+  priceId: string | null,
+): void {
+  const message = error.message ?? "";
+  if (message.includes("unknown_price") || message.includes("plan_price_mismatch")) {
+    logger.error("billing.price_unmapped", {
+      eventId: event.id,
+      type: event.type,
+      priceId,
+      reason: message.includes("unknown_price") ? "unknown_price" : "plan_price_mismatch",
+    });
+  }
+}
+
 // ------------------------------------------------------------- checkout ----
 
 /**
@@ -256,9 +296,12 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
       if (!orgId) return "unknown_customer";
 
       const fields = subscriptionFields(subscription);
-      const planId =
-        planIdForPrice(fields.priceId) ??
-        ((subscription.metadata?.["plan_id"] as PlanId | undefined) ?? null);
+      // The price decides the plan, and the database owns that mapping
+      // (`billing_plan_prices`). This deployment's own reading of the price
+      // is sent only as a cross-check: if the two disagree the event fails
+      // loudly instead of either one being believed. Subscription metadata is
+      // never consulted — it is a free-text field nobody pays for.
+      const planId = planIdForPrice(fields.priceId);
 
       const { data, error } = await service.rpc("rpc_billing_apply_subscription", {
         p_org_id: orgId,
@@ -274,7 +317,10 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
         p_event_created: eventCreated,
       });
 
-      if (error) throw error;
+      if (error) {
+        reportUnknownPrice(error, event, fields.priceId);
+        throw error;
+      }
       return data === "stale" ? "stale" : "applied";
     }
 
@@ -288,16 +334,22 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
       // THE ONLY THING THAT MINTS MONTHLY SMS. Not checkout, not subscription
       // creation: a paid invoice for a billing period, once, expiring at the
       // end of the period it paid for.
+      // The price, not a plan name: the database maps it, and an unknown
+      // price fails the event rather than minting anyone's allowance.
+      const priceId = invoicePriceId(invoice);
       const { error } = await service.rpc("rpc_billing_apply_invoice_paid", {
         p_org_id: orgId,
         p_invoice_id: invoice.id,
-        p_plan_id: planIdForPrice(invoicePriceId(invoice)),
+        p_stripe_price_id: priceId,
         p_period_start: unixToIso(line?.period?.start),
         p_period_end: unixToIso(line?.period?.end),
         p_amount_paid: invoice.amount_paid ?? 0,
       });
 
-      if (error) throw error;
+      if (error) {
+        reportUnknownPrice(error, event, priceId);
+        throw error;
+      }
       return "applied";
     }
 
@@ -354,7 +406,7 @@ export async function receiveStripeWebhook(
   } catch (error) {
     await service.rpc("rpc_stripe_event_fail", {
       p_event_id: event.id,
-      p_error: error instanceof Error ? error.message : String(error),
+      p_error: describeError(error),
     });
     throw error;
   }
