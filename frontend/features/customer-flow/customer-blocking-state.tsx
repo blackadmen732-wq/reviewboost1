@@ -25,7 +25,7 @@ export function CustomerBlockingState({
 }: CustomerBlockingStateProps) {
   const unavailable = kind === "unavailable";
   return (
-    <CustomerFrame poweredBy={messages.poweredBy}>
+    <CustomerFrame>
       <div className="blocking-state-toolbar">
         <LanguageSelector
           locale={locale}

@@ -147,6 +147,17 @@ describe("no letter tile stands in for the mark", () => {
     expect(source).toMatch(/<ReviewBoostLogo\b/);
   });
 
+  it("every customer-page state credits ReviewBoost with the same lockup", () => {
+    // Loading and error go through CustomerFrame; the loaded page is
+    // CustomerVisitView. A customer must not see the credit change shape.
+    for (const file of [
+      "frontend/features/customer-flow/customer-frame.tsx",
+      "frontend/features/customer-page/customer-visit-view.tsx",
+    ]) {
+      expect(read(file)).toMatch(/<ReviewBoostLogo pose="poweredBy" size="poweredBy" \/>/);
+    }
+  });
+
   it("catches the tile and nothing that merely contains the letter", () => {
     expect(hasPlaceholderTile(`<span className="bg-brand">B</span>`)).toBe(true);
     expect(hasPlaceholderTile(`<span className="bg-brand">\n  B\n</span>`)).toBe(true);

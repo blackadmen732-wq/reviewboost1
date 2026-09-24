@@ -13,7 +13,7 @@ const messages = customerMessages.en;
 describe("customer flow accessibility", () => {
   it("has no Axe violations on the rating state", async () => {
     const { container } = render(
-      <CustomerFrame poweredBy={messages.poweredBy}>
+      <CustomerFrame>
         <RatingScreen
           messages={messages}
           rating={3}
@@ -28,7 +28,7 @@ describe("customer flow accessibility", () => {
 
   it("has no Axe violations on the recoverable error state", async () => {
     const { container } = render(
-      <CustomerFrame poweredBy={messages.poweredBy}>
+      <CustomerFrame>
         <RatingScreen
           messages={messages}
           rating={2}
@@ -43,7 +43,7 @@ describe("customer flow accessibility", () => {
 
   it("has no Axe violations on the identical handoff", async () => {
     const { container } = render(
-      <CustomerFrame poweredBy={messages.poweredBy}>
+      <CustomerFrame>
         <HandoffScreen
           businessName="Mario's Pizza"
           destinationUrl="https://search.google.com/local/writereview?placeid=abc"

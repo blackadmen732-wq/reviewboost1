@@ -16,7 +16,7 @@ export function CustomerLoading({ messages }: { messages: CustomerMessages }) {
   }, []);
 
   return (
-    <CustomerFrame poweredBy={messages.poweredBy}>
+    <CustomerFrame>
       <div className="loading-header" aria-hidden="true">
         <Skeleton className="loading-avatar" />
         <div className="loading-business-copy">
