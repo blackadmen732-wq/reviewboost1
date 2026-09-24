@@ -225,15 +225,13 @@ export async function createCheckoutSession(
 export async function ensureStripeCustomer(orgId: string, requestId: string): Promise<string> {
   const service = serviceRoleClient();
 
-  const { data: existing, error } = await service
-    .from("billing_customers")
-    .select("stripe_customer_id")
-    .eq("org_id", orgId)
-    .maybeSingle();
+  const { data: existing, error } = await service.rpc("rpc_billing_customer_for_org", {
+    p_org_id: orgId,
+  });
 
   if (error) throw error;
 
-  const found = (existing as { stripe_customer_id?: string } | null)?.stripe_customer_id;
+  const found = typeof existing === "string" && existing.length > 0 ? existing : null;
   if (found) return found;
 
   const customer = await stripeClient().customers.create(
@@ -435,7 +433,8 @@ export async function readBillingState(
       .select("plan_id, status, cancel_at_period_end, trial_ends_at, current_period_end")
       .eq("org_id", orgId)
       .maybeSingle(),
-    serviceRoleClient().rpc("rpc_sms_balance", { p_org_id: orgId }),
+    // As the signed-in owner, so the function's own membership check applies.
+    context.db.rpc("rpc_sms_balance", { p_org_id: orgId }),
   ]);
 
   if (entitlement.error) {
