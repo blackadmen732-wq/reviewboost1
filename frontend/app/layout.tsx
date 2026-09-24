@@ -8,6 +8,7 @@ import { PwaRegister } from "@/components/pwa-register";
 import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
 import "@/styles/customer-page.css";
+import "@/styles/public-showcase.css";
 
 const DESCRIPTION =
   "A code on the counter. The same Google review opportunity for every customer.";

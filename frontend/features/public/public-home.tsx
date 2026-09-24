@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CustomerPageShowcase } from "@/features/public/customer-page-showcase";
 import { FAQ } from "@/features/public/faq";
 import { PricingTable } from "@/features/public/pricing-table";
 import {
@@ -63,6 +64,8 @@ export function PublicHome() {
           </div>
         </div>
       </section>
+
+      <CustomerPageShowcase />
 
       <section className="border-t border-[#e1e5dc] bg-[#f5f6f0]">
         <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-24">

@@ -31,6 +31,7 @@ export function absoluteUrl(path: string): string {
 export const PUBLIC_ROUTES = [
   "/",
   "/product",
+  "/examples",
   "/how-it-works",
   "/pricing",
   "/integrity",
