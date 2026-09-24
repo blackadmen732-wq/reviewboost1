@@ -78,6 +78,12 @@ export function CustomerPageEditor({
     setUploadError(null);
     setUploadState("signing");
 
+    // Show the picked file immediately — the owner should see their photo in
+    // the preview the instant they choose it, not after the upload pipeline
+    // finishes. The draft's heroAssetId is only recorded once the upload is
+    // confirmed server-side, below.
+    setHeroUrl(URL.createObjectURL(file));
+
     // Step 1: get signed upload ticket
     const beginRes = await fetch("/api/v1/customer-page/assets", {
       method: "POST",
@@ -125,8 +131,8 @@ export function CustomerPageEditor({
       return;
     }
 
-    // Show a local preview URL and record the assetId in the draft.
-    setHeroUrl(URL.createObjectURL(file));
+    // Record the confirmed assetId in the draft. The preview URL was already
+    // set to the local file the moment it was chosen, above.
     setDraft((prev) => ({ ...prev, heroAssetId: ticket.assetId }));
     setUploadState("done");
   }, []);
@@ -205,7 +211,7 @@ export function CustomerPageEditor({
           ? "Verifying…"
           : heroUrl
             ? "Replace photo"
-            : "Add photo";
+            : "Upload photo";
 
   if (!loaded) {
     return (
@@ -217,28 +223,9 @@ export function CustomerPageEditor({
   }
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-      {/* Live preview — the real customer page, in phone chrome. */}
-      <div className="w-full shrink-0 lg:max-w-sm">
-        <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted">
-          What your customers see
-        </p>
-        <PhoneFrame label={`${businessName} customer page preview`}>
-          <CustomerVisitView
-            heroUrl={heroUrl ?? null}
-            transform={DEFAULT_HERO_TRANSFORM}
-            heading={previewMessages.ratingHeading}
-            support={draft.tagline ?? previewMessages.ratingSupport}
-            footerLine={previewMessages.footerPromise}
-          >
-            {/* Inert: this is a picture of the page, not a place to rate. */}
-            <VisitStars value={null} messages={previewMessages} preview />
-          </CustomerVisitView>
-        </PhoneFrame>
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-1 flex-col gap-4">
+    <div className="customer-page-editor">
+      {/* Controls — left rail on desktop, below the preview on mobile. */}
+      <div className="customer-page-editor__rail flex flex-col gap-4">
         {/* Photo upload */}
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6b635b]">
@@ -293,6 +280,26 @@ export function CustomerPageEditor({
             {publishing ? "Publishing…" : "Publish"}
           </button>
         </div>
+      </div>
+
+      {/* Live preview — the real customer page, in phone chrome. Large stage
+          on desktop; stacked above the rail on mobile. */}
+      <div className="customer-page-editor__stage">
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted">
+          What your customers see
+        </p>
+        <PhoneFrame label={`${businessName} customer page preview`}>
+          <CustomerVisitView
+            heroUrl={heroUrl ?? null}
+            transform={DEFAULT_HERO_TRANSFORM}
+            heading={previewMessages.ratingHeading}
+            support={draft.tagline ?? previewMessages.ratingSupport}
+            footerLine={previewMessages.footerPromise}
+          >
+            {/* Inert: this is a picture of the page, not a place to rate. */}
+            <VisitStars value={null} messages={previewMessages} preview />
+          </CustomerVisitView>
+        </PhoneFrame>
       </div>
     </div>
   );

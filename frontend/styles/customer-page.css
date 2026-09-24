@@ -298,7 +298,7 @@ html:has(.customer-live) {
 }
 
 .phone-frame {
-  width: min(100%, 360px);
+  width: min(100%, 440px);
   margin-inline: auto;
 }
 
@@ -354,11 +354,15 @@ html:has(.customer-live) {
 
 .customer-page-editor {
   display: grid;
+  grid-template-areas:
+    "preview"
+    "rail";
   gap: 28px;
 }
 
 @media (min-width: 880px) {
   .customer-page-editor {
+    grid-template-areas: "rail preview";
     grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
     align-items: start;
     gap: 40px;
@@ -366,7 +370,12 @@ html:has(.customer-live) {
 }
 
 .customer-page-editor__rail {
+  grid-area: rail;
   padding-bottom: 24px;
+}
+
+.customer-page-editor__stage {
+  grid-area: preview;
 }
 
 .nfc-sheet {
