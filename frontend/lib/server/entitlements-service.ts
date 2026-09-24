@@ -1,9 +1,16 @@
 import "server-only";
 
 import { buildEntitlementSnapshot, type EntitlementSnapshot } from "@/lib/owner/entitlements";
-import { isPlanId, type EntitlementStatus } from "@/lib/owner/plan-catalog";
+import { isPlanId, type PlanId } from "@/lib/owner/plan-catalog";
 import type { AuthenticatedContext } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
+import {
+  allowsService,
+  effectiveStatus,
+  type EntitlementStatus as ServerStatus,
+  locationLimit,
+  tagLimit,
+} from "@/lib/server/entitlements";
 import { logger } from "@/lib/server/logger";
 
 function fail(context: string, error: unknown): never {
@@ -18,7 +25,7 @@ export async function getEntitlementSnapshot(
   const [snapshotResult, locationsResult, tagsResult] = await Promise.all([
     context.db
       .from("entitlement_snapshots")
-      .select("plan_id, status")
+      .select("plan_id, status, trial_ends_at")
       .eq("org_id", orgId)
       .maybeSingle(),
     context.db
@@ -37,15 +44,55 @@ export async function getEntitlementSnapshot(
   if (locationsResult.error) fail("entitlements.locations", locationsResult.error);
   if (tagsResult.error) fail("entitlements.tags", tagsResult.error);
 
-  const planId = snapshotResult.data?.plan_id;
-  const status = snapshotResult.data?.status;
+  return snapshotFromRow(
+    snapshotResult.data as { plan_id: string | null; status: string; trial_ends_at: string | null } | null,
+    locationsResult.count ?? 0,
+    tagsResult.count ?? 0,
+  );
+}
 
-  return buildEntitlementSnapshot({
-    planId: isPlanId(planId) ? planId : "starter",
-    status: (status as EntitlementStatus | undefined) ?? "active",
-    locationsUsed: locationsResult.count ?? 0,
-    tagsUsed: tagsResult.count ?? 0,
+/**
+ * The owner-facing snapshot, with limits taken from the same model the
+ * database enforces (`app.entitlement_tag_limit` / `_location_limit`,
+ * mirrored in lib/server/entitlements.ts) for the status that governs now.
+ *
+ * It used to default a missing or planless row to an active Starter plan,
+ * which told a business that had never paid it could create three Tags; the
+ * database then refused the second. No row now fails closed, like the
+ * database does.
+ */
+export function snapshotFromRow(
+  row: { plan_id: string | null; status: string; trial_ends_at: string | null } | null,
+  locationsUsed: number,
+  tagsUsed: number,
+): EntitlementSnapshot {
+  const planId: PlanId | null = row && isPlanId(row.plan_id) ? row.plan_id : null;
+  const stored = (row?.status ?? "suspended") as ServerStatus;
+  const status = effectiveStatus(stored, row?.trial_ends_at ?? null);
+
+  const base = buildEntitlementSnapshot({
+    planId,
+    status: status === "cancelled" || status === "past_due" ? status : "active",
+    locationsUsed,
+    tagsUsed,
   });
+
+  const tagLimitNow = tagLimit(planId, status);
+  const locationLimitNow = locationLimit(planId, status);
+  const closed = status === "cancelled";
+  const tags = closed ? "cancelled" : tagsUsed >= tagLimitNow ? "limit-reached" : "available";
+  const locations = closed ? "cancelled" : locationsUsed >= locationLimitNow ? "limit-reached" : "available";
+
+  return {
+    ...base,
+    tagLimit: tagLimitNow,
+    locationLimit: locationLimitNow,
+    tags,
+    locations,
+    canCreateTag: tags === "available",
+    canCreateLocation: locations === "available",
+    canUseSoftware: allowsService(status) || (status === "suspended" && planId === null),
+  };
 }
 
 export function assertCanCreateTag(snapshot: EntitlementSnapshot): void {
