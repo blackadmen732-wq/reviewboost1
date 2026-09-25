@@ -79,10 +79,14 @@ export default async function SettingsPage() {
           {several ? "Places" : "Place"}
         </h2>
 
-        {locations.map((location) => (
+        {locations.map((location, index) => (
           <div
             key={location.locationId}
-            className="flex flex-col gap-3"
+            className={
+              several && index > 0
+                ? "mt-3 flex flex-col gap-3 border-t border-border pt-6"
+                : "flex flex-col gap-3"
+            }
             data-location-id={location.locationId}
           >
             <EditableRow

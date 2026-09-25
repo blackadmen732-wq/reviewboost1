@@ -164,7 +164,7 @@ export function deriveHomeModel({
       title: counts.googleLinkInvalid ? "That Google link is wrong" : "Google link is missing",
       body: counts.googleLinkInvalid
         ? GOOGLE_LINK_INVALID
-        : "Set it in Settings. Every Tag uses this one link.",
+        : "Set it in Settings. Until then, those Tags send nobody to Google.",
     });
   }
 

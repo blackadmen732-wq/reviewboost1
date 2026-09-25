@@ -737,6 +737,22 @@ export const listLocations = cache(async (orgId: string): Promise<OwnerLocation[
   }));
 });
 
+/**
+ * The worst link across every place. Any wrong link reads as wrong, then any
+ * missing one as missing; no places at all is missing.
+ */
+export function ownerGoogleLinkFlagsForAll(urls: ReadonlyArray<string | null | undefined>): {
+  hasGoogleLink: boolean;
+  googleLinkInvalid: boolean;
+} {
+  if (urls.length === 0) return { hasGoogleLink: false, googleLinkInvalid: false };
+  const flags = urls.map(ownerGoogleLinkFlags);
+  if (flags.some((flag) => flag.googleLinkInvalid)) {
+    return { hasGoogleLink: false, googleLinkInvalid: true };
+  }
+  return { hasGoogleLink: flags.every((flag) => flag.hasGoogleLink), googleLinkInvalid: false };
+}
+
 export function ownerGoogleLinkFlags(url: string | null | undefined): {
   hasGoogleLink: boolean;
   googleLinkInvalid: boolean;
@@ -777,7 +793,7 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
   const weekStart = startOfLocalWeek(timezone);
   const priorWeekStart = new Date(weekStart.getTime() - 7 * 86_400_000);
 
-  const [today, thisWeek, lastWeek, unread, praise, stands, location, recent] = await Promise.all([
+  const [today, thisWeek, lastWeek, unread, praise, stands, locations, recent] = await Promise.all([
     supabase
       .from("customer_responses")
       .select("id", { count: "exact", head: true })
@@ -811,7 +827,7 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
       .eq("status", "unmatched")
       .gte("created_at", monthStart.toISOString()),
     supabase.from("review_stands").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "active"),
-    getPrimaryLocation(orgId),
+    listLocations(orgId),
     supabase
       .from("customer_responses")
       .select("rating")
@@ -842,7 +858,9 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
         ? ratings.reduce((total, rating) => total + rating, 0) / ratings.length
         : null,
     recentCount: ratings.length,
-    ...ownerGoogleLinkFlags(location?.destination?.url ?? null),
+    // Every place, not the first: a second location with no link has Tags
+    // that send nobody to Google, and Home has to say so.
+    ...ownerGoogleLinkFlagsForAll(locations.map((location) => location.destination?.url ?? null)),
   };
 });
 

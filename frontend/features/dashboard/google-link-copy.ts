@@ -10,7 +10,7 @@ import { isValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
 export type GoogleLinkState = "missing" | "invalid" | "valid";
 
 export const GOOGLE_LINK_BLAST =
-  "Every Tag uses this one link. A wrong address sends every customer to the wrong Google page.";
+  "Every Tag at this place uses this link. A wrong address sends every customer who taps one to the wrong Google page.";
 
 export const GOOGLE_LINK_EMPTY = "Not set yet — Tags cannot send people to Google";
 
