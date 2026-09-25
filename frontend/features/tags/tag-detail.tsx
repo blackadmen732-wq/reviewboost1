@@ -14,10 +14,40 @@ import {
   tagReadiness,
   tagReadinessLabel,
 } from "@/lib/owner/tag-readiness";
+import { ownerOrAdmin } from "@/lib/owner/permissions";
 import type { Stand } from "@/lib/server/owner-data";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
-export function TagDetail({ stand }: { stand: Stand }) {
+/**
+ * A Tag. Everything on the managed view — loading the code, printing, saving,
+ * programming NFC, making a new code — goes through routes that only an owner
+ * or admin may call, so a member or viewer gets the read-only view instead of
+ * a spinner that fails and buttons that 403.
+ */
+export function TagDetail({ stand, canManage }: { stand: Stand; canManage: boolean }) {
+  return canManage ? <ManagedTagDetail stand={stand} /> : <ReadOnlyTagDetail stand={stand} />;
+}
+
+function ReadOnlyTagDetail({ stand }: { stand: Stand }) {
+  const status = tagReadiness(stand);
+  return (
+    <div className="flex flex-col gap-8">
+      <header>
+        <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
+          {stand.label}
+        </h1>
+        <p className="mt-2 text-base text-muted">
+          {stand.locationName ?? "Place"} · {tagReadinessLabel(status)} · {lastUsedLabel(stand.lastOpenedAt)}
+        </p>
+      </header>
+      <p className="text-base text-muted" data-tag-access="read-only">
+        {ownerOrAdmin("print, program or change this Tag")}
+      </p>
+    </div>
+  );
+}
+
+function ManagedTagDetail({ stand }: { stand: Stand }) {
   const router = useRouter();
   const qr = useAuthenticatedQr(stand.standId);
   // Set the moment a Tag is programmed so the header stops saying "Needs NFC"

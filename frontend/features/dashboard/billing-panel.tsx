@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { PUBLIC_PLANS, TRIAL } from "@/features/public/pricing-plans";
+import { ownerOnly } from "@/lib/owner/permissions";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 type PlanId = "starter" | "growth" | "pro";
@@ -131,7 +132,12 @@ function describe(billing: Billing): { title: string; body: string; tone: "info"
   }
 }
 
-export function BillingPanel({ billing }: { billing: Billing }) {
+/**
+ * `canManage` is the owner: `api/v1/billing` POST refuses everyone else. An
+ * admin, member or viewer reads the same state with no checkout or portal
+ * button that would come back 403.
+ */
+export function BillingPanel({ billing, canManage }: { billing: Billing; canManage: boolean }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -223,7 +229,11 @@ export function BillingPanel({ billing }: { billing: Billing }) {
         </section>
       ) : null}
 
-      {needsCheckout ? (
+      {!canManage ? (
+        <p className="text-base text-muted" data-billing-access="read-only">
+          {ownerOnly("choose a plan or change payment")}
+        </p>
+      ) : needsCheckout ? (
         <section aria-labelledby="plans-heading">
           <h2 id="plans-heading" className="mb-1 text-base font-semibold text-ink">
             Choose a plan

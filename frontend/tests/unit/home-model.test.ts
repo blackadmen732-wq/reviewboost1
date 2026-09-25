@@ -203,6 +203,33 @@ describe("deriveHomeModel", () => {
   });
 });
 
+describe("a member or viewer on Home", () => {
+  it("is told what needs doing, but offered no setup button the API would refuse", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, hasGoogleLink: false },
+      stands: [],
+      hasLocation: true,
+      canManage: false,
+    });
+
+    expect(model.attentions.map((a) => a.kind)).toEqual(["tag-missing", "google"]);
+    expect(model.primary).toBeNull();
+    expect(model.showPreview).toBe(false);
+  });
+
+  it("still gets Read feedback, which every role may do", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, unread: 2, recentCount: 5 },
+      stands: [programmedStand],
+      hasLocation: true,
+      canManage: false,
+    });
+
+    expect(model.primary).toEqual({ label: "Read feedback", href: "/feedback" });
+    expect(model.showPreview).toBe(false);
+  });
+});
+
 describe("tagStatusLine", () => {
   it("states absence honestly", () => {
     expect(tagStatusLine({ total: 0, live: 0, programmed: 0, needsRewrite: 0 })).toBe(

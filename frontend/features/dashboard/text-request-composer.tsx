@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { notify } from "@/components/ui/toast";
+import { ownerOrAdmin } from "@/lib/owner/permissions";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 interface Balance {
@@ -32,6 +33,11 @@ interface TextRequestComposerProps {
   balance: Balance;
   tags: readonly TagOption[];
   recent: readonly RecentRequest[];
+  /**
+   * Sending, previewing and cancelling are owner/admin at the API. Everyone
+   * else sees the balance and the recent list, and no form that would 403.
+   */
+  canSendRequests: boolean;
 }
 
 interface Preview {
@@ -52,7 +58,12 @@ interface Preview {
  * a curly quote, or an accented name — and the number it produces is what the
  * business is billed against.
  */
-export function TextRequestComposer({ balance, tags, recent }: TextRequestComposerProps) {
+export function TextRequestComposer({
+  balance,
+  tags,
+  recent,
+  canSendRequests,
+}: TextRequestComposerProps) {
   const router = useRouter();
   const [phone, setPhone] = useState("");
   const [standId, setStandId] = useState(tags[0]?.standId ?? "");
@@ -183,7 +194,11 @@ export function TextRequestComposer({ balance, tags, recent }: TextRequestCompos
           Send a request
         </h2>
 
-        {tags.length === 0 ? (
+        {!canSendRequests ? (
+          <p className="text-base text-muted" data-text-request-access="read-only">
+            {ownerOrAdmin("send Text Requests")}
+          </p>
+        ) : tags.length === 0 ? (
           <InlineNotice kind="info">
             <p>Create a Tag first — the message carries its link.</p>
           </InlineNotice>

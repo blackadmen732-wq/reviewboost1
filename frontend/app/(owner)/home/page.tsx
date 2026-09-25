@@ -4,6 +4,7 @@ import { OwnerHome } from "@/features/dashboard/owner-home";
 import { deriveHomeModel } from "@/features/dashboard/home-model";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { InstallPrompt } from "@/features/dashboard/install-prompt";
+import { permissionsFor } from "@/lib/owner/permissions";
 import {
   getOwnerCounts,
   listLocations,
@@ -43,6 +44,7 @@ export default async function HomePage() {
     counts,
     stands,
     hasLocation: locations.length > 0,
+    canManage: permissionsFor(organization.role).manageTags,
   });
 
   return (

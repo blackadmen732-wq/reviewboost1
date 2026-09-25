@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { TagDetail } from "@/features/tags/tag-detail";
+import { permissionsFor } from "@/lib/owner/permissions";
 import { getStand, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
@@ -36,7 +37,7 @@ export default async function TagDetailPage({
           Tags
         </Link>
       </p>
-      <TagDetail stand={stand} />
+      <TagDetail stand={stand} canManage={permissionsFor(organization.role).manageTags} />
     </OwnerShell>
   );
 }

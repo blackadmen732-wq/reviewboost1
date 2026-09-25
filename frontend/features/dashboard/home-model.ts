@@ -109,10 +109,18 @@ export function deriveHomeModel({
   counts,
   stands,
   hasLocation,
+  canManage = true,
 }: {
   counts: HomeCounts;
   stands: HomeStand[];
   hasLocation: boolean;
+  /**
+   * Owner or admin. Creating and programming Tags, the Google link and the
+   * customer-page preview are all refused to anyone else by the API, so a
+   * member or viewer is shown what needs doing but not a button to do it —
+   * reading feedback is the one action every role has.
+   */
+  canManage?: boolean;
 }): HomeModel {
   const kind: HomeKind = isHomeEmpty(counts) ? "empty" : "active";
   const tags = summarizeTags(stands);
@@ -189,6 +197,8 @@ export function deriveHomeModel({
     primary = null;
   }
 
+  if (!canManage && primary?.href !== "/feedback") primary = null;
+
   // Ready empty: Google is set, a tag exists and is programmed. Waiting.
   if (kind === "empty" && counts.hasGoogleLink && hasStand && tags.programmed > 0 && tags.needsRewrite === 0) {
     primary = null;
@@ -198,7 +208,7 @@ export function deriveHomeModel({
     kind,
     attentions,
     primary,
-    showPreview: hasStand,
+    showPreview: hasStand && canManage,
     previewStandId: previewStand?.standId ?? null,
     tagStatus: tags,
     headline: ratingsHeadline(counts),
