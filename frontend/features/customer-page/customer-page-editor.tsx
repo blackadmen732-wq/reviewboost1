@@ -226,9 +226,12 @@ export function CustomerPageEditor({
         <PhoneFrame label={`${businessName} customer page preview`}>
           <CustomerVisitView
             heroUrl={heroUrl ?? null}
+            businessName={businessName}
             transform={DEFAULT_HERO_TRANSFORM}
             heading={previewMessages.ratingHeading}
-            support={draft.tagline ?? previewMessages.ratingSupport}
+            // The live page always says this line; a leftover draft tagline
+            // would show here and never reach a customer.
+            support={previewMessages.ratingSupport}
             footerLine={previewMessages.footerPromise}
           >
             {/* Inert: this is a picture of the page, not a place to rate. */}

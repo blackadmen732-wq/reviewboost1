@@ -27,6 +27,11 @@ import {
 
 export interface CustomerVisitViewProps {
   heroUrl: string | null;
+  /**
+   * Shown large in the hero when the business has not published artwork yet,
+   * so the page still says whose it is instead of showing an empty block.
+   */
+  businessName?: string | null;
   transform: HeroTransform;
   heading: string;
   support: string;
@@ -37,6 +42,7 @@ export interface CustomerVisitViewProps {
 
 export function CustomerVisitView({
   heroUrl,
+  businessName = null,
   transform,
   heading,
   support,
@@ -65,7 +71,9 @@ export function CustomerVisitView({
             style={{ transform: heroTransformStyle(crop) }}
           />
         ) : (
-          <div className="visit-hero__empty" aria-hidden="true" />
+          <div className="visit-hero__empty" aria-hidden="true">
+            {businessName ? <p className="visit-hero__name">{businessName}</p> : null}
+          </div>
         )}
         {language ? <div className="visit-language">{language}</div> : null}
       </div>

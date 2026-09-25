@@ -13,12 +13,16 @@ html:has(.customer-live) {
    Canvas is 390/844 (Mario SoT). Hero 56% / card 44%. Card never moves. */
 
 .visit-stage {
+  /* Sizes inside the sheet are relative to the stage, not the browser window,
+     so the owner's phone preview scales exactly like the customer's phone. */
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
   min-height: 0;
-  background: #fff;
+  /* Dark behind the sheet's rounded corners, which sit over the artwork. */
+  background: #121513;
   overflow: hidden;
 }
 
@@ -40,10 +44,27 @@ html:has(.customer-live) {
   pointer-events: none;
 }
 
+/* No artwork yet: the business's own name, set large on a quiet dark field.
+   Deliberate rather than broken, and still unmistakably theirs. */
 .visit-hero__empty {
+  display: grid;
   width: 100%;
   height: 100%;
-  background: #1a1a1a;
+  place-items: center;
+  padding: 24px 24px 56px;
+  background: #151916;
+}
+
+.visit-hero__name {
+  margin: 0;
+  max-width: 14ch;
+  color: #f4f6f4;
+  font-size: clamp(1.9rem, 10cqi, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .visit-language {
@@ -57,6 +78,27 @@ html:has(.customer-live) {
 .visit-language .language-select {
   min-height: 40px;
   color: #fff;
+}
+
+/* Any artwork can sit behind the language control, including a white one, so
+   it carries its own backing rather than trusting the photo for contrast. */
+.visit-language .language-selector {
+  min-height: 40px;
+  border-radius: 999px;
+  background: rgb(10 12 11 / 48%);
+}
+
+.visit-language .language-select {
+  /* Sized to the chosen language, not the longest one, where supported. */
+  field-sizing: content;
+  width: auto;
+  border-radius: 999px;
+  padding-inline-end: 14px;
+}
+
+.visit-language .language-select:hover {
+  border-color: transparent;
+  background: rgb(255 255 255 / 12%);
 }
 
 /* The Mario card is a fixed light surface in both themes — so every colour
@@ -102,15 +144,20 @@ html:has(.customer-live) {
 }
 
 .visit-card {
+  position: relative;
   display: flex;
   flex: 0 0 44%;
   flex-direction: column;
   height: 44%;
   max-height: 44%;
   z-index: 2;
+  /* The sheet rises into the artwork so its rounded top reads as a surface
+     laid over the business's photo, not a white block under it. */
+  margin-top: -30px;
   background: #fff;
-  border-radius: 36px 36px 0 0;
-  padding: 32px 24px 14px;
+  border-radius: 32px 32px 0 0;
+  box-shadow: 0 -10px 28px rgb(0 0 0 / 16%);
+  padding: clamp(24px, 7cqi, 32px) 20px calc(12px + env(safe-area-inset-bottom));
   overflow: hidden;
 }
 
@@ -154,6 +201,8 @@ html:has(.customer-live) {
 .visit-stage:has([data-flow-screen="blocking"]) .visit-card {
   display: block;
   height: auto;
+  /* The sheet runs to the bottom of the screen, whatever its content. */
+  min-height: calc(68dvh + 30px);
   max-height: none;
   overflow: visible;
 }
@@ -177,10 +226,11 @@ html:has(.customer-live) {
 .visit-heading {
   margin: 0;
   color: var(--rb-ink);
-  font-size: clamp(1.85rem, 7.6vw, 2.35rem);
-  font-weight: 720;
-  letter-spacing: -0.035em;
-  line-height: 1.05;
+  font-size: clamp(1.7rem, 8.6cqi, 2.5rem);
+  font-weight: 760;
+  letter-spacing: -0.04em;
+  line-height: 1.04;
+  text-wrap: balance;
 }
 
 .visit-heading:focus {
@@ -188,18 +238,23 @@ html:has(.customer-live) {
 }
 
 .visit-support {
-  margin: 12px 0 0;
-  color: var(--rb-muted);
-  font-size: 0.72rem;
-  font-weight: 620;
-  letter-spacing: 0.14em;
+  margin: 10px 0 0;
+  color: #59615b;
+  font-size: clamp(0.66rem, 3.1cqi, 0.76rem);
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
+/* The stars sit in the middle of whatever room the sheet has, so a tall phone
+   gets breathing room around them instead of a gap above the footer. */
 .visit-card__body {
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
   min-height: 0;
-  margin-top: 20px;
+  margin-top: 8px;
   overflow: auto;
 }
 
@@ -207,16 +262,17 @@ html:has(.customer-live) {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  margin-top: 12px;
-  gap: 4px;
+  margin-top: 8px;
+  gap: 2px;
 }
 
 .visit-footer__line {
   margin: 0;
-  color: var(--rb-muted);
-  font-size: 0.58rem;
-  font-weight: 620;
-  letter-spacing: 0.1em;
+  /* Quiet, but still 4.5:1 on the white sheet. */
+  color: #646c66;
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-align: center;
   text-transform: uppercase;
 }
@@ -228,12 +284,13 @@ html:has(.customer-live) {
 }
 
 /* Five stars, on a 320px phone as much as a 430px one. Fixed 52px targets with
-   an 18px gap needed 332px of card and clipped the fifth star below that. */
+   an 18px gap needed 332px of card and clipped the fifth star below that. Sizes
+   follow the stage width, and never drop below a 48px target. */
 .visit-stars__row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(6px, 3.5vw, 18px);
+  gap: clamp(2px, 1.6cqi, 10px);
 }
 
 .visit-star {
@@ -270,31 +327,115 @@ html:has(.customer-live) {
 
 .visit-star__label {
   display: grid;
-  width: clamp(44px, 13vw, 52px);
-  height: clamp(44px, 13vw, 52px);
+  width: clamp(48px, 16cqi, 64px);
+  height: clamp(48px, 16cqi, 64px);
   place-items: center;
-  color: #c5c5c5;
+  /* A firm neutral outline: it has to read as "tap me" on a bright day, which
+     the old #c5c5c5 hairline did not. */
+  color: #6f7771;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .visit-star__label svg {
-  width: clamp(38px, 11vw, 44px);
-  height: clamp(38px, 11vw, 44px);
-  fill: transparent;
+  width: 88%;
+  height: 88%;
+  fill: #fff;
+  filter: drop-shadow(0 2px 3px rgb(23 26 24 / 14%));
+  transition: transform 120ms ease-out, color 160ms ease-out, fill 160ms ease-out;
 }
 
+/* Rating gold: a warm fill with a darker edge so the shape still holds 3:1
+   against the white sheet. Never green or red — a two is not a failure. */
 .visit-star__label[data-filled="true"] {
-  color: var(--rb-star);
+  color: #b8790b;
 }
 
 .visit-star__label[data-filled="true"] svg {
-  fill: currentColor;
+  fill: #f4b41a;
+  filter: drop-shadow(0 3px 5px rgb(184 121 11 / 28%));
+  animation: visit-star-fill 240ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  animation-delay: calc(var(--star-index, 0) * 35ms);
+}
+
+/* The thumb gets an answer the instant it lands, before any network. */
+.visit-star__input:active + .visit-star__label svg {
+  transform: scale(0.88);
+}
+
+@keyframes visit-star-fill {
+  0% { transform: scale(0.82); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visit-star__label svg { transition: none; }
+  .visit-star__label[data-filled="true"] svg { animation: none; }
+  .visit-star__input:active + .visit-star__label svg { transform: none; }
 }
 
 .visit-star__input:focus-visible + .visit-star__label {
   outline: 2px solid var(--rb-focus);
   outline-offset: 3px;
   border-radius: 8px;
+}
+
+/* ------------------------------------------------ rating status line --- */
+
+.visit-card .rating-actions {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  min-height: 0;
+  margin-top: 14px;
+}
+
+.visit-card .rating-actions:empty {
+  display: none;
+}
+
+.visit-status {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--rb-muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.visit-status--error {
+  color: var(--rb-danger);
+}
+
+.visit-status--error strong {
+  font-weight: 650;
+}
+
+/* An error needs its message and its retry on screen together. The stars no
+   longer have to hold still — the customer has already tapped — so the sheet
+   grows into the artwork instead of clipping either. */
+.visit-card:has(.visit-status--error) {
+  flex: 0 0 auto;
+  height: auto;
+  max-height: none;
+}
+
+.visit-card:has(.visit-status--error) .visit-card__body {
+  overflow: visible;
+}
+
+/* On the shortest phones the promise line is the first thing to give way. */
+@media (max-height: 620px) {
+  .customer-live .visit-footer__line {
+    display: none;
+  }
+}
+
+.visit-card .visit-retry {
+  width: auto;
+  min-width: 160px;
+  min-height: 44px;
 }
 
 .phone-frame {
@@ -350,6 +491,19 @@ html:has(.customer-live) {
   width: 100%;
   height: 100dvh;
   max-height: 100dvh;
+}
+
+/* Opened on a computer, it stays a phone-shaped page: one centred column no
+   wider than 520px, not a sheet stretched across a monitor. */
+@media (min-width: 560px) {
+  .customer-live {
+    background: #0e1110;
+  }
+
+  .customer-live .visit-stage {
+    max-width: 520px;
+    margin-inline: auto;
+  }
 }
 
 .customer-page-editor {
@@ -560,4 +714,20 @@ html:has(.customer-live) {
   .nfc-card[data-working="true"] .nfc-card__wave { opacity: 1; }
   .nfc-check__ring,
   .nfc-check__tick { stroke-dashoffset: 0; }
+}
+
+/* Inside the sheet every line of the handoff is centred, like the rating. */
+.visit-card [data-flow-screen="handoff"] .customer-support {
+  text-align: center;
+}
+
+/* The sheet already keeps its action in view; a sticky bar with the old card's
+   negative margins sat on top of the ReviewBoost footer. */
+.visit-card .customer-action-bar {
+  position: static;
+  margin: 16px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }

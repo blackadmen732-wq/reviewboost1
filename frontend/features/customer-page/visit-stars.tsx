@@ -31,7 +31,12 @@ export function VisitStars({
         {ratings.map((rating) => {
           const selected = value !== null && rating <= value;
           return (
-            <span className="visit-star" key={rating}>
+            <span
+              className="visit-star"
+              key={rating}
+              // Filling stars land left to right, a beat apart.
+              style={{ "--star-index": rating - 1 } as React.CSSProperties}
+            >
               <input
                 className="visit-star__input"
                 id={`visit-rating-${rating}`}
@@ -44,7 +49,7 @@ export function VisitStars({
                 aria-label={messages.ratingSpoken[rating]}
               />
               <label className="visit-star__label" htmlFor={`visit-rating-${rating}`} data-filled={selected || undefined}>
-                <Star aria-hidden="true" strokeWidth={1.25} />
+                <Star aria-hidden="true" strokeWidth={1.6} strokeLinejoin="round" />
               </label>
             </span>
           );

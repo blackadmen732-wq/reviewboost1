@@ -1,8 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { InlineNotice } from "@/components/ui/inline-notice";
-import { CustomerActionBar } from "@/features/customer-flow/customer-action-bar";
 import { VisitStars } from "@/features/customer-page/visit-stars";
 import type { SubmissionStatus } from "@/features/customer-flow/customer-flow-state";
 import type {
@@ -57,36 +55,32 @@ export function RatingScreen({
         disabled={isSubmitting}
       />
 
+      {/* Status lives in one short, centred line under the stars. The sheet is
+          a fixed 44% of the screen so the stars never move under a thumb; a
+          boxed notice plus a large button did not fit in it, and the error
+          was squeezed to a sliver the customer could not read. */}
       <div className="rating-actions" data-rating-actions>
         {isSubmitting ? (
-          <p className="customer-support" role="status">
+          <p className="visit-status" role="status">
             {messages.sending}
           </p>
         ) : null}
 
         {hasError ? (
-          <InlineNotice
-            id="feedback-status"
-            kind="error"
-            title={messages.submitErrorHeading}
-            blocking
-          >
-            <p>{messages.submitErrorBody}</p>
-          </InlineNotice>
+          <>
+            <p id="feedback-status" className="visit-status visit-status--error" role="alert">
+              <strong>{messages.submitErrorHeading}</strong> {messages.submitErrorBody}
+            </p>
+            <Button type="button" className="visit-retry" onClick={onRetry}>
+              {messages.tryAgain}
+            </Button>
+          </>
         ) : null}
 
         {isOffline ? (
-          <InlineNotice id="feedback-status" kind="offline">
-            <p>{messages.offline}</p>
-          </InlineNotice>
-        ) : null}
-
-        {hasError ? (
-          <CustomerActionBar>
-            <Button type="button" size="lg" onClick={onRetry}>
-              {messages.tryAgain}
-            </Button>
-          </CustomerActionBar>
+          <p id="feedback-status" className="visit-status" role="status">
+            {messages.offline}
+          </p>
         ) : null}
       </div>
     </section>
