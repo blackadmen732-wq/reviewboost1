@@ -73,8 +73,8 @@ export const viewport: Viewport = {
   // flash white before the first paint — the thing that most makes a PWA feel
   // like a browser rather than an app.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F8F5F0" },
-    { media: "(prefers-color-scheme: dark)", color: "#14120F" },
+    { media: "(prefers-color-scheme: light)", color: "#F6F7F5" },
+    { media: "(prefers-color-scheme: dark)", color: "#0C100E" },
   ],
 
 };
@@ -92,7 +92,7 @@ export default function RootLayout({
           means the first frame is already cream — no device-specific assets to
           maintain, and no white flash in a demo.
         */}
-        <style>{`html{background-color:#F8F5F0}@media (prefers-color-scheme:dark){html{background-color:#14120F}}`}</style>
+        <style>{`html{background-color:#F6F7F5}@media (prefers-color-scheme:dark){html{background-color:#0C100E}}`}</style>
       </head>
       <body className={GeistSans.className}>
         <Providers>{children}</Providers>

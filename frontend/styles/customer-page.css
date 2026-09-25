@@ -117,27 +117,27 @@ html:has(.customer-live) {
  * The hero above is dark artwork in both modes for the same reason: this is a
  * printed-feeling page a customer sees once, not a themed surface. */
 .visit-card {
-  --rb-canvas: #f8f5f0;
+  --rb-canvas: #f6f7f5;
   --rb-surface: #ffffff;
-  --rb-quiet: #f2efe9;
+  --rb-quiet: #f0f2f0;
   --rb-ink: #171a18;
-  --rb-muted: #5d655f;
-  --rb-border: #d8ded9;
-  --rb-border-strong: #b7c0ba;
+  --rb-muted: #646e68;
+  --rb-border: #dce2de;
+  --rb-border-strong: #b9c3bd;
   --rb-brand-hover: #009a61;
   --rb-brand-active: #008f5b;
-  --rb-brand-soft: #ddf5ea;
+  --rb-brand-soft: #e3f5ec;
   --rb-brand-text: #007a4d;
   --rb-on-brand: #0d2118;
   --rb-action: #007a4d;
   --rb-action-hover: #006b43;
   --rb-action-pressed: #005b39;
   --rb-on-action: #ffffff;
-  --rb-star: #bf7d00;
-  --rb-star-soft: #fff3d0;
+  --rb-star: #b97d0c;
+  --rb-star-soft: #fff7e5;
   --rb-danger: #b33a3a;
-  --rb-danger-soft: #faeaea;
-  --rb-info: #356d8c;
+  --rb-danger-soft: #fce8e8;
+  --rb-info: #2663a0;
   --rb-focus: #005fcc;
   --rb-focus-soft: rgb(0 95 204 / 28%);
   color: #171a18;

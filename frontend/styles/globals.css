@@ -30,31 +30,33 @@
 
 :root {
   color-scheme: light dark;
-  /* Locked 2026-09-09 constitution palette. Brand green is identity, never
-     a white-label button. Action green is the only filled CTA green. */
-  --rb-canvas: #f8f5f0;
+  /* Constitution palette, neutrals cooled 2026-09-25: the cream canvas, beige
+     quiet surface and brown-gold star read as tan across large areas, and dark
+     mode was a warm brown-black. Brand green is identity, never a white-label
+     button. Action green is the only filled CTA green. */
+  --rb-canvas: #f6f7f5;
   --rb-surface: #ffffff;
-  --rb-quiet: #f2efe9;
+  --rb-quiet: #f0f2f0;
   --rb-ink: #171a18;
-  --rb-muted: #5d655f;
-  --rb-border: #d8ded9;
-  --rb-border-strong: #b7c0ba;
+  --rb-muted: #646e68;
+  --rb-border: #dce2de;
+  --rb-border-strong: #b9c3bd;
   --rb-brand: #00a86b;
   --rb-brand-hover: #009a61;
   --rb-brand-active: #008f5b;
-  --rb-brand-soft: #ddf5ea;
+  --rb-brand-soft: #e3f5ec;
   --rb-brand-text: #007a4d;
   --rb-on-brand: #0d2118;
   --rb-action: #007a4d;
   --rb-action-hover: #006b43;
   --rb-action-pressed: #005b39;
   --rb-on-action: #ffffff;
-  --rb-star: #bf7d00;
-  --rb-star-soft: #fff3d0;
+  --rb-star: #b97d0c;
+  --rb-star-soft: #fff7e5;
   --rb-warning: #9a6417;
   --rb-danger: #b33a3a;
-  --rb-danger-soft: #faeaea;
-  --rb-info: #356d8c;
+  --rb-danger-soft: #fce8e8;
+  --rb-info: #2663a0;
   --rb-focus: #005fcc;
   --rb-focus-soft: rgb(0 95 204 / 28%);
   --radius-control: 12px;
@@ -91,29 +93,29 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --rb-canvas: #14120f;
-    --rb-surface: #1c1915;
-    --rb-quiet: #262119;
-    --rb-ink: #f7f4ee;
-    --rb-muted: #b5aea2;
-    --rb-border: #332e26;
-    --rb-border-strong: #4f483c;
+    --rb-canvas: #0c100e;
+    --rb-surface: #131816;
+    --rb-quiet: #19201c;
+    --rb-ink: #f7f9f7;
+    --rb-muted: #abb5af;
+    --rb-border: #303a34;
+    --rb-border-strong: #465149;
     --rb-brand: #00a86b;
     --rb-brand-hover: #17c07f;
     --rb-brand-active: #21cf8c;
-    --rb-brand-soft: #123b2c;
-    --rb-brand-text: #4fd69b;
-    --rb-on-brand: #06231a;
-    --rb-action: #1a9a64;
-    --rb-action-hover: #17c07f;
-    --rb-action-pressed: #21cf8c;
-    --rb-on-action: #06231a;
-    --rb-star: #f7b928;
-    --rb-star-soft: #3d2e12;
-    --rb-danger: #f08a8a;
+    --rb-brand-soft: #143729;
+    --rb-brand-text: #45cf99;
+    --rb-on-brand: #071b13;
+    --rb-action: #32cf94;
+    --rb-action-hover: #4ad8a3;
+    --rb-action-pressed: #2bb885;
+    --rb-on-action: #071b13;
+    --rb-star: #f2b94b;
+    --rb-star-soft: #3a2e14;
+    --rb-danger: #ff8f8f;
     --rb-danger-soft: #452323;
-    --rb-info: #8bc2df;
-    --rb-focus: #4d8eff;
+    --rb-info: #78b5f4;
+    --rb-focus: #7ab8ff;
     --rb-focus-soft: rgb(77 142 255 / 34%);
     --shadow-control: 0 1px 0 rgb(0 0 0 / 40%);
     --shadow-button: 0 1px 0 rgb(0 0 0 / 40%);
@@ -125,57 +127,57 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --rb-canvas: #f8f5f0;
+  --rb-canvas: #f6f7f5;
   --rb-surface: #ffffff;
-  --rb-quiet: #f2efe9;
+  --rb-quiet: #f0f2f0;
   --rb-ink: #171a18;
-  --rb-muted: #5d655f;
-  --rb-border: #d8ded9;
-  --rb-border-strong: #b7c0ba;
+  --rb-muted: #646e68;
+  --rb-border: #dce2de;
+  --rb-border-strong: #b9c3bd;
   --rb-brand: #00a86b;
   --rb-brand-hover: #009a61;
   --rb-brand-active: #008f5b;
-  --rb-brand-soft: #ddf5ea;
+  --rb-brand-soft: #e3f5ec;
   --rb-brand-text: #007a4d;
   --rb-on-brand: #0d2118;
   --rb-action: #007a4d;
   --rb-action-hover: #006b43;
   --rb-action-pressed: #005b39;
   --rb-on-action: #ffffff;
-  --rb-star: #bf7d00;
-  --rb-star-soft: #fff3d0;
+  --rb-star: #b97d0c;
+  --rb-star-soft: #fff7e5;
   --rb-danger: #b33a3a;
-  --rb-danger-soft: #faeaea;
-  --rb-info: #356d8c;
+  --rb-danger-soft: #fce8e8;
+  --rb-info: #2663a0;
   --rb-focus: #005fcc;
   --rb-focus-soft: rgb(0 95 204 / 28%);
 }
 :root[data-theme="dark"],
 .dark {
   color-scheme: dark;
-  --rb-canvas: #14120f;
-  --rb-surface: #1c1915;
-  --rb-quiet: #262119;
-  --rb-ink: #f7f4ee;
-  --rb-muted: #b5aea2;
-  --rb-border: #332e26;
-  --rb-border-strong: #4f483c;
+  --rb-canvas: #0c100e;
+  --rb-surface: #131816;
+  --rb-quiet: #19201c;
+  --rb-ink: #f7f9f7;
+  --rb-muted: #abb5af;
+  --rb-border: #303a34;
+  --rb-border-strong: #465149;
   --rb-brand: #00a86b;
   --rb-brand-hover: #17c07f;
   --rb-brand-active: #21cf8c;
-  --rb-brand-soft: #123b2c;
-  --rb-brand-text: #4fd69b;
-  --rb-on-brand: #06231a;
-  --rb-action: #1a9a64;
-  --rb-action-hover: #17c07f;
-  --rb-action-pressed: #21cf8c;
-  --rb-on-action: #06231a;
-  --rb-star: #f7b928;
-  --rb-star-soft: #3d2e12;
-  --rb-danger: #f08a8a;
+  --rb-brand-soft: #143729;
+  --rb-brand-text: #45cf99;
+  --rb-on-brand: #071b13;
+  --rb-action: #32cf94;
+  --rb-action-hover: #4ad8a3;
+  --rb-action-pressed: #2bb885;
+  --rb-on-action: #071b13;
+  --rb-star: #f2b94b;
+  --rb-star-soft: #3a2e14;
+  --rb-danger: #ff8f8f;
   --rb-danger-soft: #452323;
-  --rb-info: #8bc2df;
-  --rb-focus: #4d8eff;
+  --rb-info: #78b5f4;
+  --rb-focus: #7ab8ff;
   --rb-focus-soft: rgb(77 142 255 / 34%);
 }
 
