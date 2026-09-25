@@ -27,18 +27,22 @@ export function FeedbackList({ items }: { items: FeedbackItem[] }) {
           <Link
             href={`/feedback/${item.id}`}
             className={cn(
-              "flex min-h-14 items-start gap-3 py-4",
-              "transition-colors duration-150 hover:bg-quiet/60",
+              "group -mx-2 flex min-h-14 items-center gap-3 rounded-[var(--radius-control)] px-2 py-3.5",
+              "transition-colors duration-150 hover:bg-quiet active:bg-quiet",
               "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
             )}
           >
-            <div className="min-w-0 flex-1">
-              <div className="mb-1 flex items-center gap-2">
-                <Stars rating={item.rating} />
+            {/* Unread is a dot in its own column, so read and unread rows
+                keep their stars lined up down the list. */}
+            <span className="flex w-2 shrink-0 self-start pt-[0.4rem]" aria-hidden={item.isRead || undefined}>
+              {item.isRead ? null : (
+                <span className="size-2 rounded-full bg-action" aria-label="Unread" role="img" />
+              )}
+            </span>
 
-                {item.isRead ? null : (
-                  <span className="size-1.5 rounded-full bg-ink" aria-label="Unread" role="img" />
-                )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2.5">
+                <Stars rating={item.rating} size="md" />
 
                 {item.isResolved ? (
                   <span className="inline-flex items-center gap-1 text-sm text-muted">
@@ -47,27 +51,34 @@ export function FeedbackList({ items }: { items: FeedbackItem[] }) {
                   </span>
                 ) : null}
 
-                <time dateTime={item.submittedAt} className="ml-auto shrink-0 text-sm text-muted">
+                <time
+                  dateTime={item.submittedAt}
+                  className={cn(
+                    "ml-auto shrink-0 text-sm tabular-nums",
+                    item.isRead ? "text-muted" : "font-medium text-ink",
+                  )}
+                >
                   {relativeDay(item.submittedAt)}
                 </time>
               </div>
 
+              {/* A rating with no message is one line. Saying "Rating only,
+                  no message" on every such row was the same sentence, over
+                  and over, carrying nothing the stars had not already said. */}
               {item.note ? (
                 <p
                   className={cn(
-                    "line-clamp-2 whitespace-pre-wrap text-base leading-relaxed",
+                    "mt-1.5 line-clamp-2 whitespace-pre-wrap text-base leading-relaxed",
                     item.isRead ? "text-muted" : "text-ink",
                   )}
                 >
                   {item.note}
                 </p>
-              ) : (
-                <p className="text-base italic text-muted">Rating only, no message</p>
-              )}
+              ) : null}
             </div>
 
             <ChevronRight
-              className="mt-1 size-5 shrink-0 text-[color:var(--rb-border-strong)]"
+              className="size-5 shrink-0 text-[color:var(--rb-border-strong)] transition-transform duration-150 group-hover:translate-x-0.5"
               aria-hidden="true"
             />
           </Link>
