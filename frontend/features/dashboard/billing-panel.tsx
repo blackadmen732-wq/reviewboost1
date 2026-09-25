@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
+import { PUBLIC_PLANS, TRIAL } from "@/features/public/pricing-plans";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 type PlanId = "starter" | "growth" | "pro";
@@ -19,25 +20,21 @@ interface Billing {
 }
 
 /**
- * The locked plans, for the pricing table only.
- *
- * These are the same numbers the database enforces and the API returns. They
- * are written here because a signed-out pricing table has no backend state to
- * read — but nothing about the *current* subscription is taken from this
- * object. What a business has is whatever `billing` says it has.
+ * The locked plans come from `PUBLIC_PLANS`, the same list the pricing page
+ * shows, so the price and trial an owner is offered here cannot drift from it.
+ * Nothing about the *current* subscription is taken from that list. What a
+ * business has is whatever `billing` says it has.
  */
-const PLANS: ReadonlyArray<{
-  id: PlanId;
-  name: string;
-  priceUsd: number;
-  locations: number;
-  tags: number;
-  sms: number;
-}> = [
-  { id: "starter", name: "Starter", priceUsd: 49, locations: 1, tags: 3, sms: 150 },
-  { id: "growth", name: "Growth", priceUsd: 79, locations: 2, tags: 8, sms: 500 },
-  { id: "pro", name: "Pro", priceUsd: 129, locations: 5, tags: 25, sms: 1500 },
-];
+const PLANS = PUBLIC_PLANS;
+
+/**
+ * Only Starter has a trial, and only for a business that has never had a
+ * plan: checkout gives no second trial after a cancellation.
+ */
+function checkoutLabel(plan: (typeof PLANS)[number], firstSubscription: boolean): string {
+  if (firstSubscription && plan.trialDays > 0) return `Start ${plan.trialDays}-day free trial`;
+  return `Subscribe for $${plan.price} a month`;
+}
 
 function formatDate(value: string | null): string | null {
   if (!value) return null;
@@ -116,7 +113,7 @@ function describe(billing: Billing): { title: string; body: string; tone: "info"
       if (billing.planId === null) {
         return {
           title: "Choose a plan to open your Tags",
-          body: "Your Tags are ready and they are not serving customers yet. Pick a plan below — seven days free, and nothing is charged until the trial ends.",
+          body: `Your Tags are ready and they are not serving customers yet. Pick a plan below — ${TRIAL.plan} is free for ${TRIAL.days} days.`,
           tone: "info",
         };
       }
@@ -184,6 +181,7 @@ export function BillingPanel({ billing }: { billing: Billing }) {
   }
 
   const currentPlan = PLANS.find((plan) => plan.id === billing.planId);
+  const firstSubscription = billing.planId === null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -214,7 +212,7 @@ export function BillingPanel({ billing }: { billing: Billing }) {
             </div>
             <div className="flex gap-2">
               <dt>Messages a month</dt>
-              <dd className="font-medium text-ink">{currentPlan.sms}</dd>
+              <dd className="font-medium text-ink">{currentPlan.monthlyTexts}</dd>
             </div>
           </dl>
           <p className="mt-3 text-sm text-muted">
@@ -231,8 +229,9 @@ export function BillingPanel({ billing }: { billing: Billing }) {
             Choose a plan
           </h2>
           <p className="mb-4 text-sm text-muted">
-            Seven days free. A card is needed to start, and you are not charged until the
-            trial ends.
+            {firstSubscription
+              ? `${TRIAL.plan} is free for ${TRIAL.days} days — a card is needed to start, and nothing is charged until the trial ends. Growth and Pro are charged when you subscribe.`
+              : "A card is needed. You are charged when you subscribe."}
           </p>
           <ul className="grid gap-3 sm:grid-cols-3">
             {PLANS.map((plan) => (
@@ -243,7 +242,7 @@ export function BillingPanel({ billing }: { billing: Billing }) {
                 <div>
                   <p className="text-base font-semibold text-ink">{plan.name}</p>
                   <p className="text-2xl font-semibold tracking-[-0.02em] text-ink">
-                    ${plan.priceUsd}
+                    ${plan.price}
                     <span className="text-sm font-normal text-muted"> a month</span>
                   </p>
                 </div>
@@ -254,7 +253,7 @@ export function BillingPanel({ billing }: { billing: Billing }) {
                   <li>
                     {plan.tags} {plan.tags === 1 ? "Tag" : "Tags"}
                   </li>
-                  <li>{plan.sms} text messages a month</li>
+                  <li>{plan.monthlyTexts.toLocaleString()} text messages a month</li>
                 </ul>
                 <Button
                   type="button"
@@ -263,7 +262,7 @@ export function BillingPanel({ billing }: { billing: Billing }) {
                   loadingLabel="Opening…"
                   disabled={busy !== null}
                 >
-                  Start free trial
+                  {checkoutLabel(plan, firstSubscription)}
                 </Button>
               </li>
             ))}

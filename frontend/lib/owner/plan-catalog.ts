@@ -20,6 +20,12 @@ export interface PlanDefinition {
   locationLimit: number;
   tagLimit: number;
   smsIncluded: 0;
+  /**
+   * Free days before the first charge. Starter is the only plan with a trial;
+   * Growth and Pro charge at checkout. Checkout, the pricing page and the
+   * billing screen all read this, so they cannot disagree.
+   */
+  trialDays: 7 | 0;
 }
 
 export const PLAN_CATALOG: Record<PlanId, PlanDefinition> = {
@@ -30,6 +36,7 @@ export const PLAN_CATALOG: Record<PlanId, PlanDefinition> = {
     locationLimit: 1,
     tagLimit: 3,
     smsIncluded: 0,
+    trialDays: 7,
   },
   growth: {
     id: "growth",
@@ -38,6 +45,7 @@ export const PLAN_CATALOG: Record<PlanId, PlanDefinition> = {
     locationLimit: 2,
     tagLimit: 8,
     smsIncluded: 0,
+    trialDays: 0,
   },
   pro: {
     id: "pro",
@@ -46,8 +54,14 @@ export const PLAN_CATALOG: Record<PlanId, PlanDefinition> = {
     locationLimit: 5,
     tagLimit: 25,
     smsIncluded: 0,
+    trialDays: 0,
   },
 };
+
+/** Whether choosing this plan starts a free trial rather than a charge. */
+export function planHasTrial(id: PlanId): boolean {
+  return PLAN_CATALOG[id].trialDays > 0;
+}
 
 export const DEFAULT_PLAN_ID: PlanId = "starter";
 

@@ -58,8 +58,8 @@ describe("PublicHome", () => {
     for (const plan of PUBLIC_PLANS) {
       expect(screen.getByText(`$${plan.price}`)).toBeVisible();
     }
-    // The trial is a trial: seven days, a card, and not a free tier.
-    expect(screen.getByText(/7 days free/i)).toBeVisible();
+    // The trial is Starter's: seven days, a card, and not a free tier.
+    expect(screen.getByText(/Starter free for 7 days/i)).toBeVisible();
     expect(screen.queryByText(/free forever/i)).not.toBeInTheDocument();
     // The FAQ does ask "Is there a free plan?" — and answers No. Matching the
     // phrase would fail on the denial, so this checks the offer instead: every

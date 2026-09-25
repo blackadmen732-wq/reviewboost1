@@ -8,7 +8,7 @@ import {
   type EntitlementStatus,
   PLANS,
   type PlanId,
-  TRIAL_DAYS,
+  trialDaysFor,
 } from "@/lib/server/entitlements";
 import { planIdForPrice, publicFrontendUrl, stripePriceId } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
@@ -27,8 +27,10 @@ import { serviceRoleClient } from "@/lib/server/supabase";
  *
  * WHAT A TRIAL IS
  * ---------------
- * Seven days, no charge, a card required up front, and a paid plan chosen
- * before it starts. One location, one Tag, and no SMS at all. There is no
+ * Starter only. Seven days, no charge, a card required up front. One
+ * location, one Tag, and no SMS at all. Growth and Pro have no trial: checkout
+ * charges the first month immediately, and the paid invoice is what makes the
+ * plan active and mints its texts. There is no
  * permanent free plan and no "we'll figure out the plan later" state — a trial
  * without a chosen plan is a subscription nobody knows how to renew.
  */
@@ -153,16 +155,21 @@ export async function createCheckoutSession(
   const customerId = await ensureStripeCustomer(orgId, requestId);
   const origin = publicFrontendUrl();
 
+  // A business that has subscribed before does not get a second trial by
+  // cancelling and checking out again.
+  const trialDays = existing ? 0 : trialDaysFor(planId);
+
   const session = await stripe.checkout.sessions.create(
     {
       mode: "subscription",
       customer: customerId,
       line_items: [{ price, quantity: 1 }],
-      // A card is required before the trial starts. A trial that can be taken
-      // without one is a free plan with a timer.
+      // A card is always required: before Starter's trial starts, and to pay
+      // Growth and Pro today. A trial without one is a free plan with a timer.
       payment_method_collection: "always",
       subscription_data: {
-        trial_period_days: TRIAL_DAYS,
+        // Only Starter has a trial. Omitting the field charges immediately.
+        ...(trialDays > 0 ? { trial_period_days: trialDays } : {}),
         metadata: { org_id: orgId, plan_id: planId },
       },
       client_reference_id: orgId,

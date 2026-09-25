@@ -56,7 +56,7 @@ export function PricingTable() {
 
       <div className="mt-8 rounded-[var(--radius-card)] border border-border bg-quiet p-6">
         <p className="text-base font-medium text-ink">
-          Start with {TRIAL.days} days free — {TRIAL.tags} Tag, {TRIAL.locations} location.
+          Try {TRIAL.plan} free for {TRIAL.days} days — {TRIAL.tags} Tag, {TRIAL.locations} location.
         </p>
         <p className="mt-2 max-w-[48ch] text-sm leading-relaxed text-muted">{TRIAL.note}</p>
         <div className="mt-5 max-w-xs">

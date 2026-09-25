@@ -76,6 +76,12 @@ describe("the trial is a trial, not a free plan", () => {
     expect(TRIAL.note.toLowerCase()).toContain("nothing is charged");
   });
 
+  it("is Starter's alone, and says Growth and Pro are charged at once", () => {
+    expect(TRIAL.plan).toBe("Starter");
+    expect(PUBLIC_PLANS.filter((p) => p.trialDays > 0).map((p) => p.id)).toEqual(["starter"]);
+    expect(TRIAL.note).toMatch(/Growth and Pro are charged when you subscribe/);
+  });
+
   it("never offers a free plan", () => {
     const words = [...PUBLIC_PLANS.map((p) => `${p.name} ${p.fit}`), ...EVERY_PLAN].join(" ");
     expect(words.toLowerCase()).not.toMatch(/\bfree\b|forever/);

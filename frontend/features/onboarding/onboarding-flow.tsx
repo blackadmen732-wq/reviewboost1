@@ -300,8 +300,8 @@ export function OnboardingFlow() {
             business puts this on the counter and finds out from a customer.
             The door opens when a plan does. */}
         <p className="text-base text-muted">
-          Choose a plan to switch it on. Seven days free, and nothing is
-          charged until the trial ends.
+          Choose a plan to switch it on. Starter is free for seven days,
+          and nothing is charged until the trial ends.
         </p>
       </div>
 

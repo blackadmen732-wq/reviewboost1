@@ -70,7 +70,9 @@ export default function TermsPage() {
 
       <h2>Billing</h2>
       <p>
-        Paid plans begin after the free trial. Payment is handled by Stripe; we never see
+        Starter begins with a seven-day free trial; a card is required, and the first charge
+        is made when the trial ends unless you cancel before then. Growth and Pro have no
+        trial and are charged when you subscribe. Payment is handled by Stripe; we never see
         your full card number. Plans renew automatically until cancelled, and cancelling
         takes effect at the end of the period you have already paid for. We do not refund
         partial periods except where the law requires it.

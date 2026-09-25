@@ -61,11 +61,11 @@ export const FAQ: readonly FaqEntry[] = [
   },
   {
     question: "Is there a free plan?",
-    answer: `No. There is a ${TRIAL.days}-day trial with one Tag, and then plans start at $${cheapest.price} a month.`,
+    answer: `No. ${TRIAL.plan} has a ${TRIAL.days}-day trial with one Tag, then plans start at $${cheapest.price} a month. Growth and Pro have no trial.`,
   },
   {
     question: "Do I need a card to start the trial?",
-    answer: `Yes. Nothing is charged until the ${TRIAL.days} days are up, and you can cancel before then without paying anything.`,
+    answer: `Yes. The trial is on ${TRIAL.plan} only. Nothing is charged until the ${TRIAL.days} days are up, and you can cancel before then without paying anything.`,
   },
   {
     question: "What happens if I cancel?",

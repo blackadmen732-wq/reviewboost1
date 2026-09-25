@@ -7,7 +7,7 @@ import { PricingTable } from "@/features/public/pricing-table";
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "Seven days free, then $49, $79 or $129 a month. A card is required to start and nothing is charged until the trial ends.",
+    "$49, $79 or $129 a month. Starter starts with seven days free, card required; Growth and Pro are charged when you subscribe.",
 };
 
 export default function PricingPage() {

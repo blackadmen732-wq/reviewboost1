@@ -82,7 +82,7 @@ export const PRICING = {
   // Stripe billing is live. This used to read "Billing is not live yet",
   // which was true when it was written and is now the kind of stale sentence
   // that makes a visitor doubt everything else on the page.
-  caveat: "Seven days free. A card is required to start, and nothing is charged until the trial ends.",
+  caveat: "Starter has a seven-day free trial, card required. Growth and Pro are charged when you subscribe.",
 } as const;
 
 export const SECURITY = {

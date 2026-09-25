@@ -220,9 +220,12 @@ This section used to read "No subscription plans, billing enforcement, trial
 flow, cancellation flow, or Stripe integration exists in the current
 repository." Every clause of that is now false.
 
-**The offer is frozen.** No free plan. A seven-day trial at $0 that requires a
-card (1 location, 1 Tag, 0 SMS), then Starter $49 (1 / 3 / 150), Growth $79
-(2 / 8 / 500), Pro $129 (5 / 25 / 1,500).
+**The offer is frozen.** No free plan. Starter $49 (1 / 3 / 150) is the only
+plan with a trial: seven days at $0, card required (1 location, 1 Tag, 0 SMS),
+and only for a business that has never subscribed. Growth $79 (2 / 8 / 500) and
+Pro $129 (5 / 25 / 1,500) have no trial and are charged at checkout.
+`PLAN_CATALOG.trialDays` in `frontend/lib/owner/plan-catalog.ts` is the one
+place this is written; checkout, the pricing page and the billing screen read it.
 
 The database is the authority, not a frontend constant:
 `app.entitlement_tag_limit`, `app.entitlement_location_limit` and

@@ -79,9 +79,9 @@ readable only by your business.
 
 PLANS
 
-Seven days free, then $49, $79 or $129 a month depending on how many locations
-and Tags you need. A card is required to start the trial and nothing is charged
-until it ends. Subscriptions are managed at reviewboost.fit; this app shows
+$49, $79 or $129 a month depending on how many locations and Tags you need.
+Starter comes with a seven-day free trial: a card is required to start it and
+nothing is charged until it ends. Growth and Pro are charged when you subscribe. Subscriptions are managed at reviewboost.fit; this app shows
 your plan and what is left of it.
 
 Requires an internet connection. NFC programming requires a phone with NFC
