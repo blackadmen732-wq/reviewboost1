@@ -47,9 +47,27 @@ describe("Tags list", () => {
       "href",
       "/stands/11111111-1111-1111-1111-111111111111",
     );
-    expect(screen.getByText("Needs NFC")).toBeVisible();
-    expect(screen.getByText("Ready")).toBeVisible();
+    // QR and NFC are separate states, because they fail separately.
+    expect(screen.getByText("Program NFC")).toBeVisible();
+    expect(screen.getByText("NFC ready")).toBeVisible();
+    expect(screen.getAllByText("QR ready")).toHaveLength(2);
     expect(screen.getByText(/High Street · Not used yet/)).toBeVisible();
     expect(screen.getByText(/Used today/)).toBeVisible();
+  });
+
+  it("says which half to redo after the code changed", () => {
+    render(
+      <TagsList
+        stands={[
+          stand({
+            nfcProvisionedAt: "2026-09-01T00:00:00.000Z",
+            tokenRotatedAt: "2026-09-10T00:00:00.000Z",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Reprint QR")).toBeVisible();
+    expect(screen.getByText("Reprogram NFC")).toBeVisible();
   });
 });
