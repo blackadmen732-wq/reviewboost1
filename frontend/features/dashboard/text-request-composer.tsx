@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { notify } from "@/components/ui/toast";
 import { ownerOrAdmin } from "@/lib/owner/permissions";
+import {
+  DEFAULT_TEXT_REQUEST_WORDS,
+  previewParts,
+  templateFromOwnerWords,
+} from "@/lib/sms/text-request-message";
+import { relativeDay } from "@/lib/utils/relative-day";
+import { cn } from "@/lib/utils/cn";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 interface Balance {
@@ -107,7 +114,7 @@ export function TextRequestComposer({
       const response = await authorizedFetch("/api/v1/text-requests/preview", {
         phone: phone.trim(),
         standId,
-        ...(message.trim() ? { messageTemplate: message.trim() } : {}),
+        ...(templateFromOwnerWords(message) ? { messageTemplate: templateFromOwnerWords(message) } : {}),
       });
 
       if (!response.ok) {
@@ -134,7 +141,7 @@ export function TextRequestComposer({
       const response = await authorizedFetch("/api/v1/text-requests", {
         phone: phone.trim(),
         standId,
-        ...(message.trim() ? { messageTemplate: message.trim() } : {}),
+        ...(templateFromOwnerWords(message) ? { messageTemplate: templateFromOwnerWords(message) } : {}),
         consent: { source: "owner_import" },
       });
 
@@ -155,173 +162,258 @@ export function TextRequestComposer({
   }
 
   const canSend = phone.trim().length > 2 && standId !== "" && balance.total > 0;
+  const chosenTag = tags.find((tag) => tag.standId === standId) ?? null;
 
   return (
-    <div className="flex flex-col gap-6">
-      <section
-        className="rounded-[var(--radius-card)] border border-border bg-surface p-4"
-        aria-labelledby="balance-heading"
-      >
-        <h2 id="balance-heading" className="text-sm font-medium text-muted">
-          Messages you can send
-        </h2>
-        <p className="mt-1 text-3xl font-semibold tracking-[-0.02em] text-ink">
-          {balance.total}
+    <div className="flex flex-col gap-10">
+      <BalanceLine balance={balance} />
+
+      {!canSendRequests ? (
+        <p className="text-base text-muted" data-text-request-access="read-only">
+          {ownerOrAdmin("send Text Requests")}
         </p>
-        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
-          <div className="flex gap-2">
-            <dt>Included this month</dt>
-            <dd className="font-medium text-ink">{balance.monthly}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt>Purchased</dt>
-            <dd className="font-medium text-ink">{balance.purchased}</dd>
-          </div>
-        </dl>
-        {balance.monthly > 0 ? (
-          <p className="mt-2 text-sm text-muted">
-            Included messages are used first and do not carry over. Purchased ones stay
-            until you use them.
-          </p>
-        ) : null}
-      </section>
-
-      <section
-        className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4"
-        aria-labelledby="compose-heading"
-      >
-        <h2 id="compose-heading" className="text-base font-semibold text-ink">
-          Send a request
-        </h2>
-
-        {!canSendRequests ? (
-          <p className="text-base text-muted" data-text-request-access="read-only">
-            {ownerOrAdmin("send Text Requests")}
-          </p>
-        ) : tags.length === 0 ? (
-          <InlineNotice kind="info">
-            <p>Create a Tag first — the message carries its link.</p>
-          </InlineNotice>
-        ) : (
-          <>
-            <label className="flex flex-col gap-1 text-sm font-medium text-muted">
-              Mobile number
+      ) : tags.length === 0 ? (
+        <InlineNotice kind="info">
+          <p>Create a Tag first — the message carries its link.</p>
+        </InlineNotice>
+      ) : (
+        <section className="flex flex-col gap-5" aria-label="Send a Text Request">
+          <Field label="Customer's mobile number">
+            {(id) => (
               <input
-                className="min-h-14 rounded-[var(--radius-control)] border border-border bg-canvas px-4 text-base text-ink"
+                id={id}
+                className={fieldClass}
                 type="tel"
                 inputMode="tel"
                 autoComplete="off"
                 value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                placeholder="+1 555 123 4567"
+                onChange={(event) => {
+                  setPhone(event.target.value);
+                  setPreview(null);
+                }}
+                placeholder="(555) 123-4567"
               />
-            </label>
+            )}
+          </Field>
 
-            <label className="flex flex-col gap-1 text-sm font-medium text-muted">
-              Which Tag
-              <select
-                className="min-h-14 rounded-[var(--radius-control)] border border-border bg-canvas px-4 text-base text-ink"
-                value={standId}
-                onChange={(event) => setStandId(event.target.value)}
-              >
-                {tags.map((tag) => (
-                  <option key={tag.standId} value={tag.standId}>
-                    {tag.locationName ? `${tag.label} — ${tag.locationName}` : tag.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+          {tags.length > 1 ? (
+            <Field label="Send the link to">
+              {(id) => (
+                <select
+                  id={id}
+                  className={fieldClass}
+                  value={standId}
+                  onChange={(event) => {
+                    setStandId(event.target.value);
+                    setPreview(null);
+                  }}
+                >
+                  {tags.map((tag) => (
+                    <option key={tag.standId} value={tag.standId}>
+                      {tag.locationName ? `${tag.label} — ${tag.locationName}` : tag.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+          ) : null}
 
-            <label className="flex flex-col gap-1 text-sm font-medium text-muted">
-              Message (optional)
+          <Field label="Message" hint="Optional. Your Tag's link is added at the end.">
+            {(id, hintId) => (
               <textarea
-                className="min-h-24 rounded-[var(--radius-control)] border border-border bg-canvas p-4 text-base text-ink"
+                id={id}
+                aria-describedby={hintId}
+                className={cn(fieldClass, "min-h-24 py-3.5 leading-relaxed")}
                 value={message}
+                maxLength={420}
                 onChange={(event) => {
                   setMessage(event.target.value);
                   setPreview(null);
                 }}
-                placeholder="How was your visit? Tap here to leave a review: {{link}}"
+                placeholder={DEFAULT_TEXT_REQUEST_WORDS}
               />
-              <span className="text-xs text-muted">
-                Leave it empty to use the default. Include {"{{link}}"} where the Tag link
-                should go.
-              </span>
-            </label>
+            )}
+          </Field>
 
+          <MessagePreview words={message} tagLabel={chosenTag?.label ?? "your Tag"} />
+
+          {error ? (
+            <InlineNotice kind="error" title="That did not go through" blocking>
+              <p>{error}</p>
+            </InlineNotice>
+          ) : null}
+
+          {balance.total === 0 ? (
+            <InlineNotice kind="info">
+              <p>You have no texts left. Buy more or wait for your next billing date.</p>
+            </InlineNotice>
+          ) : null}
+
+          <div className="flex flex-col gap-3">
+            <Button
+              type="button"
+              variant="action"
+              size="lg"
+              onClick={() => void send()}
+              loading={busy}
+              loadingLabel="Sending…"
+              disabled={!canSend}
+            >
+              Send text request
+            </Button>
+            {/* The exact count depends on the real link, which only the server
+                builds, so it is a server check rather than a guess here. */}
             {preview ? (
-              <InlineNotice kind="info">
-                {/* Message count only. The server still computes exact segments —
-                    including the GSM-7/UCS-2 split that makes one emoji halve the
-                    limit — and the ledger still bills on that. An owner cannot act
-                    on "UCS-2" and should not have to learn what it means. */}
-                <p>
-                  {preview.segments === 1
-                    ? "1 message will be billed."
-                    : `${preview.segments} messages will be billed.`}
-                </p>
-              </InlineNotice>
-            ) : null}
-
-            {error ? (
-              <InlineNotice kind="error" title="That did not go through" blocking>
-                <p>{error}</p>
-              </InlineNotice>
-            ) : null}
-
-            {balance.total === 0 ? (
-              <InlineNotice kind="info">
-                <p>You have no messages left. Buy more or wait for your next billing date.</p>
-              </InlineNotice>
-            ) : null}
-
-            <div className="flex flex-wrap gap-3">
-              <Button
+              <p className="text-center text-sm text-muted" role="status">
+                {preview.segments === 1
+                  ? "This uses 1 text."
+                  : `This uses ${preview.segments} texts — shorten the message to use fewer.`}
+              </p>
+            ) : (
+              <button
                 type="button"
-                variant="secondary"
+                className="mx-auto min-h-11 rounded-[var(--radius-control)] px-3 text-sm font-medium text-muted underline-offset-4 hover:text-ink hover:underline disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
                 onClick={() => void runPreview()}
                 disabled={busy || phone.trim().length < 3 || standId === ""}
               >
-                Preview
-              </Button>
-              <Button
-                type="button"
-                onClick={() => void send()}
-                loading={busy}
-                loadingLabel="Sending…"
-                disabled={!canSend}
-              >
-                Send
-              </Button>
-            </div>
-          </>
-        )}
-      </section>
+                How many texts will this use?
+              </button>
+            )}
+          </div>
+        </section>
+      )}
 
-      <section aria-labelledby="recent-heading">
-        <h2 id="recent-heading" className="mb-3 text-base font-semibold text-ink">
-          Recent
-        </h2>
-        {recent.length === 0 ? (
-          <p className="text-sm text-muted">Nothing sent yet.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {recent.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center justify-between gap-4 rounded-[var(--radius-control)] border border-border bg-surface px-4 py-3"
-              >
-                <span className="text-sm text-ink">
+      <RecentList recent={recent} />
+    </div>
+  );
+}
+
+const fieldClass =
+  "min-h-14 w-full rounded-[var(--radius-control)] border border-border bg-surface px-4 text-base text-ink placeholder:text-muted transition-colors focus:border-[color:var(--rb-brand)] focus:outline-none focus:ring-4 focus:ring-[color:var(--rb-focus-soft)]";
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: (id: string, hintId: string | undefined) => React.ReactNode;
+}) {
+  const id = useId();
+  const hintId = hint ? `${id}-hint` : undefined;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-sm font-medium text-ink">
+        {label}
+      </label>
+      {children(id, hintId)}
+      {hint ? (
+        <p id={hintId} className="text-sm text-muted">
+          {hint}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The text as the customer's phone will show it. The words are exact; the
+ * link is the Tag's real ReviewBoost link, which the server builds, so it is
+ * shown as the link rather than as a made-up address.
+ */
+function MessagePreview({ words, tagLabel }: { words: string; tagLabel: string }) {
+  const { before, after } = previewParts(words);
+  return (
+    <div aria-label="Message preview" role="group">
+      <p className="mb-2 text-sm font-medium text-muted">What they&apos;ll get</p>
+      <div className="max-w-[20rem] rounded-[20px] rounded-bl-[6px] bg-quiet px-4 py-3 text-[0.9375rem] leading-relaxed text-ink">
+        {before}{" "}
+        <span className="break-words font-medium text-brand-text underline decoration-1 underline-offset-2">
+          link to {tagLabel}
+        </span>
+        {after ? ` ${after}` : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One line, not an accounting lesson. The split by source only appears when
+ * there is something purchased to split out.
+ */
+function BalanceLine({ balance }: { balance: Balance }) {
+  return (
+    <section aria-label="Texts left">
+      <p className="flex items-baseline gap-2">
+        <span className="text-[2rem] font-semibold leading-none tracking-[-0.03em] text-ink tabular-nums">
+          {balance.total.toLocaleString()}
+        </span>
+        <span className="text-base text-muted">{balance.total === 1 ? "text left" : "texts left"}</span>
+      </p>
+      {balance.purchased > 0 ? (
+        <p className="mt-2 text-sm text-muted">
+          {balance.monthly.toLocaleString()} from this month&apos;s plan, used first ·{" "}
+          {balance.purchased.toLocaleString()} purchased, kept until used
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+const STATUS: Record<string, { label: string; tone: "ok" | "wait" | "bad" | "off" }> = {
+  scheduled: { label: "Scheduled", tone: "wait" },
+  queued: { label: "Sending", tone: "wait" },
+  sending: { label: "Sending", tone: "wait" },
+  submitted: { label: "Sent", tone: "wait" },
+  provider_unknown: { label: "Sent", tone: "wait" },
+  delivered: { label: "Delivered", tone: "ok" },
+  failed: { label: "Not delivered", tone: "bad" },
+  suppressed: { label: "Not sent — number opted out or blocked", tone: "off" },
+  cancelled: { label: "Cancelled", tone: "off" },
+};
+
+function RecentList({ recent }: { recent: readonly RecentRequest[] }) {
+  return (
+    <section aria-labelledby="recent-heading">
+      <h2 id="recent-heading" className="mb-2 text-sm font-medium text-muted">
+        Recent
+      </h2>
+      {recent.length === 0 ? (
+        <p className="text-base text-muted">Nothing sent yet.</p>
+      ) : (
+        <ul className="divide-y divide-border border-y border-border">
+          {recent.map((item) => {
+            const status = STATUS[item.status] ?? { label: item.status, tone: "wait" as const };
+            return (
+              <li key={item.id} className="flex min-h-14 items-center gap-3 py-3">
+                <span className="text-base tabular-nums text-ink">
                   ••• {item.recipientLastFour ?? "????"}
                 </span>
-                <span className="text-sm text-muted">
-                  {item.segments} {item.segments === 1 ? "message" : "messages"} · {item.status}
+                <span className="text-sm text-muted">{relativeDay(item.createdAt)}</span>
+                <span
+                  className={cn(
+                    "ml-auto inline-flex items-center gap-1.5 text-sm",
+                    status.tone === "bad" ? "font-medium text-danger" : "text-muted",
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "size-2 rounded-full",
+                      status.tone === "ok" && "bg-brand",
+                      status.tone === "wait" && "bg-[color:var(--rb-border-strong)]",
+                      status.tone === "bad" && "bg-danger",
+                      status.tone === "off" && "border border-[color:var(--rb-border-strong)]",
+                    )}
+                  />
+                  {status.label}
                 </span>
               </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

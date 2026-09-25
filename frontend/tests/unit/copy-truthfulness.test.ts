@@ -153,7 +153,7 @@ describe("the owner UI hides machinery the owner cannot act on", () => {
     // The owner sees a message count.
     expect(composer).not.toMatch(/\{preview\.encoding/);
     expect(composer).not.toMatch(/\{preview\.unitCount/);
-    expect(composer).toMatch(/message will be billed|messages will be billed/);
+    expect(composer).toMatch(/This uses 1 text|This uses \$\{preview\.segments\} texts/);
   });
 
   it("offers the Customer Page one action, not a draft model", () => {

@@ -15,6 +15,7 @@ import { reviewRequestDedupeKey } from "@/lib/server/sms/dedupe";
 import { normalizePhone, phoneHash, toStoredPhone } from "@/lib/server/sms/phone";
 import { nextAllowedSendTime } from "@/lib/server/sms/quiet-hours";
 import { uuidSchema } from "@/lib/server/validation";
+import { DEFAULT_TEXT_REQUEST_TEMPLATE } from "@/lib/sms/text-request-message";
 
 /**
  * Owner-facing Text Requests service.
@@ -30,7 +31,7 @@ import { uuidSchema } from "@/lib/server/validation";
  * returns no row. Only the *encrypted* rendered message is persisted.
  */
 
-const DEFAULT_TEMPLATE = "How was your visit? Tap here to leave a review: {{link}}";
+const DEFAULT_TEMPLATE = DEFAULT_TEXT_REQUEST_TEMPLATE;
 const DEDUPE_WINDOW_SECONDS = 24 * 60 * 60;
 
 // A national number needs a country to become E.164; the org can carry a
