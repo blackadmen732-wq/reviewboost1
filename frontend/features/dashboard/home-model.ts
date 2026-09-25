@@ -55,8 +55,24 @@ export interface TagStatus {
   needsRewrite: number;
 }
 
+/**
+ * The new-owner path, from real state only. Each step is done when the data
+ * says so — nothing is ticked because a button was pressed. Printing a code is
+ * not recorded anywhere, so step three completes on NFC or, like the rest,
+ * when the first rating arrives and Home stops showing setup at all.
+ */
+export type SetupStepKey = "tag" | "google" | "print" | "first-rating";
+
+export interface SetupStep {
+  key: SetupStepKey;
+  title: string;
+  done: boolean;
+}
+
 export interface HomeModel {
   kind: HomeKind;
+  /** Only for a Home with no ratings yet. */
+  setup: SetupStep[] | null;
   attentions: Attention[];
   primary: HomePrimary | null;
   showPreview: boolean;
@@ -204,8 +220,19 @@ export function deriveHomeModel({
     primary = null;
   }
 
+  const setup: SetupStep[] | null =
+    kind === "empty"
+      ? [
+          { key: "tag", title: "Create your first Tag", done: hasStand },
+          { key: "google", title: "Add your Google review link", done: counts.hasGoogleLink },
+          { key: "print", title: "Print the code or program NFC", done: tags.programmed > 0 },
+          { key: "first-rating", title: "Get your first rating", done: false },
+        ]
+      : null;
+
   return {
     kind,
+    setup,
     attentions,
     primary,
     showPreview: hasStand && canManage,

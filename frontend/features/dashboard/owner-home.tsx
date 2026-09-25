@@ -1,19 +1,27 @@
+import { Check, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { FeedbackList, type FeedbackItem } from "@/features/dashboard/feedback-list";
 import {
+  type Attention,
   type HomeModel,
+  type HomePrimary,
+  type SetupStep,
   tagStatusLine,
 } from "@/features/dashboard/home-model";
 import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page";
+import { cn } from "@/lib/utils/cn";
 
 /**
  * Owner Home. One question: do I need to do anything?
  *
- * Muscle memory (SoT v1.7): do not move these slots —
- * business name, one number, one warning, one green action, then
- * unread rows and Tags status. Same position, color, word.
+ * The answer is the biggest thing on the screen. Everything else — the week's
+ * number, unread rows, Tags — is quieter and underneath, in the same order
+ * every time so a glance between customers finds it where it was yesterday.
+ *
+ * A business with no ratings yet gets its setup as a short checklist built
+ * from real state, with the one action on the step it is on.
  */
 
 export function OwnerHome({
@@ -27,15 +35,10 @@ export function OwnerHome({
 }) {
   return (
     <div className="flex flex-col">
-      <header className="mb-10">
-        <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
+      <header className="mb-8">
+        <h1 className="text-[1.375rem] font-semibold tracking-[-0.02em] text-ink">
           {businessName}
         </h1>
-        {model.headline ? (
-          <p className="mt-3 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {model.headline}
-          </p>
-        ) : null}
       </header>
 
       {model.kind === "empty" ? (
@@ -47,40 +50,125 @@ export function OwnerHome({
   );
 }
 
+/** "Needs you" or "All good", with a dot that carries the same meaning. */
+function StateLabel({ calm }: { calm: boolean }) {
+  return (
+    <p className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-muted">
+      <span
+        aria-hidden="true"
+        className={cn("size-2 rounded-full", calm ? "bg-brand" : "bg-star")}
+      />
+      {calm ? "All good" : "Needs you"}
+    </p>
+  );
+}
+
+function PrimaryAction({ primary }: { primary: HomePrimary | null }) {
+  if (!primary) return null;
+  return (
+    <div className="mt-6 max-w-sm">
+      <Button asChild variant="action" size="lg">
+        <Link href={primary.href}>{primary.label}</Link>
+      </Button>
+    </div>
+  );
+}
+
+function StateTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[2rem] font-semibold leading-[1.1] tracking-[-0.035em] text-ink">
+      {children}
+    </p>
+  );
+}
+
 function EmptyHome({ model }: { model: HomeModel }) {
   const blocker = model.attentions[0] ?? null;
 
   return (
     <section className="max-w-[36rem]">
+      <StateLabel calm={!blocker} />
       {blocker ? (
         <>
-          <p className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {blocker.title}
-          </p>
+          <StateTitle>{blocker.title}</StateTitle>
           <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{blocker.body}</p>
         </>
       ) : (
         <>
-          <p className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            No ratings yet.
-          </p>
+          <StateTitle>No ratings yet.</StateTitle>
           <p className="mt-3 max-w-[34ch] text-base leading-relaxed text-muted">
             Your tag is ready. Put it where people pay.
           </p>
         </>
       )}
 
-      {model.primary ? (
-        <div className="mt-8 max-w-xs">
-          <Button asChild variant="action" size="lg">
-            <Link href={model.primary.href}>{model.primary.label}</Link>
-          </Button>
-        </div>
-      ) : null}
+      <PrimaryAction primary={model.primary} />
+
+      {model.setup ? <SetupSteps steps={model.setup} /> : null}
 
       {model.showPreview && model.previewStandId ? (
         <PreviewCustomerPage standId={model.previewStandId} />
       ) : null}
+    </section>
+  );
+}
+
+/**
+ * Where the business is in getting set up. Plain rows, not cards: a tick and
+ * a line for what is done, and the current step in ink. The action for the
+ * current step is the green button above, so there is still only one.
+ */
+function SetupSteps({ steps }: { steps: SetupStep[] }) {
+  const current = steps.findIndex((step) => !step.done);
+  const doneCount = steps.filter((step) => step.done).length;
+
+  return (
+    <section className="mt-10" aria-labelledby="setup-heading">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h2 id="setup-heading" className="text-sm font-medium text-muted">
+          Getting set up
+        </h2>
+        <p className="text-sm tabular-nums text-muted">
+          {doneCount} of {steps.length}
+        </p>
+      </div>
+      <ol className="divide-y divide-border border-y border-border">
+        {steps.map((step, index) => {
+          const isCurrent = index === current;
+          return (
+            <li
+              key={step.key}
+              className="flex min-h-14 items-center gap-4 py-3"
+              aria-current={isCurrent ? "step" : undefined}
+              data-setup-step={step.key}
+              data-done={step.done || undefined}
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "grid size-7 shrink-0 place-items-center rounded-full text-[0.8125rem] font-semibold tabular-nums",
+                  step.done && "bg-brand-soft text-brand-text",
+                  !step.done && isCurrent && "bg-ink text-canvas",
+                  !step.done && !isCurrent && "border border-border text-muted",
+                )}
+              >
+                {step.done ? <Check className="size-4" strokeWidth={3} /> : index + 1}
+              </span>
+              <span
+                className={cn(
+                  "text-base",
+                  step.done && "text-muted line-through decoration-border",
+                  !step.done && isCurrent && "font-semibold text-ink",
+                  !step.done && !isCurrent && "text-muted",
+                )}
+              >
+                {step.title}
+                {step.done ? <span className="sr-only"> — done</span> : null}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }
@@ -92,51 +180,82 @@ function ActiveHome({
   model: HomeModel;
   unreadItems: FeedbackItem[];
 }) {
-  const firstAttention = model.attentions[0] ?? null;
+  const [firstAttention, ...otherAttentions] = model.attentions;
 
   return (
-    <div className="flex flex-col gap-12">
+    <div className="flex flex-col gap-10">
       <section className="max-w-[36rem]">
+        <StateLabel calm={!firstAttention} />
         {firstAttention ? (
           <>
-            <p className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-              {firstAttention.title}
-            </p>
-            <p className="mt-2 max-w-[40ch] text-base leading-relaxed text-muted">
+            <StateTitle>{firstAttention.title}</StateTitle>
+            <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">
               {firstAttention.body}
             </p>
           </>
         ) : (
           <>
-            <p className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-              Nothing needs you
-            </p>
-            <p className="mt-2 text-base leading-relaxed text-muted">
-              You can close this and get back to work.
+            <StateTitle>Nothing needs you</StateTitle>
+            <p className="mt-3 text-base leading-relaxed text-muted">
+              Everything is working. Get back to your customers.
             </p>
           </>
         )}
 
-        {model.primary ? (
-          <div className="mt-8 max-w-xs">
-            <Button asChild variant="action" size="lg">
-              <Link href={model.primary.href}>{model.primary.label}</Link>
-            </Button>
-          </div>
-        ) : null}
+        <PrimaryAction primary={model.primary} />
+
+        {otherAttentions.length > 0 ? <AlsoNeeds attentions={otherAttentions} /> : null}
       </section>
+
+      {model.headline ? (
+        <section aria-label="This week">
+          <p className="text-lg font-semibold tracking-[-0.01em] text-ink">{model.headline}</p>
+        </section>
+      ) : null}
 
       {unreadItems.length > 0 ? (
         <section>
-          <h2 className="mb-4 text-sm font-medium text-muted">Unread feedback</h2>
+          <h2 className="mb-2 text-sm font-medium text-muted">Unread feedback</h2>
           <FeedbackList items={unreadItems} />
         </section>
       ) : null}
 
       <section>
-        <h2 className="mb-1 text-sm font-medium text-muted">Tags</h2>
-        <p className="text-base text-ink">{tagStatusLine(model.tagStatus)}</p>
+        <Link
+          href="/stands"
+          className="group -mx-2 flex min-h-14 items-center gap-3 rounded-[var(--radius-control)] px-2 transition-colors hover:bg-quiet active:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium text-muted">Tags</span>
+            <span className="block text-base text-ink">{tagStatusLine(model.tagStatus)}</span>
+          </span>
+          <ChevronRight
+            aria-hidden="true"
+            className="size-5 text-muted transition-transform duration-150 group-hover:translate-x-0.5"
+          />
+        </Link>
       </section>
+    </div>
+  );
+}
+
+/**
+ * Everything else that needs doing, by name. Home used to show only the first
+ * item, so a business with an unread complaint and a broken Google link was
+ * told about the complaint and never about the link.
+ */
+function AlsoNeeds({ attentions }: { attentions: Attention[] }) {
+  return (
+    <div className="mt-8">
+      <p className="mb-2 text-sm font-medium text-muted">Also</p>
+      <ul className="flex flex-col gap-2">
+        {attentions.map((attention) => (
+          <li key={attention.kind} className="flex items-start gap-3 text-base text-ink">
+            <span aria-hidden="true" className="mt-2.5 size-1.5 shrink-0 rounded-full bg-star" />
+            {attention.title}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
