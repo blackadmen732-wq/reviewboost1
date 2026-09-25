@@ -24,12 +24,19 @@ import {
   GOOGLE_LINK_INVALID,
 } from "@/features/dashboard/google-link-copy";
 
+const LOCATION_ID = "22222222-2222-2222-2222-222222222222";
 const valid = "https://g.page/corner-cafe";
 const invalid = "https://evil.example/reviews";
 
 describe("GoogleLinkCare", () => {
+  it("offers no Change to a role that cannot save", () => {
+    render(<GoogleLinkCare value={valid} locationId={LOCATION_ID} readOnly />);
+    expect(screen.queryByRole("button", { name: /change/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/corner-cafe/)).toBeInTheDocument();
+  });
+
   it("names a missing link and does not offer Open", () => {
-    render(<GoogleLinkCare value={null} />);
+    render(<GoogleLinkCare value={null} locationId={LOCATION_ID} />);
 
     expect(screen.getByText(GOOGLE_LINK_EMPTY)).toBeVisible();
     expect(document.querySelector("[data-google-link-state='missing']")).not.toBeNull();
@@ -42,7 +49,7 @@ describe("GoogleLinkCare", () => {
     const open = vi.fn();
     vi.stubGlobal("open", open);
 
-    render(<GoogleLinkCare value={invalid} />);
+    render(<GoogleLinkCare value={invalid} locationId={LOCATION_ID} />);
 
     expect(screen.getByText(invalid)).toBeVisible();
     expect(screen.getByText(GOOGLE_LINK_INVALID)).toBeVisible();
@@ -60,7 +67,7 @@ describe("GoogleLinkCare", () => {
     const open = vi.fn();
     vi.stubGlobal("open", open);
 
-    render(<GoogleLinkCare value={valid} />);
+    render(<GoogleLinkCare value={valid} locationId={LOCATION_ID} />);
 
     expect(document.querySelector("[data-google-link-state='valid']")).not.toBeNull();
     await user.click(screen.getByRole("button", { name: "Open" }));
@@ -73,7 +80,7 @@ describe("GoogleLinkCare", () => {
     const open = vi.fn();
     vi.stubGlobal("open", open);
 
-    render(<GoogleLinkCare value={null} />);
+    render(<GoogleLinkCare value={null} locationId={LOCATION_ID} />);
     await user.click(screen.getByRole("button", { name: "Change" }));
     await user.type(screen.getByLabelText("Google link"), invalid);
     await user.click(screen.getByRole("button", { name: "Test" }));

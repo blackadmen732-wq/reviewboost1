@@ -22,6 +22,8 @@ import { GoogleLinkCare } from "@/features/dashboard/google-link-care";
  * `save()`, leaving the button in its loading state with no way back but a page
  * reload.
  */
+const LOCATION_ID = "22222222-2222-2222-2222-222222222222";
+
 describe("Google link network recovery", () => {
   const VALID = "https://g.page/r/abcdef/review";
 
@@ -35,7 +37,7 @@ describe("Google link network recovery", () => {
   }
 
   async function startEditing() {
-    render(<GoogleLinkCare value={null} />);
+    render(<GoogleLinkCare value={null} locationId={LOCATION_ID} />);
     fireEvent.click(await screen.findByRole("button", { name: /add|edit|save|change/i }));
   }
 
@@ -106,7 +108,7 @@ describe("Google link network recovery", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled());
   });
 
-  it("writes the generic destination, not the old google field", async () => {
+  it("writes the generic destination for its own place, not the old google field", async () => {
     signedIn();
     const fetchMock = vi.fn(
       async () => new Response(JSON.stringify({ data: {} }), { status: 200 }),
@@ -121,7 +123,13 @@ describe("Google link network recovery", () => {
     // cast is only to read the RequestInit the component passed.
     const [, init] = fetchMock.mock.calls[0] as unknown as [RequestInfo | URL, RequestInit];
     const body = JSON.parse(String(init.body));
-    expect(body).toEqual({ destinationProvider: "google", destinationUrl: VALID });
+    // The settings API refuses a location change that does not name its
+    // location. This body used to omit it, so every save came back 400.
+    expect(body).toEqual({
+      locationId: LOCATION_ID,
+      destinationProvider: "google",
+      destinationUrl: VALID,
+    });
     expect(body).not.toHaveProperty("googleReviewUrl");
   });
 });

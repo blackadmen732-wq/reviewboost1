@@ -37,7 +37,21 @@ function refuseOrOpen(url: string, onRefuse: (message: string) => void): boolean
   return true;
 }
 
-export function GoogleLinkCare({ value }: { value: string | null }) {
+/**
+ * The link belongs to one place. `locationId` is sent with every save because
+ * the settings API refuses a location change that does not name its location,
+ * and a business with two places must never have the wrong one edited.
+ */
+export function GoogleLinkCare({
+  value,
+  locationId,
+  readOnly = false,
+}: {
+  value: string | null;
+  locationId: string;
+  readOnly?: boolean;
+}) {
+  const inputId = `setting-googleReviewUrl-${locationId}`;
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
@@ -85,7 +99,7 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
           "content-type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ destinationProvider: "google", destinationUrl: trimmed }),
+        body: JSON.stringify({ locationId, destinationProvider: "google", destinationUrl: trimmed }),
       });
 
       if (!response.ok) {
@@ -119,11 +133,11 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
     <div className="flex flex-col gap-4" data-google-link-state={savedState}>
       {editing ? (
         <div className="rounded-[var(--radius-card)] border border-brand bg-surface p-4">
-          <label className="block text-sm font-medium text-muted" htmlFor="setting-googleReviewUrl">
+          <label className="block text-sm font-medium text-muted" htmlFor={inputId}>
             Google link
           </label>
           <Input
-            id="setting-googleReviewUrl"
+            id={inputId}
             className="mt-1.5"
             type="url"
             inputMode="url"
@@ -208,18 +222,20 @@ export function GoogleLinkCare({ value }: { value: string | null }) {
               </p>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setDraft(value ?? "");
-              setError(null);
-              setEditing(true);
-            }}
-            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-brand-text transition-colors hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-          >
-            <Pencil className="size-4" aria-hidden="true" />
-            Change
-          </button>
+          {readOnly ? null : (
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(value ?? "");
+                setError(null);
+                setEditing(true);
+              }}
+              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-brand-text transition-colors hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+            >
+              <Pencil className="size-4" aria-hidden="true" />
+              Change
+            </button>
+          )}
         </div>
       )}
 
