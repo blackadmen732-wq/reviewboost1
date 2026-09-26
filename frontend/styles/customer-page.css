@@ -28,8 +28,8 @@ html:has(.customer-live) {
 
 .visit-hero {
   position: relative;
-  flex: 1 1 56%;
-  height: 56%;
+  flex: 1 1 58%;
+  height: 58%;
   min-height: 0;
   overflow: hidden;
   background: #1a1a1a;
@@ -86,14 +86,15 @@ html:has(.customer-live) {
 
 .visit-language .language-selector,
 .visit-language .language-select {
-  min-height: 40px;
+  min-height: 34px;
   color: #fff;
+  font-size: 0.8125rem;
 }
 
 /* Any artwork can sit behind the language control, including a white one, so
    it carries its own backing rather than trusting the photo for contrast. */
 .visit-language .language-selector {
-  min-height: 40px;
+  min-height: 34px;
   border-radius: 999px;
   background: rgb(10 12 11 / 48%);
 }
@@ -131,7 +132,7 @@ html:has(.customer-live) {
   --rb-surface: #ffffff;
   --rb-quiet: #f0f2f0;
   --rb-ink: #171a18;
-  --rb-muted: #646e68;
+  --rb-muted: #66706a;
   --rb-border: #dce2de;
   --rb-border-strong: #b9c3bd;
   --rb-brand-hover: #009a61;
@@ -153,21 +154,24 @@ html:has(.customer-live) {
   color: #171a18;
 }
 
+/* Measured against the approved Mario reference: artwork ~58% of the screen,
+   the sheet the remaining ~42% rising over it on a ~28px radius, a soft
+   off-white rather than paper white, the heading ~45pt below the edge. */
 .visit-card {
   position: relative;
   display: flex;
-  flex: 0 0 44%;
+  flex: 0 0 42%;
   flex-direction: column;
-  height: 44%;
-  max-height: 44%;
+  height: 42%;
+  max-height: 42%;
   z-index: 2;
   /* The sheet rises into the artwork so its rounded top reads as a surface
      laid over the business's photo, not a white block under it. */
-  margin-top: -30px;
-  background: #fff;
-  border-radius: 32px 32px 0 0;
-  box-shadow: 0 -10px 28px rgb(0 0 0 / 16%);
-  padding: clamp(24px, 7cqi, 32px) 20px calc(12px + env(safe-area-inset-bottom));
+  margin-top: -28px;
+  background: #f8f8f7;
+  border-radius: 34px 34px 0 0;
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 18%);
+  padding: clamp(26px, 10.5cqi, 44px) 16px calc(10px + env(safe-area-inset-bottom));
   overflow: hidden;
 }
 
@@ -236,10 +240,10 @@ html:has(.customer-live) {
 .visit-heading {
   margin: 0;
   color: var(--rb-ink);
-  font-size: clamp(1.7rem, 8.6cqi, 2.5rem);
-  font-weight: 760;
-  letter-spacing: -0.04em;
-  line-height: 1.04;
+  font-size: clamp(1.6rem, 8.25cqi, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
   text-wrap: balance;
 }
 
@@ -247,24 +251,26 @@ html:has(.customer-live) {
   outline: none;
 }
 
+/* A quiet instruction: regular weight, wide tracking — it explains, the
+   heading asks. */
 .visit-support {
-  margin: 10px 0 0;
-  color: #59615b;
-  font-size: clamp(0.66rem, 3.1cqi, 0.76rem);
-  font-weight: 600;
-  letter-spacing: 0.16em;
+  margin: clamp(8px, 3cqi, 14px) 0 0;
+  color: #515653;
+  font-size: clamp(0.62rem, 2.85cqi, 0.74rem);
+  font-weight: 450;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
-/* The stars sit in the middle of whatever room the sheet has, so a tall phone
-   gets breathing room around them instead of a gap above the footer. */
+/* The stars sit directly under the instruction, and the calm space goes
+   below them, above the footer — the stars belong to the question. */
 .visit-card__body {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   min-height: 0;
-  margin-top: 8px;
+  margin-top: clamp(16px, 8.5cqi, 38px);
   overflow: auto;
 }
 
@@ -272,17 +278,25 @@ html:has(.customer-live) {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  margin-top: 8px;
-  gap: 2px;
+  margin-top: auto;
+  padding-top: 8px;
+  gap: 4px;
+}
+
+/* "Powered by ReviewBoost" stays quiet: smaller than the product-wide logo
+   size, so it signs the page rather than competing with the question. */
+.visit-footer > :first-child {
+  zoom: 0.8;
 }
 
 .visit-footer__line {
   margin: 0;
   /* Quiet, but still 4.5:1 on the white sheet. */
   color: #646c66;
-  font-size: 0.55rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-size: clamp(6px, 1.95cqi, 0.55rem);
+  font-weight: 500;
+  letter-spacing: 0.17em;
+  white-space: nowrap;
   text-align: center;
   text-transform: uppercase;
 }
@@ -300,7 +314,7 @@ html:has(.customer-live) {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(2px, 1.6cqi, 10px);
+  gap: clamp(2px, 1.2cqi, 8px);
 }
 
 .visit-star {
@@ -337,32 +351,35 @@ html:has(.customer-live) {
 
 .visit-star__label {
   display: grid;
-  width: clamp(48px, 16cqi, 64px);
-  height: clamp(48px, 16cqi, 64px);
+  /* 44pt is Apple's minimum target; at every width the row of five plus its
+     gaps fits inside the sheet's 16px side padding. */
+  width: clamp(44px, 16.4cqi, 70px);
+  height: clamp(44px, 16.4cqi, 70px);
   place-items: center;
   /* A firm, dark, fine outline on a white star: it has to read as "tap me" on
      a bright day, which the old #c5c5c5 hairline did not. */
-  color: #464c48;
+  color: #4d514f;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 
 .visit-star__label svg {
-  width: 88%;
-  height: 88%;
-  fill: #fff;
-  filter: drop-shadow(0 3px 4px rgb(23 26 24 / 16%));
+  width: 92%;
+  height: 92%;
+  overflow: visible;
+  fill: #fdfdfd;
+  filter: drop-shadow(0 4px 5px rgb(23 26 24 / 17%));
   transition: transform 110ms ease-out, color 140ms ease-out, fill 140ms ease-out;
 }
 
 /* Rating gold: a warm fill with a darker edge so the shape still holds 3:1
    against the white sheet. Never green or red — a two is not a failure. */
 .visit-star__label[data-filled="true"] {
-  color: #b8790b;
+  color: #b27405;
 }
 
 .visit-star__label[data-filled="true"] svg {
-  fill: #f4b41a;
+  fill: #f5b422;
   filter: drop-shadow(0 3px 5px rgb(184 121 11 / 28%));
   animation: visit-star-fill 160ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
   animation-delay: calc(var(--star-index, 0) * 20ms);
@@ -448,38 +465,133 @@ html:has(.customer-live) {
   min-height: 44px;
 }
 
+/* ------------------------------------------------ owner phone preview --- */
+
+/* A modern iPhone in CSS: a thin graphite rim, a black bezel, side buttons.
+   The screen content is drawn at the device's real 390 × 844 and scaled into
+   the screen (see phone-frame.tsx), so everything inside the device is in
+   real device points. */
 .phone-frame {
-  width: min(100%, 360px);
+  width: min(100%, 340px);
   margin-inline: auto;
+  padding-inline: 4px;
+}
+
+.phone-frame__body {
+  position: relative;
+  border-radius: 15.5% / 7.2%;
+  padding: 1%;
+  background: linear-gradient(135deg, #6b6f6d 0%, #2a2c2b 22%, #1a1b1b 50%, #2a2c2b 78%, #5c605e 100%);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 55%),
+    0 28px 56px -22px rgb(0 0 0 / 50%),
+    0 10px 20px -10px rgb(0 0 0 / 30%);
 }
 
 .phone-frame__bezel {
-  position: relative;
   overflow: hidden;
-  border: 10px solid #111;
-  border-radius: 40px;
-  background: #111;
-  box-shadow: 0 18px 40px -24px rgb(23 26 24 / 55%);
+  border-radius: 14.6% / 6.8%;
+  background: #030303;
+  padding: 3.6%;
 }
 
+.phone-frame__screen {
+  position: relative;
+  aspect-ratio: 390 / 844;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 11.6% / 5.4%;
+  background: #121513;
+}
+
+.phone-frame__device {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+}
+
+.phone-frame__button {
+  position: absolute;
+  width: 0.9%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #111, #3d403f);
+}
+
+.phone-frame__button--action { left: -0.7%; top: 15.5%; height: 4.4%; }
+.phone-frame__button--up { left: -0.7%; top: 22.5%; height: 8%; }
+.phone-frame__button--down { left: -0.7%; top: 32%; height: 8%; }
+.phone-frame__button--power {
+  right: -0.7%;
+  top: 25%;
+  height: 12%;
+  background: linear-gradient(270deg, #111, #3d403f);
+}
+
+/* Real iPhone metrics, in points. */
 .phone-frame__island {
   position: absolute;
-  top: 10px;
+  top: 11px;
   left: 50%;
-  z-index: 3;
-  width: 96px;
-  height: 22px;
-  border-radius: 12px;
+  z-index: 5;
+  width: 124px;
+  height: 36px;
+  border-radius: 999px;
+  background: #000;
+  transform: translateX(-50%);
+}
+
+.phone-frame__status {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 4;
+  display: flex;
+  height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 32px 0 42px;
+  color: #fff;
+  pointer-events: none;
+  text-shadow: 0 0 6px rgb(0 0 0 / 35%);
+}
+
+.phone-frame__time {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.phone-frame__icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.phone-frame__icons svg {
+  fill: currentColor;
+  filter: drop-shadow(0 0 3px rgb(0 0 0 / 30%));
+}
+
+.phone-frame__signal { width: 18px; }
+.phone-frame__wifi { width: 17px; }
+.phone-frame__battery { width: 27px; }
+
+.phone-frame__home {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  z-index: 5;
+  width: 136px;
+  height: 5px;
+  border-radius: 999px;
   background: #111;
   transform: translateX(-50%);
 }
 
-.phone-frame__screen {
-  aspect-ratio: 390 / 844;
-  width: 100%;
-  height: auto;
-  overflow: hidden;
-  background: #fff;
+/* The device's bottom safe area: the footer sits above the home indicator,
+   as env(safe-area-inset-bottom) makes it on a real iPhone. */
+.phone-frame__device .visit-card {
+  padding-bottom: 30px;
 }
 
 .customer-live {
@@ -550,7 +662,7 @@ html:has(.customer-live) {
   justify-content: space-between;
   padding: 32px 24px 28px;
   background: var(--rb-surface);
-  border-radius: 28px 28px 0 0;
+  border-radius: 34px 34px 0 0;
 }
 
 /* The stage between the card and the controls. It carries whichever figure the

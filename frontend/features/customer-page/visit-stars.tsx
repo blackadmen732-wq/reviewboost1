@@ -1,7 +1,5 @@
 "use client";
 
-import { Star } from "lucide-react";
-
 import type { CustomerMessages, RatingValue } from "@/lib/i18n/customer-messages";
 
 const ratings: RatingValue[] = [1, 2, 3, 4, 5];
@@ -49,12 +47,28 @@ export function VisitStars({
                 aria-label={messages.ratingSpoken[rating]}
               />
               <label className="visit-star__label" htmlFor={`visit-rating-${rating}`} data-filled={selected || undefined}>
-                <Star aria-hidden="true" strokeWidth={1.35} strokeLinejoin="round" />
+                <VisitStar />
               </label>
             </span>
           );
         })}
       </div>
     </fieldset>
+  );
+}
+
+/**
+ * A classic five-point star: sharp points, full arms, a fine outline. The
+ * rounded icon-set star this replaces read as generic UI rather than as the
+ * one thing on the page a customer is meant to touch.
+ */
+const STAR_PATH =
+  "M12 1.7 L15.12 8.61 L22.65 9.44 L17.04 14.54 L18.58 21.96 L12 18.2 L5.42 21.96 L6.96 14.54 L1.35 9.44 L8.88 8.61 Z";
+
+function VisitStar() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d={STAR_PATH} strokeWidth={1.05} strokeLinejoin="round" stroke="currentColor" />
+    </svg>
   );
 }

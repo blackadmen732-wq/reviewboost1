@@ -132,7 +132,8 @@ describe("WYSIWYG canvas (SoT v1.9 / v1.10)", () => {
     const editor = source("features/customer-page/customer-page-editor.tsx");
     const live = source("features/customer-flow/customer-flow.tsx");
     expect(css).toContain("aspect-ratio: 390 / 844");
-    expect(css).toContain("flex: 0 0 44%");
+    // Measured from the approved Mario reference: artwork ~58%, sheet ~42%.
+    expect(css).toContain("flex: 0 0 42%");
     expect(css).not.toContain("height: 640px");
     expect(editor).toContain("CustomerVisitView");
     expect(live).toContain("CustomerVisitView");
