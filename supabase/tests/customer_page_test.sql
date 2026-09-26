@@ -13,7 +13,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(29);
+select plan(33);
 
 create or replace function tests.set_actor(p_user_id uuid) returns void
 language plpgsql as $$
@@ -340,6 +340,32 @@ select throws_ok(
         format('{"tagline":"%s"}', repeat('x', 121))::jsonb)$$,
     'invalid_page_tagline',
     'a tagline longer than the page can show is refused at the write');
+
+-- ============================================================ the bucket ===
+-- Created by migration, not only by config.toml, so a hosted project has it.
+reset role;
+
+select is(
+    (select public from storage.buckets where id = 'customer-page'),
+    true,
+    'the customer-page bucket exists and serves published photos publicly');
+
+select is(
+    (select file_size_limit from storage.buckets where id = 'customer-page'),
+    5242880::bigint,
+    'storage itself refuses a photo over 5 MiB');
+
+select is(
+    (select allowed_mime_types from storage.buckets where id = 'customer-page'),
+    array['image/jpeg', 'image/png', 'image/webp'],
+    'storage itself refuses anything but JPEG, PNG and WebP');
+
+select is_empty(
+    $$select policyname from pg_policies
+       where schemaname = 'storage' and tablename = 'objects'
+         and cmd in ('INSERT', 'UPDATE', 'DELETE', 'ALL')
+         and (roles && array['anon', 'authenticated', 'public']::name[])$$,
+    'no storage policy lets a browser write objects directly; uploads need a signed URL');
 
 select * from finish();
 rollback;
