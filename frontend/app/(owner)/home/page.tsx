@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 
 import { OwnerHome } from "@/features/dashboard/owner-home";
 import { deriveHomeModel } from "@/features/dashboard/home-model";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { InstallPrompt } from "@/features/dashboard/install-prompt";
+import { parseSetupSeen, SETUP_SEEN_COOKIE } from "@/features/dashboard/setup-seen-cookie";
 import { permissionsFor } from "@/lib/owner/permissions";
 import { insightsHomeLine } from "@/lib/owner/insights";
 import {
@@ -60,6 +62,7 @@ export default async function HomePage() {
         businessName={organization.name}
         model={model}
         insightsLine={insightsHomeLine(insights)}
+        seenDone={parseSetupSeen((await cookies()).get(SETUP_SEEN_COOKIE)?.value)}
         unreadItems={unread.items.map((item) => ({
           id: item.responseId,
           rating: item.rating,

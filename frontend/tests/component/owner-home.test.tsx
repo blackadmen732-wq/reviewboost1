@@ -155,3 +155,50 @@ describe("OwnerHome", () => {
     expect(screen.queryByText("No ratings yet.")).not.toBeInTheDocument();
   });
 });
+
+describe("setup steps finished since the last visit", () => {
+  // A Tag made and programmed, nothing rated yet: some steps done, some not.
+  const model = () =>
+    deriveHomeModel({
+      counts: { ...emptyCounts, activeStands: 1 },
+      stands: [programmed],
+      hasLocation: true,
+      hasCustomerPhoto: false,
+    });
+
+  it("draw nothing on a first visit, where everything would be new", () => {
+    const { container } = render(<OwnerHome businessName="Oak & Vine" model={model()} unreadItems={[]} seenDone={null} />);
+    expect(container.querySelector("[data-fresh]")).toBeNull();
+    expect(container.querySelector(".animate-check-draw")).toBeNull();
+  });
+
+  it("draw the tick once for a step done since then, and only that one", () => {
+    const m = model();
+    const done = (m.setup ?? []).filter((step) => step.done).map((step) => step.key);
+    expect(done.length).toBeGreaterThan(0);
+    const { container } = render(
+      <OwnerHome businessName="Oak & Vine" model={m} unreadItems={[]} seenDone={done.slice(1)} />,
+    );
+    const fresh = container.querySelectorAll("[data-fresh]");
+    expect(fresh).toHaveLength(1);
+    expect(fresh[0]?.closest("[data-setup-step]")).toHaveAttribute("data-setup-step", done[0]);
+  });
+
+  it("draw nothing when every done step was already seen", () => {
+    const m = model();
+    const done = (m.setup ?? []).filter((step) => step.done).map((step) => step.key);
+    const { container } = render(<OwnerHome businessName="Oak & Vine" model={m} unreadItems={[]} seenDone={done} />);
+    expect(container.querySelector("[data-fresh]")).toBeNull();
+    expect(container.querySelector(".animate-step-current")).toBeNull();
+  });
+});
+
+describe("parseSetupSeen", () => {
+  it("reads step keys and treats anything mangled as a first visit", async () => {
+    const { parseSetupSeen } = await import("@/features/dashboard/setup-seen-cookie");
+    expect(parseSetupSeen(undefined)).toBeNull();
+    expect(parseSetupSeen("tag%2Cgoogle")).toEqual(["tag", "google"]);
+    expect(parseSetupSeen("%E0%A4%A")).toBeNull();
+    expect(parseSetupSeen("tag,<script>,google")).toEqual(["tag", "google"]);
+  });
+});

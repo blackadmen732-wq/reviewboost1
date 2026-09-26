@@ -11,6 +11,7 @@ import {
   tagStatusLine,
 } from "@/features/dashboard/home-model";
 import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page";
+import { SetupSeen } from "@/features/dashboard/setup-seen";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -29,10 +30,17 @@ export function OwnerHome({
   model,
   unreadItems,
   insightsLine = null,
+  seenDone = null,
 }: {
   businessName: string;
   model: HomeModel;
   unreadItems: FeedbackItem[];
+  /**
+   * The setup steps this browser last showed as done, or null if it never has.
+   * A step done since then draws its tick once; nothing animates on a first
+   * visit, where everything would be "new".
+   */
+  seenDone?: readonly string[] | null;
   /** "4.3 average · 84 ratings · Improving", or null when there is not enough to say. */
   insightsLine?: string | null;
 }) {
@@ -45,7 +53,7 @@ export function OwnerHome({
       </header>
 
       {model.kind === "empty" ? (
-        <EmptyHome model={model} />
+        <EmptyHome model={model} seenDone={seenDone} />
       ) : (
         <ActiveHome model={model} unreadItems={unreadItems} insightsLine={insightsLine} />
       )}
@@ -85,7 +93,7 @@ function StateTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function EmptyHome({ model }: { model: HomeModel }) {
+function EmptyHome({ model, seenDone }: { model: HomeModel; seenDone: readonly string[] | null }) {
   const blocker = model.attentions[0] ?? null;
 
   return (
@@ -107,7 +115,7 @@ function EmptyHome({ model }: { model: HomeModel }) {
 
       <PrimaryAction primary={model.primary} />
 
-      {model.setup ? <SetupSteps steps={model.setup} /> : null}
+      {model.setup ? <SetupSteps steps={model.setup} seenDone={seenDone} /> : null}
 
       {model.showPreview && model.previewStandId ? (
         <PreviewCustomerPage standId={model.previewStandId} />
@@ -121,11 +129,15 @@ function EmptyHome({ model }: { model: HomeModel }) {
  * a line for what is done, and the current step in ink. The action for the
  * current step is the green button above, so there is still only one.
  */
-function SetupSteps({ steps }: { steps: SetupStep[] }) {
+function SetupSteps({ steps, seenDone }: { steps: SetupStep[]; seenDone: readonly string[] | null }) {
   // The photo is optional and has its own link, so "the step you are on" —
   // the one the green button above is for — skips it.
   const current = steps.findIndex((step) => !step.done && step.key !== "photo");
   const doneCount = steps.filter((step) => step.done).length;
+  // Done since this browser last looked: the tick draws once, and the step
+  // that is now current takes its ink just after. Nothing else moves.
+  const fresh = (step: SetupStep) => seenDone !== null && step.done && !seenDone.includes(step.key);
+  const advanced = steps.some(fresh);
 
   return (
     <section className="mt-10" aria-labelledby="setup-heading">
@@ -137,9 +149,11 @@ function SetupSteps({ steps }: { steps: SetupStep[] }) {
           {doneCount} of {steps.length}
         </p>
       </div>
+      <SetupSeen done={steps.filter((step) => step.done).map((step) => step.key)} />
       <ol className="divide-y divide-border border-y border-border">
         {steps.map((step, index) => {
           const isCurrent = index === current;
+          const drawn = fresh(step);
           return (
             <li
               key={step.key}
@@ -155,9 +169,22 @@ function SetupSteps({ steps }: { steps: SetupStep[] }) {
                   step.done && "bg-brand-soft text-brand-text",
                   !step.done && isCurrent && "bg-ink text-canvas",
                   !step.done && !isCurrent && "border border-border text-muted",
+                  drawn && "animate-step-done",
+                  !step.done && isCurrent && advanced && "animate-step-current",
                 )}
+                data-fresh={drawn || undefined}
               >
-                {step.done ? <Check className="size-4" strokeWidth={3} /> : index + 1}
+                {step.done ? (
+                  drawn ? (
+                    <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6 9 17l-5-5" pathLength={1} className="animate-check-draw" />
+                    </svg>
+                  ) : (
+                    <Check className="size-4" strokeWidth={3} />
+                  )
+                ) : (
+                  index + 1
+                )}
               </span>
               {step.href ? (
                 // Optional, so it never takes the green button: the row itself
