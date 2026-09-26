@@ -14,7 +14,7 @@ export function TextRequestSection() {
   return (
     <div className="grid items-center gap-12 md:grid-cols-12 md:gap-12">
       <div className="mx-auto w-full max-w-[280px] md:col-span-5 md:max-w-[300px]">
-        <PhoneFrame label="A text message from the business with a ReviewBoost link">
+        <PhoneFrame label="A text message from the business with a ReviewBoost link" device statusTone="dark">
           <div className="flex h-full flex-col bg-[#f2f3f5] font-sans">
             <div className="flex flex-col items-center gap-1 border-b border-black/5 bg-white/80 pb-3 pt-12">
               <span className="grid size-10 place-items-center rounded-full bg-[#d7dbe0] text-sm font-semibold text-[#3a3f45]">

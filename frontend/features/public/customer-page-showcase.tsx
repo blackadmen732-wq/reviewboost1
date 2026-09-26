@@ -127,7 +127,7 @@ export function CustomerPageShowcase() {
             Looks like your business. Works like ReviewBoost.
           </h2>
           <p className="mx-auto mt-4 max-w-[46ch] text-lg leading-relaxed text-muted">
-            Your photo on top. The same simple rating underneath, for every business.
+            The top is yours. The rating underneath is the same for every business.
           </p>
         </div>
 
@@ -137,8 +137,20 @@ export function CustomerPageShowcase() {
           role="group"
           aria-roledescription="carousel"
           aria-label="Example ReviewBoost customer pages"
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              goTo(activeIndex - 1);
+            } else if (event.key === "ArrowRight") {
+              event.preventDefault();
+              goTo(activeIndex + 1);
+            }
+          }}
         >
-          <div className="relative mx-auto flex h-[620px] max-w-[1100px] items-center justify-center">
+          <p className="sr-only" aria-live="polite">
+            Showing {SHOWCASE_BUSINESSES[activeIndex]?.name}
+          </p>
+          <div className="showcase-stage relative mx-auto flex h-[700px] max-w-[1100px] items-center justify-center">
             <button
               type="button"
               onClick={() => goTo(activeIndex - 1)}
@@ -156,11 +168,14 @@ export function CustomerPageShowcase() {
                 <div
                   key={biz.id}
                   className="showcase-phone-slot"
+                  data-position={isActive ? "center" : isSide ? "side" : "hidden"}
                   style={{
-                    transform: `translate(-50%, -50%) translateX(${offset * 320}px) scale(${
-                      isActive ? 1 : isSide ? 0.8 : 0.66
-                    })`,
-                    opacity: isActive ? 1 : isSide ? 0.55 : 0,
+                    // Side phones tuck partly behind the centre one and turn
+                    // a few degrees toward it: depth, not cover-flow.
+                    transform: `translate(-50%, -50%) translateX(${offset * 230}px) translateY(${
+                      isActive ? 0 : 18
+                    }px) rotateY(${offset * -4}deg) scale(${isActive ? 1 : isSide ? 0.82 : 0.66})`,
+                    opacity: isActive || isSide ? 1 : 0,
                     zIndex: isActive ? 30 : isSide ? 20 : 10,
                     pointerEvents: isActive || isSide ? "auto" : "none",
                   }}
@@ -174,7 +189,7 @@ export function CustomerPageShowcase() {
                     aria-hidden={!isActive && !isSide}
                     className="showcase-phone-button"
                   >
-                    <PhoneFrame label={`${biz.name} customer page example`}>
+                    <PhoneFrame label={`${biz.name} customer page example`} device>
                       <CustomerVisitView
                         heroUrl={biz.heroSrc}
                         transform={DEFAULT_HERO_TRANSFORM}
@@ -219,7 +234,7 @@ export function CustomerPageShowcase() {
               className="showcase-scroller__item"
               aria-label={biz.name}
             >
-              <PhoneFrame label={`${biz.name} customer page example`}>
+              <PhoneFrame label={`${biz.name} customer page example`} device>
                 <CustomerVisitView
                   heroUrl={biz.heroSrc}
                   transform={DEFAULT_HERO_TRANSFORM}
@@ -262,8 +277,8 @@ export function CustomerPageShowcase() {
         </div>
 
         <p className="mx-auto mt-10 max-w-[48ch] text-center text-base leading-relaxed text-muted">
-          Upload your photo, preview exactly what customers see, publish. No fonts, colours or
-          layouts to fiddle with.{" "}
+          Upload your artwork — a photo, a poster, your logo — preview exactly what customers
+          see, and publish. The rating underneath is ReviewBoost&apos;s, and it never changes.{" "}
           <Link
             href="/examples"
             className="font-semibold text-brand-text underline-offset-4 hover:underline"

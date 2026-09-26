@@ -63,7 +63,7 @@ export function DemoPhone({
           maxWidth: box ? undefined : "100%",
         }}
       >
-        <PhoneFrame label={label}>
+        <PhoneFrame label={label} device>
           <CustomerVisitView
             heroUrl={heroSrc}
             transform={DEFAULT_HERO_TRANSFORM}
