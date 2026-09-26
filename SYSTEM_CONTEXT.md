@@ -496,9 +496,16 @@ system.**
 ### Implemented in the current repository — PARTIALLY VERIFIED
 
 Tenant isolation via row security; short-lived access tokens with rotating
-refresh tokens and reuse detection; account lockout; TOTP; AES-256-GCM for PII
-(including phone numbers on Text Requests) with keyed HMAC lookups; CSRF;
-layered rate limiting; recursive log redaction.
+refresh tokens and reuse detection (Supabase Auth, `supabase/config.toml`);
+per-IP sign-in and code-verification rate limits (Supabase Auth — there is no
+per-account lockout); AES-256-GCM for PII (including phone numbers on Text
+Requests) with keyed HMAC lookups; CSRF; layered rate limiting; recursive log
+redaction.
+
+**Not implemented: MFA / TOTP.** `[auth.mfa.totp]` and `[auth.mfa.phone]` are
+disabled in `supabase/config.toml`, there is no enrollment flow, and no route
+checks for an `aal2` session. Nothing in the product is protected by a second
+factor, and no copy may say otherwise.
 
 Migrations and pgTAP security tests, including tenant-isolation and privilege
 attacks, have run successfully against CI databases. This is not evidence of a
@@ -515,7 +522,7 @@ against production infrastructure.
 - Tenant identity derived from authenticated server context only
 - Parameterised SQL everywhere
 - Every exposed tenant table carries row security
-- MFA required for billing, member administration, integration connection, API key creation, PII export, and organisation deletion
+- MFA required for billing, member administration, integration connection, API key creation, PII export, and organisation deletion — **APPROVED BUT NOT IMPLEMENTED (launch decision open).** Enforcing it needs TOTP enabled in Supabase Auth, an enrollment screen, and a server-side `aal2` check on those routes; enforcing the check without enrollment would lock every owner out of billing and deletion. See docs/backend/LAUNCH_GATE.md
 - Append-only audit and financial ledgers
 - CI runs type checking, tests, secret scanning, and dependency audit
 

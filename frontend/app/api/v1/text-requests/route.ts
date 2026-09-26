@@ -74,7 +74,8 @@ export async function GET(request: NextRequest): Promise<Response> {
     // says is left, by source, or it shows nothing.
     const [items, balance] = await Promise.all([
       listTextRequests(context, limit),
-      serviceRoleClient().rpc("rpc_sms_balance", { p_org_id: context.orgId }),
+      // As the signed-in owner, so the function's own membership check applies.
+      context.db.rpc("rpc_sms_balance", { p_org_id: context.orgId }),
     ]);
 
     if (balance.error) {
