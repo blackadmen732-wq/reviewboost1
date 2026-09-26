@@ -61,7 +61,7 @@ def main() -> None:
     x = 0.0
     parts = {"Review": [], "Boost": []}
     for index, (info, pos) in enumerate(zip(infos, positions)):
-        pen = SVGPathPen(glyph_set)
+        pen = SVGPathPen(glyph_set, ntos=fmt)
         # Font units are y-up; flip onto a baseline at `ascent`.
         tpen = TransformPen(pen, (scale, 0, 0, -scale, x + pos.x_offset * scale, ascent))
         glyph_set[order[info.codepoint]].draw(tpen)

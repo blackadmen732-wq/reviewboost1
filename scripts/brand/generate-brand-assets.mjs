@@ -172,6 +172,18 @@ export const MARK_HEIGHT = ${MARK_H};
 export const MARK_PATHS = [
 ${mark.paths.map((p) => `  ${JSON.stringify(p.d)},`).join("\n")}
 ] as const;
+
+/**
+ * The wordmark, "ReviewBoost" in Geist SemiBold outlines (Branding/Wordmark.svg).
+ * Drawn as a logotype rather than live text so "Boost" can carry the brand
+ * green, which text at this size could not (WCAG exempts logotypes).
+ * The box is the cap height plus overshoot: 0.74em of the outlined type.
+ */
+export const WORDMARK_VIEWBOX = ${JSON.stringify(wordmark.viewBox.join(" "))};
+export const WORDMARK_WIDTH = ${wordmark.viewBox[2]};
+export const WORDMARK_HEIGHT = ${wordmark.viewBox[3]};
+export const WORDMARK_REVIEW = ${JSON.stringify(wordmark.paths[0].d)};
+export const WORDMARK_BOOST = ${JSON.stringify(wordmark.paths[1].d)};
 `,
 );
 

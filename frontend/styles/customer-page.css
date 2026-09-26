@@ -303,14 +303,12 @@ html:has(.customer-live) {
   top: 0.33cqi;
 }
 
-.visit-powered strong {
+/* The logotype sits on the text's baseline at the reference's 1.032em name
+   size; "Review" takes this ink. */
+.visit-powered .visit-powered__word {
   color: #111111;
-  font-size: 1.032em;
-  font-weight: 600;
-}
-
-.visit-powered__boost {
-  color: var(--rb-brand, #00a86b);
+  position: relative;
+  top: 0.33cqi;
 }
 
 

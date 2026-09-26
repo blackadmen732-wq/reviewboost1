@@ -3,7 +3,13 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { MARK_HEIGHT, MARK_PATHS, MARK_WIDTH } from "@/components/brand/mark-geometry";
+import {
+  MARK_HEIGHT,
+  MARK_PATHS,
+  MARK_WIDTH,
+  WORDMARK_BOOST,
+  WORDMARK_REVIEW,
+} from "@/components/brand/mark-geometry";
 
 /**
  * One ReviewBoost mark, one green, one source.
@@ -68,6 +74,12 @@ describe("Branding/Mark.svg is the one mark", () => {
       const paths = pathData(read(file));
       for (const d of mark) expect(paths, file).toContain(d);
     }
+  });
+});
+
+describe("the wordmark is the outlined Branding/Wordmark.svg", () => {
+  it("is what the web lockup draws", () => {
+    expect([WORDMARK_REVIEW, WORDMARK_BOOST]).toEqual(pathData(read("Branding/Wordmark.svg")));
   });
 });
 

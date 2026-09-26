@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { LogoMark } from "@/components/brand/logo-mark";
+import { Wordmark } from "@/components/brand/wordmark";
 import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
 import {
   clampHeroTransform,
@@ -103,16 +104,14 @@ export function CustomerVisitView({
         <footer className="visit-footer">
           {/* The reference's layout, grey "Powered by" and the name, with the
               ReviewBoost mark where the reference had a generic bolt: one
-              identity on every surface. The name is set as the lockup sets it,
-              "Review" in ink and "Boost" in brand green. */}
+              identity on every surface. The name is the logotype, "Review" in
+              ink and "Boost" in brand green. */}
           <p className="visit-powered">
             <LogoMark size={14} className="visit-powered__mark" />
             <span>
-              Powered by{" "}
-              <strong>
-                Review<span className="visit-powered__boost">Boost</span>
-              </strong>
+              Powered by <span className="sr-only">ReviewBoost</span>
             </span>
+            <Wordmark height="0.76em" className="visit-powered__word" />
           </p>
           <p className="visit-footer__line">{footerLine}</p>
         </footer>

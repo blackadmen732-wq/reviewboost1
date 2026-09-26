@@ -1,4 +1,5 @@
 import { LogoMark } from "@/components/brand/logo-mark";
+import { Wordmark } from "@/components/brand/wordmark";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -8,10 +9,9 @@ import { cn } from "@/lib/utils/cn";
  * nav / footer / poweredBy). The mark is `logo-mark.tsx`, drawn from
  * `Branding/Mark.svg`, and nowhere else. Do not invent a second mark.
  *
- * This is the horizontal lockup, `[mark] ReviewBoost`, that `Branding/Logo.svg`
- * exports for use outside the product. Here the name is live text in the
- * product's own face (Geist SemiBold, the face that file was outlined from):
- * it stays crisp at any size, follows the theme's ink, and is selectable.
+ * This is the horizontal lockup, `[mark] ReviewBoost`, the same one
+ * `Branding/Logo.svg` exports: the mark beside the outlined wordmark, both
+ * drawn from generated geometry, never retyped.
  *
  * Clearspace is 0.25 × mark size on every side (`--rb-logo-clearspace`).
  */
@@ -25,10 +25,11 @@ const MARK_PX: Record<LogoSize, number> = {
   poweredBy: 16,
 };
 
-const WORD: Record<LogoSize, string> = {
-  nav: "text-[1.0625rem] tracking-[-0.02em]",
-  footer: "text-[0.9375rem] tracking-[-0.015em]",
-  poweredBy: "text-[0.8125rem] tracking-[-0.01em]",
+/** The type size the wordmark stands in for; the logotype box is 0.74 of it. */
+const WORD_PX: Record<LogoSize, number> = {
+  nav: 17,
+  footer: 15,
+  poweredBy: 13,
 };
 
 export function ReviewBoostLogo({
@@ -62,23 +63,14 @@ export function ReviewBoostLogo({
       {pose === "mark" ? (
         <span className="sr-only">ReviewBoost</span>
       ) : (
-        /* Two-tone, as Branding/Logo.svg sets it: "Review" in ink, "Boost"
-           in the one ReviewBoost green. `aria-hidden` on the halves with a
-           single readable label keeps a screen reader from announcing it as
-           two words.
-
-           Same weight, same size, no space: one word in two colours, kerned
-           by the font. The green is the brand green (#00A86B), not the darker
-           action green, because a logotype is exempt from WCAG text contrast
-           (1.4.3, "Logotypes") and a second logo green is how the brand
-           drifted before. Running text around it keeps the action green. */
-        <span className={cn("font-semibold", WORD[size])}>
+        /* The logotype, as Branding/Logo.svg sets it: "Review" in the
+           surface's ink, "Boost" in the one brand green. Drawn from the
+           outlined wordmark (see wordmark.tsx), with one readable name for
+           assistive tech. */
+        <>
           <span className="sr-only">ReviewBoost</span>
-          <span aria-hidden="true">Review</span>
-          <span aria-hidden="true" className="text-[color:var(--rb-brand)]">
-            Boost
-          </span>
-        </span>
+          <Wordmark height={WORD_PX[size] * 0.74} />
+        </>
       )}
     </span>
   );
