@@ -439,6 +439,13 @@ textarea {
 }
 
 
+/* Set for one frame while the theme changes: see theme-control.tsx. */
+[data-theme-switching] *,
+[data-theme-switching] *::before,
+[data-theme-switching] *::after {
+  transition: none !important;
+}
+
 /* Screen entrance. Short enough to feel instant, long enough to register that
    one screen replaced another — which is the difference between an app and a
    set of linked documents. */

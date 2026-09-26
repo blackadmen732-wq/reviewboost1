@@ -49,8 +49,14 @@ function subscribe(onChange: () => void): () => void {
 
 function applyChoice(choice: ThemeChoice) {
   const root = document.documentElement;
+  // The whole page changes colour in one frame. Left alone, every control
+  // with a colour transition eased to the new theme over 150ms while the
+  // rest snapped, so the switch shimmered across the screen in patches.
+  root.setAttribute("data-theme-switching", "");
   if (choice === "system") delete root.dataset.theme;
   else root.dataset.theme = choice;
+  void root.offsetHeight;
+  requestAnimationFrame(() => root.removeAttribute("data-theme-switching"));
   try {
     if (choice === "system") window.localStorage.removeItem(THEME_STORAGE_KEY);
     else window.localStorage.setItem(THEME_STORAGE_KEY, choice);
