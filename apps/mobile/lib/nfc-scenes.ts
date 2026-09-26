@@ -7,6 +7,10 @@
  * Tag on their phone in the morning and from the dashboard in the afternoon
  * should be doing the same thing twice, not learning two products.
  *
+ * Keep this file to plain constants and functions with no runtime imports:
+ * the web suite compiles it without this app's toolchain, so an import of an
+ * app dependency here would not resolve there.
+ *
  * The write machine keeps all of its states — each is a real step with its own
  * failure mode — but reading, writing and verifying are not three screens. To
  * the person holding a Tag against a phone it is one action: ready, writing,

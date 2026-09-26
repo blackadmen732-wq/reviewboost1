@@ -76,6 +76,9 @@ export function NfcProgramSheet({
             showsVerticalScrollIndicator={false}
           >
           <View style={styles.brand} accessible accessibilityLabel="ReviewBoost">
+            {/* A raster of the canonical mark (frontend/components/brand/
+                logo-mark.tsx), made by scripts/brand/render-native-logo-mark.mjs.
+                Regenerate it there; never edit the PNGs by hand. */}
             <Image
               source={require("../assets/logo-mark.png")}
               style={styles.mark}
