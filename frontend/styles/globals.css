@@ -244,8 +244,9 @@
    content simply appears in its final position. */
 .rb-reveal {
   opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(12px);
+  /* Content entrance: 240ms, the top of the 180–240ms band. */
+  transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1), transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: opacity, transform;
 }
 .rb-reveal[data-visible="true"] {

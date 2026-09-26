@@ -42,10 +42,14 @@ function Stars({ count }: { count: number }) {
   );
 }
 
-/** Five ratings, one destination. Drawn, not animated: the point is sameness. */
+/**
+ * Five ratings, one handoff, one destination. The phone in the middle is the
+ * real screen every rating reaches on its way out; the card is where the
+ * browser goes next. Drawn, not animated: the point is sameness.
+ */
 function SameDestination() {
   return (
-    <div className="grid items-center gap-6 md:grid-cols-[auto_1fr_auto] md:gap-0">
+    <div className="grid items-center gap-6 md:grid-cols-[auto_minmax(60px,1fr)_220px_minmax(40px,0.6fr)_auto] md:gap-0">
       <ul className="flex justify-center gap-2 md:flex-col md:gap-3">
         {[1, 2, 3, 4, 5].map((count) => (
           <li
@@ -63,7 +67,7 @@ function SameDestination() {
         ))}
       </ul>
 
-      {/* Five lines into one: every rating arrives at the same place. */}
+      {/* Five lines into one: every rating arrives at the same screen. */}
       <svg
         className="hidden h-[236px] w-full md:block"
         viewBox="0 0 200 236"
@@ -86,8 +90,21 @@ function SameDestination() {
         ↓
       </p>
 
-      <div className="mx-auto w-full max-w-[300px] rounded-[22px] border border-border bg-surface p-6 shadow-[var(--shadow-card)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">Opens</p>
+      <div className="mx-auto w-full max-w-[220px]">
+        <DemoPhone
+          heroSrc="/images/showcase/pizza-hero.png"
+          label="The screen every rating reaches: thanks, and on to Google"
+          screen="handoff"
+        />
+      </div>
+
+      <div aria-hidden="true" className="flex items-center justify-center px-2 text-2xl text-muted">
+        <span className="md:hidden">↓</span>
+        <span className="hidden h-px w-full border-t-[1.5px] border-dashed border-brand md:block" />
+      </div>
+
+      <div className="mx-auto w-full max-w-[260px] rounded-[22px] border border-border bg-surface p-6 shadow-[var(--shadow-card)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">Then opens</p>
         <p className="mt-2 text-lg font-semibold tracking-[-0.01em] text-ink">
           The business&apos;s Google review page
         </p>
@@ -95,6 +112,18 @@ function SameDestination() {
           The same page, whichever star they tapped. Writing a review is up to them.
         </p>
       </div>
+    </div>
+  );
+}
+
+/** The thread between scenes: one journey, not three separate cards. */
+function Connector() {
+  return (
+    <div aria-hidden="true" className="flex justify-center py-6 md:py-8">
+      <span className="flex flex-col items-center gap-1.5">
+        <span className="h-14 w-px border-l-[1.5px] border-dashed border-brand/60 md:h-16" />
+        <span className="size-2 rounded-full bg-brand" />
+      </span>
     </div>
   );
 }
@@ -114,7 +143,12 @@ export function HowItWorksScenes() {
 
         {/* 01 — the physical Tag. Visual first, big. */}
         <Reveal className="mt-16 grid items-center gap-10 md:mt-20 md:grid-cols-12 md:gap-12">
-          <div className="relative h-[380px] overflow-hidden rounded-[32px] bg-quiet sm:h-[440px] md:col-span-7">
+          <div className="rb-tap-scene group relative h-[380px] overflow-hidden rounded-[32px] bg-quiet sm:h-[440px] md:col-span-7">
+            {/* The counter the Tag sits on. */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-0 bottom-0 h-[30%] border-t border-white/70 bg-[linear-gradient(180deg,#e7ebe8,#dde2de)]"
+            />
             {/* A phone coming down onto the Tag. Still, not animated: the
                 moment itself is the point. */}
             <div className="absolute left-1/2 top-[-46%] w-[200px] -translate-x-1/2 rotate-[-10deg] sm:top-[-42%] sm:w-[220px]">
@@ -126,12 +160,14 @@ export function HowItWorksScenes() {
             </div>
             <span
               aria-hidden="true"
-              className="absolute bottom-[25%] left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5"
+              className="rb-tap-arcs absolute bottom-[25%] left-1/2 flex -translate-x-1/2 flex-col-reverse items-center gap-1.5"
             >
+              {/* Brighten once, in sequence, when the scene is pointed at or
+                  tapped — the Tag answering. Never on a loop. */}
               {[40, 64, 88].map((width) => (
                 <span
                   key={width}
-                  className="h-2.5 rounded-t-full border-x-2 border-t-2 border-brand/60"
+                  className="h-2.5 rounded-t-full border-x-2 border-t-2 border-brand"
                   style={{ width }}
                 />
               ))}
@@ -153,8 +189,10 @@ export function HowItWorksScenes() {
           </div>
         </Reveal>
 
+        <Connector />
+
         {/* 02 — the customer page. Copy first, the phone large on the right. */}
-        <Reveal className="mt-20 grid items-center gap-10 md:mt-28 md:grid-cols-12 md:gap-12">
+        <Reveal className="grid items-center gap-10 md:grid-cols-12 md:gap-12">
           <div className="order-2 md:order-1 md:col-span-5 md:col-start-2">
             <StepLabel number="02" label="Rate" />
             <h3 className="mt-4 text-[clamp(1.6rem,2.6vw,2.25rem)] font-bold leading-[1.1] tracking-[-0.025em] text-ink">
@@ -174,8 +212,10 @@ export function HowItWorksScenes() {
           </div>
         </Reveal>
 
-        {/* 03 — the handoff. Full width: five ratings, one destination. */}
-        <Reveal className="mt-20 md:mt-28">
+        <Connector />
+
+        {/* 03 — the handoff. Full width: five ratings, one handoff, one destination. */}
+        <Reveal>
           <div className="mx-auto max-w-[44rem] text-center">
             <div className="flex justify-center">
               <StepLabel number="03" label="Continue" />
@@ -187,7 +227,7 @@ export function HowItWorksScenes() {
               {CONTINUE_STEP?.body}
             </p>
           </div>
-          <div className="mx-auto mt-12 max-w-[760px]">
+          <div className="mx-auto mt-12 max-w-[1040px]">
             <SameDestination />
           </div>
         </Reveal>
