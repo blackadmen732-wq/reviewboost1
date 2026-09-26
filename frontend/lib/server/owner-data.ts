@@ -9,9 +9,16 @@ import { tryDecrypt } from "@/lib/server/crypto";
 import { locationLimit, tagLimit } from "@/lib/server/entitlements";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
+import {
+  insightPeriods,
+  summarizeInsights,
+  type FeedbackInsights,
+  type InsightRange,
+  type InsightRow,
+} from "@/lib/owner/insights";
 import { logger } from "@/lib/server/logger";
 import { supabaseServer } from "@/lib/supabase/server";
-import { startOfLocalDay, startOfLocalMonth, startOfLocalWeek } from "@/lib/utils/local-day";
+import { localDay, startOfLocalDay, startOfLocalMonth, startOfLocalWeek } from "@/lib/utils/local-day";
 
 export { localHour, startOfLocalDay, startOfLocalMonth } from "@/lib/utils/local-day";
 
@@ -242,6 +249,11 @@ export async function listReviews(
     unreadOnly?: boolean | undefined;
     withNotesOnly?: boolean | undefined;
     openOnly?: boolean | undefined;
+    /** One of the organization's own locations; the caller validates it. */
+    locationId?: string | undefined;
+    /** Inclusive start and exclusive end instants, from local calendar days. */
+    submittedFrom?: string | undefined;
+    submittedBefore?: string | undefined;
   } = {},
 ): Promise<Page<Review>> {
   const supabase = await supabaseServer();
@@ -265,6 +277,9 @@ export async function listReviews(
   if (options.unreadOnly) query = query.is("read_at", null);
   if (options.withNotesOnly) query = query.not("note_encrypted", "is", null);
   if (options.openOnly) query = query.is("resolved_at", null);
+  if (options.locationId) query = query.eq("location_id", options.locationId);
+  if (options.submittedFrom) query = query.gte("submitted_at", options.submittedFrom);
+  if (options.submittedBefore) query = query.lt("submitted_at", options.submittedBefore);
 
   const { data, error } = await query;
   if (error) dataFailure("list_reviews", error);
@@ -406,40 +421,61 @@ export async function getReview(
   };
 }
 
-/** How many responses sit at each star value — the Reviews page breakdown. */
-export async function getRatingBreakdown(orgId: string): Promise<{
-  counts: Record<1 | 2 | 3 | 4 | 5, number>;
-  total: number;
-  average: number | null;
-}> {
+// ------------------------------------------------------------- insights ----
+
+/**
+ * Feedback → Insights for one period view, one read.
+ *
+ * The periods are local calendar days in the business's zone, computed in
+ * lib/owner/insights.ts; the database only counts ratings of each star value
+ * between those boundaries (rpc_feedback_insights, which runs as the caller
+ * under row level security). No rating rows leave the database.
+ *
+ * `locationId` must already be one of this organization's own locations — the
+ * page checks it against listLocations. The function would return nothing for
+ * anyone else's anyway, but an unchecked id would make that look like a quiet
+ * month rather than a mistake.
+ *
+ * Only when the periods hold nothing at all is a second, one-row probe made, to
+ * tell a quiet stretch from a business that has never had a rating.
+ */
+export async function getFeedbackInsights(
+  orgId: string,
+  timezone: string,
+  options: { range: InsightRange; locationId?: string | null | undefined },
+): Promise<FeedbackInsights> {
   const supabase = await supabaseServer();
+  const periods = insightPeriods(timezone, options.range);
+  const locationId = options.locationId ?? null;
 
-  const results = await Promise.all(
-    ([1, 2, 3, 4, 5] as const).map((rating) =>
-      supabase
-        .from("customer_responses")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .eq("rating", rating),
-    ),
-  );
+  const { data, error } = await supabase.rpc("rpc_feedback_insights", {
+    p_org_id: orgId,
+    p_bounds: periods.bounds,
+    p_location_id: locationId,
+  });
+  if (error) dataFailure("feedback_insights", error);
 
-  for (const r of results) {
-    if (r.error) dataFailure("rating_breakdown", r.error);
+  const rows: InsightRow[] = ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+    bucket: Number(row.bucket),
+    rating: Number(row.rating),
+    responses: Number(row.responses),
+  }));
+
+  let hasEarlier = false;
+  if (rows.length === 0) {
+    let probe = supabase
+      .from("customer_responses")
+      .select("id")
+      .eq("org_id", orgId)
+      .lt("submitted_at", periods.previous.start)
+      .limit(1);
+    if (locationId) probe = probe.eq("location_id", locationId);
+    const earlier = await probe;
+    if (earlier.error) dataFailure("feedback_insights.earlier", earlier.error);
+    hasEarlier = (earlier.data ?? []).length > 0;
   }
 
-  const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<1 | 2 | 3 | 4 | 5, number>;
-  let total = 0;
-  let weighted = 0;
-
-  ([1, 2, 3, 4, 5] as const).forEach((rating, index) => {
-    const count = results[index]?.count ?? 0;
-    counts[rating] = count;
-    total += count;
-    weighted += count * rating;
-  });
-
-  return { counts, total, average: total > 0 ? weighted / total : null };
+  return summarizeInsights(periods, rows, hasEarlier);
 }
 
 // --------------------------------------------------------------- praise ----
@@ -773,7 +809,6 @@ export interface OwnerCounts {
   unread: number;
   unmatchedPraise: number;
   activeStands: number;
-  recentAverage: number | null;
   recentCount: number;
   hasGoogleLink: boolean;
   googleLinkInvalid: boolean;
@@ -792,7 +827,10 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
   const dayStart = startOfLocalDay(timezone);
   const monthStart = startOfLocalMonth(timezone);
   const weekStart = startOfLocalWeek(timezone);
-  const priorWeekStart = new Date(weekStart.getTime() - 7 * 86_400_000);
+  // Thirteen calendar days back, not the week start minus 7 × 24h: a week that
+  // contains a daylight-saving change is 167 or 169 hours long, and the
+  // subtraction put the boundary at 23:00 or 01:00 on the wrong day.
+  const priorWeekStart = localDay(timezone, -13).start;
 
   const [today, thisWeek, lastWeek, unread, praise, stands, locations, recent] = await Promise.all([
     supabase
@@ -829,9 +867,11 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
       .gte("created_at", monthStart.toISOString()),
     supabase.from("review_stands").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "active"),
     listLocations(orgId),
+    // Whether anyone has rated yet, for Home's empty state. Ids, not ratings:
+    // the one average in the product is the one Insights computes.
     supabase
       .from("customer_responses")
-      .select("rating")
+      .select("id")
       .eq("org_id", orgId)
       .order("submitted_at", { ascending: false })
       .limit(50),
@@ -845,7 +885,6 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
   if (stands.error) dataFailure("owner_counts.stands", stands.error);
   if (recent.error) dataFailure("owner_counts.recent", recent.error);
 
-  const ratings = (recent.data ?? []).map((row) => row.rating as number);
 
   return {
     ratingsToday: today.count ?? 0,
@@ -854,11 +893,7 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
     unread: unread.count ?? 0,
     unmatchedPraise: praise.count ?? 0,
     activeStands: stands.count ?? 0,
-    recentAverage:
-      ratings.length > 0
-        ? ratings.reduce((total, rating) => total + rating, 0) / ratings.length
-        : null,
-    recentCount: ratings.length,
+    recentCount: (recent.data ?? []).length,
     // Every place, not the first: a second location with no link has Tags
     // that send nobody to Google, and Home has to say so.
     ...ownerGoogleLinkFlagsForAll(locations.map((location) => location.destination?.url ?? null)),

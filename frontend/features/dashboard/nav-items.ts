@@ -24,8 +24,10 @@ import type { LucideIcon } from "lucide-react";
  * and start hunting — and a user who is hunting has decided the app is
  * complicated.
  *
- * Reviews, Praise and Customers are historical views of data the V1 public
- * contract no longer collects. They remain as pages but are not in the nav.
+ * Insights is not a destination either: it is a tab inside Feedback
+ * (/feedback/insights), so the bar never grows an "Analytics". The old Reviews
+ * page redirects there. Praise and Customers are historical views of data the
+ * V1 public contract no longer collects; they remain as pages, not in the nav.
  */
 
 export interface NavItem {
