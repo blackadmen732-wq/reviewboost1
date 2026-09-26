@@ -19,6 +19,15 @@ import type { Stand } from "@/lib/server/owner-data";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils/cn";
 
+
+/** The only action that invalidates a printed QR code or a programmed NFC chip. */
+export const ROTATE_WARNING =
+  "This is the only change that stops a Tag working. As soon as you confirm, the QR code you printed and the NFC chip you programmed for this Tag stop opening your Customer Page.";
+
+/** Everything that does not need a new code — so nobody rotates to "apply" it. */
+export const ROTATE_NOT_NEEDED =
+  "You don’t need a new code to change your Google link, your Customer Page or this Tag’s place — those reach the Tag on its next tap. Only do this if the code was copied or you want the old one to stop working.";
+
 /**
  * A Tag. Everything on the managed view — loading the code, printing, saving,
  * programming NFC, making a new code — goes through routes that only an owner
@@ -108,7 +117,7 @@ function ManagedTagDetail({ stand }: { stand: Stand }) {
       return;
     }
     qr.reload();
-    notify.success("New code ready", "Print it and replace the old one.");
+    notify.success("New code ready", "The old code no longer works. Print this one and program NFC again.");
   }
 
   return (
@@ -191,12 +200,32 @@ function ManagedTagDetail({ stand }: { stand: Stand }) {
         }}
       />
 
+      {/* The one action that changes what is printed and programmed on this
+          Tag. Everything else — the Google link, the Customer Page, the place,
+          the name — is resolved when a customer opens the Tag, so it never
+          needs a new code; the dialog says so, so nobody does this to "apply"
+          a change. */}
       <AlertDialog
         open={confirming}
         onOpenChange={setConfirming}
-        title="Your printed code will stop working"
-        description="Anyone who scans the old code will see nothing. Print the new one and put it out."
-        confirmLabel="Yes, make a new code"
+        title="Make a new code? The old one stops working."
+        description={ROTATE_WARNING}
+        details={
+          <>
+            <ul className="list-disc space-y-1 pl-5" data-rotate-consequences>
+              <li>Print the new code and replace the one on the counter.</li>
+              <li>
+                {(justProgrammedAt ?? stand.nfcProvisionedAt)
+                  ? "Program this Tag’s NFC chip again."
+                  : "If this Tag has an NFC chip, program it again."}
+              </li>
+            </ul>
+            <p className="mt-3 text-sm text-muted" data-rotate-not-needed>
+              {ROTATE_NOT_NEEDED}
+            </p>
+          </>
+        }
+        confirmLabel="Make a new code"
         cancelLabel="Keep my code"
         loading={busy}
         onConfirm={() => void rotate()}
