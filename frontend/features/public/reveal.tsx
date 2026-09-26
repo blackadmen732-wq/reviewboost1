@@ -30,8 +30,10 @@ export function Reveal({
 
     // Environments without IntersectionObserver (older browsers, jsdom in
     // tests) get the content immediately rather than permanently invisible.
+    // Marked on the node directly rather than through state, so the effect
+    // never sets state synchronously.
     if (typeof IntersectionObserver === "undefined") {
-      setVisible(true);
+      node.dataset.visible = "true";
       return;
     }
 
