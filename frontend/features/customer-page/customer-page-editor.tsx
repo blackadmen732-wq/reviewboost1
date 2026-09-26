@@ -8,6 +8,7 @@ import { CustomerVisitView } from "@/features/customer-page/customer-visit-view"
 import { PhoneFrame } from "@/features/customer-page/phone-frame";
 import { VisitStars } from "@/features/customer-page/visit-stars";
 import { ownerFetch } from "@/lib/api/owner-fetch";
+import { NormalizePhotoError, normalizePhoto } from "@/lib/images/normalize-photo";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 import { DEFAULT_HERO_TRANSFORM } from "@/lib/owner/hero-transform";
 import type { CustomerPageContent } from "@/lib/server/customer-page-service";
@@ -20,7 +21,7 @@ interface CustomerPageEditorProps {
   onSaved?: () => void;
 }
 
-type UploadState = "idle" | "signing" | "uploading" | "confirming" | "done" | "error";
+type UploadState = "idle" | "preparing" | "signing" | "uploading" | "confirming" | "done" | "error";
 
 /**
  * The preview is the customer page itself — the same CustomerVisitView tree
@@ -99,9 +100,27 @@ export function CustomerPageEditor({
   const uploadHero = useCallback(
     async (file: File) => {
       setUploadError(null);
-      setUploadState("signing");
+      setUploadState("preparing");
       const previous = heroUrl;
-      const local = URL.createObjectURL(file);
+
+      // Upright, JPEG/PNG/WebP and under 5 MB before anything is sent — a
+      // camera photo straight off a phone is usually none of those. The
+      // preview shows the prepared photo, which is exactly what is uploaded.
+      let photo: Awaited<ReturnType<typeof normalizePhoto>>;
+      try {
+        photo = await normalizePhoto(file);
+      } catch (caught) {
+        setUploadState("error");
+        setUploadError(
+          caught instanceof NormalizePhotoError
+            ? caught.message
+            : "That photo could not be prepared. Try a different one.",
+        );
+        return;
+      }
+
+      setUploadState("signing");
+      const local = URL.createObjectURL(photo.blob);
       setHeroUrl(local);
 
       const fail = (message: string) => {
@@ -120,7 +139,7 @@ export function CustomerPageEditor({
         const beginRes = await ownerFetch("/api/v1/customer-page/assets", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind: "hero", contentType: file.type }),
+          body: JSON.stringify({ kind: "hero", contentType: photo.type }),
         });
         if (!beginRes.ok) return fail(await messageOf(beginRes, "Upload failed."));
         const { data: ticket } = (await beginRes.json()) as {
@@ -133,8 +152,8 @@ export function CustomerPageEditor({
         const storageUrl = `${supabaseUrl}/storage/v1/object/upload/sign/customer-page/${ticket.path}?token=${ticket.token}`;
         const putRes = await fetch(storageUrl, {
           method: "PUT",
-          headers: { "Content-Type": file.type, "x-upsert": "true" },
-          body: file,
+          headers: { "Content-Type": photo.type, "x-upsert": "true" },
+          body: photo.blob,
         });
         if (!putRes.ok) return fail("The photo did not upload. Please try again.");
 
@@ -225,9 +244,12 @@ export function CustomerPageEditor({
   }, [draft, onSaved]);
 
   const uploading =
-    uploadState === "signing" || uploadState === "uploading" || uploadState === "confirming";
+    uploadState === "preparing" ||
+    uploadState === "signing" ||
+    uploadState === "uploading" ||
+    uploadState === "confirming";
   const uploadLabel =
-    uploadState === "signing"
+    uploadState === "preparing" || uploadState === "signing"
       ? "Preparing…"
       : uploadState === "uploading"
         ? "Uploading…"

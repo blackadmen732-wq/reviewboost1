@@ -8,7 +8,25 @@ vi.mock("@/lib/supabase/browser", () => ({
   }),
 }));
 
+// jsdom cannot decode images, so photo preparation is stood in for here; its
+// own behaviour is covered by tests/unit/normalize-photo.test.ts and by a real
+// browser. By default a picked file comes back prepared as itself.
+const normalizePhoto = vi.hoisted(() =>
+  vi.fn(async (file: File) => ({
+    blob: file,
+    type: "image/jpeg" as const,
+    width: 1200,
+    height: 900,
+    converted: false,
+  })),
+);
+vi.mock("@/lib/images/normalize-photo", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/images/normalize-photo")>()),
+  normalizePhoto,
+}));
+
 import { CustomerPageEditor } from "@/features/customer-page/customer-page-editor";
+import { NormalizePhotoError } from "@/lib/images/normalize-photo";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 
 /**
@@ -254,6 +272,32 @@ describe("Customer page editor, as the signed-in owner", () => {
     );
 
     await waitFor(() => expect(screen.getByText(/file type is not allowed/i)).toBeVisible());
+    expect(document.querySelector("[data-hero-layer] img")).toBeNull();
+  });
+
+  it("says why a photo cannot be used, and sends nothing", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push(`${init?.method ?? "GET"} ${String(input)}`);
+        return new Response(JSON.stringify({ data: { draft: {}, published: null } }), {
+          status: 200,
+        });
+      }),
+    );
+    normalizePhoto.mockRejectedValueOnce(
+      new NormalizePhotoError("heic-unsupported", "This browser can’t open HEIC photos."),
+    );
+
+    render(<CustomerPageEditor businessName="Mario’s Pizza" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^publish/i })).toBeVisible());
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+    fireEvent.change(input!, { target: { files: [new File(["x"], "IMG_0001.HEIC", { type: "image/heic" })] } });
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/can’t open HEIC/));
+    expect(calls.some((call) => call.includes("/assets"))).toBe(false);
     expect(document.querySelector("[data-hero-layer] img")).toBeNull();
   });
 });
