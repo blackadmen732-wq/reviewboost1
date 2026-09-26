@@ -355,8 +355,10 @@ select is(
     5242880::bigint,
     'storage itself refuses a photo over 5 MiB');
 
-select is(
-    (select allowed_mime_types from storage.buckets where id = 'customer-page'),
+-- A set, not a list: the order carries no meaning, and the local stack's
+-- config.toml seeding rewrites it after migrations run.
+select set_eq(
+    $$select unnest(allowed_mime_types) from storage.buckets where id = 'customer-page'$$,
     array['image/jpeg', 'image/png', 'image/webp'],
     'storage itself refuses anything but JPEG, PNG and WebP');
 
