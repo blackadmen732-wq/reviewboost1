@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/browser", () => ({
   supabaseBrowser: () => ({
-    auth: { getSession: async () => ({ data: { session: null } }) },
+    // Signed in: the editor calls the owner API with this session as a Bearer.
+    auth: { getSession: async () => ({ data: { session: { access_token: "owner-token" } } }) },
   }),
 }));
 
@@ -180,5 +181,79 @@ describe("Customer page publish", () => {
 
     await waitFor(() => expect(screen.getByText(/storage is unavailable/i)).toBeVisible());
     expect(screen.queryByText(/page is live/i)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The owner API accepts a Bearer session token and nothing else. The editor
+ * used to call it with a bare fetch, so against the real backend it loaded no
+ * draft, failed every upload and never published — while these tests, which
+ * stub fetch, passed.
+ */
+describe("Customer page editor, as the signed-in owner", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("sends the owner's session on every owner API call", async () => {
+    const auth: Array<string | null> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        auth.push(new Headers(init?.headers).get("authorization"));
+        return new Response(JSON.stringify({ data: { draft: {}, published: null } }), {
+          status: 200,
+        });
+      }),
+    );
+
+    render(<CustomerPageEditor businessName="Mario’s Pizza" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^publish/i })).toBeVisible());
+    fireEvent.click(screen.getByRole("button", { name: /^publish/i }));
+    await waitFor(() => expect(auth.length).toBeGreaterThanOrEqual(3));
+
+    expect(auth.every((value) => value === "Bearer owner-token")).toBe(true);
+  });
+
+  it("previews a picked photo at once, and puts the old one back if the upload fails", async () => {
+    let releaseSign: (response: Response) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).endsWith("/assets") && init?.method === "POST") {
+          return new Promise<Response>((resolve) => {
+            releaseSign = resolve;
+          });
+        }
+        return new Response(JSON.stringify({ data: { draft: {}, published: null } }), {
+          status: 200,
+        });
+      }),
+    );
+    vi.stubGlobal("URL", Object.assign(URL, {
+      createObjectURL: () => "blob:picked-photo",
+      revokeObjectURL: () => undefined,
+    }));
+
+    render(<CustomerPageEditor businessName="Mario’s Pizza" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^publish/i })).toBeVisible());
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+    const file = new File(["x"], "hero.jpg", { type: "image/jpeg" });
+    fireEvent.change(input!, { target: { files: [file] } });
+
+    // Shown while the upload is still in flight.
+    await waitFor(() =>
+      expect(document.querySelector("[data-hero-layer] img")?.getAttribute("src")).toBe(
+        "blob:picked-photo",
+      ),
+    );
+
+    releaseSign(
+      new Response(JSON.stringify({ error: { message: "That file type is not allowed." } }), {
+        status: 400,
+      }),
+    );
+
+    await waitFor(() => expect(screen.getByText(/file type is not allowed/i)).toBeVisible());
+    expect(document.querySelector("[data-hero-layer] img")).toBeNull();
   });
 });

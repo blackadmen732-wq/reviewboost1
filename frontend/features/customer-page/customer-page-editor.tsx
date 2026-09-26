@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
 import { PhoneFrame } from "@/features/customer-page/phone-frame";
 import { VisitStars } from "@/features/customer-page/visit-stars";
+import { ownerFetch } from "@/lib/api/owner-fetch";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 import { DEFAULT_HERO_TRANSFORM } from "@/lib/owner/hero-transform";
 import type { CustomerPageContent } from "@/lib/server/customer-page-service";
@@ -48,7 +49,7 @@ export function CustomerPageEditor({
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch("/api/v1/customer-page");
+        const res = await ownerFetch("/api/v1/customer-page");
         if (!res.ok) return;
         const { data } = (await res.json()) as {
           data: {
@@ -74,62 +75,79 @@ export function CustomerPageEditor({
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const uploadHero = useCallback(async (file: File) => {
-    setUploadError(null);
-    setUploadState("signing");
+  /**
+   * Upload → preview → Publish, with the preview first.
+   *
+   * The chosen photo appears in the phone the moment it is picked, from a
+   * local object URL, while the three-step upload (sign, send to storage,
+   * confirm) runs behind it. It used to appear only after all three finished,
+   * so the owner stared at the old photo wondering whether anything happened.
+   * If any step fails the previous photo comes back and the error says so —
+   * the preview never shows something that is not actually saved.
+   */
+  const uploadHero = useCallback(
+    async (file: File) => {
+      setUploadError(null);
+      setUploadState("signing");
+      const previous = heroUrl;
+      const local = URL.createObjectURL(file);
+      setHeroUrl(local);
 
-    // Step 1: get signed upload ticket
-    const beginRes = await fetch("/api/v1/customer-page/assets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "hero", contentType: file.type }),
-    });
-    if (!beginRes.ok) {
-      const err = await beginRes.json().catch(() => ({}));
-      setUploadState("error");
-      setUploadError((err as { error?: { message?: string } }).error?.message ?? "Upload failed.");
-      return;
-    }
-    const { data: ticket } = (await beginRes.json()) as {
-      data: { assetId: string; path: string; token: string };
-    };
+      const fail = (message: string) => {
+        URL.revokeObjectURL(local);
+        setHeroUrl(previous);
+        setUploadState("error");
+        setUploadError(message);
+      };
+      const messageOf = async (res: Response, fallback: string) => {
+        const err = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+        return err.error?.message ?? fallback;
+      };
 
-    // Step 2: upload directly to Supabase Storage
-    setUploadState("uploading");
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const storageUrl = `${supabaseUrl}/storage/v1/object/upload/sign/customer-page/${ticket.path}?token=${ticket.token}`;
-    const putRes = await fetch(storageUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type, "x-upsert": "true" },
-      body: file,
-    });
-    if (!putRes.ok) {
-      setUploadState("error");
-      setUploadError("Storage upload failed. Please try again.");
-      return;
-    }
+      try {
+        // Step 1: get a signed upload ticket
+        const beginRes = await ownerFetch("/api/v1/customer-page/assets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "hero", contentType: file.type }),
+        });
+        if (!beginRes.ok) return fail(await messageOf(beginRes, "Upload failed."));
+        const { data: ticket } = (await beginRes.json()) as {
+          data: { assetId: string; path: string; token: string };
+        };
 
-    // Step 3: confirm upload server-side
-    setUploadState("confirming");
-    const confirmRes = await fetch("/api/v1/customer-page/assets", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assetId: ticket.assetId, path: ticket.path }),
-    });
-    if (!confirmRes.ok) {
-      const err = await confirmRes.json().catch(() => ({}));
-      setUploadState("error");
-      setUploadError(
-        (err as { error?: { message?: string } }).error?.message ?? "Confirmation failed.",
-      );
-      return;
-    }
+        // Step 2: upload directly to Supabase Storage (the ticket authorises it)
+        setUploadState("uploading");
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const storageUrl = `${supabaseUrl}/storage/v1/object/upload/sign/customer-page/${ticket.path}?token=${ticket.token}`;
+        const putRes = await fetch(storageUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type, "x-upsert": "true" },
+          body: file,
+        });
+        if (!putRes.ok) return fail("The photo did not upload. Please try again.");
 
-    // Show a local preview URL and record the assetId in the draft.
-    setHeroUrl(URL.createObjectURL(file));
-    setDraft((prev) => ({ ...prev, heroAssetId: ticket.assetId }));
-    setUploadState("done");
-  }, []);
+        // Step 3: confirm the upload server-side
+        setUploadState("confirming");
+        const confirmRes = await ownerFetch("/api/v1/customer-page/assets", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assetId: ticket.assetId, path: ticket.path }),
+        });
+        if (!confirmRes.ok) return fail(await messageOf(confirmRes, "The photo could not be checked. Please try again."));
+
+        setDraft((prev) => ({ ...prev, heroAssetId: ticket.assetId }));
+        setUploadState("done");
+      } catch (caught) {
+        fail(
+          caught instanceof Error && caught.name === "SessionExpiredError"
+            ? caught.message
+            : "Could not reach ReviewBoost. Check your connection and try again.",
+        );
+      }
+    },
+    [heroUrl],
+  );
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,7 +174,7 @@ export function CustomerPageEditor({
     setStatusMsg(null);
 
     try {
-      const saved = await fetch("/api/v1/customer-page", {
+      const saved = await ownerFetch("/api/v1/customer-page", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...draft, tagline: draft.tagline ?? null }),
@@ -171,7 +189,7 @@ export function CustomerPageEditor({
         return;
       }
 
-      const res = await fetch("/api/v1/customer-page", {
+      const res = await ownerFetch("/api/v1/customer-page", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
