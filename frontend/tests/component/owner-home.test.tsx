@@ -148,7 +148,7 @@ describe("OwnerHome", () => {
       />,
     );
 
-    expect(screen.getByText("1 message needs you")).toBeVisible();
+    expect(screen.getByText("1 new rating")).toBeVisible();
     expect(screen.getByText("Waited twenty minutes.")).toBeVisible();
     expect(screen.getByRole("link", { name: "Read feedback" })).toHaveAttribute("href", "/feedback");
     expect(screen.getByText("1 tag · not programmed yet")).toBeVisible();

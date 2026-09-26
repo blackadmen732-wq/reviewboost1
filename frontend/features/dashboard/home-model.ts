@@ -168,8 +168,10 @@ export function deriveHomeModel({
   if (counts.unread > 0) {
     attentions.push({
       kind: "unread",
-      title: counts.unread === 1 ? "1 message needs you" : `${counts.unread} messages need you`,
-      body: "Read them before the next rush.",
+      // Ratings, not "messages": the customer page collects a star and nothing
+      // else, and Home must not promise words that are not there.
+      title: counts.unread === 1 ? "1 new rating" : `${counts.unread} new ratings`,
+      body: counts.unread === 1 ? "See it before the next rush." : "See them before the next rush.",
     });
   }
 
