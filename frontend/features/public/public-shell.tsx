@@ -6,20 +6,18 @@ import { PublicHeader } from "@/features/public/public-header";
 import { PUBLIC_FOOTER } from "@/features/public/public-copy";
 
 /**
- * Public chrome. Figma "navbar-container" sets the visual direction for the
- * marketing site: warm off-white bar (#f5f6f0), hairline rule (#e1e5dc),
- * pill CTA. The authenticated app (dashboard, customer flow) keeps the
- * locked constitution tokens untouched — this palette is scoped to the
- * marketing shell only.
+ * Public chrome. `.rb-public` (public-showcase.css) scopes the website's
+ * palette — cool neutrals, ReviewBoost green as the action — so the
+ * authenticated app keeps its own tokens untouched.
  */
 export function PublicShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh bg-[#f5f6f0] text-[#1b2a1e]">
+    <div className="rb-public min-h-dvh bg-canvas text-ink">
       <PublicHeader />
 
       <main>{children}</main>
 
-      <footer className="border-t border-[#e1e5dc] bg-[#f5f6f0]">
+      <footer className="border-t border-border bg-canvas">
         <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-5 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <ReviewBoostLogo pose="full" size="footer" />
           <nav className="flex flex-wrap gap-x-6 gap-y-3" aria-label="Legal">
@@ -27,7 +25,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className="text-sm text-[#4a5d4e] transition-colors duration-150 hover:text-[#1b2a1e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+                className="text-sm text-muted transition-colors duration-150 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
               >
                 {item.label}
               </Link>

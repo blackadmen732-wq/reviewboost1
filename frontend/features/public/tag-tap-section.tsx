@@ -38,21 +38,21 @@ export function TagTapSection() {
   return (
     <div className="grid items-center gap-12 md:grid-cols-2 md:gap-16">
       <div>
-        <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#2d6a4f]">Product</p>
-        <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.02em] text-[#1b4332]">
+        <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-brand-text">Product</p>
+        <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.02em] text-ink">
           {PRODUCT.headline}
         </h2>
-        <p className="mt-4 max-w-[38ch] text-lg leading-relaxed text-[#4a5d4e]">{PRODUCT.lede}</p>
+        <p className="mt-4 max-w-[38ch] text-lg leading-relaxed text-muted">{PRODUCT.lede}</p>
         <ul className="mt-8 flex flex-col gap-5">
           {PRODUCT.items.map((item) => (
             <li key={item.title} className="flex gap-4">
               <span
                 aria-hidden="true"
-                className="mt-1 inline-flex size-2 shrink-0 rounded-full bg-[#2d6a4f]"
+                className="mt-1 inline-flex size-2 shrink-0 rounded-full bg-brand"
               />
               <div>
-                <h3 className="text-base font-semibold text-[#1b4332]">{item.title}</h3>
-                <p className="mt-1 max-w-[36ch] text-base leading-relaxed text-[#4a5d4e]">{item.body}</p>
+                <h3 className="text-base font-semibold text-ink">{item.title}</h3>
+                <p className="mt-1 max-w-[36ch] text-base leading-relaxed text-muted">{item.body}</p>
               </div>
             </li>
           ))}
@@ -60,7 +60,7 @@ export function TagTapSection() {
       </div>
 
       <div
-        className="relative flex items-center justify-center overflow-hidden rounded-[2rem] border border-[#e1e5dc] bg-white py-20"
+        className="relative flex items-center justify-center overflow-hidden rounded-[2rem] border border-border bg-white py-20"
         role="img"
         aria-label="A Tag being tapped and read, then confirmed"
       >
@@ -75,7 +75,7 @@ export function TagTapSection() {
         <div className="relative">
           {phase === "success" ? <SuccessCheck /> : <ReaderIndicator active={phase === "writing"} />}
         </div>
-        <p className="absolute bottom-7 left-0 right-0 text-center text-sm font-medium text-[#4a5d4e]">
+        <p className="absolute bottom-7 left-0 right-0 text-center text-sm font-medium text-muted">
           {phase === "ready" ? "Ready to tap" : phase === "writing" ? "Reading the Tag" : "Same link, every time"}
         </p>
       </div>

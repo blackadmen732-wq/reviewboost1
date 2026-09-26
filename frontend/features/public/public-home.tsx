@@ -38,24 +38,24 @@ import { TextRequestSection } from "@/features/public/text-request-section";
 export function PublicHome() {
   return (
     <PublicShell>
-      <section className="bg-[#edede5]">
+      <section className="bg-quiet">
         <div className="mx-auto flex max-w-[1200px] flex-col-reverse items-center gap-10 px-5 py-20 sm:px-8 md:flex-row md:gap-12 md:py-28">
           <div className="flex w-full flex-col md:w-1/2">
-            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[#d8f3dc] px-3 py-1.5 text-xs font-semibold text-[#1b4332]">
+            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-brand-soft px-3 py-1.5 text-xs font-semibold text-ink">
               <ShieldCheck className="size-3.5" aria-hidden="true" />
               Every star gets the same Google link
             </span>
-            <h1 className="mt-6 text-[clamp(2.5rem,5.5vw,4.25rem)] font-extrabold leading-[1.05] tracking-[-0.035em] text-[#1b4332]">
+            <h1 className="mt-6 text-[clamp(2.5rem,5.5vw,4.25rem)] font-extrabold leading-[1.05] tracking-[-0.035em] text-ink">
               {PUBLIC_HERO.title}
             </h1>
-            <p className="mt-6 max-w-[40ch] text-xl leading-relaxed text-[#4a5d4e]">
+            <p className="mt-6 max-w-[40ch] text-xl leading-relaxed text-muted">
               {PUBLIC_HERO.lede}
             </p>
             <div className="mt-9 flex max-w-sm flex-col gap-3 sm:flex-row">
               <Button asChild variant="action" size="lg" className="rounded-full">
                 <Link href={PUBLIC_HERO.primary.href}>{PUBLIC_HERO.primary.label}</Link>
               </Button>
-              <Button asChild variant="ghost" size="lg" className="rounded-full text-[#1b4332] hover:bg-[#d8f3dc]">
+              <Button asChild variant="ghost" size="lg" className="rounded-full text-ink hover:bg-brand-soft">
                 <Link href={PUBLIC_HERO.secondary.href}>{PUBLIC_HERO.secondary.label}</Link>
               </Button>
             </div>
@@ -75,25 +75,25 @@ export function PublicHome() {
 
       <CustomerPageShowcase />
 
-      <section className="border-t border-[#e1e5dc] bg-[#f5f6f0]">
+      <section className="border-t border-border bg-canvas">
         <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
           <Reveal>
-            <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#2d6a4f]">
+            <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-brand-text">
               How it works
             </p>
           </Reveal>
           <ol className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
             {HOW_IT_WORKS.map((step, index) => (
               <Reveal key={step.title} delay={index * 90} className="h-full">
-                <li className="flex h-full flex-col gap-4 rounded-2xl border border-[#e1e5dc] bg-white p-6">
-                  <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[#d8f3dc] text-sm font-bold text-[#1b4332]">
+                <li className="flex h-full flex-col gap-4 rounded-2xl border border-border bg-white p-6">
+                  <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-bold text-ink">
                     {index + 1}
                   </span>
                   <div>
-                    <h2 className="text-lg font-semibold tracking-[-0.01em] text-[#1b4332]">
+                    <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink">
                       {step.title}
                     </h2>
-                    <p className="mt-2 text-base leading-relaxed text-[#4a5d4e]">{step.body}</p>
+                    <p className="mt-2 text-base leading-relaxed text-muted">{step.body}</p>
                   </div>
                 </li>
               </Reveal>
@@ -102,7 +102,7 @@ export function PublicHome() {
           <p className="mt-10">
             <Link
               href="/how-it-works"
-              className="text-sm font-medium text-[#2d6a4f] underline-offset-4 transition-colors duration-150 hover:underline"
+              className="text-sm font-medium text-brand-text underline-offset-4 transition-colors duration-150 hover:underline"
             >
               The whole path
             </Link>
@@ -110,7 +110,7 @@ export function PublicHome() {
         </div>
       </section>
 
-      <section className="border-t border-[#e1e5dc] bg-white">
+      <section className="border-t border-border bg-white">
         <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
           <Reveal>
             <TagTapSection />
@@ -118,15 +118,15 @@ export function PublicHome() {
         </div>
       </section>
 
-      <section className="border-t border-[#e1e5dc] bg-[#f5f6f0]">
+      <section className="border-t border-border bg-canvas">
         <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
           <Reveal className="grid items-center gap-12 md:grid-cols-2 md:gap-16">
             <div>
-              <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#2d6a4f]">Home</p>
-              <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.02em] text-[#1b4332]">
+              <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-brand-text">Home</p>
+              <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.02em] text-ink">
                 One screen, and it tells you what actually needs you
               </h2>
-              <p className="mt-4 max-w-[38ch] text-lg leading-relaxed text-[#4a5d4e]">
+              <p className="mt-4 max-w-[38ch] text-lg leading-relaxed text-muted">
                 Setup is four short things, not a wizard. Once they&apos;re done, this
                 screen gets out of the way and shows the feedback that just came in.
               </p>
@@ -136,7 +136,7 @@ export function PublicHome() {
         </div>
       </section>
 
-      <section className="border-t border-[#e1e5dc] bg-white">
+      <section className="border-t border-border bg-white">
         <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
           <Reveal>
             <TextRequestSection />
@@ -144,21 +144,21 @@ export function PublicHome() {
         </div>
       </section>
 
-      <section className="border-t border-[#e1e5dc] bg-[#f5f6f0]">
+      <section className="border-t border-border bg-canvas">
         <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-28">
           <Reveal>
-            <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#2d6a4f]">
+            <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-brand-text">
               Integrity
             </p>
-            <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.02em] text-[#1b4332]">
+            <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.02em] text-ink">
               {INTEGRITY.headline}
             </h2>
-            <p className="mt-4 max-w-[40ch] text-lg leading-relaxed text-[#4a5d4e]">{INTEGRITY.lede}</p>
-            <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-[#4a5d4e]">{INTEGRITY.body}</p>
+            <p className="mt-4 max-w-[40ch] text-lg leading-relaxed text-muted">{INTEGRITY.lede}</p>
+            <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{INTEGRITY.body}</p>
             <p className="mt-10">
               <Link
                 href="/integrity"
-                className="text-sm font-medium text-[#2d6a4f] underline-offset-4 transition-colors duration-150 hover:underline"
+                className="text-sm font-medium text-brand-text underline-offset-4 transition-colors duration-150 hover:underline"
               >
                 Why this is the product
               </Link>
@@ -167,16 +167,16 @@ export function PublicHome() {
         </div>
       </section>
 
-      <section className="border-t border-[#e1e5dc] bg-white">
+      <section className="border-t border-border bg-white">
         <div className="mx-auto max-w-[52rem] px-5 py-20 sm:px-8 sm:py-28">
           <Reveal>
-            <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#2d6a4f]">
+            <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-brand-text">
               Pricing
             </p>
-            <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.02em] text-[#1b4332]">
+            <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.02em] text-ink">
               {PRICING.headline}
             </h2>
-            <p className="mt-3 max-w-[36ch] text-lg leading-relaxed text-[#4a5d4e]">{PRICING.lede}</p>
+            <p className="mt-3 max-w-[36ch] text-lg leading-relaxed text-muted">{PRICING.lede}</p>
 
             {/* The prices themselves. This section used to be a headline, a lede
                 and a link — a pricing section with no prices in it, which is the
@@ -185,11 +185,11 @@ export function PublicHome() {
               <PricingTable />
             </div>
 
-            <p className="mt-6 max-w-[48ch] text-sm leading-relaxed text-[#4a5d4e]">{PRICING.caveat}</p>
+            <p className="mt-6 max-w-[48ch] text-sm leading-relaxed text-muted">{PRICING.caveat}</p>
             <p className="mt-10">
               <Link
                 href="/pricing"
-                className="text-sm font-medium text-[#2d6a4f] underline-offset-4 transition-colors duration-150 hover:underline"
+                className="text-sm font-medium text-brand-text underline-offset-4 transition-colors duration-150 hover:underline"
               >
                 How we charge
               </Link>
@@ -198,27 +198,27 @@ export function PublicHome() {
         </div>
       </section>
 
-      <section className="border-t border-[#e1e5dc] bg-[#f5f6f0]">
+      <section className="border-t border-border bg-canvas">
         <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-28">
           <Reveal>
-            <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#2d6a4f]">
+            <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-brand-text">
               Security and privacy
             </p>
-            <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.02em] text-[#1b4332]">
+            <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.02em] text-ink">
               {SECURITY.headline}
             </h2>
-            <p className="mt-3 max-w-[40ch] text-lg leading-relaxed text-[#4a5d4e]">{SECURITY.lede}</p>
-            <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-[#4a5d4e]">{PRIVACY.lede}</p>
+            <p className="mt-3 max-w-[40ch] text-lg leading-relaxed text-muted">{SECURITY.lede}</p>
+            <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{PRIVACY.lede}</p>
             <p className="mt-10 flex flex-wrap gap-x-6 gap-y-2">
               <Link
                 href="/security"
-                className="text-sm font-medium text-[#2d6a4f] underline-offset-4 transition-colors duration-150 hover:underline"
+                className="text-sm font-medium text-brand-text underline-offset-4 transition-colors duration-150 hover:underline"
               >
                 Security
               </Link>
               <Link
                 href="/privacy"
-                className="text-sm font-medium text-[#2d6a4f] underline-offset-4 transition-colors duration-150 hover:underline"
+                className="text-sm font-medium text-brand-text underline-offset-4 transition-colors duration-150 hover:underline"
               >
                 Privacy
               </Link>
@@ -227,27 +227,27 @@ export function PublicHome() {
         </div>
       </section>
 
-      <section className="border-t border-[#e1e5dc] bg-white">
+      <section className="border-t border-border bg-white">
         <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-28">
           <Reveal>
-            <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#2d6a4f]">
+            <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-brand-text">
               Questions
             </p>
             {/* Plain <details>. It is keyboard accessible and works before any
                 JavaScript arrives, which matters on a phone with two bars. */}
-            <div className="mt-8 divide-y divide-[#e1e5dc] border-y border-[#e1e5dc]">
+            <div className="mt-8 divide-y divide-border border-y border-border">
               {FAQ.map((entry) => (
                 <details key={entry.question} className="group py-4">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-medium text-[#1b2a1e] [&::-webkit-details-marker]:hidden">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-medium text-ink [&::-webkit-details-marker]:hidden">
                     {entry.question}
                     <span
                       aria-hidden="true"
-                      className="shrink-0 text-[#4a5d4e] transition-transform duration-150 group-open:rotate-45"
+                      className="shrink-0 text-muted transition-transform duration-150 group-open:rotate-45"
                     >
                       +
                     </span>
                   </summary>
-                  <p className="mt-3 max-w-[52ch] text-base leading-relaxed text-[#4a5d4e]">
+                  <p className="mt-3 max-w-[52ch] text-base leading-relaxed text-muted">
                     {entry.answer}
                   </p>
                 </details>
@@ -257,13 +257,13 @@ export function PublicHome() {
         </div>
       </section>
 
-      <section className="border-t border-[#e1e5dc] bg-[#edede5]">
+      <section className="border-t border-border bg-quiet">
         <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-28">
           <Reveal>
-            <h2 className="text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.02em] text-[#1b4332]">
+            <h2 className="text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.02em] text-ink">
               {CLOSE.headline}
             </h2>
-            <p className="mt-3 max-w-[36ch] text-lg leading-relaxed text-[#4a5d4e]">{CLOSE.lede}</p>
+            <p className="mt-3 max-w-[36ch] text-lg leading-relaxed text-muted">{CLOSE.lede}</p>
             <div className="mt-8 max-w-xs">
               <Button asChild variant="action" size="lg" className="rounded-full">
                 <Link href={START_HREF}>Get started</Link>

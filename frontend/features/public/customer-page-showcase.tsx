@@ -120,16 +120,16 @@ export function CustomerPageShowcase() {
   }, []);
 
   return (
-    <section className="border-t border-[#e1e5dc] bg-[#f5f6f0]" aria-labelledby="customer-page-showcase-heading">
+    <section className="border-t border-border bg-canvas" aria-labelledby="customer-page-showcase-heading">
       <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-24">
-        <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#2d6a4f]">Customer page</p>
+        <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-brand-text">Customer page</p>
         <h2
           id="customer-page-showcase-heading"
-          className="mt-4 max-w-[24ch] text-2xl font-bold tracking-[-0.02em] text-[#1b4332] sm:text-3xl"
+          className="mt-4 max-w-[24ch] text-2xl font-bold tracking-[-0.02em] text-ink sm:text-3xl"
         >
           Looks like your business. Works like ReviewBoost.
         </h2>
-        <p className="mt-3 max-w-[46ch] text-base leading-relaxed text-[#4a5d4e]">
+        <p className="mt-3 max-w-[46ch] text-base leading-relaxed text-muted">
           Every business gets its own visual identity while ReviewBoost keeps the customer interaction simple and
           consistent.
         </p>
@@ -248,8 +248,8 @@ export function CustomerPageShowcase() {
               className={cn(
                 "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors duration-150",
                 index === activeIndex
-                  ? "border-[#1b4332] bg-[#1b4332] text-white"
-                  : "border-[#d3dccd] bg-white text-[#4a5d4e] hover:border-[#2d6a4f] hover:text-[#1b4332]",
+                  ? "border-ink bg-ink text-white"
+                  : "border-border bg-white text-muted hover:border-brand hover:text-ink",
               )}
             >
               {biz.category}
@@ -263,18 +263,18 @@ export function CustomerPageShowcase() {
               key={biz.id}
               className={cn(
                 "size-1.5 rounded-full transition-colors duration-150",
-                index === activeIndex ? "bg-[#2d6a4f]" : "bg-[#d3dccd]",
+                index === activeIndex ? "bg-brand" : "bg-quiet",
               )}
             />
           ))}
         </div>
 
-        <p className="mt-6 text-center text-sm font-medium text-[#4a5d4e]">
-          Showing <span className="text-[#1b4332]">{active.name}</span>
+        <p className="mt-6 text-center text-sm font-medium text-muted">
+          Showing <span className="text-ink">{active.name}</span>
         </p>
 
         {/* Customization explainer — upload/preview/publish, nothing more. */}
-        <div className="mt-16 rounded-3xl border border-[#e1e5dc] bg-white p-8 sm:p-10">
+        <div className="mt-16 rounded-3xl border border-border bg-white p-8 sm:p-10">
           <div className="grid gap-8 sm:grid-cols-3">
             {[
               { step: "Upload", body: "Add a photo of your counter, your chair, your storefront." },
@@ -282,15 +282,15 @@ export function CustomerPageShowcase() {
               { step: "Publish", body: "One tap, and every scan of your Tag shows the new page." },
             ].map((item) => (
               <div key={item.step}>
-                <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#2d6a4f]">{item.step}</p>
-                <p className="mt-2 text-base leading-relaxed text-[#4a5d4e]">{item.body}</p>
+                <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-brand-text">{item.step}</p>
+                <p className="mt-2 text-base leading-relaxed text-muted">{item.body}</p>
               </div>
             ))}
           </div>
-          <h3 className="mt-10 text-xl font-bold tracking-[-0.01em] text-[#1b4332]">
+          <h3 className="mt-10 text-xl font-bold tracking-[-0.01em] text-ink">
             Your business on top. ReviewBoost underneath.
           </h3>
-          <p className="mt-3 max-w-[52ch] text-base leading-relaxed text-[#4a5d4e]">
+          <p className="mt-3 max-w-[52ch] text-base leading-relaxed text-muted">
             Upload your artwork, see exactly what customers will see, and publish. You are not building a website or
             choosing fonts, colors, or layouts — ReviewBoost keeps the rating and the Google handoff exactly as
             consistent as they are above.

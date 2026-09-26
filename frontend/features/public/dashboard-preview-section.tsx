@@ -42,15 +42,15 @@ const SAMPLE_FEEDBACK: FeedbackItem[] = [
 export function DashboardPreviewSection() {
   return (
     <div
-      className="pointer-events-none select-none overflow-hidden rounded-[1.5rem] border border-[#e1e5dc] bg-[#f8f5f0] shadow-[0_24px_60px_-24px_rgba(27,67,50,0.25)]"
+      className="pointer-events-none select-none overflow-hidden rounded-[1.5rem] border border-border bg-canvas shadow-[0_24px_60px_-24px_rgba(27,67,50,0.25)]"
       role="img"
       aria-label="ReviewBoost Home screen, showing setup progress and recent feedback"
     >
-      <div className="flex items-center gap-2 border-b border-[#e1e5dc] bg-white px-5 py-3.5">
-        <span className="size-2.5 rounded-full bg-[#e1e5dc]" aria-hidden="true" />
-        <span className="size-2.5 rounded-full bg-[#e1e5dc]" aria-hidden="true" />
-        <span className="size-2.5 rounded-full bg-[#e1e5dc]" aria-hidden="true" />
-        <span className="ml-2 text-sm font-medium text-[#4a5d4e]">Home</span>
+      <div className="flex items-center gap-2 border-b border-border bg-white px-5 py-3.5">
+        <span className="size-2.5 rounded-full bg-quiet" aria-hidden="true" />
+        <span className="size-2.5 rounded-full bg-quiet" aria-hidden="true" />
+        <span className="size-2.5 rounded-full bg-quiet" aria-hidden="true" />
+        <span className="ml-2 text-sm font-medium text-muted">Home</span>
       </div>
       <div className="bg-canvas p-6 sm:p-8">
         <HomeSetupChecklist checklist={SAMPLE_CHECKLIST} />

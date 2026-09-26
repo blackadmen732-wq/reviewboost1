@@ -1,6 +1,50 @@
-/* Marketing-only styles for the customer-page demo carousel on the public
- * homepage and /customer-page. Scoped under `.showcase-*` so nothing here can
- * ever touch the real owner or customer surfaces. */
+/* Marketing-only styles for the public website. Scoped under `.rb-public`
+ * and `.showcase-*` so nothing here can ever touch the real owner or
+ * customer surfaces. */
+
+/* The public site's palette. The owner app keeps its own tokens (its action
+ * colour is ink); the website keeps ReviewBoost green as the action and cool,
+ * clean neutrals so large surfaces never read beige. Every public component
+ * uses the ordinary token utilities (bg-canvas, text-muted, bg-action...), so
+ * the colours live here once instead of as hex codes in forty class names. */
+.rb-public {
+  color-scheme: light;
+  --rb-canvas: #f6f7f5;
+  --rb-surface: #ffffff;
+  --rb-quiet: #f0f2f0;
+  --rb-ink: #171a18;
+  --rb-muted: #66706a;
+  --rb-border: #dce2de;
+  --rb-border-strong: #b9c3bd;
+  --rb-brand: #00a86b;
+  --rb-brand-soft: #e3f5ec;
+  --rb-brand-text: #007a4d;
+  --rb-action: #007a4d;
+  --rb-action-hover: #006b43;
+  --rb-action-pressed: #005b39;
+  --rb-on-action: #ffffff;
+  --shadow-card: 0 1px 2px rgb(23 26 24 / 4%), 0 18px 48px -24px rgb(23 26 24 / 18%);
+}
+
+/* A dark band inside the light site (pricing, the closing call to action).
+ * Green-black rather than pure black, so it still belongs to ReviewBoost. */
+.rb-public-dark {
+  color-scheme: dark;
+  --rb-canvas: #0c100e;
+  --rb-surface: #131816;
+  --rb-quiet: #19201c;
+  --rb-ink: #f7f9f7;
+  --rb-muted: #abb5af;
+  --rb-border: #2a332e;
+  --rb-border-strong: #465149;
+  --rb-brand-soft: #143729;
+  --rb-brand-text: #32cf94;
+  --rb-action: #32cf94;
+  --rb-action-hover: #4ad8a3;
+  --rb-action-pressed: #2bb885;
+  --rb-on-action: #071b13;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 30%), 0 24px 64px -30px rgb(0 0 0 / 85%);
+}
 
 .showcase-phone-slot {
   position: absolute;
@@ -36,10 +80,10 @@
   width: 44px;
   height: 44px;
   place-items: center;
-  border: 1px solid #d3dccd;
+  border: 1px solid var(--rb-border);
   border-radius: 50%;
-  background: #fff;
-  color: #1b4332;
+  background: var(--rb-surface);
+  color: var(--rb-ink);
   transform: translateY(-50%);
   transition:
     background-color 150ms ease,
@@ -47,7 +91,7 @@
 }
 
 .showcase-arrow:hover {
-  background: #f0f3ec;
+  background: var(--rb-quiet);
 }
 
 .showcase-arrow:focus-visible {
