@@ -27,6 +27,19 @@ function FeedbackRow({ item }: { item: FeedbackItem }) {
         item.isResolved && styles.cardResolved,
       ]}
       onPress={() => router.push(`/feedback/${item.id}`)}
+      // One phrase for VoiceOver. "Unread" was only a coloured dot, and the
+      // rating only star glyphs; both are said here.
+      accessibilityRole="button"
+      accessibilityLabel={[
+        `${item.rating} out of 5 stars`,
+        !item.isRead ? "Unread" : null,
+        item.isResolved ? "Resolved" : null,
+        item.note ?? "No note",
+        relativeTime(item.submittedAt),
+      ]
+        .filter(Boolean)
+        .join(". ")}
+      accessibilityHint="Opens this feedback"
     >
       <View style={styles.topRow}>
         <View style={styles.statusRow}>
@@ -76,7 +89,7 @@ export default function FeedbackListScreen() {
     return (
       <SafeAreaView style={styles.centered} edges={["bottom"]}>
         <Text style={styles.errorText}>{error}</Text>
-        <Pressable style={styles.retryButton} onPress={load}>
+        <Pressable style={styles.retryButton} onPress={load} accessibilityRole="button">
           <Text style={styles.retryText}>Retry</Text>
         </Pressable>
       </SafeAreaView>

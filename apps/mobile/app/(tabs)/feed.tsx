@@ -86,7 +86,7 @@ export default function FeedScreen() {
       {error && items.length === 0 ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>Couldn’t load activity.</Text>
-          <Pressable onPress={() => void load()} style={styles.retryButton}>
+          <Pressable onPress={() => void load()} style={styles.retryButton} accessibilityRole="button">
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>

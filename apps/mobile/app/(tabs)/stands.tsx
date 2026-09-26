@@ -67,6 +67,7 @@ function StandCard({ item }: { item: StandItem }) {
     <Pressable
       style={styles.card}
       onPress={() => router.push(`/stand/${item.standId}`)}
+      accessibilityRole="button"
     >
       <View style={styles.cardHeader}>
         <View style={{ flex: 1 }}>

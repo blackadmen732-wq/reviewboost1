@@ -312,6 +312,8 @@ export default function StandDetailScreen() {
             <Pressable
               style={styles.nfcButton}
               onPress={() => void Linking.openURL(standUrl)}
+              accessibilityRole="link"
+              accessibilityHint="Opens in your browser"
             >
               <Text style={styles.nfcButtonText}>Open customer page</Text>
             </Pressable>
@@ -327,6 +329,7 @@ export default function StandDetailScreen() {
             </Text>
             <Pressable
               style={styles.nfcButton}
+              accessibilityRole="button"
               onPress={() => {
                 Share.share(
                   Platform.OS === "ios"

@@ -88,3 +88,28 @@ describe("the balance view", () => {
     });
   });
 });
+
+/**
+ * App Store 3.1.3(f): a free companion to a plan bought on the web must not
+ * sell inside the app or point at where to pay. The account copy states
+ * facts about the plan and stops.
+ */
+describe("account copy stays purchase-free", () => {
+  const statuses = ["trialing", "active", "past_due", "cancelled", "suspended"] as const;
+
+  it("never tells the owner to pay, subscribe, upgrade or go to the web", () => {
+    for (const status of statuses) {
+      for (const cancelAtPeriodEnd of [false, true]) {
+        const view = accountView(
+          billing({ status, cancelAtPeriodEnd, currentPeriodEnd: "2026-10-26T00:00:00Z" }),
+          null,
+        );
+        if (view.kind !== "ready") throw new Error(status);
+        const copy = `${view.statusTitle} ${view.statusBody}`;
+        expect(copy, status).not.toMatch(
+          /subscribe|upgrade|buy|purchase|on the web|website|update your card|pricing/i,
+        );
+      }
+    }
+  });
+});
