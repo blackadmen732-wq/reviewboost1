@@ -119,8 +119,10 @@ export default function PrivacyPage() {
         . We respond within 30 days.
       </p>
       <p>
-        To delete your account from inside the app, go to{" "}
-        <strong>Settings → Delete account</strong> and type your business name to confirm.
+        To delete your account from inside ReviewBoost, go to{" "}
+        <strong>Settings → Delete account</strong> on the web, or{" "}
+        <strong>Account → Delete account</strong> in the iPhone or Android app, and type
+        your business name to confirm.
         Your business, its Tags and every rating are removed when you confirm, and your
         subscription is cancelled at the same time.
       </p>
@@ -128,8 +130,15 @@ export default function PrivacyPage() {
       <h2>Cookies and local storage</h2>
       <p>
         We use a single session cookie set by Supabase Auth to keep you signed in. We do
-        not use advertising cookies or tracking pixels. The app uses browser local storage
-        for offline support only.
+        not use advertising cookies or tracking pixels. The web app uses browser local
+        storage for offline support only.
+      </p>
+      <p>
+        The ReviewBoost iPhone and Android apps keep your sign-in in the phone&apos;s
+        secure storage (the iOS Keychain or Android Keystore) and nothing else about
+        you on the device. Signing out removes it. The apps contain no advertising,
+        analytics or tracking code and do not use your device&apos;s advertising
+        identifier.
       </p>
 
       <h2>Children</h2>

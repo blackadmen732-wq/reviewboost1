@@ -94,17 +94,24 @@ const TOPICS: Topic[] = [
     question: "How do I delete my account?",
     answer: (
       <>
-        Email{" "}
+        If you own the business, delete it yourself: Settings, then Delete
+        account on the web, or Account, then Delete account in the ReviewBoost
+        app. It is immediate and cancels the subscription first. If you cannot
+        sign in, email{" "}
         <a
           href="mailto:privacy@reviewboost.fit?subject=Delete%20my%20account"
           className="font-medium text-ink underline underline-offset-2 hover:no-underline"
         >
           privacy@reviewboost.fit
         </a>{" "}
-        from the address you signed up with, with the subject &quot;Delete my
-        account&quot;. We confirm by email before anything is removed, and tell
-        you what was deleted. Deleting the account is not the same as cancelling
-        — cancel first if you only want the billing to stop.
+        from the address you signed up with.{" "}
+        <Link
+          href="/delete-account"
+          className="font-medium text-ink underline underline-offset-2 hover:no-underline"
+        >
+          What deleting removes
+        </Link>
+        .
       </>
     ),
   },
