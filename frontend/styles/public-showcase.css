@@ -158,69 +158,116 @@
   }
 }
 
-/* ------------------------------------------------------------ hero scene ---
- * Photo behind, the real customer page in front, the Tag on the counter.
- * One aspect-ratio box, everything placed in percentages, so the composition
- * is the same picture at every width instead of a desktop layout squeezed. */
-.hero-scene {
+/* ------------------------------------------------------------ hero stage ---
+ * Atmosphere behind (the counter photograph, blurred and washed back), the
+ * product in front: the owner's Home, the phone, and the Tag touching it.
+ * One aspect-ratio box, everything placed in percentages, so the picture is
+ * the same composition at every width. */
+.hero__backdrop {
+  position: absolute;
+  inset: -40px;
+  z-index: -1;
+  filter: blur(28px) saturate(0.35);
+  opacity: 0.4;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  /* Wash the backdrop to the canvas under the copy, lighter under the product. */
+  background:
+    linear-gradient(90deg, var(--rb-canvas) 0%, rgb(246 247 245 / 94%) 40%, rgb(246 247 245 / 62%) 100%),
+    linear-gradient(0deg, var(--rb-canvas) 0%, transparent 30%);
+}
+
+.hero-stage {
   position: relative;
   width: 100%;
-  max-width: 640px;
+  max-width: 700px;
   margin-inline: auto;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 1.12 / 1;
 }
 
-.hero-scene__photo {
+.hero-stage__app {
   position: absolute;
-  top: 4%;
+  top: 6%;
   left: 0;
-  width: 70%;
-  height: 80%;
+  width: 72%;
+  height: 84%;
   overflow: hidden;
-  border-radius: 28px;
-  background: var(--rb-quiet);
+  border-radius: 18px;
+  pointer-events: none;
+  /* The window is a crop of the real screen: it fades out rather than ending
+   * mid-row at the section edge. */
+  mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
 }
 
-.hero-scene__photo img {
-  object-position: 22% 62%;
-}
-
-.hero-scene__phone {
+.hero-stage__phone {
   position: absolute;
   top: 0;
   right: 0;
   z-index: 2;
-  width: 42%;
-  filter: drop-shadow(0 30px 40px rgb(23 26 24 / 22%));
+  width: 38%;
+  filter: drop-shadow(0 30px 40px rgb(23 26 24 / 24%));
 }
 
-.hero-scene__tag {
+.hero-stage__tag {
   position: absolute;
-  bottom: 0;
-  left: 6%;
+  bottom: 1%;
+  left: 38%;
   z-index: 3;
-  transform: rotate(-4deg);
+  transform: rotate(-5deg);
 }
 
-@media (max-width: 640px) {
-  .hero-scene {
-    aspect-ratio: 1 / 1.08;
-  }
-
-  .hero-scene__photo {
-    width: 62%;
-    height: 72%;
-  }
-
-  .hero-scene__phone {
-    width: 50%;
-  }
+/* NFC signal between the Tag and the phone above it. Still: the picture is
+ * the moment of the tap, not an animation of it. */
+.hero-stage__arcs {
+  position: absolute;
+  top: -8px;
+  right: -34px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 4px;
+  transform: rotate(40deg);
 }
 
-@media (max-width: 480px) {
-  .hero-scene__tag {
-    left: 2%;
-    transform: rotate(-4deg) scale(0.78);
+.hero-stage__arcs span {
+  display: block;
+  height: 9px;
+  border: 2px solid var(--rb-brand);
+  border-bottom: 0;
+  border-radius: 999px 999px 0 0;
+  opacity: 0.7;
+}
+
+.hero-stage__arcs span:nth-child(1) { width: 18px; }
+.hero-stage__arcs span:nth-child(2) { width: 32px; }
+.hero-stage__arcs span:nth-child(3) { width: 46px; }
+
+@media (max-width: 767px) {
+  /* A phone gets the two objects it can read: the Tag and the page. */
+  .hero-stage {
+    aspect-ratio: 1 / 1.02;
+    max-width: 420px;
+  }
+
+  .hero-stage__app {
+    display: none;
+  }
+
+  .hero-stage__phone {
+    left: auto;
+    right: 2%;
+    width: 56%;
+  }
+
+  .hero-stage__tag {
+    left: 0;
+    bottom: 2%;
+    transform: rotate(-5deg) scale(0.78);
     transform-origin: bottom left;
   }
 }

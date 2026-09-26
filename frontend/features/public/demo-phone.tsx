@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 
+import { HandoffScreen } from "@/features/customer-flow/screens/handoff-screen";
 import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
 import { PhoneFrame } from "@/features/customer-page/phone-frame";
 import { VisitStars } from "@/features/customer-page/visit-stars";
@@ -27,11 +28,16 @@ export function DemoPhone({
   label,
   value = null,
   baseWidth = 300,
+  screen = "rating",
+  businessName = "Mario's Pizza",
 }: {
   heroSrc: string;
   label: string;
   value?: RatingValue | null;
   baseWidth?: number;
+  /** "handoff" shows the real screen every rating reaches on its way to Google. */
+  screen?: "rating" | "handoff";
+  businessName?: string;
 }) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
@@ -52,7 +58,7 @@ export function DemoPhone({
   }, [baseWidth]);
 
   return (
-    <div ref={outer} className="w-full" style={box ? { height: box.height } : undefined}>
+    <div ref={outer} className="w-full" style={box ? { height: box.height } : undefined} inert>
       <div
         ref={inner}
         style={{
@@ -67,11 +73,19 @@ export function DemoPhone({
           <CustomerVisitView
             heroUrl={heroSrc}
             transform={DEFAULT_HERO_TRANSFORM}
-            heading={messages.ratingHeading}
-            support={messages.ratingSupport}
+            heading={screen === "rating" ? messages.ratingHeading : ""}
+            support={screen === "rating" ? messages.ratingSupport : ""}
             footerLine={messages.footerPromise}
           >
-            <VisitStars value={value} messages={messages} preview />
+            {screen === "rating" ? (
+              <VisitStars value={value} messages={messages} preview />
+            ) : (
+              <HandoffScreen
+                businessName={businessName}
+                destinationUrl="#"
+                messages={messages}
+              />
+            )}
           </CustomerVisitView>
         </PhoneFrame>
       </div>
