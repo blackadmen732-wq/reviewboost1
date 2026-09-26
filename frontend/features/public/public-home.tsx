@@ -115,8 +115,9 @@ export function PublicHome() {
           to be a headline, a lede and a link — a pricing section with no
           prices in it, which is the one question a visitor came to answer. */}
       <PricingSection headline={PRICING.headline} lede={PRICING.lede}>
-        <p className="mx-auto mt-12 max-w-[48ch] text-center text-sm leading-relaxed text-muted">
-          {PRICING.caveat}{" "}
+        {/* The trial terms are already on the Starter card and in the line
+            under the cards; a third telling here was repetition. */}
+        <p className="mt-12 text-center text-sm">
           <Link
             href="/pricing"
             className="font-medium text-ink underline-offset-4 transition-colors duration-150 hover:underline"
