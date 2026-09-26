@@ -5,7 +5,9 @@ import { deriveHomeModel } from "@/features/dashboard/home-model";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { InstallPrompt } from "@/features/dashboard/install-prompt";
 import { permissionsFor } from "@/lib/owner/permissions";
+import { insightsHomeLine } from "@/lib/owner/insights";
 import {
+  getFeedbackInsights,
   getOwnerCounts,
   hasPublishedCustomerPhoto,
   listLocations,
@@ -30,7 +32,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const { organization } = await requireOwner("/home");
 
-  const [counts, stands, locations, unread, hasCustomerPhoto] = await Promise.all([
+  const [counts, stands, locations, unread, hasCustomerPhoto, insights] = await Promise.all([
     getOwnerCounts(organization.orgId, organization.timezone),
     listStands(organization.orgId),
     listLocations(organization.orgId),
@@ -40,6 +42,7 @@ export default async function HomePage() {
       limit: 5,
     }),
     hasPublishedCustomerPhoto(organization.orgId),
+    getFeedbackInsights(organization.orgId, organization.timezone, { range: 30 }),
   ]);
 
   const model = deriveHomeModel({
@@ -56,6 +59,7 @@ export default async function HomePage() {
       <OwnerHome
         businessName={organization.name}
         model={model}
+        insightsLine={insightsHomeLine(insights)}
         unreadItems={unread.items.map((item) => ({
           id: item.responseId,
           rating: item.rating,

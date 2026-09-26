@@ -28,10 +28,13 @@ export function OwnerHome({
   businessName,
   model,
   unreadItems,
+  insightsLine = null,
 }: {
   businessName: string;
   model: HomeModel;
   unreadItems: FeedbackItem[];
+  /** "4.3 average · 84 ratings · Improving", or null when there is not enough to say. */
+  insightsLine?: string | null;
 }) {
   return (
     <div className="flex flex-col">
@@ -44,7 +47,7 @@ export function OwnerHome({
       {model.kind === "empty" ? (
         <EmptyHome model={model} />
       ) : (
-        <ActiveHome model={model} unreadItems={unreadItems} />
+        <ActiveHome model={model} unreadItems={unreadItems} insightsLine={insightsLine} />
       )}
     </div>
   );
@@ -190,9 +193,11 @@ function SetupSteps({ steps }: { steps: SetupStep[] }) {
 function ActiveHome({
   model,
   unreadItems,
+  insightsLine,
 }: {
   model: HomeModel;
   unreadItems: FeedbackItem[];
+  insightsLine: string | null;
 }) {
   const [firstAttention, ...otherAttentions] = model.attentions;
 
@@ -224,6 +229,27 @@ function ActiveHome({
       {model.headline ? (
         <section aria-label="This week">
           <p className="text-lg font-semibold tracking-[-0.01em] text-ink">{model.headline}</p>
+        </section>
+      ) : null}
+
+      {/* One quiet line, never a chart: Home answers "does anything need me",
+          and this only points to where the longer answer lives. */}
+      {insightsLine ? (
+        <section>
+          <Link
+            href="/feedback/insights"
+            className="group -mx-2 flex min-h-14 items-center gap-3 rounded-[var(--radius-control)] px-2 transition-colors hover:bg-quiet active:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-muted">Last 30 days</span>
+              <span className="block text-base text-ink">{insightsLine}</span>
+            </span>
+            <span className="shrink-0 text-sm font-medium text-brand-text">View insights</span>
+            <ChevronRight
+              aria-hidden="true"
+              className="size-5 shrink-0 text-muted transition-transform duration-150 group-hover:translate-x-0.5"
+            />
+          </Link>
         </section>
       ) : null}
 
