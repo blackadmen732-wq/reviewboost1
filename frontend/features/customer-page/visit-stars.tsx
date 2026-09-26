@@ -49,7 +49,7 @@ export function VisitStars({
                 aria-label={messages.ratingSpoken[rating]}
               />
               <label className="visit-star__label" htmlFor={`visit-rating-${rating}`} data-filled={selected || undefined}>
-                <Star aria-hidden="true" strokeWidth={1.6} strokeLinejoin="round" />
+                <Star aria-hidden="true" strokeWidth={1.35} strokeLinejoin="round" />
               </label>
             </span>
           );

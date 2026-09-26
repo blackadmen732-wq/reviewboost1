@@ -39,6 +39,8 @@ html:has(.customer-live) {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  opacity: 0;
+  transition: opacity 220ms ease-out;
   transform-origin: center center;
   user-select: none;
   pointer-events: none;
@@ -46,6 +48,14 @@ html:has(.customer-live) {
 
 /* No artwork yet: the business's own name, set large on a quiet dark field.
    Deliberate rather than broken, and still unmistakably theirs. */
+.visit-hero__image[data-loaded] {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visit-hero__image { transition: none; }
+}
+
 .visit-hero__empty {
   display: grid;
   width: 100%;
@@ -330,9 +340,9 @@ html:has(.customer-live) {
   width: clamp(48px, 16cqi, 64px);
   height: clamp(48px, 16cqi, 64px);
   place-items: center;
-  /* A firm neutral outline: it has to read as "tap me" on a bright day, which
-     the old #c5c5c5 hairline did not. */
-  color: #6f7771;
+  /* A firm, dark, fine outline on a white star: it has to read as "tap me" on
+     a bright day, which the old #c5c5c5 hairline did not. */
+  color: #464c48;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -341,8 +351,8 @@ html:has(.customer-live) {
   width: 88%;
   height: 88%;
   fill: #fff;
-  filter: drop-shadow(0 2px 3px rgb(23 26 24 / 14%));
-  transition: transform 120ms ease-out, color 160ms ease-out, fill 160ms ease-out;
+  filter: drop-shadow(0 3px 4px rgb(23 26 24 / 16%));
+  transition: transform 110ms ease-out, color 140ms ease-out, fill 140ms ease-out;
 }
 
 /* Rating gold: a warm fill with a darker edge so the shape still holds 3:1
@@ -354,8 +364,8 @@ html:has(.customer-live) {
 .visit-star__label[data-filled="true"] svg {
   fill: #f4b41a;
   filter: drop-shadow(0 3px 5px rgb(184 121 11 / 28%));
-  animation: visit-star-fill 240ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
-  animation-delay: calc(var(--star-index, 0) * 35ms);
+  animation: visit-star-fill 160ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  animation-delay: calc(var(--star-index, 0) * 20ms);
 }
 
 /* The thumb gets an answer the instant it lands, before any network. */
@@ -364,8 +374,8 @@ html:has(.customer-live) {
 }
 
 @keyframes visit-star-fill {
-  0% { transform: scale(0.82); }
-  60% { transform: scale(1.08); }
+  0% { transform: scale(0.86); }
+  60% { transform: scale(1.06); }
   100% { transform: scale(1); }
 }
 

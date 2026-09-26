@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
 import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
@@ -61,15 +61,7 @@ export function CustomerVisitView({
     >
       <div className="visit-hero" data-hero-layer>
         {heroUrl ? (
-          // Artwork origin is the owner's published/draft upload.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={heroUrl}
-            alt=""
-            draggable={false}
-            className="visit-hero__image"
-            style={{ transform: heroTransformStyle(crop) }}
-          />
+          <HeroImage src={heroUrl} transform={heroTransformStyle(crop)} />
         ) : (
           <div className="visit-hero__empty" aria-hidden="true">
             {businessName ? <p className="visit-hero__name">{businessName}</p> : null}
@@ -94,5 +86,36 @@ export function CustomerVisitView({
         </footer>
       </section>
     </div>
+  );
+}
+
+/**
+ * The business's artwork. The hero keeps its size on the dark field while the
+ * photo downloads, then the photo fades in — no layout jump, no white flash.
+ * A photo already in the cache (or one that loaded before hydration) is shown
+ * at once rather than waiting for an onLoad that already fired.
+ */
+function HeroImage({ src, transform }: { src: string; transform: string }) {
+  const ref = useRef<HTMLImageElement>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    setLoaded(Boolean(ref.current?.complete && ref.current.naturalWidth > 0));
+  }, [src]);
+
+  return (
+    // Artwork origin is the owner's published/draft upload.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      ref={ref}
+      src={src}
+      alt=""
+      draggable={false}
+      decoding="async"
+      className="visit-hero__image"
+      data-loaded={loaded || undefined}
+      onLoad={() => setLoaded(true)}
+      style={{ transform }}
+    />
   );
 }
