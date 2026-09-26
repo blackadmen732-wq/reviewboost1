@@ -8,6 +8,7 @@ import { PwaRegister } from "@/components/pwa-register";
 import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
 import "@/styles/customer-page.css";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
 const DESCRIPTION =
   "A code on the counter. The same Google review opportunity for every customer.";
@@ -92,7 +93,10 @@ export default function RootLayout({
           means the first frame is already cream — no device-specific assets to
           maintain, and no white flash in a demo.
         */}
-        <style>{`html{background-color:#F6F7F5}@media (prefers-color-scheme:dark){html{background-color:#0C100E}}`}</style>
+        <style>{`html{background-color:#F6F7F5}@media (prefers-color-scheme:dark){html{background-color:#0C100E}}html[data-theme=light]{background-color:#F6F7F5}html[data-theme=dark]{background-color:#0C100E}`}</style>
+        {/* The owner's Light/Dark choice from Settings, applied before the
+            first paint so a dark choice never flashes light. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className={GeistSans.className}>
         <Providers>{children}</Providers>

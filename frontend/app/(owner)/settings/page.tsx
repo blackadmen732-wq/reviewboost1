@@ -7,6 +7,7 @@ import { GoogleLinkCare } from "@/features/dashboard/google-link-care";
 import { EditableRow } from "@/features/dashboard/settings-form";
 import { SignOutButton } from "@/features/dashboard/sign-out-button";
 import { AddLocationButton } from "@/features/settings/add-location-button";
+import { ThemeControl } from "@/features/settings/theme-control";
 import { ownerOrAdmin, permissionsFor } from "@/lib/owner/permissions";
 import { getEntitlementSnapshot } from "@/lib/server/entitlements-service";
 import { listLocations, requireOwner } from "@/lib/server/owner-data";
@@ -134,6 +135,24 @@ export default async function SettingsPage() {
             <p className="text-sm text-muted">Your plan, messages left, and payment.</p>
           </div>
         </Link>
+      </section>
+
+      <section className="mb-6 flex flex-col gap-3" aria-labelledby="appearance-heading">
+        <h2
+          id="appearance-heading"
+          className="text-sm font-semibold uppercase tracking-wide text-muted"
+        >
+          Appearance
+        </h2>
+        <div className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-base font-medium text-ink">Theme</p>
+            <p className="text-sm text-muted">
+              System follows this device. Your choice is kept on this device only.
+            </p>
+          </div>
+          <ThemeControl />
+        </div>
       </section>
 
       <section className="mb-6 flex flex-col gap-3">
