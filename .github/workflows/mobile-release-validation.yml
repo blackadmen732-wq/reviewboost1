@@ -45,6 +45,9 @@ jobs:
           node -e '
             const c = require("/tmp/expo-config.json");
             const errs = [];
+            // A plugin is listed by name, or as [name, options] when it is configured.
+            const hasPlugin = (name) =>
+              (c.plugins || []).some((p) => (Array.isArray(p) ? p[0] : p) === name);
             if (c.ios?.bundleIdentifier !== "fit.reviewboost.app")
               errs.push("ios.bundleIdentifier must be fit.reviewboost.app, got " + c.ios?.bundleIdentifier);
             if (c.android?.package !== "fit.reviewboost.app")
@@ -53,9 +56,9 @@ jobs:
               errs.push("scheme must be reviewboost, got " + c.scheme);
             if (!c.ios?.infoPlist?.NFCReaderUsageDescription)
               errs.push("ios.infoPlist.NFCReaderUsageDescription is missing");
-            if (!(c.plugins || []).includes("react-native-nfc-manager"))
+            if (!hasPlugin("react-native-nfc-manager"))
               errs.push("react-native-nfc-manager plugin missing");
-            if (!(c.plugins || []).includes("expo-secure-store"))
+            if (!hasPlugin("expo-secure-store"))
               errs.push("expo-secure-store plugin missing");
             if (errs.length) { console.error("::error::" + errs.join(" | ")); process.exit(1); }
             console.log("Identifiers, NFC usage string, and plugins OK.");
