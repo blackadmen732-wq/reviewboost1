@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/data/auth-context";
 import { colors, radii, fonts } from "@/theme";
 
@@ -26,6 +27,9 @@ export default function LoginScreen() {
   const codeField = useRef<TextInput>(null);
   const { sendCode, verifyCode } = useAuth();
   const router = useRouter();
+  // The back link sits under the status bar / Dynamic Island on every
+  // iPhone, rather than at a fixed 64pt that only fits some of them.
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
@@ -43,14 +47,15 @@ export default function LoginScreen() {
     setSubmitting(true);
 
     try {
-      const err = await sendCode(address);
-      if (err) {
-        setError(err);
+      const result = await sendCode(address);
+      if (result.kind === "failed") {
+        setError(result.message);
         return;
       }
       setEmail(address);
       setCode("");
       setStep("code");
+      if (result.kind === "throttled") setError(result.message);
       setSecondsLeft(RESEND_SECONDS);
       setTimeout(() => codeField.current?.focus(), 100);
     } catch {
@@ -65,9 +70,10 @@ export default function LoginScreen() {
     setError(null);
     setSubmitting(true);
     try {
-      const err = await sendCode(email);
-      if (err) {
-        setError(err);
+      const result = await sendCode(email);
+      if (result.kind !== "sent") {
+        setError(result.message);
+        if (result.kind === "throttled") setSecondsLeft(RESEND_SECONDS);
         return;
       }
       setCode("");
@@ -110,7 +116,7 @@ export default function LoginScreen() {
       >
         <View style={styles.inner}>
           <Pressable
-            style={styles.backButton}
+            style={[styles.backButton, { top: insets.top + 8 }]}
             onPress={() => {
               setStep("email");
               setError(null);
@@ -233,7 +239,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     lineHeight: 22,
   },
-  backButton: { position: "absolute", top: 64, left: 24 },
+  backButton: { position: "absolute", left: 16, minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
   backText: { fontSize: 15, color: colors.inkMuted },
   errorBox: {
     backgroundColor: colors.dangerBg,
