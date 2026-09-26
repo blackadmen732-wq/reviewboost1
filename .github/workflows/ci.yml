@@ -51,6 +51,30 @@ jobs:
         run: npx vitest run
         working-directory: frontend
 
+  dependency-audit:
+    name: Dependency vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Web app and API (blocking on high/critical)
+        # What ships to the server. A critical advisory in `next` was live on
+        # this branch (unauthenticated RCE via the image optimizer) with no
+        # check anywhere that would have said so.
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high --package-lock-only
+
+      - name: Mobile app (report only)
+        # Reported, not yet blocking: the Expo dependency tree carries
+        # advisories that need a coordinated SDK upgrade. Tracked in
+        # docs/backend/LAUNCH_GATE.md; make this blocking once it is clean.
+        working-directory: apps/mobile
+        run: npm audit --omit=dev --audit-level=high --package-lock-only || true
+
   mobile:
     runs-on: ubuntu-latest
     defaults:
