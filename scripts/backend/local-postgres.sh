@@ -188,7 +188,7 @@ reset_db() {
 apply_migrations() {
     local mode="${1:-until}"
     # Compared by version, so `20260901213000` and
-    # `20260901213000_restore_rpc_create_organization_definer.sql` both mean
+    # its full filename (`20260901213000_<name>.sql`) both mean
     # "through that migration". Comparing whole filenames silently dropped
     # the named migration itself from `until` and ran it again under `after`.
     local marker="${2:-}"

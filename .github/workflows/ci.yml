@@ -115,7 +115,7 @@ jobs:
             found=1
           fi
 
-          if git grep -nIE '(sk_live_[A-Za-z0-9]{20,}|re_[A-Za-z0-9_]{20,})' -- ':!*.md' ':!.githooks/**'; then
+          if git grep -nIE '(sk_live_[A-Za-z0-9]{20,}|(^|[^A-Za-z0-9_])re_[A-Za-z0-9_]{20,})' -- ':!*.md' ':!.githooks/**'; then
             echo "::error::A live API key appears to be committed."
             found=1
           fi

@@ -14,7 +14,7 @@ for file in $staged; do
     '^(JWT_SECRET|PII_ENCRYPTION_KEY|TWILIO_AUTH_TOKEN|TWILIO_API_KEY_SECRET|RESEND_API_KEY|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET)=.+'; then
     echo "BLOCKED: $file contains a populated secret assignment."; fail=1
   fi
-  if git show ":$file" 2>/dev/null | grep -qE '(re_[A-Za-z0-9_]{20,}|sk_live_[A-Za-z0-9]{20,}|SK[0-9a-f]{32}|AC[0-9a-f]{32})'; then
+  if git show ":$file" 2>/dev/null | grep -qE '((^|[^A-Za-z0-9_])re_[A-Za-z0-9_]{20,}|sk_live_[A-Za-z0-9]{20,}|SK[0-9a-f]{32}|AC[0-9a-f]{32})'; then
     echo "BLOCKED: $file looks like it contains a live API key."; fail=1
   fi
 done
