@@ -1142,3 +1142,26 @@ export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBillin
       : null,
   };
 });
+
+/**
+ * Whether any published Customer Page — the business's own or one place's —
+ * carries a photo. Home uses it for one optional setup step, so a failed read
+ * leaves the step out (null) rather than taking Home down with it.
+ */
+export const hasPublishedCustomerPhoto = cache(async (orgId: string): Promise<boolean | null> => {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("customer_page_profiles")
+    .select("published")
+    .eq("org_id", orgId)
+    .not("published", "is", null);
+
+  if (error) {
+    logger.warn("owner.customer_photo_read_failed", { orgId, error });
+    return null;
+  }
+
+  return (data ?? []).some(
+    (row) => typeof (row.published as { heroUrl?: unknown } | null)?.heroUrl === "string",
+  );
+});

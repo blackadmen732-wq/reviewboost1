@@ -343,3 +343,40 @@ describe("only active Tags count as ready", () => {
     expect(tagStatusLine(summarizeTags([paused, retired]))).toBe("2 tags, none live");
   });
 });
+
+/**
+ * The Customer Page photo is an optional setup step. It links to the editor
+ * while undone, never takes the green button, and is left out when it could
+ * not be read rather than shown wrong.
+ */
+describe("customer page photo step", () => {
+  const base = { counts: emptyCounts, stands: [liveStand], hasLocation: true };
+  const photoStep = (model: ReturnType<typeof deriveHomeModel>) =>
+    model.setup?.find((step) => step.key === "photo");
+
+  it("links to the editor until a photo is published", () => {
+    const model = deriveHomeModel({ ...base, hasCustomerPhoto: false });
+    expect(photoStep(model)).toMatchObject({ done: false, href: "/customer-page" });
+    // The one green button stays on the required path.
+    expect(model.primary?.href).not.toBe("/customer-page");
+  });
+
+  it("is done, with no link, once a photo is live", () => {
+    expect(photoStep(deriveHomeModel({ ...base, hasCustomerPhoto: true }))).toEqual({
+      key: "photo",
+      title: "Add your photo to the customer page",
+      done: true,
+    });
+  });
+
+  it("offers no link to someone the editor would refuse", () => {
+    const step = photoStep(deriveHomeModel({ ...base, hasCustomerPhoto: false, canManage: false }));
+    expect(step?.done).toBe(false);
+    expect(step?.href).toBeUndefined();
+  });
+
+  it("is left out when the photo state could not be read", () => {
+    expect(photoStep(deriveHomeModel({ ...base, hasCustomerPhoto: null }))).toBeUndefined();
+    expect(photoStep(deriveHomeModel(base))).toBeUndefined();
+  });
+});

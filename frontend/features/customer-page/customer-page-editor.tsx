@@ -8,6 +8,7 @@ import { CustomerVisitView } from "@/features/customer-page/customer-visit-view"
 import { PhoneFrame } from "@/features/customer-page/phone-frame";
 import { VisitStars } from "@/features/customer-page/visit-stars";
 import { ownerFetch } from "@/lib/api/owner-fetch";
+import { NormalizePhotoError, normalizePhoto } from "@/lib/images/normalize-photo";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 import { DEFAULT_HERO_TRANSFORM } from "@/lib/owner/hero-transform";
 import type { CustomerPageContent } from "@/lib/server/customer-page-service";
@@ -20,7 +21,7 @@ interface CustomerPageEditorProps {
   onSaved?: () => void;
 }
 
-type UploadState = "idle" | "signing" | "uploading" | "confirming" | "done" | "error";
+type UploadState = "idle" | "preparing" | "signing" | "uploading" | "confirming" | "done" | "error";
 
 /**
  * The preview is the customer page itself — the same CustomerVisitView tree
@@ -99,9 +100,27 @@ export function CustomerPageEditor({
   const uploadHero = useCallback(
     async (file: File) => {
       setUploadError(null);
-      setUploadState("signing");
+      setUploadState("preparing");
       const previous = heroUrl;
-      const local = URL.createObjectURL(file);
+
+      // Upright, JPEG/PNG/WebP and under 5 MB before anything is sent — a
+      // camera photo straight off a phone is usually none of those. The
+      // preview shows the prepared photo, which is exactly what is uploaded.
+      let photo: Awaited<ReturnType<typeof normalizePhoto>>;
+      try {
+        photo = await normalizePhoto(file);
+      } catch (caught) {
+        setUploadState("error");
+        setUploadError(
+          caught instanceof NormalizePhotoError
+            ? caught.message
+            : "That photo could not be prepared. Try a different one.",
+        );
+        return;
+      }
+
+      setUploadState("signing");
+      const local = URL.createObjectURL(photo.blob);
       setHeroUrl(local);
 
       const fail = (message: string) => {
@@ -120,7 +139,7 @@ export function CustomerPageEditor({
         const beginRes = await ownerFetch("/api/v1/customer-page/assets", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind: "hero", contentType: file.type }),
+          body: JSON.stringify({ kind: "hero", contentType: photo.type }),
         });
         if (!beginRes.ok) return fail(await messageOf(beginRes, "Upload failed."));
         const { data: ticket } = (await beginRes.json()) as {
@@ -133,8 +152,8 @@ export function CustomerPageEditor({
         const storageUrl = `${supabaseUrl}/storage/v1/object/upload/sign/customer-page/${ticket.path}?token=${ticket.token}`;
         const putRes = await fetch(storageUrl, {
           method: "PUT",
-          headers: { "Content-Type": file.type, "x-upsert": "true" },
-          body: file,
+          headers: { "Content-Type": photo.type, "x-upsert": "true" },
+          body: photo.blob,
         });
         if (!putRes.ok) return fail("The photo did not upload. Please try again.");
 
@@ -225,9 +244,12 @@ export function CustomerPageEditor({
   }, [draft, onSaved]);
 
   const uploading =
-    uploadState === "signing" || uploadState === "uploading" || uploadState === "confirming";
+    uploadState === "preparing" ||
+    uploadState === "signing" ||
+    uploadState === "uploading" ||
+    uploadState === "confirming";
   const uploadLabel =
-    uploadState === "signing"
+    uploadState === "preparing" || uploadState === "signing"
       ? "Preparing…"
       : uploadState === "uploading"
         ? "Uploading…"
@@ -251,18 +273,29 @@ export function CustomerPageEditor({
 
   // Upload → preview → Publish, in that order, in one column. The phone is
   // the owner's preview only; /q/{token} never draws it.
+  //
+  // The phone is drawn at a preview size (PhoneFrame size="editor") so the
+  // three steps read as one short workflow rather than one giant device, and
+  // the column ends with room for the fixed bottom bar and the home-indicator
+  // safe area, so Publish and its status always scroll fully clear of the bar.
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-col gap-5">
+    <div
+      className="mx-auto flex w-full max-w-sm flex-col pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:pb-0"
+      data-customer-page-editor
+    >
       <div>
+        {/* Secondary: quieter and shorter than Publish, still a 44px target. */}
         <Button
           type="button"
           variant="secondary"
+          size="sm"
+          className="font-medium shadow-none"
           disabled={uploading}
           loading={uploading}
           loadingLabel={uploadLabel}
           onClick={() => fileInputRef.current?.click()}
         >
-          <ImageUp className="size-5" aria-hidden="true" />
+          <ImageUp className="size-4" aria-hidden="true" />
           {uploadLabel}
         </Button>
         <input
@@ -279,16 +312,16 @@ export function CustomerPageEditor({
         ) : null}
       </div>
 
-      <div>
+      <div className="mt-5">
         {unpublished ? (
-          <p className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-ink">
+          <p className="mb-2 flex items-center justify-center gap-1.5 text-sm font-medium text-ink">
             <span aria-hidden="true" className="size-2 rounded-full bg-star" />
             Not published yet
           </p>
         ) : null}
         {/* The real customer page — the same CustomerVisitView /q renders —
             with the draft image, inside the preview phone. */}
-        <PhoneFrame label={`${businessName} customer page preview`}>
+        <PhoneFrame label={`${businessName} customer page preview`} size="editor">
           <CustomerVisitView
             heroUrl={heroUrl ?? null}
             transform={DEFAULT_HERO_TRANSFORM}
@@ -306,11 +339,10 @@ export function CustomerPageEditor({
 
       {/* One action. publish() saves the draft first, so there is no separate
           Save step to hold in mind. */}
-      <div>
+      <div className="mt-6">
         <Button
           type="button"
           variant="action"
-          size="lg"
           disabled={publishing || uploading}
           loading={publishing}
           loadingLabel="Publishing…"

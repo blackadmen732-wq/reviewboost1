@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CreditCard, Eye, LifeBuoy, Mail, Shield, Trash2 } from "lucide-react";
+import { CreditCard, Eye, ImageUp, LifeBuoy, Mail, Shield, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 import { AppShell } from "@/features/dashboard/app-shell";
@@ -119,6 +119,31 @@ export default async function SettingsPage() {
             {entitlements.locationLimit === 1 ? "place" : "places"}.
           </p>
         ) : null}
+      </section>
+
+      {/* The Customer Page is reached from here and from Home's setup list —
+          not from the bottom bar, which stays the four things an owner does
+          every day. Everyone can open it; the editor itself tells a member or
+          viewer that only an owner or admin can change it. */}
+      <section className="mb-6 flex flex-col gap-3" aria-labelledby="customer-page-heading">
+        <h2
+          id="customer-page-heading"
+          className="text-sm font-semibold uppercase tracking-wide text-muted"
+        >
+          Customer page
+        </h2>
+        <Link
+          href="/customer-page"
+          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+            <ImageUp className="size-5 text-muted" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-medium text-ink">Your photo</p>
+            <p className="text-sm text-muted">What customers see when they scan a Tag.</p>
+          </div>
+        </Link>
       </section>
 
       <section className="mb-6 flex flex-col gap-3">

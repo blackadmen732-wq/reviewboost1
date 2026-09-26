@@ -491,6 +491,20 @@ html:has(.customer-live) {
   padding-inline: 4px;
 }
 
+/* In the owner editor the phone is a preview, not a life-size device: about
+   256px wide on a 320px screen, 284px at 390, 300px at 430, and larger again
+   once the desktop column has room. Only the frame's size changes; the page
+   inside is the same 390 x 844 layout, scaled. */
+.phone-frame--editor {
+  width: min(100%, clamp(250px, 40vw + 128px, 305px));
+}
+
+@media (min-width: 1024px) {
+  .phone-frame--editor {
+    width: min(100%, 340px);
+  }
+}
+
 .phone-frame__body {
   position: relative;
   border-radius: 15.5% / 7.2%;

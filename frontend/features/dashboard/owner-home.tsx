@@ -119,7 +119,9 @@ function EmptyHome({ model }: { model: HomeModel }) {
  * current step is the green button above, so there is still only one.
  */
 function SetupSteps({ steps }: { steps: SetupStep[] }) {
-  const current = steps.findIndex((step) => !step.done);
+  // The photo is optional and has its own link, so "the step you are on" —
+  // the one the green button above is for — skips it.
+  const current = steps.findIndex((step) => !step.done && step.key !== "photo");
   const doneCount = steps.filter((step) => step.done).length;
 
   return (
@@ -154,17 +156,29 @@ function SetupSteps({ steps }: { steps: SetupStep[] }) {
               >
                 {step.done ? <Check className="size-4" strokeWidth={3} /> : index + 1}
               </span>
-              <span
-                className={cn(
-                  "text-base",
-                  step.done && "text-muted line-through decoration-border",
-                  !step.done && isCurrent && "font-semibold text-ink",
-                  !step.done && !isCurrent && "text-muted",
-                )}
-              >
-                {step.title}
-                {step.done ? <span className="sr-only"> — done</span> : null}
-              </span>
+              {step.href ? (
+                // Optional, so it never takes the green button: the row itself
+                // goes to the Customer Page editor while it is undone.
+                <Link
+                  href={step.href}
+                  className="-my-3 flex min-h-14 flex-1 items-center justify-between gap-3 py-3 text-base text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+                >
+                  {step.title}
+                  <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-muted" />
+                </Link>
+              ) : (
+                <span
+                  className={cn(
+                    "text-base",
+                    step.done && "text-muted line-through decoration-border",
+                    !step.done && isCurrent && "font-semibold text-ink",
+                    !step.done && !isCurrent && "text-muted",
+                  )}
+                >
+                  {step.title}
+                  {step.done ? <span className="sr-only"> — done</span> : null}
+                </span>
+              )}
             </li>
           );
         })}

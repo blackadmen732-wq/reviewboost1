@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -39,4 +42,21 @@ describe("PhoneFrame", () => {
       "Mario’s preview",
     );
   });
+
+  it("draws the editor preview at its own responsive size, same device inside", () => {
+    const { container } = render(
+      <PhoneFrame label="Editor preview" size="editor">
+        <div />
+      </PhoneFrame>,
+    );
+    expect(container.querySelector(".phone-frame--editor")).toBeTruthy();
+    const device = container.querySelector<HTMLElement>(".phone-frame__device");
+    expect(device?.style.width).toBe("390px");
+    expect(device?.style.height).toBe("844px");
+
+    const css = readFileSync(join(process.cwd(), "styles/customer-page.css"), "utf8");
+    // ~256px at 320 wide, ~284px at 390, 305px cap on phones.
+    expect(css).toContain("width: min(100%, clamp(250px, 40vw + 128px, 305px));");
+  });
 });
+

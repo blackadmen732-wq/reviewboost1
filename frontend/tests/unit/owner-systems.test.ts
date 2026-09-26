@@ -204,3 +204,10 @@ describe("Home headline", () => {
     expect(ratingsHeadline({ ratingsThisWeek: 1, ratingsLastWeek: 0 })).toBe("1 rating this week");
   });
 });
+
+describe("customer page discoverability", () => {
+  it("is reached from Settings, and never from the bottom bar", () => {
+    expect(source("app/(owner)/settings/page.tsx")).toContain('href="/customer-page"');
+    expect(source("features/dashboard/nav-items.ts")).not.toContain("/customer-page");
+  });
+});
