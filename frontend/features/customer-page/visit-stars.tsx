@@ -58,17 +58,18 @@ export function VisitStars({
 }
 
 /**
- * A classic five-point star: sharp points, full arms, a fine outline. The
+ * A classic five-point star fitted to the approved reference pixel by pixel:
+ * each vertex fitted to the reference's own star outline, a thin stroke, round joins. The
  * rounded icon-set star this replaces read as generic UI rather than as the
  * one thing on the page a customer is meant to touch.
  */
 const STAR_PATH =
-  "M12 1.7 L15.12 8.61 L22.65 9.44 L17.04 14.54 L18.58 21.96 L12 18.2 L5.42 21.96 L6.96 14.54 L1.35 9.44 L8.88 8.61 Z";
+  "M12 1.77 L15.22 8.74 L22.58 9.47 L17.1 14.7 L18.67 22.3 L12 18.56 L5.33 22.3 L6.9 14.7 L1.42 9.47 L8.78 8.74 Z";
 
 function VisitStar() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d={STAR_PATH} strokeWidth={0.72} strokeLinejoin="round" stroke="currentColor" />
+      <path d={STAR_PATH} strokeWidth={0.62} strokeLinejoin="round" stroke="currentColor" />
     </svg>
   );
 }

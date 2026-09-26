@@ -26,10 +26,11 @@ html:has(.customer-live) {
   overflow: hidden;
 }
 
+/* The business's image takes whatever height the sheet leaves. A taller
+   phone shows more of the photo — the ReviewBoost sheet does not grow. */
 .visit-hero {
   position: relative;
-  flex: 1 1 58%;
-  height: 58%;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
   background: #1a1a1a;
@@ -139,27 +140,33 @@ html:has(.customer-live) {
   color: #171a18;
 }
 
-/* Measured against the approved Mario reference: artwork ~58% of the screen,
-   the sheet the remaining ~42% rising over it on a ~28px radius, a soft
-   off-white rather than paper white, the heading ~45pt below the edge. */
-/* The approved reference, measured (1pt = 1/390 of the screen, so every
-   size below is in cqi and scales with the phone): sheet from 58% of the
-   screen, ~27pt top corners; heading cap-top at 46pt; instruction centred at
-   92pt; stars centred at 160pt, 58pt each on a 71pt pitch; footer anchored to
-   the bottom, promise line ~42pt above the screen edge. */
+/* The approved reference, measured from its pixels at a 390pt-wide screen
+   (1pt = 1/390 of the width, so every size is in cqi and the sheet scales
+   with the phone's WIDTH, never its height):
+
+     sheet height                320pt   (82.05cqi)
+     heading ink top / height     44 / 33.5pt, 294pt wide
+     instruction ink top          87pt, 265.5pt wide
+     stars ink top / height      131 / 56pt, row 339.5pt wide
+     "Powered by" ink top        255pt, 139pt wide
+     promise line ink top        276pt, 267pt wide, ~40pt above the bottom
+
+   The sheet is a fixed shape; the hero above absorbs the rest of the screen.
+   On an iPhone the home-indicator inset (34pt) sits inside the ~40pt the
+   reference already leaves under the promise line; a larger inset grows the
+   sheet by the difference rather than overlapping the footer. */
 .visit-card {
   position: relative;
   display: flex;
-  flex: 0 0 42%;
+  flex: 0 0 auto;
   flex-direction: column;
-  height: 42%;
-  max-height: 42%;
+  height: calc(82.05cqi + max(0px, env(safe-area-inset-bottom) - 10cqi));
   z-index: 2;
   margin-top: -28px;
   background: #f9f9f9;
   border-radius: 7cqi 7cqi 0 0;
   box-shadow: 0 -6px 20px rgb(0 0 0 / 16%);
-  padding: 11.2cqi 0 max(5cqi, calc(env(safe-area-inset-bottom) + 1.5cqi));
+  padding: 10.075cqi 0 0;
   overflow: hidden;
 }
 
@@ -227,11 +234,12 @@ html:has(.customer-live) {
 
 .visit-heading {
   margin: 0;
-  color: #111111;
-  font-size: 8.5cqi;
-  font-weight: 800;
-  letter-spacing: -0.045em;
-  line-height: 1.05;
+  color: #0a0a0a;
+  font-family: var(--font-visit-heading), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--visit-heading-size, 8.85cqi);
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
 .visit-heading:focus {
@@ -241,11 +249,13 @@ html:has(.customer-live) {
 /* A quiet instruction: regular weight, wide tracking — it explains, the
    heading asks. */
 .visit-support {
-  margin: 3.6cqi 0 0;
-  color: #4a4a4a;
-  font-size: 2.7cqi;
-  font-weight: 400;
-  letter-spacing: 0.25em;
+  margin: var(--visit-support-gap, 1.885cqi) 0 0;
+  color: #6a6a6a;
+  font-family: var(--font-visit-caps), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 2.885cqi;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
@@ -253,51 +263,58 @@ html:has(.customer-live) {
    below them, above the footer — the stars belong to the question. */
 .visit-card__body {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   flex-direction: column;
-  justify-content: flex-start;
   min-height: 0;
-  margin-top: 8cqi;
-  overflow: auto;
+  margin-top: var(--visit-stars-gap, 7.39cqi);
 }
 
 .visit-footer {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  gap: 2.4cqi;
-  padding-top: 3cqi;
+  gap: var(--visit-footer-gap, 1.49cqi);
+  margin-top: var(--visit-footer-top, 15.9cqi);
 }
 
 .visit-powered {
   display: inline-flex;
   align-items: center;
-  gap: 1.4cqi;
+  gap: 1.08cqi;
   margin: 0;
-  color: #555555;
-  font-size: 2.75cqi;
-  font-weight: 400;
-  letter-spacing: -0.005em;
+  color: #595959;
+  font-family: var(--font-visit-heading), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 2.664cqi;
+  font-weight: 300;
+  letter-spacing: 0.02em;
 }
 
 .visit-powered svg {
-  width: 3cqi;
-  height: 3cqi;
-  fill: #555555;
+  width: 3.72cqi;
+  height: 3.72cqi;
+  fill: #626262;
+}
+
+.visit-powered > span {
+  position: relative;
+  top: 0.33cqi;
 }
 
 .visit-powered strong {
   color: #111111;
-  font-weight: 650;
+  font-size: 1.032em;
+  font-weight: 600;
 }
 
 
 .visit-footer__line {
   margin: 0;
-  color: #646464;
-  font-size: 1.6cqi;
+  color: #6c6c6c;
+  font-family: var(--font-visit-caps), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.64cqi;
+  font-optical-sizing: none;
   font-weight: 500;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.257em;
   text-align: center;
   text-transform: uppercase;
   white-space: nowrap;
@@ -316,7 +333,7 @@ html:has(.customer-live) {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2.3cqi;
+  gap: 1.66cqi;
 }
 
 .visit-star {
@@ -354,10 +371,11 @@ html:has(.customer-live) {
 .visit-star__label {
   display: grid;
   /* 58pt on a 390pt screen; never under Apple's 44pt target. */
-  width: max(44px, 15.8cqi);
-  height: max(44px, 15.8cqi);
+  /* Star ink 56pt on a 390pt screen; the target never under Apple's 44pt. */
+  width: max(44px, 16.4cqi);
+  height: max(44px, 16.4cqi);
   place-items: center;
-  color: #4f4f4f;
+  color: #494949;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -444,18 +462,13 @@ html:has(.customer-live) {
 .visit-card:has(.visit-status--error) {
   flex: 0 0 auto;
   height: auto;
+  min-height: 82.05cqi;
   max-height: none;
+  padding-bottom: max(6cqi, calc(env(safe-area-inset-bottom) + 2cqi));
 }
 
 .visit-card:has(.visit-status--error) .visit-card__body {
   overflow: visible;
-}
-
-/* On the shortest phones the promise line is the first thing to give way. */
-@media (max-height: 620px) {
-  .customer-live .visit-footer__line {
-    display: none;
-  }
 }
 
 .visit-card .visit-retry {
@@ -589,9 +602,6 @@ html:has(.customer-live) {
 
 /* The device's bottom safe area: the footer sits above the home indicator,
    as env(safe-area-inset-bottom) makes it on a real iPhone. */
-.phone-frame__device .visit-card {
-  padding-bottom: 34px;
-}
 
 .customer-live {
   display: grid;
@@ -612,6 +622,9 @@ html:has(.customer-live) {
   width: 100%;
   height: 100dvh;
   max-height: 100dvh;
+  /* A screen too short for the fixed sheet scrolls rather than clipping the
+     stars or the footer; the hero has already shrunk to nothing by then. */
+  overflow-y: auto;
 }
 
 /* Opened on a computer, it stays a phone-shaped page: one centred column no

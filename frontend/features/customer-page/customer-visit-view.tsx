@@ -1,5 +1,6 @@
 "use client";
 
+import localFont from "next/font/local";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
@@ -24,6 +25,33 @@ import {
  * the honest version. Real crop controls need the transform persisted first.
  */
 
+/**
+ * The heading and "Powered by" face of the approved reference. Measured
+ * against it pixel for pixel, Inter Tight overlaps the reference heading at 0.80
+ * (Geist, the app face, peaks at 0.34 — it cannot reach the reference's
+ * height at the reference's width). Bundled, latin subset, SIL OFL 1.1 — see
+ * lib/fonts/InterTight-OFL.txt.
+ */
+const visitHeadingFont = localFont({
+  src: "../../lib/fonts/InterTight-latin-variable.woff2",
+  variable: "--font-visit-heading",
+  weight: "100 900",
+  display: "swap",
+});
+
+/**
+ * The face of the reference's two tracked-caps lines, the instruction and the
+ * promise line. DM Sans overlaps them at 0.55 and 0.71 where Geist reaches
+ * 0.25 and 0.29 — its round O, C and G are what those lines are made of.
+ * Bundled, latin subset, SIL OFL 1.1 — see lib/fonts/DMSans-OFL.txt.
+ */
+const visitCapsFont = localFont({
+  src: "../../lib/fonts/DMSans-latin-variable.woff2",
+  variable: "--font-visit-caps",
+  weight: "100 1000",
+  display: "swap",
+});
+
 export interface CustomerVisitViewProps {
   heroUrl: string | null;
   transform: HeroTransform;
@@ -47,7 +75,7 @@ export function CustomerVisitView({
 
   return (
     <div
-      className="visit-stage"
+      className={`visit-stage ${visitHeadingFont.variable} ${visitCapsFont.variable}`}
       data-customer-visit
       data-customer-canvas={CUSTOMER_CANVAS.aspectRatio}
       data-card-fixed=""
@@ -76,7 +104,7 @@ export function CustomerVisitView({
               and "ReviewBoost" in ink. */}
           <p className="visit-powered">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M13.2 2 4.5 13.6h6.3L9.9 22l9.6-12.4h-6.4L13.2 2Z" />
+              <path d="M13.14 1 4.9 13.76h5.97L10.02 23 19.1 9.36h-6.06L13.14 1Z" />
             </svg>
             <span>
               Powered by <strong>ReviewBoost</strong>

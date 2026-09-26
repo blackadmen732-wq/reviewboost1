@@ -2,9 +2,14 @@ import "@testing-library/jest-dom/vitest";
 import "vitest-axe/extend-expect";
 
 import { cleanup } from "@testing-library/react";
-import { afterAll, afterEach, beforeAll } from "vitest";
+import { afterAll, afterEach, beforeAll, vi } from "vitest";
 
 import { apiMockServer } from "@/tests/msw/server";
+
+// next/font is compiled by Next; under Vitest it is a plain module call.
+vi.mock("next/font/local", () => ({
+  default: () => ({ className: "", variable: "", style: { fontFamily: "sans-serif" } }),
+}));
 
 beforeAll(() => apiMockServer.listen({ onUnhandledRequest: "error" }));
 

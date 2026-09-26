@@ -132,8 +132,10 @@ describe("WYSIWYG canvas (SoT v1.9 / v1.10)", () => {
     const editor = source("features/customer-page/customer-page-editor.tsx");
     const live = source("features/customer-flow/customer-flow.tsx");
     expect(css).toContain("aspect-ratio: 390 / 844");
-    // Measured from the approved Mario reference: artwork ~58%, sheet ~42%.
-    expect(css).toContain("flex: 0 0 42%");
+    // The sheet is sized by screen width (320pt at 390 wide, measured from the
+    // approved reference); the artwork takes whatever height is left.
+    expect(css).toContain("height: calc(82.05cqi");
+    expect(css).not.toContain("flex: 0 0 42%");
     expect(css).not.toContain("height: 640px");
     expect(editor).toContain("CustomerVisitView");
     expect(live).toContain("CustomerVisitView");
