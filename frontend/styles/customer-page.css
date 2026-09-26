@@ -291,10 +291,11 @@ html:has(.customer-live) {
   letter-spacing: 0.02em;
 }
 
-.visit-powered svg {
-  width: 3.72cqi;
+/* The mark sits where the reference's bolt did, at the same height; its width
+   follows the mark's own proportions (290.09 x 269.09). */
+.visit-powered .visit-powered__mark {
+  width: calc(3.72cqi * 290.09 / 269.09);
   height: 3.72cqi;
-  fill: #626262;
 }
 
 .visit-powered > span {
@@ -306,6 +307,10 @@ html:has(.customer-live) {
   color: #111111;
   font-size: 1.032em;
   font-weight: 600;
+}
+
+.visit-powered__boost {
+  color: var(--rb-brand, #00a86b);
 }
 
 

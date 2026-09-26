@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BrandLockup } from "@/components/brand-lockup";
 import { useAuth } from "@/data/auth-context";
 import { colors, radii, fonts } from "@/theme";
 
@@ -186,7 +187,9 @@ export default function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.inner}>
-        <Text style={styles.brand}>ReviewBoost</Text>
+        <View style={styles.brand}>
+          <BrandLockup height={40} />
+        </View>
         <Text style={styles.subtitle}>
           Enter your email and we&apos;ll send you a sign-in code. No password needed.
         </Text>
@@ -230,7 +233,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   inner: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
-  brand: { fontSize: 32, ...fonts.heading, color: colors.brandText, textAlign: "center" },
+  brand: { alignItems: "center" },
   subtitle: {
     fontSize: 16,
     color: colors.inkMuted,

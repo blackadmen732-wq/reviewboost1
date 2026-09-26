@@ -108,7 +108,7 @@ audit found on the branch as it stood; "Now" is after the fixes in this PR (see 
 |---|---|---|---|---|---|
 | D1 | Refined, app-like design | 4.0 | Tab bar used text glyphs (◉ ✉ ➤ ⬡ ☰) as icons. | NEEDS FIX | PASS — SF Symbols (§11) |
 | D2 | Launch screen | HIG: Launching | Generated storyboard referenced an image not in the catalog and used white `systemBackground`, then the app painted `#F6F7F5`: a visible flash. | NEEDS FIX | PASS — plain canvas `#F6F7F5`, no logo, no text; root view matches |
-| D3 | App icon | HIG: App icons | 1024×1024, RGB, no alpha, no baked corners, derived from `Branding/Icon_only.svg`. Previews in `docs/mobile/icon-previews/`. | PASS | PASS · NEEDS REAL-DEVICE TEST (Home Screen tinting on iOS 26) |
+| D3 | App icon | HIG: App icons | 1024×1024, RGB, no alpha, no baked corners, generated from `Branding/Mark.svg` by `scripts/brand/generate-brand-assets.mjs`. QA sheet in `docs/mobile/icon-previews/brand-qa.png`. | PASS | PASS · NEEDS REAL-DEVICE TEST (Home Screen tinting on iOS 26) |
 | D4 | Minimum functionality | 4.2 | Native NFC Tag programming (Core NFC), secure persisted session, feedback inbox and detail, Tags, Text Request status, account controls. Not a WebView. | PASS | PASS |
 | D5 | Works on its own | 4.2.3(i) | Needs only an account. | PASS | PASS |
 | D6 | Login services | 4.8 | Only ReviewBoost's own email-code sign-in. 4.8 applies to third-party/social login, so Sign in with Apple is not required. | NOT APPLICABLE | NOT APPLICABLE |
@@ -339,7 +339,7 @@ Verification still needed on the archive: Xcode → Organizer → *Generate Priv
 
 | Gate | Status | Evidence / what is left |
 |---|---|---|
-| App icon | PASS | 1024 RGB no alpha, from `Branding/Icon_only.svg`; previews in `docs/mobile/icon-previews/` |
+| App icon | PASS | 1024 RGB no alpha, generated from `Branding/Mark.svg`; QA sheet in `docs/mobile/icon-previews/brand-qa.png` |
 | Launch screen | PASS | Solid canvas storyboard; root view `#F6F7F5` |
 | iPhone layouts | NEEDS EXTERNAL ACTION | Source reviewed; must be checked on TestFlight on small, standard and Pro Max iPhones |
 | iPad decision | PASS | iPhone only (`supportsTablet: false`) |

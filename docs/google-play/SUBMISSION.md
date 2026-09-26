@@ -106,7 +106,7 @@ opposite plainly is cheaper than being mistaken for one.
 Adaptive icon layers already exist and are declared in `app.json`:
 `android-icon-foreground.png`, `android-icon-background.png`, and
 `android-icon-monochrome.png` for themed icons on Android 13+. The background
-colour is `#035B3B`.
+colour is the one ReviewBoost green, `#00A86B` (see `Branding/README.md`).
 
 **Shots to capture** (same list as the App Store package, so one session covers
 both):

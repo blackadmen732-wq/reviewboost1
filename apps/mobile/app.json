@@ -70,7 +70,7 @@
     "android": {
       "package": "fit.reviewboost.app",
       "adaptiveIcon": {
-        "backgroundColor": "#035B3B",
+        "backgroundColor": "#00A86B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

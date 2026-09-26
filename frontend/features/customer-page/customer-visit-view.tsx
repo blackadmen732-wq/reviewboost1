@@ -3,6 +3,7 @@
 import localFont from "next/font/local";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { LogoMark } from "@/components/brand/logo-mark";
 import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
 import {
   clampHeroTransform,
@@ -100,14 +101,17 @@ export function CustomerVisitView({
         ) : null}
         <div className="visit-card__body">{children}</div>
         <footer className="visit-footer">
-          {/* The approved reference: a small grey bolt, grey "Powered by",
-              and "ReviewBoost" in ink. */}
+          {/* The reference's layout, grey "Powered by" and the name, with the
+              ReviewBoost mark where the reference had a generic bolt: one
+              identity on every surface. The name is set as the lockup sets it,
+              "Review" in ink and "Boost" in brand green. */}
           <p className="visit-powered">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M13.14 1 4.9 13.76h5.97L10.02 23 19.1 9.36h-6.06L13.14 1Z" />
-            </svg>
+            <LogoMark size={14} className="visit-powered__mark" />
             <span>
-              Powered by <strong>ReviewBoost</strong>
+              Powered by{" "}
+              <strong>
+                Review<span className="visit-powered__boost">Boost</span>
+              </strong>
             </span>
           </p>
           <p className="visit-footer__line">{footerLine}</p>

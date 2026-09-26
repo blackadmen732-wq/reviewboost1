@@ -3,85 +3,157 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { MARK_HEIGHT, MARK_PATHS, MARK_WIDTH } from "@/components/brand/mark-geometry";
+
 /**
- * The brand is the owner's, not something to approximate.
+ * One ReviewBoost mark, one green, one source.
  *
- * Every mark in the product was a placeholder: `logo-mark.tsx` drew a rounded
- * square containing the letter "B", the favicon and app-icon routes generated
- * the same "B", and the shipped PNG icon set was a raster of it. The owner's
- * real artwork was sitting in `Branding/` the whole time.
- *
- * These tests tie the rendered mark to that supplied artwork, so a future
- * "quick placeholder" cannot quietly become the logo again.
+ * The brand drifted twice before: first to a placeholder "B" set in a
+ * typeface, then to two hand-made variants of the R (a bright-green mark and a
+ * dark-green tile rotated 1.12 degrees, with the dark green leaking into the
+ * Android icon). `Branding/Mark.svg` is now the only drawing, and
+ * `scripts/brand/generate-brand-assets.mjs` writes everything else from it.
+ * These tests fail when anything starts drawing or colouring the mark on its
+ * own again.
  */
 
 const REPO = join(process.cwd(), "..");
+const BRAND_GREEN = "#00A86B";
 
 function read(path: string): string {
   return readFileSync(join(REPO, path), "utf8");
 }
 
-/** Every `d="…"` in an SVG or component, which is the geometry itself. */
+/** Every `d="…"` in an SVG, which is the geometry itself. */
 function pathData(source: string): string[] {
   return [...source.matchAll(/\sd="([^"]+)"/g)].map((match) => match[1]!.trim());
 }
 
-describe("the mark is the owner's supplied artwork", () => {
-  const supplied = pathData(read("Branding/Logo.svg"));
-  const rendered = pathData(read("frontend/components/brand/logo-mark.tsx"));
+function hexColours(source: string): string[] {
+  return [...source.matchAll(/#[0-9A-Fa-f]{6}\b/g)].map((match) => match[0].toUpperCase());
+}
 
-  it("draws every path the supplied asset draws, unaltered", () => {
-    expect(supplied.length).toBeGreaterThan(0);
-    expect(rendered).toEqual(supplied);
+/** PNG width, height and colour type, straight from the IHDR chunk. */
+function pngHeader(path: string) {
+  const bytes = readFileSync(join(REPO, path));
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), colourType: bytes[25] };
+}
+
+describe("Branding/Mark.svg is the one mark", () => {
+  const source = read("Branding/Mark.svg");
+
+  it("is the mark alone: no container, rotation, text or second colour", () => {
+    expect(source).not.toMatch(/<rect|<circle|<ellipse/);
+    expect(source).not.toMatch(/rotate\(/);
+    expect(source).not.toMatch(/<text|<image|filter=/);
+    expect(new Set(hexColours(source))).toEqual(new Set([BRAND_GREEN]));
   });
 
-  it("is not a letter set in a typeface", () => {
-    const source = read("frontend/components/brand/logo-mark.tsx");
-    // The placeholder was <text>B</text> on a rect. A real mark has no glyph.
-    expect(source).not.toMatch(/<text/);
-    expect(source).not.toMatch(/fontFamily/);
+  it("is what the web component draws, via the generated geometry", () => {
+    expect([...MARK_PATHS]).toEqual(pathData(source));
+    const [, , width, height] = /viewBox="([^"]+)"/.exec(source)![1]!.split(" ").map(Number);
+    expect([MARK_WIDTH, MARK_HEIGHT]).toEqual([width, height]);
   });
 
-  it("carries the approved green, via the token", () => {
-    expect(read("frontend/components/brand/logo-mark.tsx")).toContain("#00A86B");
+  it("is copied, not redrawn, into every exported SVG", () => {
+    const mark = pathData(source);
+    for (const file of [
+      "Branding/AppIcon.svg",
+      "Branding/Logo.svg",
+      "Branding/Logo-on-dark.svg",
+      "frontend/public/brand/icon.svg",
+      "frontend/public/brand/logo.svg",
+      "frontend/public/brand/mark.svg",
+    ]) {
+      const paths = pathData(read(file));
+      for (const d of mark) expect(paths, file).toContain(d);
+    }
   });
 });
 
 describe("the mark lives in exactly one place", () => {
-  it("no other brand component defines mark geometry", () => {
+  it("no brand component holds path data of its own", () => {
     const dir = join(REPO, "frontend/components/brand");
     const offenders = readdirSync(dir)
-      .filter((file) => file.endsWith(".tsx") && file !== "logo-mark.tsx")
+      .filter((file) => file.endsWith(".tsx"))
       .filter((file) => pathData(readFileSync(join(dir, file), "utf8")).length > 0);
-
-    // Two components drawing the same mark is how they drift apart.
     expect(offenders).toEqual([]);
   });
-});
 
-describe("the shipped icon is the owner's app icon", () => {
-  it("public/brand/icon.svg is the supplied tile verbatim", () => {
-    expect(read("frontend/public/brand/icon.svg")).toBe(read("Branding/Icon_only.svg"));
-  });
-
-  it("public/brand/logo.svg is the supplied mark verbatim", () => {
-    expect(read("frontend/public/brand/logo.svg")).toBe(read("Branding/Logo.svg"));
-  });
-
-  it("no shipped brand SVG renders a letter instead of the mark", () => {
-    const dir = join(REPO, "frontend/public/brand");
-    const lettered = readdirSync(dir)
-      .filter((file) => file.endsWith(".svg"))
-      .filter((file) => /<text/.test(readFileSync(join(dir, file), "utf8")));
-
-    expect(lettered).toEqual([]);
+  it("the old hand-made variants are gone", () => {
+    const branding = readdirSync(join(REPO, "Branding"));
+    expect(branding).not.toContain("Icon_only.svg");
+    expect(branding).not.toContain("IconOnly.tsx");
+    expect(branding).not.toContain("Logo.tsx");
+    expect(readdirSync(join(REPO, "frontend/public/brand"))).not.toContain("icon-square.svg");
   });
 
   it("no route generates an icon from a glyph", () => {
     const app = readdirSync(join(REPO, "frontend/app"));
-    // icon.tsx / apple-icon.tsx drew "B" with ImageResponse. The icons are now
-    // the approved raster, declared in layout.tsx.
     expect(app).not.toContain("icon.tsx");
     expect(app).not.toContain("apple-icon.tsx");
+  });
+
+  it("no shipped brand SVG sets live text", () => {
+    const dir = join(REPO, "frontend/public/brand");
+    const lettered = readdirSync(dir)
+      .filter((file) => file.endsWith(".svg"))
+      .filter((file) => /<text/.test(readFileSync(join(dir, file), "utf8")));
+    expect(lettered).toEqual([]);
+  });
+});
+
+describe("one ReviewBoost green", () => {
+  it("every brand file uses only the brand green, white, and ink", () => {
+    const allowed = new Set([BRAND_GREEN, "#FFFFFF", "#171A18", "#F7F9F7"]);
+    for (const file of [
+      "Branding/Mark.svg",
+      "Branding/Wordmark.svg",
+      "Branding/AppIcon.svg",
+      "Branding/Logo.svg",
+      "Branding/Logo-on-dark.svg",
+    ]) {
+      for (const colour of hexColours(read(file))) expect(allowed, `${file} uses ${colour}`).toContain(colour);
+    }
+  });
+
+  it("the Android adaptive background and the web token are that green", () => {
+    const app = JSON.parse(read("apps/mobile/app.json"));
+    expect(app.expo.android.adaptiveIcon.backgroundColor.toUpperCase()).toBe(BRAND_GREEN);
+    expect(read("frontend/styles/globals.css")).toMatch(/--rb-brand: #00a86b;/i);
+    expect(read("apps/mobile/theme.ts")).toMatch(/brand: "#00a86b"/i);
+  });
+
+  it("the old dark logo green is not a brand colour anywhere", () => {
+    for (const file of ["apps/mobile/app.json", "frontend/components/brand/logo-mark.tsx", "Branding/AppIcon.svg"]) {
+      expect(read(file).toUpperCase()).not.toContain("#035B3B");
+    }
+  });
+});
+
+describe("app icons are OS-ready", () => {
+  it("the App Store icon is 1024 square with no alpha channel", () => {
+    // Colour type 2 is RGB. 6 would be RGBA, which App Store Connect rejects.
+    expect(pngHeader("apps/mobile/assets/icon.png")).toEqual({ width: 1024, height: 1024, colourType: 2 });
+  });
+
+  it("the app-icon artwork is a full square, left for the OS to mask", () => {
+    const icon = read("Branding/AppIcon.svg");
+    expect(icon).toMatch(/<rect width="1024" height="1024" fill="#00A86B"\/>/);
+    expect(icon).not.toMatch(/\srx=|rotate\(/);
+  });
+
+  it("Android adaptive layers are transparent over a flat background", () => {
+    // 6 = RGBA: the foreground and monochrome must be see-through around the mark.
+    expect(pngHeader("apps/mobile/assets/android-icon-foreground.png").colourType).toBe(6);
+    expect(pngHeader("apps/mobile/assets/android-icon-monochrome.png").colourType).toBe(6);
+  });
+
+  it("every icon the manifest and layout declare exists at its declared size", () => {
+    const manifest = read("frontend/app/manifest.ts");
+    for (const match of manifest.matchAll(/src: "\/brand\/([^"]+)", sizes: "(\d+)x\d+"/g)) {
+      const { width } = pngHeader(`frontend/public/brand/${match[1]}`);
+      expect(width, match[1]).toBe(Number(match[2]));
+    }
   });
 });

@@ -5,13 +5,13 @@ import { cn } from "@/lib/utils/cn";
  * One logo slot for the owner product.
  *
  * Poses and sizes follow the 2026-09-09 pack (full / mark / poweredBy;
- * nav / footer / poweredBy). The mark is the owner's approved asset, held in
- * `logo-mark.tsx` and nowhere else. Do not invent a second mark.
+ * nav / footer / poweredBy). The mark is `logo-mark.tsx`, drawn from
+ * `Branding/Mark.svg`, and nowhere else. Do not invent a second mark.
  *
- * The name beside it is live text in the product's own face rather than a
- * wordmark image: it stays crisp at any size, inherits the surrounding colour,
- * and is selectable and translatable. There is no wordmark asset to match —
- * the supplied artwork is the mark alone.
+ * This is the horizontal lockup, `[mark] ReviewBoost`, that `Branding/Logo.svg`
+ * exports for use outside the product. Here the name is live text in the
+ * product's own face (Geist SemiBold, the face that file was outlined from):
+ * it stays crisp at any size, follows the theme's ink, and is selectable.
  *
  * Clearspace is 0.25 × mark size on every side (`--rb-logo-clearspace`).
  */
@@ -62,22 +62,20 @@ export function ReviewBoostLogo({
       {pose === "mark" ? (
         <span className="sr-only">ReviewBoost</span>
       ) : (
-        /* Two-tone, as the approved lockup sets it: "Review" in ink, "Boost" in
-           green. One <span> in a single colour was not the wordmark.
-           `aria-hidden` on the halves with a single readable label keeps a
-           screen reader from announcing it as two words.
+        /* Two-tone, as Branding/Logo.svg sets it: "Review" in ink, "Boost"
+           in the one ReviewBoost green. `aria-hidden` on the halves with a
+           single readable label keeps a screen reader from announcing it as
+           two words.
 
-           The green here is the ACTION green (#007A4D), not the brand green
-           (#00A86B), and that is deliberate. A logotype rendered as an image is
-           exempt from WCAG contrast; this is live text, which is not. Brand
-           green on white measures 3.08:1 — below the 4.5:1 floor for normal
-           text, and the "Powered by ReviewBoost" footer sets it at 13px. The
-           action green measures 5.4:1 on white and 4.96:1 on the warm canvas.
-           The mark itself keeps the brand green, because a graphic may. */
+           Same weight, same size, no space: one word in two colours, kerned
+           by the font. The green is the brand green (#00A86B), not the darker
+           action green, because a logotype is exempt from WCAG text contrast
+           (1.4.3, "Logotypes") and a second logo green is how the brand
+           drifted before. Running text around it keeps the action green. */
         <span className={cn("font-semibold", WORD[size])}>
           <span className="sr-only">ReviewBoost</span>
           <span aria-hidden="true">Review</span>
-          <span aria-hidden="true" className="text-[color:var(--rb-action)]">
+          <span aria-hidden="true" className="text-[color:var(--rb-brand)]">
             Boost
           </span>
         </span>
