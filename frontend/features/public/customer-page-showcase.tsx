@@ -238,7 +238,7 @@ export function CustomerPageShowcase() {
             another. Dots, pills and a "Showing …" line all said the same
             thing three times. */}
         <div className="mt-8 flex justify-center">
-          <div className="flex max-w-full gap-1 overflow-x-auto px-1 [scrollbar-width:none]">
+          <div className="flex max-w-full flex-wrap justify-center gap-x-1">
             {SHOWCASE_BUSINESSES.map((biz, index) => (
               <button
                 key={biz.id}
@@ -247,8 +247,8 @@ export function CustomerPageShowcase() {
                 aria-pressed={index === activeIndex}
                 aria-label={`Show ${biz.name} (${biz.category})`}
                 className={cn(
-                  "relative min-h-11 shrink-0 px-3.5 text-sm font-medium transition-colors duration-150",
-                  "after:absolute after:inset-x-3.5 after:bottom-1.5 after:h-0.5 after:rounded-full after:transition-colors after:duration-150",
+                  "relative min-h-11 shrink-0 px-2.5 text-sm font-medium sm:px-3.5 transition-colors duration-150",
+                  "after:absolute after:inset-x-2.5 after:bottom-1.5 sm:after:inset-x-3.5 after:h-0.5 after:rounded-full after:transition-colors after:duration-150",
                   "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] rounded-lg",
                   index === activeIndex
                     ? "text-ink after:bg-brand"

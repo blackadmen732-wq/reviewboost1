@@ -17,6 +17,7 @@ import {
 } from "@/features/public/public-copy";
 import { PublicShell } from "@/features/public/public-shell";
 import { Reveal } from "@/features/public/reveal";
+import { ScaleToFit } from "@/features/public/scale-to-fit";
 import { TagTapSection } from "@/features/public/tag-tap-section";
 import { TextRequestSection } from "@/features/public/text-request-section";
 
@@ -42,6 +43,9 @@ import { TextRequestSection } from "@/features/public/text-request-section";
 const linkClass =
   "text-sm font-semibold text-brand-text underline-offset-4 transition-colors duration-150 hover:underline";
 
+/** A link that stands on its own line gets a full-size tap target. */
+const standaloneLinkClass = `${linkClass} inline-flex min-h-11 items-center`;
+
 export function PublicHome() {
   return (
     <PublicShell>
@@ -62,7 +66,7 @@ export function PublicHome() {
       <section className="border-b border-border">
         <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
           <Reveal className="grid items-center gap-12 md:grid-cols-12 md:gap-12">
-            <div className="md:col-span-5">
+            <div className="min-w-0 md:col-span-5">
               <p className="text-sm font-semibold text-brand-text">Your Home screen</p>
               <h2 className="mt-4 text-[clamp(1.9rem,3.4vw,2.75rem)] font-bold leading-[1.08] tracking-[-0.03em] text-ink">
                 One screen, and it tells you what actually needs you.
@@ -72,8 +76,10 @@ export function PublicHome() {
                 out of the way and shows the feedback that just came in.
               </p>
             </div>
-            <div className="md:col-span-7">
-              <DashboardPreviewSection />
+            <div className="min-w-0 md:col-span-7">
+              <ScaleToFit minWidth={520}>
+                <DashboardPreviewSection />
+              </ScaleToFit>
             </div>
           </Reveal>
         </div>
@@ -89,7 +95,7 @@ export function PublicHome() {
 
       <PricingSection headline={PRICING.headline} lede={PRICING.lede}>
         <p className="mt-12 text-center">
-          <Link href="/pricing" className={linkClass}>
+          <Link href="/pricing" className={standaloneLinkClass}>
             How we charge
           </Link>
         </p>
@@ -109,7 +115,7 @@ export function PublicHome() {
                   {INTEGRITY.body}
                 </p>
                 <p className="mt-6">
-                  <Link href="/integrity" className={linkClass}>
+                  <Link href="/integrity" className={standaloneLinkClass}>
                     Why this is the product
                   </Link>
                 </p>
@@ -119,10 +125,10 @@ export function PublicHome() {
                 <p className="mt-2 text-base leading-relaxed text-muted">{SECURITY.lede}</p>
                 <p className="mt-2 text-base leading-relaxed text-muted">{PRIVACY.lede}</p>
                 <p className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
-                  <Link href="/security" className={linkClass}>
+                  <Link href="/security" className={standaloneLinkClass}>
                     Security
                   </Link>
-                  <Link href="/privacy" className={linkClass}>
+                  <Link href="/privacy" className={standaloneLinkClass}>
                     Privacy
                   </Link>
                 </p>
