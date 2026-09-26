@@ -1,7 +1,27 @@
 # Production migration plan — `reviewboost` (`zoyqikgqfqulwkihjbev`)
 
-Status: **proposed, not approved. Nothing here has been run against production.**
+Status: **proposed, not approved. Nothing here has been run against production.** See §0 for the gates.
 Audited 2026-09-26 against PR #67 (`cursor/sprint-forge-owner-systems-v15-7042`).
+
+## 0. Gates before any production migration (owner's decision, 2026-09-26)
+
+Production stays untouched until every gate is closed:
+
+1. Backend CI fully green on PR #67's head.
+2. Stripe production configuration verified, including a real checkout.
+3. Twilio may stay disabled if Text Requests are not launching yet, but the app
+   must fail closed cleanly without it.
+4. A same-day Supabase backup or PITR confirmed.
+5. Decide whether the two existing orgs, **`ck`** and **`Min Corner`** (no
+   Google link, no customer responses), are test orgs or real pilot businesses.
+6. Then finalize their entitlement treatment.
+
+**Do not start their 7-day entitlement clock.** As written, #12 and #20 below
+give every existing org `trialing` with `trial_ends_at = now() + 7 days` at
+the moment of the push. That must be replaced before the push by whichever
+treatment gate 6 settles on. If they are test orgs, no paid subscription is
+invented for them: they are reset/deleted later, or given an explicit,
+controlled prelaunch grace period.
 
 ## 1. Where production is
 
