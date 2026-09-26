@@ -51,7 +51,8 @@ export function MarkReadButton({ responseId }: { responseId: string }) {
 
   if (done) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-muted">
+      // Fades in where the button was (120ms): the tap was taken, nothing jumps.
+      <span className="animate-fade-in inline-flex min-h-11 items-center gap-1.5 px-3 text-sm font-medium text-muted">
         <Check className="size-4" aria-hidden="true" />
         Read
       </span>

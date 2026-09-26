@@ -57,7 +57,9 @@ export default async function FeedbackDetailPage({
       </article>
 
       <div className="mt-8 flex items-center justify-between gap-3">
-        <p className="text-sm text-muted">{review.isResolved ? "Sorted" : "Not sorted yet"}</p>
+        <p key={String(review.isResolved)} className="animate-fade-in text-sm text-muted">
+          {review.isResolved ? "Sorted" : "Not sorted yet"}
+        </p>
         <ResolveButton responseId={review.responseId} isResolved={review.isResolved} />
       </div>
 
