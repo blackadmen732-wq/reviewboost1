@@ -1,19 +1,17 @@
-import Image from "next/image";
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Hero } from "@/features/public/hero";
+import { HowItWorksScenes } from "@/features/public/how-it-works-scenes";
 import { CustomerPageShowcase } from "@/features/public/customer-page-showcase";
 import { DashboardPreviewSection } from "@/features/public/dashboard-preview-section";
 import { FAQ } from "@/features/public/faq";
 import { PricingTable } from "@/features/public/pricing-table";
 import {
   CLOSE,
-  HOW_IT_WORKS,
   INTEGRITY,
   PRICING,
   PRIVACY,
-  PUBLIC_HERO,
   SECURITY,
   START_HREF,
 } from "@/features/public/public-copy";
@@ -38,77 +36,11 @@ import { TextRequestSection } from "@/features/public/text-request-section";
 export function PublicHome() {
   return (
     <PublicShell>
-      <section className="bg-quiet">
-        <div className="mx-auto flex max-w-[1200px] flex-col-reverse items-center gap-10 px-5 py-20 sm:px-8 md:flex-row md:gap-12 md:py-28">
-          <div className="flex w-full flex-col md:w-1/2">
-            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-brand-soft px-3 py-1.5 text-xs font-semibold text-ink">
-              <ShieldCheck className="size-3.5" aria-hidden="true" />
-              Every star gets the same Google link
-            </span>
-            <h1 className="mt-6 text-[clamp(2.5rem,5.5vw,4.25rem)] font-extrabold leading-[1.05] tracking-[-0.035em] text-ink">
-              {PUBLIC_HERO.title}
-            </h1>
-            <p className="mt-6 max-w-[40ch] text-xl leading-relaxed text-muted">
-              {PUBLIC_HERO.lede}
-            </p>
-            <div className="mt-9 flex max-w-sm flex-col gap-3 sm:flex-row">
-              <Button asChild variant="action" size="lg" className="rounded-full">
-                <Link href={PUBLIC_HERO.primary.href}>{PUBLIC_HERO.primary.label}</Link>
-              </Button>
-              <Button asChild variant="ghost" size="lg" className="rounded-full text-ink hover:bg-brand-soft">
-                <Link href={PUBLIC_HERO.secondary.href}>{PUBLIC_HERO.secondary.label}</Link>
-              </Button>
-            </div>
-          </div>
-          <div className="w-full overflow-hidden rounded-[2rem] md:w-1/2">
-            <Image
-              src="/images/hero-counter-tag.png"
-              alt="A customer holding a phone up to a Tag on a shop counter"
-              width={960}
-              height={720}
-              className="h-full w-full object-cover"
-              priority
-            />
-          </div>
-        </div>
-      </section>
+      <Hero />
 
       <CustomerPageShowcase />
 
-      <section className="border-t border-border bg-canvas">
-        <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
-          <Reveal>
-            <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-brand-text">
-              How it works
-            </p>
-          </Reveal>
-          <ol className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
-            {HOW_IT_WORKS.map((step, index) => (
-              <Reveal key={step.title} delay={index * 90} className="h-full">
-                <li className="flex h-full flex-col gap-4 rounded-2xl border border-border bg-white p-6">
-                  <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-bold text-ink">
-                    {index + 1}
-                  </span>
-                  <div>
-                    <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink">
-                      {step.title}
-                    </h2>
-                    <p className="mt-2 text-base leading-relaxed text-muted">{step.body}</p>
-                  </div>
-                </li>
-              </Reveal>
-            ))}
-          </ol>
-          <p className="mt-10">
-            <Link
-              href="/how-it-works"
-              className="text-sm font-medium text-brand-text underline-offset-4 transition-colors duration-150 hover:underline"
-            >
-              The whole path
-            </Link>
-          </p>
-        </div>
-      </section>
+      <HowItWorksScenes />
 
       <section className="border-t border-border bg-white">
         <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">

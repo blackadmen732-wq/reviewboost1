@@ -135,3 +135,78 @@
     scroll-behavior: auto;
   }
 }
+
+/* ------------------------------------------------------------ hero scene ---
+ * Photo behind, the real customer page in front, the Tag on the counter.
+ * One aspect-ratio box, everything placed in percentages, so the composition
+ * is the same picture at every width instead of a desktop layout squeezed. */
+.hero-scene {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
+  aspect-ratio: 1 / 1;
+}
+
+.hero-scene__photo {
+  position: absolute;
+  top: 4%;
+  left: 0;
+  width: 70%;
+  height: 80%;
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--rb-quiet);
+}
+
+.hero-scene__photo img {
+  object-position: 22% 62%;
+}
+
+.hero-scene__phone {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  width: 42%;
+  filter: drop-shadow(0 30px 40px rgb(23 26 24 / 22%));
+}
+
+.hero-scene__tag {
+  position: absolute;
+  bottom: 0;
+  left: 6%;
+  z-index: 3;
+  transform: rotate(-4deg);
+}
+
+@media (max-width: 640px) {
+  .hero-scene {
+    aspect-ratio: 1 / 1.08;
+  }
+
+  .hero-scene__photo {
+    width: 62%;
+    height: 72%;
+  }
+
+  .hero-scene__phone {
+    width: 50%;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-scene__tag {
+    left: 2%;
+    transform: rotate(-4deg) scale(0.78);
+    transform-origin: bottom left;
+  }
+}
+
+/* A Tag reads as an object on a surface: a crisp edge and a contact shadow. */
+.rb-tag {
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 80%) inset,
+    0 2px 4px rgb(23 26 24 / 8%),
+    0 24px 40px -18px rgb(23 26 24 / 35%);
+}
