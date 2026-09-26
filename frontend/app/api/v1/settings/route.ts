@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireOrganizationContext } from "@/lib/server/auth";
-import { DESTINATION_PROVIDERS, isValidDestinationUrl } from "@/lib/server/destination";
+import { DESTINATION_PROVIDERS, isWritableDestinationUrl } from "@/lib/server/destination";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
 import { parseOrThrow, uuidSchema } from "@/lib/server/validation";
@@ -64,7 +64,7 @@ const updateSchema = z
   .superRefine((value, ctx) => {
     if (value.destinationUrl === undefined) return;
     const provider = value.destinationProvider ?? "google";
-    if (value.destinationUrl !== "" && !isValidDestinationUrl(provider, value.destinationUrl)) {
+    if (value.destinationUrl !== "" && !isWritableDestinationUrl(provider, value.destinationUrl)) {
       ctx.addIssue({
         code: "custom",
         path: ["destinationUrl"],

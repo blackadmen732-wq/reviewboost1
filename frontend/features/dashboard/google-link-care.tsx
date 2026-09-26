@@ -16,7 +16,7 @@ import {
   openGoogleReviewUrl,
 } from "@/features/dashboard/google-link-copy";
 import { GoogleLinkHelp } from "@/features/dashboard/settings-form";
-import { isValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
+import { isGoogleReviewWritingUrl } from "@/lib/security/google-review-url";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -60,7 +60,7 @@ export function GoogleLinkCare({
   const [justSaved, setJustSaved] = useState(false);
 
   const trimmed = draft.trim();
-  const draftLooksRight = trimmed !== "" && isValidatedGoogleReviewUrl(trimmed);
+  const draftLooksRight = trimmed !== "" && isGoogleReviewWritingUrl(trimmed);
   const savedState = googleLinkState(value);
 
   function speakRefusal(message: string) {

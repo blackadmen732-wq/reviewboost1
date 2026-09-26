@@ -10,7 +10,8 @@ vi.mock("@/lib/supabase/browser", () => ({
 
 import { ProgramTagSheet } from "@/features/tags/program-tag-sheet";
 
-const STAND_URL = "https://reviewboost.fit/q/abc123";
+// A real token is 43 URL-safe characters; the public API accepts 8 to 128.
+const STAND_URL = "https://reviewboost.fit/q/abc123DEF456ghi";
 
 /** A stand-in for the browser's NDEFReader, recording what was written. */
 class FakeNDEFReader {
@@ -75,13 +76,13 @@ describe("Program Tag sheet", () => {
   });
 
   /** url lookup → ok; provisioning POST → caller's choice. */
-  function mockFetch({ provisionOk = true }: { provisionOk?: boolean } = {}) {
+  function mockFetch({ provisionOk = true, standUrl = STAND_URL }: { provisionOk?: boolean; standUrl?: string } = {}) {
     const calls: string[] = [];
     const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       calls.push(`${init?.method ?? "GET"} ${url}`);
       if (url.includes("/qr")) {
-        return new Response(JSON.stringify({ data: { standUrl: STAND_URL } }), { status: 200 });
+        return new Response(JSON.stringify({ data: { standUrl } }), { status: 200 });
       }
       return new Response("{}", { status: provisionOk ? 200 : 503 });
     });
@@ -113,6 +114,23 @@ describe("Program Tag sheet", () => {
   function title(): string | null {
     return document.getElementById("nfc-title")?.textContent ?? null;
   }
+
+  it("never programs a chip with anything but a ReviewBoost /q/ link — not even one the server sent", async () => {
+    for (const standUrl of [
+      "https://search.google.com/local/writereview?placeid=ChIJRouteMain0001",
+      "https://g.page/r/RouteMain/review",
+      `${STAND_URL}?next=https://g.page/r/RouteMain/review`,
+    ]) {
+      const calls = mockFetch({ standUrl });
+      FakeNDEFReader.onScan = (emit) => act(() => emit([]));
+      const { unmount } = render(<ProgramTagSheet standId="stand-1" open onClose={vi.fn()} onReady={vi.fn()} />);
+      await hold();
+      await waitFor(() => expect(phase()).toBe("failed"));
+      expect(FakeNDEFReader.writes, standUrl).toHaveLength(0);
+      expect(calls.filter((call) => call.startsWith("POST")), standUrl).toHaveLength(0);
+      unmount();
+    }
+  });
 
   it("writes a blank Tag without stopping to ask", async () => {
     mockFetch();

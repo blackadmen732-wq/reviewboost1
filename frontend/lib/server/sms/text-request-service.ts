@@ -4,9 +4,8 @@ import { z } from "zod";
 
 import type { OrganizationContext } from "@/lib/server/auth";
 import { KEY_VERSION, decrypt, digestStandToken, encrypt } from "@/lib/server/crypto";
-import { publicFrontendUrl } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
-import { standUrl } from "@/lib/server/google-review-url";
+import { canonicalTagUrl } from "@/lib/server/tag-url";
 import { logger } from "@/lib/server/logger";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import { getProviderRate } from "@/lib/server/sms/provider";
@@ -227,7 +226,7 @@ export async function resolveStand(
   return {
     standId: data.id as string,
     locationId,
-    link: standUrl(publicFrontendUrl(), token),
+    link: canonicalTagUrl(token),
     timezone: resolveTimezone(loc?.timezone as string | null | undefined),
   };
 }

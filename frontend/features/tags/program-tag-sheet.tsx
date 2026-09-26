@@ -16,6 +16,7 @@ import {
 } from "@/lib/owner/nfc-presentation";
 import type { ProgramPhase, TagContents } from "@/lib/owner/nfc-phases";
 import { classifyTagContents, type ReadRecord } from "@/lib/owner/nfc-read";
+import { isReviewBoostTagUrl } from "@/lib/security/tag-url";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /** How long to wait for the chip to announce itself before giving up on a read. */
@@ -243,6 +244,8 @@ export function ProgramTagSheet({
         if (!res.ok) throw new Error("url");
         const json = (await res.json()) as { data?: { standUrl?: string } };
         if (!json.data?.standUrl) throw new Error("url");
+        // Only a plain ReviewBoost /q/ link is ever written to a chip.
+        if (!isReviewBoostTagUrl(json.data.standUrl)) throw new Error("url");
         url = json.data.standUrl;
         setStandUrl(url);
       } catch (caught) {

@@ -12,7 +12,7 @@ import {
   GOOGLE_LINK_LATER,
 } from "@/features/dashboard/google-link-copy";
 import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
-import { isValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
+import { isGoogleReviewWritingUrl } from "@/lib/security/google-review-url";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -52,7 +52,7 @@ export function OnboardingFlow() {
   const qr = useAuthenticatedQr(created?.standId ?? null);
 
   const trimmedUrl = googleUrl.trim();
-  const urlLooksRight = trimmedUrl !== "" && isValidatedGoogleReviewUrl(trimmedUrl);
+  const urlLooksRight = trimmedUrl !== "" && isGoogleReviewWritingUrl(trimmedUrl);
 
   function slugify(value: string): string {
     // Generated rather than asked for. "Choose a web address" is a question

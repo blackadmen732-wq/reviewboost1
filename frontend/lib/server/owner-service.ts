@@ -14,9 +14,10 @@ import {
   assertCanCreateTag,
   entitlementApiError,
 } from "@/lib/server/entitlements";
-import { publicFrontendUrl, tokenDigestKeyVersion } from "@/lib/server/env";
+import { tokenDigestKeyVersion } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
-import { isValidGoogleReviewUrl, standUrl } from "@/lib/server/google-review-url";
+import { isGoogleReviewWritingUrl } from "@/lib/server/google-review-url";
+import { canonicalTagUrl } from "@/lib/server/tag-url";
 import { logger } from "@/lib/server/logger";
 
 /**
@@ -91,7 +92,7 @@ export async function createOrganization(
   input: CreateOrganizationInput,
   requestId: string,
 ): Promise<CreatedOrganization> {
-  if (input.googleReviewUrl !== undefined && !isValidGoogleReviewUrl(input.googleReviewUrl)) {
+  if (input.googleReviewUrl !== undefined && !isGoogleReviewWritingUrl(input.googleReviewUrl)) {
     // Refused at the door rather than stored and failed later: an invalid
     // destination means the stand serves a page the customer's browser rejects,
     // and the owner would have no idea why.
@@ -140,7 +141,7 @@ export async function createOrganization(
     organizationId: row.org_id,
     locationId: row.location_id,
     standId: row.stand_id,
-    standUrl: standUrl(publicFrontendUrl(), token),
+    standUrl: canonicalTagUrl(token),
     standToken: token,
   };
 }
@@ -272,7 +273,7 @@ export async function rotateStandToken(
 
   return {
     standId,
-    standUrl: standUrl(publicFrontendUrl(), token),
+    standUrl: canonicalTagUrl(token),
     standToken: token,
   };
 }
@@ -306,7 +307,7 @@ export async function getStandTokenForReprint(
   const token = tryDecrypt(data.public_token_encrypted as string | null);
   if (token === null) return null;
 
-  return { token, standUrl: standUrl(publicFrontendUrl(), token), label: data.label as string };
+  return { token, standUrl: canonicalTagUrl(token), label: data.label as string };
 }
 
 // ------------------------------------------------- NFC provisioning --
@@ -388,7 +389,7 @@ export async function createStand(
 
   return {
     standId,
-    standUrl: standUrl(publicFrontendUrl(), token),
+    standUrl: canonicalTagUrl(token),
     standToken: token,
   };
 }

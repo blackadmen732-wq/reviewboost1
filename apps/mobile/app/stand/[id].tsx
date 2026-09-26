@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams } from "expo-router";
 import * as Linking from "expo-linking";
+import { isReviewBoostTagUrl } from "@/lib/tag-url";
 import { Tappable } from "@/components/tappable";
 import { useAuth } from "@/data/auth-context";
 import { apiFetch } from "@/data/api";
@@ -76,6 +77,9 @@ export default function StandDetailScreen() {
           `/api/v1/review-stands/${id}/qr?format=json`,
           orgId,
         );
+        // Only a plain ReviewBoost /q/ link is ever written to a chip; anything
+        // else fails closed as a load error rather than being programmed.
+        if (!isReviewBoostTagUrl(res.data.standUrl)) throw new Error("not a Tag URL");
         setStandUrl(res.data.standUrl);
         setStandLabel(res.data.label);
       } catch {
