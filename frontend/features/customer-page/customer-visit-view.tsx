@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
 import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
 import {
   clampHeroTransform,
@@ -27,11 +26,6 @@ import {
 
 export interface CustomerVisitViewProps {
   heroUrl: string | null;
-  /**
-   * Shown large in the hero when the business has not published artwork yet,
-   * so the page still says whose it is instead of showing an empty block.
-   */
-  businessName?: string | null;
   transform: HeroTransform;
   heading: string;
   support: string;
@@ -42,7 +36,6 @@ export interface CustomerVisitViewProps {
 
 export function CustomerVisitView({
   heroUrl,
-  businessName = null,
   transform,
   heading,
   support,
@@ -63,9 +56,7 @@ export function CustomerVisitView({
         {heroUrl ? (
           <HeroImage src={heroUrl} transform={heroTransformStyle(crop)} />
         ) : (
-          <div className="visit-hero__empty" aria-hidden="true">
-            {businessName ? <p className="visit-hero__name">{businessName}</p> : null}
-          </div>
+          <div className="visit-hero__empty" aria-hidden="true" />
         )}
         {language ? <div className="visit-language">{language}</div> : null}
       </div>
@@ -81,7 +72,16 @@ export function CustomerVisitView({
         ) : null}
         <div className="visit-card__body">{children}</div>
         <footer className="visit-footer">
-          <ReviewBoostLogo pose="poweredBy" size="poweredBy" />
+          {/* The approved reference: a small grey bolt, grey "Powered by",
+              and "ReviewBoost" in ink. */}
+          <p className="visit-powered">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M13.2 2 4.5 13.6h6.3L9.9 22l9.6-12.4h-6.4L13.2 2Z" />
+            </svg>
+            <span>
+              Powered by <strong>ReviewBoost</strong>
+            </span>
+          </p>
           <p className="visit-footer__line">{footerLine}</p>
         </footer>
       </section>

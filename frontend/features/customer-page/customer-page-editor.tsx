@@ -249,23 +249,48 @@ export function CustomerPageEditor({
   const unpublished = Boolean(draft.heroAssetId) && draft.heroAssetId !== liveHeroAssetId;
   const published = statusMsg === "Page is live!";
 
+  // Upload → preview → Publish, in that order, in one column. The phone is
+  // the owner's preview only; /q/{token} never draws it.
   return (
-    <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12">
-      {/* Live preview — the real customer page, in the phone. */}
-      <div className="w-full shrink-0 lg:max-w-sm">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <p className="text-sm font-medium text-muted">What your customers see</p>
-          {unpublished ? (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink">
-              <span aria-hidden="true" className="size-2 rounded-full bg-star" />
-              Not published yet
-            </span>
-          ) : null}
-        </div>
+    <div className="mx-auto flex w-full max-w-sm flex-col gap-5">
+      <div>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={uploading}
+          loading={uploading}
+          loadingLabel={uploadLabel}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <ImageUp className="size-5" aria-hidden="true" />
+          {uploadLabel}
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        {uploadError ? (
+          <p role="alert" className="mt-2 text-sm text-danger">
+            {uploadError}
+          </p>
+        ) : null}
+      </div>
+
+      <div>
+        {unpublished ? (
+          <p className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-ink">
+            <span aria-hidden="true" className="size-2 rounded-full bg-star" />
+            Not published yet
+          </p>
+        ) : null}
+        {/* The real customer page — the same CustomerVisitView /q renders —
+            with the draft image, inside the preview phone. */}
         <PhoneFrame label={`${businessName} customer page preview`}>
           <CustomerVisitView
             heroUrl={heroUrl ?? null}
-            businessName={businessName}
             transform={DEFAULT_HERO_TRANSFORM}
             heading={previewMessages.ratingHeading}
             // The live page always says this line; a leftover draft tagline
@@ -279,77 +304,32 @@ export function CustomerPageEditor({
         </PhoneFrame>
       </div>
 
-      {/* Upload → preview → Publish. The owner chooses a photo; ReviewBoost
-          owns everything under it. */}
-      <div className="flex flex-1 flex-col gap-6 lg:pt-10">
-        <div>
-          <p className="text-base font-semibold text-ink">Your photo</p>
-          <p className="mt-1 max-w-[40ch] text-sm leading-relaxed text-muted">
-            The top of the page is yours — a photo or artwork of your business. The rating
-            part underneath is the same for every customer.
-          </p>
-          <div className="mt-4 max-w-xs">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={uploading}
-              loading={uploading}
-              loadingLabel={uploadLabel}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <ImageUp className="size-5" aria-hidden="true" />
-              {uploadLabel}
-            </Button>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <p className="mt-2 text-sm text-muted">PNG, JPEG or WebP, up to 5 MB.</p>
-          {uploadError ? (
-            <p role="alert" className="mt-2 text-sm text-danger">
-              {uploadError}
-            </p>
-          ) : null}
-        </div>
-
-        {/* The tagline input lived here. V1 is deliberately upload → preview →
-            Publish, so the control is gone; `tagline` stays in the draft, the
-            payload and the renderer, so nothing an owner already wrote is lost
-            and restoring the field is putting this input back. */}
-
-        {/* One action. "Save draft" beside "Go live" asked the owner to hold a
-            draft/published model in their head to decide which button meant
-            "done"; publish() saves first regardless, so the draft step was
-            already implicit. The safety underneath is unchanged. */}
-        <div className="max-w-xs">
-          <Button
-            type="button"
-            variant="action"
-            size="lg"
-            disabled={publishing || uploading}
-            loading={publishing}
-            loadingLabel="Publishing…"
-            onClick={() => void publish()}
+      {/* One action. publish() saves the draft first, so there is no separate
+          Save step to hold in mind. */}
+      <div>
+        <Button
+          type="button"
+          variant="action"
+          size="lg"
+          disabled={publishing || uploading}
+          loading={publishing}
+          loadingLabel="Publishing…"
+          onClick={() => void publish()}
+        >
+          Publish
+        </Button>
+        {statusMsg ? (
+          <p
+            role={published ? "status" : "alert"}
+            className={cn(
+              "mt-3 inline-flex items-center gap-1.5 text-sm font-medium",
+              published ? "text-brand-text" : "text-danger",
+            )}
           >
-            Publish
-          </Button>
-          {statusMsg ? (
-            <p
-              role={published ? "status" : "alert"}
-              className={cn(
-                "mt-3 inline-flex items-center gap-1.5 text-sm font-medium",
-                published ? "text-brand-text" : "text-danger",
-              )}
-            >
-              {published ? <Check className="size-4" strokeWidth={3} aria-hidden="true" /> : null}
-              {statusMsg}
-            </p>
-          ) : null}
-        </div>
+            {published ? <Check className="size-4" strokeWidth={3} aria-hidden="true" /> : null}
+            {statusMsg}
+          </p>
+        ) : null}
       </div>
     </div>
   );

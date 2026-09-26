@@ -46,8 +46,6 @@ html:has(.customer-live) {
   pointer-events: none;
 }
 
-/* No artwork yet: the business's own name, set large on a quiet dark field.
-   Deliberate rather than broken, and still unmistakably theirs. */
 .visit-hero__image[data-loaded] {
   opacity: 1;
 }
@@ -56,25 +54,12 @@ html:has(.customer-live) {
   .visit-hero__image { transition: none; }
 }
 
+/* No image uploaded yet: a plain neutral area. The top of the page is only
+   ever the owner's own image; ReviewBoost draws nothing there. */
 .visit-hero__empty {
-  display: grid;
   width: 100%;
   height: 100%;
-  place-items: center;
-  padding: 24px 24px 56px;
-  background: #151916;
-}
-
-.visit-hero__name {
-  margin: 0;
-  max-width: 14ch;
-  color: #f4f6f4;
-  font-size: clamp(1.9rem, 10cqi, 2.75rem);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
-  text-align: center;
-  overflow-wrap: anywhere;
+  background: #1c1d1d;
 }
 
 .visit-language {
@@ -157,6 +142,11 @@ html:has(.customer-live) {
 /* Measured against the approved Mario reference: artwork ~58% of the screen,
    the sheet the remaining ~42% rising over it on a ~28px radius, a soft
    off-white rather than paper white, the heading ~45pt below the edge. */
+/* The approved reference, measured (1pt = 1/390 of the screen, so every
+   size below is in cqi and scales with the phone): sheet from 58% of the
+   screen, ~27pt top corners; heading cap-top at 46pt; instruction centred at
+   92pt; stars centred at 160pt, 58pt each on a 71pt pitch; footer anchored to
+   the bottom, promise line ~42pt above the screen edge. */
 .visit-card {
   position: relative;
   display: flex;
@@ -165,13 +155,11 @@ html:has(.customer-live) {
   height: 42%;
   max-height: 42%;
   z-index: 2;
-  /* The sheet rises into the artwork so its rounded top reads as a surface
-     laid over the business's photo, not a white block under it. */
   margin-top: -28px;
-  background: #f8f8f7;
-  border-radius: 34px 34px 0 0;
-  box-shadow: 0 -8px 24px rgb(0 0 0 / 18%);
-  padding: clamp(26px, 10.5cqi, 44px) 16px calc(10px + env(safe-area-inset-bottom));
+  background: #f9f9f9;
+  border-radius: 7cqi 7cqi 0 0;
+  box-shadow: 0 -6px 20px rgb(0 0 0 / 16%);
+  padding: 11.2cqi 0 max(5cqi, calc(env(safe-area-inset-bottom) + 1.5cqi));
   overflow: hidden;
 }
 
@@ -239,12 +227,11 @@ html:has(.customer-live) {
 
 .visit-heading {
   margin: 0;
-  color: var(--rb-ink);
-  font-size: clamp(1.6rem, 8.25cqi, 2.4rem);
+  color: #111111;
+  font-size: 8.5cqi;
   font-weight: 800;
   letter-spacing: -0.045em;
-  line-height: 1.02;
-  text-wrap: balance;
+  line-height: 1.05;
 }
 
 .visit-heading:focus {
@@ -254,11 +241,11 @@ html:has(.customer-live) {
 /* A quiet instruction: regular weight, wide tracking — it explains, the
    heading asks. */
 .visit-support {
-  margin: clamp(8px, 3cqi, 14px) 0 0;
-  color: #515653;
-  font-size: clamp(0.62rem, 2.85cqi, 0.74rem);
-  font-weight: 450;
-  letter-spacing: 0.22em;
+  margin: 3.6cqi 0 0;
+  color: #4a4a4a;
+  font-size: 2.7cqi;
+  font-weight: 400;
+  letter-spacing: 0.25em;
   text-transform: uppercase;
 }
 
@@ -270,7 +257,7 @@ html:has(.customer-live) {
   flex-direction: column;
   justify-content: flex-start;
   min-height: 0;
-  margin-top: clamp(16px, 8.5cqi, 38px);
+  margin-top: 8cqi;
   overflow: auto;
 }
 
@@ -278,27 +265,42 @@ html:has(.customer-live) {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  margin-top: auto;
-  padding-top: 8px;
-  gap: 4px;
+  gap: 2.4cqi;
+  padding-top: 3cqi;
 }
 
-/* "Powered by ReviewBoost" stays quiet: smaller than the product-wide logo
-   size, so it signs the page rather than competing with the question. */
-.visit-footer > :first-child {
-  zoom: 0.8;
+.visit-powered {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.4cqi;
+  margin: 0;
+  color: #555555;
+  font-size: 2.75cqi;
+  font-weight: 400;
+  letter-spacing: -0.005em;
 }
+
+.visit-powered svg {
+  width: 3cqi;
+  height: 3cqi;
+  fill: #555555;
+}
+
+.visit-powered strong {
+  color: #111111;
+  font-weight: 650;
+}
+
 
 .visit-footer__line {
   margin: 0;
-  /* Quiet, but still 4.5:1 on the white sheet. */
-  color: #646c66;
-  font-size: clamp(6px, 1.95cqi, 0.55rem);
+  color: #646464;
+  font-size: 1.6cqi;
   font-weight: 500;
-  letter-spacing: 0.17em;
-  white-space: nowrap;
+  letter-spacing: 0.28em;
   text-align: center;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .visit-stars {
@@ -314,7 +316,7 @@ html:has(.customer-live) {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(2px, 1.2cqi, 8px);
+  gap: 2.3cqi;
 }
 
 .visit-star {
@@ -351,24 +353,21 @@ html:has(.customer-live) {
 
 .visit-star__label {
   display: grid;
-  /* 44pt is Apple's minimum target; at every width the row of five plus its
-     gaps fits inside the sheet's 16px side padding. */
-  width: clamp(44px, 16.4cqi, 70px);
-  height: clamp(44px, 16.4cqi, 70px);
+  /* 58pt on a 390pt screen; never under Apple's 44pt target. */
+  width: max(44px, 15.8cqi);
+  height: max(44px, 15.8cqi);
   place-items: center;
-  /* A firm, dark, fine outline on a white star: it has to read as "tap me" on
-     a bright day, which the old #c5c5c5 hairline did not. */
-  color: #4d514f;
+  color: #4f4f4f;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 
 .visit-star__label svg {
-  width: 92%;
-  height: 92%;
+  width: 100%;
+  height: 100%;
   overflow: visible;
-  fill: #fdfdfd;
-  filter: drop-shadow(0 4px 5px rgb(23 26 24 / 17%));
+  fill: #f6f6f6;
+  filter: drop-shadow(0 1.3cqi 1.1cqi rgb(0 0 0 / 20%));
   transition: transform 110ms ease-out, color 140ms ease-out, fill 140ms ease-out;
 }
 
@@ -591,7 +590,7 @@ html:has(.customer-live) {
 /* The device's bottom safe area: the footer sits above the home indicator,
    as env(safe-area-inset-bottom) makes it on a real iPhone. */
 .phone-frame__device .visit-card {
-  padding-bottom: 30px;
+  padding-bottom: 34px;
 }
 
 .customer-live {
