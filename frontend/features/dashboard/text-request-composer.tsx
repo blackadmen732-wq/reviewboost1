@@ -238,9 +238,11 @@ export function TextRequestComposer({
           <MessagePreview words={message} tagLabel={chosenTag?.label ?? "your Tag"} />
 
           {error ? (
-            <InlineNotice kind="error" title="That did not go through" blocking>
-              <p>{error}</p>
-            </InlineNotice>
+            <div className="animate-fade-in">
+              <InlineNotice kind="error" title="That did not go through" blocking>
+                <p>{error}</p>
+              </InlineNotice>
+            </div>
           ) : null}
 
           {balance.total === 0 ? (
@@ -264,7 +266,7 @@ export function TextRequestComposer({
             {/* The exact count depends on the real link, which only the server
                 builds, so it is a server check rather than a guess here. */}
             {preview ? (
-              <p className="text-center text-sm text-muted" role="status">
+              <p className="animate-fade-in text-center text-sm text-muted" role="status">
                 {preview.segments === 1
                   ? "This uses 1 text."
                   : `This uses ${preview.segments} texts — shorten the message to use fewer.`}
@@ -373,7 +375,32 @@ const STATUS: Record<string, { label: string; tone: "ok" | "wait" | "bad" | "off
   cancelled: { label: "Cancelled", tone: "off" },
 };
 
+/**
+ * What changed in the list since it was first drawn. A request just sent
+ * arrives as a new row, which settles in (opacity and 4px, 200ms); a status
+ * that moved on, Sending to Delivered, fades to the new one. Rows that were
+ * already there when the page opened are simply there. Calm on purpose: a
+ * text going out is routine, not a moment.
+ */
+function useListChanges(recent: readonly RecentRequest[]) {
+  // The list as it was before the latest change; null until it first changes.
+  const [state, setState] = useState<{ list: readonly RecentRequest[]; before: Map<string, string> | null }>({
+    list: recent,
+    before: null,
+  });
+  if (state.list !== recent) {
+    setState({ list: recent, before: new Map(state.list.map((item) => [item.id, item.status])) });
+  }
+  const before = state.before;
+  return {
+    isNew: (item: RecentRequest) => before !== null && !before.has(item.id),
+    statusMoved: (item: RecentRequest) =>
+      before !== null && before.has(item.id) && before.get(item.id) !== item.status,
+  };
+}
+
 function RecentList({ recent }: { recent: readonly RecentRequest[] }) {
+  const { isNew, statusMoved } = useListChanges(recent);
   return (
     <section aria-labelledby="recent-heading">
       <h2 id="recent-heading" className="mb-2 text-sm font-medium text-muted">
@@ -386,14 +413,19 @@ function RecentList({ recent }: { recent: readonly RecentRequest[] }) {
           {recent.map((item) => {
             const status = STATUS[item.status] ?? { label: item.status, tone: "wait" as const };
             return (
-              <li key={item.id} className="flex min-h-14 items-center gap-3 py-3">
+              <li
+                key={item.id}
+                className={cn("flex min-h-14 items-center gap-3 py-3", isNew(item) && "animate-row-in")}
+              >
                 <span className="text-base tabular-nums text-ink">
                   ••• {item.recipientLastFour ?? "????"}
                 </span>
                 <span className="text-sm text-muted">{relativeDay(item.createdAt)}</span>
                 <span
+                  key={item.status}
                   className={cn(
                     "ml-auto inline-flex items-center gap-1.5 text-sm",
+                    statusMoved(item) && "animate-fade-in",
                     status.tone === "bad" ? "font-medium text-danger" : "text-muted",
                   )}
                 >
