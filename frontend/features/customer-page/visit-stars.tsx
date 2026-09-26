@@ -68,7 +68,7 @@ const STAR_PATH =
 function VisitStar() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d={STAR_PATH} strokeWidth={1.05} strokeLinejoin="round" stroke="currentColor" />
+      <path d={STAR_PATH} strokeWidth={0.72} strokeLinejoin="round" stroke="currentColor" />
     </svg>
   );
 }
