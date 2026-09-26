@@ -287,7 +287,8 @@
 .phone-frame--device {
   position: relative;
   container-type: inline-size;
-  width: min(100%, 420px);
+  /* Room for the side buttons, which sit just outside the shell. */
+  width: min(calc(100% - 6px), 420px);
   margin-inline: auto;
 }
 
