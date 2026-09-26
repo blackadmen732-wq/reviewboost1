@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { MOBILE_NAV, isActive } from "@/features/dashboard/nav-items";
+import { MOBILE_NAV, isActive, mobileLabelOf } from "@/features/dashboard/nav-items";
 import { cn } from "@/lib/utils/cn";
 
 /**
- * Phone tabs. Four items, never five.
+ * Phone tabs. Four items, never five, each label on one line:
+ * Home · Feedback · Texts · Tags.
  */
 export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
   const pathname = usePathname();
@@ -54,7 +55,7 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
                     </span>
                   ) : null}
                 </span>
-                {item.label}
+                {mobileLabelOf(item)}
               </Link>
             </li>
           );

@@ -25,7 +25,7 @@ import { BottomNav } from "@/features/dashboard/bottom-nav";
 import { DesktopSidebar } from "@/features/dashboard/desktop-sidebar";
 
 describe("owner chrome", () => {
-  it("mobile is four tabs: Home, Feedback, Text Requests, Tags", () => {
+  it("mobile is four tabs: Home, Feedback, Texts, Tags", () => {
     render(<BottomNav unreadCount={2} />);
 
     const nav = screen.getByRole("navigation", { name: "Main" });
@@ -37,10 +37,15 @@ describe("owner chrome", () => {
     expect(links[1]).toHaveAttribute("href", "/feedback");
     expect(links[2]).toHaveAttribute("href", "/text-requests");
     expect(links[3]).toHaveAttribute("href", "/stands");
-    expect(screen.getByText("Home")).toBeVisible();
-    expect(screen.getByText("Feedback")).toBeVisible();
-    expect(screen.getByText("Text Requests")).toBeVisible();
-    expect(screen.getByText("Tags")).toBeVisible();
+    expect(links.map((link) => link.textContent?.replace("2", "").trim())).toEqual([
+      "Home",
+      "Feedback",
+      "Texts",
+      "Tags",
+    ]);
+    // Short on the phone, and the link is named by what it shows.
+    expect(screen.getByRole("link", { name: "Texts" })).toHaveAttribute("href", "/text-requests");
+    expect(screen.queryByText("Text Requests")).not.toBeInTheDocument();
     expect(screen.getByLabelText("2 unread")).toBeVisible();
     expect(screen.queryByText("Team")).not.toBeInTheDocument();
     expect(screen.queryByText("Customers")).not.toBeInTheDocument();
@@ -57,7 +62,9 @@ describe("owner chrome", () => {
     expect(screen.getByRole("link", { name: "ReviewBoost home" })).toBeVisible();
     expect(screen.getByText("Home")).toBeVisible();
     expect(screen.getByText("Feedback")).toBeVisible();
+    // The sidebar has room for the full name.
     expect(screen.getByText("Text Requests")).toBeVisible();
+    expect(screen.queryByText("Texts")).not.toBeInTheDocument();
     expect(screen.getByText("Tags")).toBeVisible();
     expect(screen.getByText("Settings")).toBeVisible();
     expect(screen.getByText("Oak & Vine")).toBeVisible();
