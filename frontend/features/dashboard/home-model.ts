@@ -61,12 +61,17 @@ export interface TagStatus {
  * not recorded anywhere, so step three completes on NFC or, like the rest,
  * when the first rating arrives and Home stops showing setup at all.
  */
-export type SetupStepKey = "tag" | "google" | "print" | "first-rating";
+export type SetupStepKey = "tag" | "google" | "photo" | "print" | "first-rating";
 
 export interface SetupStep {
   key: SetupStepKey;
   title: string;
   done: boolean;
+  /**
+   * Where to do it, for a step that is optional and so never takes the one
+   * green button. Only the photo step has one, and only while it is undone.
+   */
+  href?: "/customer-page";
 }
 
 export interface HomeModel {
@@ -126,10 +131,16 @@ export function deriveHomeModel({
   stands,
   hasLocation,
   canManage = true,
+  hasCustomerPhoto = null,
 }: {
   counts: HomeCounts;
   stands: HomeStand[];
   hasLocation: boolean;
+  /**
+   * Whether a published Customer Page carries the business's photo. Null when
+   * it could not be read: the step is left out rather than shown wrong.
+   */
+  hasCustomerPhoto?: boolean | null;
   /**
    * Owner or admin. Creating and programming Tags, the Google link and the
    * customer-page preview are all refused to anyone else by the API, so a
@@ -225,6 +236,16 @@ export function deriveHomeModel({
       ? [
           { key: "tag", title: "Create your first Tag", done: hasStand },
           { key: "google", title: "Add your Google review link", done: counts.hasGoogleLink },
+          ...(hasCustomerPhoto === null
+            ? []
+            : [
+                {
+                  key: "photo" as const,
+                  title: "Add your photo to the customer page",
+                  done: hasCustomerPhoto,
+                  ...(!hasCustomerPhoto && canManage ? { href: "/customer-page" as const } : {}),
+                },
+              ]),
           { key: "print", title: "Print the code or program NFC", done: tags.programmed > 0 },
           { key: "first-rating", title: "Get your first rating", done: false },
         ]

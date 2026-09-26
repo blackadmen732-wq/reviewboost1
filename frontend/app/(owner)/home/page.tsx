@@ -7,6 +7,7 @@ import { InstallPrompt } from "@/features/dashboard/install-prompt";
 import { permissionsFor } from "@/lib/owner/permissions";
 import {
   getOwnerCounts,
+  hasPublishedCustomerPhoto,
   listLocations,
   listReviews,
   listStands,
@@ -29,7 +30,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const { organization } = await requireOwner("/home");
 
-  const [counts, stands, locations, unread] = await Promise.all([
+  const [counts, stands, locations, unread, hasCustomerPhoto] = await Promise.all([
     getOwnerCounts(organization.orgId, organization.timezone),
     listStands(organization.orgId),
     listLocations(organization.orgId),
@@ -38,6 +39,7 @@ export default async function HomePage() {
       openOnly: true,
       limit: 5,
     }),
+    hasPublishedCustomerPhoto(organization.orgId),
   ]);
 
   const model = deriveHomeModel({
@@ -45,6 +47,7 @@ export default async function HomePage() {
     stands,
     hasLocation: locations.length > 0,
     canManage: permissionsFor(organization.role).manageTags,
+    hasCustomerPhoto,
   });
 
   return (
