@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
 import { PhoneFrame } from "@/features/customer-page/phone-frame";
 import { VisitStars } from "@/features/customer-page/visit-stars";
@@ -74,8 +73,6 @@ export function CustomerPageShowcase() {
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const programmaticScroll = useRef(false);
 
-  const active = SHOWCASE_BUSINESSES[activeIndex] ?? SHOWCASE_BUSINESSES[0];
-
   const goTo = useCallback((index: number) => {
     setActiveIndex(wrap(index, COUNT));
   }, []);
@@ -120,19 +117,19 @@ export function CustomerPageShowcase() {
   }, []);
 
   return (
-    <section className="border-t border-border bg-canvas" aria-labelledby="customer-page-showcase-heading">
-      <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-24">
-        <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-brand-text">Customer page</p>
-        <h2
-          id="customer-page-showcase-heading"
-          className="mt-4 max-w-[24ch] text-2xl font-bold tracking-[-0.02em] text-ink sm:text-3xl"
-        >
-          Looks like your business. Works like ReviewBoost.
-        </h2>
-        <p className="mt-3 max-w-[46ch] text-base leading-relaxed text-muted">
-          Every business gets its own visual identity while ReviewBoost keeps the customer interaction simple and
-          consistent.
-        </p>
+    <section className="border-b border-border bg-surface" aria-labelledby="customer-page-showcase-heading">
+      <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
+        <div className="mx-auto max-w-[40rem] text-center">
+          <h2
+            id="customer-page-showcase-heading"
+            className="text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[1.05] tracking-[-0.035em] text-ink"
+          >
+            Looks like your business. Works like ReviewBoost.
+          </h2>
+          <p className="mx-auto mt-4 max-w-[46ch] text-lg leading-relaxed text-muted">
+            Your photo on top. The same simple rating underneath, for every business.
+          </p>
+        </div>
 
         {/* Desktop / tablet: three phones, transform-driven, no re-mount on change. */}
         <div
@@ -237,70 +234,43 @@ export function CustomerPageShowcase() {
           ))}
         </div>
 
-        {/* Shared controls: category picker + pagination dots. */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-          {SHOWCASE_BUSINESSES.map((biz, index) => (
-            <button
-              key={biz.id}
-              type="button"
-              onClick={() => goTo(index)}
-              aria-pressed={index === activeIndex}
-              className={cn(
-                "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors duration-150",
-                index === activeIndex
-                  ? "border-ink bg-ink text-white"
-                  : "border-border bg-white text-muted hover:border-brand hover:text-ink",
-              )}
-            >
-              {biz.category}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-4 flex items-center justify-center gap-2" aria-hidden="true">
-          {SHOWCASE_BUSINESSES.map((biz, index) => (
-            <span
-              key={biz.id}
-              className={cn(
-                "size-1.5 rounded-full transition-colors duration-150",
-                index === activeIndex ? "bg-brand" : "bg-quiet",
-              )}
-            />
-          ))}
-        </div>
-
-        <p className="mt-6 text-center text-sm font-medium text-muted">
-          Showing <span className="text-ink">{active.name}</span>
-        </p>
-
-        {/* Customization explainer — upload/preview/publish, nothing more. */}
-        <div className="mt-16 rounded-3xl border border-border bg-white p-8 sm:p-10">
-          <div className="grid gap-8 sm:grid-cols-3">
-            {[
-              { step: "Upload", body: "Add a photo of your counter, your chair, your storefront." },
-              { step: "Preview", body: "See exactly what customers will see before it goes live." },
-              { step: "Publish", body: "One tap, and every scan of your Tag shows the new page." },
-            ].map((item) => (
-              <div key={item.step}>
-                <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-brand-text">{item.step}</p>
-                <p className="mt-2 text-base leading-relaxed text-muted">{item.body}</p>
-              </div>
+        {/* One control that both says which business is showing and moves to
+            another. Dots, pills and a "Showing …" line all said the same
+            thing three times. */}
+        <div className="mt-8 flex justify-center">
+          <div className="flex max-w-full gap-1 overflow-x-auto px-1 [scrollbar-width:none]">
+            {SHOWCASE_BUSINESSES.map((biz, index) => (
+              <button
+                key={biz.id}
+                type="button"
+                onClick={() => goTo(index)}
+                aria-pressed={index === activeIndex}
+                aria-label={`Show ${biz.name} (${biz.category})`}
+                className={cn(
+                  "relative min-h-11 shrink-0 px-3.5 text-sm font-medium transition-colors duration-150",
+                  "after:absolute after:inset-x-3.5 after:bottom-1.5 after:h-0.5 after:rounded-full after:transition-colors after:duration-150",
+                  "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] rounded-lg",
+                  index === activeIndex
+                    ? "text-ink after:bg-brand"
+                    : "text-muted after:bg-transparent hover:text-ink",
+                )}
+              >
+                {biz.category}
+              </button>
             ))}
           </div>
-          <h3 className="mt-10 text-xl font-bold tracking-[-0.01em] text-ink">
-            Your business on top. ReviewBoost underneath.
-          </h3>
-          <p className="mt-3 max-w-[52ch] text-base leading-relaxed text-muted">
-            Upload your artwork, see exactly what customers will see, and publish. You are not building a website or
-            choosing fonts, colors, or layouts — ReviewBoost keeps the rating and the Google handoff exactly as
-            consistent as they are above.
-          </p>
-          <div className="mt-6 max-w-xs">
-            <Button asChild variant="action" size="lg" className="rounded-full">
-              <Link href="/examples">Explore Customer Page</Link>
-            </Button>
-          </div>
         </div>
+
+        <p className="mx-auto mt-10 max-w-[48ch] text-center text-base leading-relaxed text-muted">
+          Upload your photo, preview exactly what customers see, publish. No fonts, colours or
+          layouts to fiddle with.{" "}
+          <Link
+            href="/examples"
+            className="font-semibold text-brand-text underline-offset-4 hover:underline"
+          >
+            See more examples
+          </Link>
+        </p>
       </div>
     </section>
   );

@@ -1,6 +1,7 @@
 import { Nfc } from "lucide-react";
 import QRCode from "qrcode";
 
+import { LogoMark } from "@/components/brand/logo-mark";
 import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
 import { cn } from "@/lib/utils/cn";
 
@@ -17,19 +18,30 @@ import { cn } from "@/lib/utils/cn";
 
 const DEMO_TARGET = "https://reviewboost.fit";
 
-export async function TagObject({
+/**
+ * The QR as one SVG path, built synchronously from the library's module grid
+ * so this renders anywhere — a server component, a client tree, a test.
+ */
+function qrSvg(text: string): string {
+  const { modules } = QRCode.create(text, { errorCorrectionLevel: "M" });
+  const size = modules.size;
+  let d = "";
+  for (let row = 0; row < size; row += 1) {
+    for (let col = 0; col < size; col += 1) {
+      if (modules.get(row, col)) d += `M${col} ${row}h1v1h-1z`;
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges"><path fill="#171a18" d="${d}"/></svg>`;
+}
+
+export function TagObject({
   size = "md",
   className,
 }: {
   size?: "sm" | "md" | "lg";
   className?: string | undefined;
 }) {
-  const svg = await QRCode.toString(DEMO_TARGET, {
-    type: "svg",
-    margin: 0,
-    errorCorrectionLevel: "M",
-    color: { dark: "#171a18", light: "#ffffff" },
-  });
+  const svg = qrSvg(DEMO_TARGET);
 
   const width = size === "lg" ? "w-[248px]" : size === "sm" ? "w-[148px]" : "w-[200px]";
 
@@ -58,6 +70,27 @@ export async function TagObject({
         <Nfc className={size === "sm" ? "size-3.5" : "size-4"} aria-hidden="true" />
         Tap or scan
       </figcaption>
+    </figure>
+  );
+}
+
+/** A round NFC Tag: the tap-only form of the same Tag. */
+export function NfcPuck({ className }: { className?: string | undefined } = {}) {
+  return (
+    <figure
+      className={cn(
+        "rb-tag grid size-[176px] place-items-center rounded-full border border-black/5 bg-white sm:size-[196px]",
+        className,
+      )}
+      aria-label="A round NFC Tag with the ReviewBoost mark"
+    >
+      <div className="flex flex-col items-center gap-3">
+        <LogoMark size={46} />
+        <span className="flex items-center gap-1.5 text-sm font-semibold text-[#171a18]">
+          <Nfc className="size-4" aria-hidden="true" />
+          Tap
+        </span>
+      </div>
     </figure>
   );
 }

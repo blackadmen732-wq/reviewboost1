@@ -1,9 +1,9 @@
-import { Nfc, QrCode, Star } from "lucide-react";
+import { QrCode, Star } from "lucide-react";
 
 import { DemoPhone } from "@/features/public/demo-phone";
 import { HOW_IT_WORKS } from "@/features/public/public-copy";
 import { Reveal } from "@/features/public/reveal";
-import { TagObject } from "@/features/public/tag-object";
+import { NfcPuck } from "@/features/public/tag-object";
 
 /**
  * How it works, as three scenes rather than three matching cards.
@@ -114,18 +114,35 @@ export function HowItWorksScenes() {
 
         {/* 01 — the physical Tag. Visual first, big. */}
         <Reveal className="mt-16 grid items-center gap-10 md:mt-20 md:grid-cols-12 md:gap-12">
-          <div className="relative flex items-center justify-center overflow-hidden rounded-[32px] bg-quiet px-6 py-14 md:col-span-7 md:py-20">
-            <div className="relative">
-              <TagObject size="lg" />
-              <span className="absolute -left-4 top-[38%] hidden -translate-x-full items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-sm font-medium text-ink shadow-[var(--shadow-control)] sm:flex">
-                <QrCode className="size-4 text-brand-text" aria-hidden="true" />
-                Any phone camera
-              </span>
-              <span className="absolute -right-4 bottom-[14%] hidden translate-x-full items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-sm font-medium text-ink shadow-[var(--shadow-control)] sm:flex">
-                <Nfc className="size-4 text-brand-text" aria-hidden="true" />
-                Or just a tap
-              </span>
+          <div className="relative h-[380px] overflow-hidden rounded-[32px] bg-quiet sm:h-[440px] md:col-span-7">
+            {/* A phone coming down onto the Tag. Still, not animated: the
+                moment itself is the point. */}
+            <div className="absolute left-1/2 top-[-46%] w-[200px] -translate-x-1/2 rotate-[-10deg] sm:top-[-42%] sm:w-[220px]">
+              <DemoPhone
+                heroSrc="/images/showcase/pizza-hero.png"
+                label="A phone held over a ReviewBoost Tag"
+                baseWidth={280}
+              />
             </div>
+            <span
+              aria-hidden="true"
+              className="absolute bottom-[25%] left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5"
+            >
+              {[40, 64, 88].map((width) => (
+                <span
+                  key={width}
+                  className="h-2.5 rounded-t-full border-x-2 border-t-2 border-brand/60"
+                  style={{ width }}
+                />
+              ))}
+            </span>
+            <div className="absolute bottom-[-24%] left-1/2 -translate-x-1/2 sm:bottom-[-20%]">
+              <NfcPuck />
+            </div>
+            <span className="absolute left-5 top-5 flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-sm font-medium text-ink shadow-[var(--shadow-control)]">
+              <QrCode className="size-4 text-brand-text" aria-hidden="true" />
+              Or scan the printed code
+            </span>
           </div>
           <div className="md:col-span-5">
             <StepLabel number="01" label="Tap or scan" />

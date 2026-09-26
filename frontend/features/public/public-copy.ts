@@ -77,12 +77,12 @@ export const INTEGRITY = {
 } as const;
 
 export const PRICING = {
-  headline: "One subscription, per location.",
-  lede: "You will see the price before anything is charged.",
+  headline: "Simple plans for local businesses.",
+  lede: "Start with what you need. Upgrade when your business needs more.",
   // Stripe billing is live. This used to read "Billing is not live yet",
   // which was true when it was written and is now the kind of stale sentence
   // that makes a visitor doubt everything else on the page.
-  caveat: "Seven days free. A card is required to start, and nothing is charged until the trial ends.",
+  caveat: "Starter has a seven-day free trial, card required. Growth and Pro are charged when you subscribe.",
 } as const;
 
 export const SECURITY = {

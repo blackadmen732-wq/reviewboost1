@@ -26,6 +26,8 @@ export interface PublicPlan {
   tags: number;
   /** Texts included each paid month. Pinned to the database by test. */
   monthlyTexts: number;
+  /** Free days before the first charge. Only Starter has any. */
+  trialDays: number;
   /** The one line that says who this plan is for. */
   fit: string;
 }
@@ -41,6 +43,7 @@ export const PUBLIC_PLANS: readonly PublicPlan[] = [
     price: dollars("starter"),
     locations: PLAN_CATALOG.starter.locationLimit,
     tags: PLAN_CATALOG.starter.tagLimit,
+    trialDays: 7,
     monthlyTexts: 150,
     fit: "One shop, one counter.",
   },
@@ -50,6 +53,7 @@ export const PUBLIC_PLANS: readonly PublicPlan[] = [
     price: dollars("growth"),
     locations: PLAN_CATALOG.growth.locationLimit,
     tags: PLAN_CATALOG.growth.tagLimit,
+    trialDays: 0,
     monthlyTexts: 500,
     fit: "A second location, or a busy one.",
   },
@@ -59,23 +63,26 @@ export const PUBLIC_PLANS: readonly PublicPlan[] = [
     price: dollars("pro"),
     locations: PLAN_CATALOG.pro.locationLimit,
     tags: PLAN_CATALOG.pro.tagLimit,
+    trialDays: 0,
     monthlyTexts: 1_500,
     fit: "Several locations under one roof.",
   },
 ] as const;
 
 /**
- * The trial. Not a plan: no plan id, and nothing mints texts during it.
+ * Starter's trial. Not a plan of its own, and nothing mints texts during it.
+ * Growth and Pro have none — they are charged at checkout.
  *
  * One Tag is deliberate — enough to put a real code on a real counter and see
  * real ratings, which is the only thing that decides whether someone subscribes.
  */
 export const TRIAL = {
   days: 7,
+  plan: PLAN_CATALOG.starter.name,
   locations: 1,
   tags: 1,
   monthlyTexts: 0,
-  note: "A card is required to start. Nothing is charged until the seven days are up.",
+  note: "Starter only. A card is required to start, and nothing is charged until the seven days are up. Growth and Pro are charged when you subscribe.",
 } as const;
 
 /** What every paid plan includes, so the cards do not repeat nine lines each. */

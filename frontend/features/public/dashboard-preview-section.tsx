@@ -1,3 +1,4 @@
+import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
 import { FeedbackList, type FeedbackItem } from "@/features/dashboard/feedback-list";
 import { HomeSetupChecklist } from "@/features/dashboard/home-setup-checklist";
 import type { SetupChecklist } from "@/features/dashboard/home-model";
@@ -42,17 +43,15 @@ const SAMPLE_FEEDBACK: FeedbackItem[] = [
 export function DashboardPreviewSection() {
   return (
     <div
-      className="pointer-events-none select-none overflow-hidden rounded-[1.5rem] border border-border bg-canvas shadow-[0_24px_60px_-24px_rgba(27,67,50,0.25)]"
+      className="pointer-events-none select-none overflow-hidden rounded-[24px] border border-border bg-surface shadow-[var(--shadow-card)]"
       role="img"
       aria-label="ReviewBoost Home screen, showing setup progress and recent feedback"
     >
-      <div className="flex items-center gap-2 border-b border-border bg-white px-5 py-3.5">
-        <span className="size-2.5 rounded-full bg-quiet" aria-hidden="true" />
-        <span className="size-2.5 rounded-full bg-quiet" aria-hidden="true" />
-        <span className="size-2.5 rounded-full bg-quiet" aria-hidden="true" />
-        <span className="ml-2 text-sm font-medium text-muted">Home</span>
+      <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+        <ReviewBoostLogo pose="full" size="footer" />
+        <span className="text-sm font-medium text-muted">Home</span>
       </div>
-      <div className="bg-canvas p-6 sm:p-8">
+      <div className="bg-canvas p-5 sm:p-7">
         <HomeSetupChecklist checklist={SAMPLE_CHECKLIST} />
         <p className="mb-3 text-sm font-medium text-muted">Recent feedback</p>
         <FeedbackList items={SAMPLE_FEEDBACK} />
