@@ -3,7 +3,6 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -15,6 +14,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import type { NfcScene, SceneCopy } from "@/lib/nfc-scenes";
+import { BrandLockup } from "@/components/brand-lockup";
 import { colors } from "@/theme";
 
 /**
@@ -75,18 +75,8 @@ export function NfcProgramSheet({
             bounces={false}
             showsVerticalScrollIndicator={false}
           >
-          <View style={styles.brand} accessible accessibilityLabel="ReviewBoost">
-            {/* A raster of the canonical mark (frontend/components/brand/
-                logo-mark.tsx), made by scripts/brand/render-native-logo-mark.mjs.
-                Regenerate it there; never edit the PNGs by hand. */}
-            <Image
-              source={require("../assets/logo-mark.png")}
-              style={styles.mark}
-              accessibilityIgnoresInvertColors
-            />
-            <Text style={styles.word} importantForAccessibility="no">
-              Review<Text style={styles.wordAccent}>Boost</Text>
-            </Text>
+          <View style={styles.brand}>
+            <BrandLockup height={28} />
           </View>
 
           <View style={[styles.stage, compact && styles.stageCompact]}>
@@ -377,12 +367,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
     paddingVertical: 8,
   },
-  mark: { width: 31, height: 28 },
-  word: { fontSize: 18, fontWeight: "600", letterSpacing: -0.3, color: colors.ink },
-  wordAccent: { color: colors.brandText },
   // Grows into the space between the logo and the actions, and never
   // shrinks below its content: a figure squeezed to nothing is worse than a
   // screen that scrolls.

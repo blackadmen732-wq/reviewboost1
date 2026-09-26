@@ -10,9 +10,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useFocusEffect } from "expo-router";
+import * as Linking from "expo-linking";
 import { useAuth } from "@/data/auth-context";
 import { useBilling } from "@/data/use-billing";
 import { accountView } from "@/data/billing-view";
+import { PUBLIC_LINKS } from "@/data/public-links";
 import { colors, radii, fonts } from "@/theme";
 
 /**
@@ -86,7 +88,30 @@ export default function AccountScreen() {
           <Text style={styles.cardBody}>{email ?? "—"}</Text>
         </View>
 
-        <Pressable style={styles.signOut} onPress={() => void logout()}>
+        {/* Apple 5.1.1(i) wants the privacy policy reachable in the app, and
+            1.5 a way to reach us. Plain rows that open the public pages. */}
+        <View style={styles.links}>
+          {PUBLIC_LINKS.map((link, index) => (
+            <Pressable
+              key={link.key}
+              style={[styles.linkRow, index > 0 ? styles.linkRowDivider : null]}
+              onPress={() => void Linking.openURL(link.url)}
+              accessibilityRole="link"
+              accessibilityHint="Opens in your browser"
+            >
+              <Text style={styles.linkText}>{link.label}</Text>
+              <Text style={styles.linkChevron} accessibilityElementsHidden importantForAccessibility="no">
+                ›
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Pressable
+          style={styles.signOut}
+          onPress={() => void logout()}
+          accessibilityRole="button"
+        >
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
 
@@ -95,7 +120,7 @@ export default function AccountScreen() {
             plain row rather than a second red button, so the destructive one
             is not the thing a thumb finds first. */}
         <Link href="/delete-account" asChild>
-          <Pressable style={styles.deleteRow}>
+          <Pressable style={styles.deleteRow} accessibilityRole="button">
             <Text style={styles.deleteText}>Delete account</Text>
           </Pressable>
         </Link>
@@ -130,5 +155,21 @@ const styles = StyleSheet.create({
   },
   signOutText: { ...fonts.body, color: colors.danger },
   deleteRow: { padding: 14, alignItems: "center" },
+  links: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  linkRow: {
+    minHeight: 48,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  linkRowDivider: { borderTopWidth: 1, borderTopColor: colors.border },
+  linkText: { ...fonts.body, color: colors.ink, fontSize: 16 },
+  linkChevron: { fontSize: 22, color: colors.inkFaint },
   deleteText: { ...fonts.body, color: colors.inkMuted },
 });

@@ -15,7 +15,10 @@ export const colors = {
 
   ink: "#171A18",
   inkMuted: "#5D655F",
-  inkFaint: "#9CA3AF",
+  // The web's muted grey. #9CA3AF measured 2.5:1 on white and was used for
+  // statuses, times and labels; this is 5.1:1 on white and 4.6:1 on the
+  // darkest surface it sits on.
+  inkFaint: "#66706a",
 
   border: "#D8DED9",
   borderLight: "#B7C0BA",

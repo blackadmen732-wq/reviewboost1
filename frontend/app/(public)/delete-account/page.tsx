@@ -49,9 +49,10 @@ export default function DeleteAccountPage() {
         >
           Settings then Delete account
         </Link>
-        , and type your business name to confirm. It happens immediately: your
-        subscription is cancelled, and the business, its Tags and every rating
-        are removed. Nobody has to approve it and there is no waiting period.
+        {" "}on the web, or Account then Delete account in the ReviewBoost iPhone or
+        Android app, and type your business name to confirm. It happens
+        immediately: your subscription is cancelled, and the business, its Tags
+        and every rating are removed. Nobody has to approve it and there is no waiting period.
       </p>
       <p>
         Only an owner can do this. If you are on someone else&rsquo;s team and

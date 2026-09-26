@@ -1,17 +1,17 @@
 import { LogoMark } from "@/components/brand/logo-mark";
+import { Wordmark } from "@/components/brand/wordmark";
 import { cn } from "@/lib/utils/cn";
 
 /**
  * One logo slot for the owner product.
  *
  * Poses and sizes follow the 2026-09-09 pack (full / mark / poweredBy;
- * nav / footer / poweredBy). The mark is the owner's approved asset, held in
- * `logo-mark.tsx` and nowhere else. Do not invent a second mark.
+ * nav / footer / poweredBy). The mark is `logo-mark.tsx`, drawn from
+ * `Branding/Mark.svg`, and nowhere else. Do not invent a second mark.
  *
- * The name beside it is live text in the product's own face rather than a
- * wordmark image: it stays crisp at any size, inherits the surrounding colour,
- * and is selectable and translatable. There is no wordmark asset to match —
- * the supplied artwork is the mark alone.
+ * This is the horizontal lockup, `[mark] ReviewBoost`, the same one
+ * `Branding/Logo.svg` exports: the mark beside the outlined wordmark, both
+ * drawn from generated geometry, never retyped.
  *
  * Clearspace is 0.25 × mark size on every side (`--rb-logo-clearspace`).
  */
@@ -25,10 +25,11 @@ const MARK_PX: Record<LogoSize, number> = {
   poweredBy: 16,
 };
 
-const WORD: Record<LogoSize, string> = {
-  nav: "text-[1.0625rem] tracking-[-0.02em]",
-  footer: "text-[0.9375rem] tracking-[-0.015em]",
-  poweredBy: "text-[0.8125rem] tracking-[-0.01em]",
+/** The type size the wordmark stands in for; the logotype box is 0.74 of it. */
+const WORD_PX: Record<LogoSize, number> = {
+  nav: 17,
+  footer: 15,
+  poweredBy: 13,
 };
 
 export function ReviewBoostLogo({
@@ -62,25 +63,14 @@ export function ReviewBoostLogo({
       {pose === "mark" ? (
         <span className="sr-only">ReviewBoost</span>
       ) : (
-        /* Two-tone, as the approved lockup sets it: "Review" in ink, "Boost" in
-           green. One <span> in a single colour was not the wordmark.
-           `aria-hidden` on the halves with a single readable label keeps a
-           screen reader from announcing it as two words.
-
-           The green here is the ACTION green (#007A4D), not the brand green
-           (#00A86B), and that is deliberate. A logotype rendered as an image is
-           exempt from WCAG contrast; this is live text, which is not. Brand
-           green on white measures 3.08:1 — below the 4.5:1 floor for normal
-           text, and the "Powered by ReviewBoost" footer sets it at 13px. The
-           action green measures 5.4:1 on white and 4.96:1 on the warm canvas.
-           The mark itself keeps the brand green, because a graphic may. */
-        <span className={cn("font-semibold", WORD[size])}>
+        /* The logotype, as Branding/Logo.svg sets it: "Review" in the
+           surface's ink, "Boost" in the one brand green. Drawn from the
+           outlined wordmark (see wordmark.tsx), with one readable name for
+           assistive tech. */
+        <>
           <span className="sr-only">ReviewBoost</span>
-          <span aria-hidden="true">Review</span>
-          <span aria-hidden="true" className="text-[color:var(--rb-action)]">
-            Boost
-          </span>
-        </span>
+          <Wordmark height={WORD_PX[size] * 0.74} />
+        </>
       )}
     </span>
   );

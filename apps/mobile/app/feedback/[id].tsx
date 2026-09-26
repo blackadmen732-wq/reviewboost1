@@ -52,7 +52,7 @@ export default function FeedbackDetailScreen() {
         {error ? (
           <View style={styles.centered}>
             <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retryButton} onPress={load}>
+            <Pressable style={styles.retryButton} onPress={load} accessibilityRole="button">
               <Text style={styles.retryText}>Retry</Text>
             </Pressable>
           </View>

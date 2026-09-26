@@ -84,12 +84,16 @@ export function accountView(
       // Still serving. A failed card does not close the door, and telling an
       // owner their Tags are dead would send them to replace hardware that is
       // fine.
+      //
+      // States the fact and stops. This app is a free companion to a plan
+      // bought on the web, and App Store 3.1.3(f) holds only while the app
+      // neither sells nor points at where to pay — "update your card on the
+      // web" was that pointer.
       return {
         kind: "ready",
         planName,
         statusTitle: "Payment failed",
-        statusBody:
-          "Your Tags are still working. Update your card on the web to keep it that way.",
+        statusBody: "Your Tags are still working.",
         needsAttention: true,
         serving: true,
       };
@@ -98,8 +102,8 @@ export function accountView(
         kind: "ready",
         planName,
         statusTitle: "Cancelled",
-        statusBody:
-          "Your Tags are not serving customers. Nothing has been deleted — the same Tags work again when you subscribe.",
+        // No "when you subscribe": the same 3.1.3(f) line as past_due.
+        statusBody: "Your Tags are not serving customers. Nothing has been deleted.",
         needsAttention: true,
         serving: false,
       };
