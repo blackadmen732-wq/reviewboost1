@@ -1,26 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { NfcCard } from "@/features/tags/nfc-card";
-import { ReaderIndicator, SuccessCheck } from "@/features/tags/nfc-visuals";
+import { NfcSheetView } from "@/features/tags/nfc-sheet-view";
 import {
   DONE_DWELL_MS,
-  isWorking,
+  failureCopy,
   NFC_SCENE_COPY,
   sceneForPhase,
+  tagDetected,
+  webFailureFromError,
+  writingCopy,
+  type NfcFailure,
+  type SceneCopy,
 } from "@/lib/owner/nfc-presentation";
-import {
-  programFailureMessage,
-  type ProgramPhase,
-  type TagContents,
-} from "@/lib/owner/nfc-phases";
+import type { ProgramPhase, TagContents } from "@/lib/owner/nfc-phases";
 import { classifyTagContents, type ReadRecord } from "@/lib/owner/nfc-read";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /** How long to wait for the chip to announce itself before giving up on a read. */
 const READ_TIMEOUT_MS = 4_000;
+
+/**
+ * Web NFC exists only in Chrome on Android, so on the web the reader is always
+ * somewhere on the back of the phone. The iPhone wording lives in the app.
+ */
+const PLATFORM = "android" as const;
+
+/** A run that the owner cancelled, or that a newer run replaced. */
+class Superseded extends Error {}
 
 /**
  * Write the Tag, then record that it was written — and never confuse the two.
@@ -37,6 +45,9 @@ const READ_TIMEOUT_MS = 4_000;
  * discarded, so a chip that was written while the network was down still showed
  * "Tag ready" — and then the Tag list kept saying it needed NFC, with no way to
  * reconcile the two except by rewriting a chip that was already correct.
+ *
+ * On screen all of that is one action: ready, writing, then success or an
+ * error — with two interruptions only where a person has to decide.
  */
 export function ProgramTagSheet({
   standId,
@@ -49,14 +60,49 @@ export function ProgramTagSheet({
   onClose: () => void;
   onReady: () => void;
 }) {
-  // Opens on the start scene, not mid-operation. Web NFC will only scan or
+  // Opens on the ready scene, not mid-operation. Web NFC will only scan or
   // write inside a user gesture, so the first tap has to come from the owner —
   // and a sheet that opens already saying "hold it there" is describing
   // something that has not begun.
   const [phase, setPhase] = useState<ProgramPhase>("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<NfcFailure | null>(null);
+  const [partialSignedOut, setPartialSignedOut] = useState(false);
   const [standUrl, setStandUrl] = useState<string | null>(null);
   const [existing, setExisting] = useState<TagContents | null>(null);
+
+  /**
+   * The run in flight. Cancelling aborts its scan and makes every later step of
+   * it a no-op — above all the write. Closing the sheet used to leave the scan
+   * running underneath, so a Tag brought near the phone afterwards could still
+   * be written by a run the owner had already walked away from.
+   */
+  const run = useRef<AbortController | null>(null);
+
+  const begin = useCallback((): AbortController => {
+    run.current?.abort();
+    const controller = new AbortController();
+    run.current = controller;
+    return controller;
+  }, []);
+
+  const guard = useCallback((controller: AbortController) => {
+    if (controller.signal.aborted || run.current !== controller) throw new Superseded();
+  }, []);
+
+  const fail = useCallback((next: NfcFailure) => {
+    setFailure(next);
+    setPhase("failed");
+  }, []);
+
+  const close = useCallback(() => {
+    run.current?.abort();
+    run.current = null;
+    setPhase("idle");
+    setFailure(null);
+    setExisting(null);
+    setPartialSignedOut(false);
+    onClose();
+  }, [onClose]);
 
   const accessToken = useCallback(async (): Promise<string | null> => {
     const {
@@ -90,199 +136,195 @@ export function ProgramTagSheet({
     [standId],
   );
 
+  /** Confirmed, or written-but-unrecorded. Never a reason to write again. */
+  const settle = useCallback(
+    async (controller: AbortController, token: string) => {
+      setPhase("checking");
+      const confirmed = await confirmWithServer(token);
+      guard(controller);
+      if (confirmed) {
+        setPhase("ready");
+        onReady();
+      } else {
+        setPhase("unconfirmed");
+      }
+    },
+    [confirmWithServer, guard, onReady],
+  );
+
   /** Retry only the server half. The chip is already correct. */
   const retryConfirmation = useCallback(async () => {
-    setError(null);
-    setPhase("checking");
-
-    const token = await accessToken();
-    if (!token) {
-      setPhase("unconfirmed");
-      setError("Please sign in again, then retry. Your Tag is already programmed.");
-      return;
+    const controller = begin();
+    setPartialSignedOut(false);
+    try {
+      setPhase("checking");
+      const token = await accessToken();
+      guard(controller);
+      if (!token) {
+        setPartialSignedOut(true);
+        setPhase("unconfirmed");
+        return;
+      }
+      await settle(controller, token);
+    } catch (caught) {
+      if (!(caught instanceof Superseded)) throw caught;
     }
-
-    if (await confirmWithServer(token)) {
-      setPhase("ready");
-      onReady();
-      return;
-    }
-    setPhase("unconfirmed");
-  }, [accessToken, confirmWithServer, onReady]);
+  }, [accessToken, begin, guard, settle]);
 
   /**
    * Write the URL, then confirm. Called only once the contents are known and,
    * where they were not blank, the owner has agreed to replace them.
    */
   const writeAndConfirm = useCallback(
-    async (url: string, token: string) => {
+    async (controller: AbortController, url: string, token: string) => {
+      guard(controller);
       setPhase("programming");
       try {
         // @ts-expect-error Web NFC is not in lib.dom yet.
         const ndef = new NDEFReader();
-        await ndef.write({ records: [{ recordType: "url", data: url }] });
+        await ndef.write(
+          { records: [{ recordType: "url", data: url }] },
+          { signal: controller.signal },
+        );
       } catch (caught) {
-        setPhase("failed");
-        setError(programFailureMessage(caught));
+        guard(controller);
+        fail(webFailureFromError(caught, "write"));
         return;
       }
 
       // Past this line the chip is correct whatever happens next, so no failure
       // below may send the owner back to writing it again.
-      setPhase("checking");
-      if (await confirmWithServer(token)) {
-        setPhase("ready");
-        onReady();
-        return;
-      }
-      setPhase("unconfirmed");
+      await settle(controller, token);
     },
-    [confirmWithServer, onReady],
+    [fail, guard, settle],
   );
 
   /** Owner saw what was on the chip and chose to replace it. */
   const overwrite = useCallback(async () => {
-    const token = await accessToken();
-    if (!standUrl || !token) {
-      setPhase("failed");
-      setError("Please sign in again.");
-      return;
+    const controller = begin();
+    try {
+      const token = await accessToken();
+      guard(controller);
+      if (!standUrl || !token) {
+        fail("signed-out");
+        return;
+      }
+      await writeAndConfirm(controller, standUrl, token);
+    } catch (caught) {
+      if (!(caught instanceof Superseded)) throw caught;
     }
-    await writeAndConfirm(standUrl, token);
-  }, [accessToken, standUrl, writeAndConfirm]);
+  }, [accessToken, begin, fail, guard, standUrl, writeAndConfirm]);
 
-  const run = useCallback(async () => {
-    setError(null);
+  const program = useCallback(async () => {
+    const controller = begin();
+    setFailure(null);
     setExisting(null);
     setPhase("looking");
 
-    const token = await accessToken();
-    if (!token) {
-      setPhase("failed");
-      setError("Please sign in again.");
-      return;
-    }
-
-    let url: string;
     try {
-      const res = await fetch(`/api/v1/review-stands/${standId}/qr?format=json`, {
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: "omit",
-      });
-      if (!res.ok) throw new Error("url");
-      const json = (await res.json()) as { data?: { standUrl?: string } };
-      if (!json.data?.standUrl) throw new Error("url");
-      url = json.data.standUrl;
-      setStandUrl(url);
-    } catch (caught) {
-      setPhase("failed");
-      setError(programFailureMessage(caught));
-      return;
-    }
-
-    if (!("NDEFReader" in window)) {
-      setPhase("failed");
-      setError("This phone cannot program a Tag. Use the ReviewBoost app, or Chrome on Android.");
-      return;
-    }
-
-    // Read first, always.
-    setPhase("reading");
-    const contents = await readTag(url);
-    setExisting(contents);
-
-    if (contents.kind === "ours") {
-      // Already pointing here. Writing again would burn a write cycle and risk
-      // corrupting a chip that is correct; only the server record is missing.
-      setPhase("already");
-      if (await confirmWithServer(token)) {
-        setPhase("ready");
-        onReady();
-      } else {
-        setPhase("unconfirmed");
+      const token = await accessToken();
+      guard(controller);
+      if (!token) {
+        fail("signed-out");
+        return;
       }
-      return;
-    }
 
-    if (contents.kind === "unreadable") {
-      setPhase("failed");
-      setError(
-        "This Tag could not be read, so nothing was written to it. It may be locked, or held too briefly. Try again, or use a Tag you know is blank.",
-      );
-      return;
-    }
+      let url: string;
+      try {
+        const res = await fetch(`/api/v1/review-stands/${standId}/qr?format=json`, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "omit",
+        });
+        guard(controller);
+        if (res.status === 401) {
+          fail("signed-out");
+          return;
+        }
+        if (!res.ok) throw new Error("url");
+        const json = (await res.json()) as { data?: { standUrl?: string } };
+        if (!json.data?.standUrl) throw new Error("url");
+        url = json.data.standUrl;
+        setStandUrl(url);
+      } catch (caught) {
+        if (caught instanceof Superseded) throw caught;
+        fail("network");
+        return;
+      }
 
-    if (contents.kind === "other") {
-      setPhase("conflict");
-      return;
-    }
+      if (!("NDEFReader" in window)) {
+        fail("unsupported");
+        return;
+      }
 
-    await writeAndConfirm(url, token);
-  }, [accessToken, confirmWithServer, onReady, standId, writeAndConfirm]);
+      // Read first, always.
+      setPhase("reading");
+      const read = await readTag(url, controller.signal);
+      guard(controller);
+      setExisting(read.contents);
+
+      if (read.contents.kind === "ours") {
+        // Already pointing here. Writing again would burn a write cycle and
+        // risk corrupting a chip that is correct; only the record is missing.
+        setPhase("already");
+        await settle(controller, token);
+        return;
+      }
+
+      if (read.contents.kind === "unreadable") {
+        // Unreadable is not blank: it might be empty, or somebody's door key,
+        // or locked. It is never written blind.
+        fail(read.failure ?? "unreadable");
+        return;
+      }
+
+      if (read.contents.kind === "other") {
+        setPhase("conflict");
+        return;
+      }
+
+      setPhase("found");
+      await writeAndConfirm(controller, url, token);
+    } catch (caught) {
+      if (!(caught instanceof Superseded)) throw caught;
+    }
+  }, [accessToken, begin, fail, guard, settle, standId, writeAndConfirm]);
 
   // The success scene closes itself. Nobody should have to dismiss a green
   // check, and leaving it up invites a second, pointless programming run.
+  const scene = sceneForPhase(phase);
   useEffect(() => {
-    if (sceneForPhase(phase) !== "done") return undefined;
-    const timer = setTimeout(() => onClose(), DONE_DWELL_MS);
+    if (scene !== "success") return undefined;
+    const timer = setTimeout(close, DONE_DWELL_MS);
     return () => clearTimeout(timer);
-  }, [phase, onClose]);
+  }, [scene, close]);
 
   if (!open) return null;
 
-  const scene = sceneForPhase(phase);
-  const copy = NFC_SCENE_COPY[scene];
-  const working = isWorking(scene);
-
-  // The one place a description of what was found is worth showing, because the
-  // owner is about to erase it.
-  const body =
-    scene === "conflict" && existing?.kind === "other"
-      ? `This Tag already has ${existing.description} on it. Replacing it will erase what is there.`
-      : scene === "unreadable" && error
-        ? error
-        : copy.body;
+  const copy: SceneCopy =
+    scene === "writing"
+      ? writingCopy(tagDetected(phase), PLATFORM)
+      : scene === "error"
+        ? failureCopy(failure)
+        : scene === "conflict" && existing?.kind === "other"
+          ? // The one place a description of what was found is worth showing,
+            // because the owner is about to erase it.
+            {
+              ...NFC_SCENE_COPY.conflict,
+              body: `This Tag already has ${existing.description} on it. Replacing it will erase what is there.`,
+            }
+          : scene === "partial" && partialSignedOut
+            ? { ...NFC_SCENE_COPY.partial, body: "Sign in again, then finish setup. Your Tag already works." }
+            : NFC_SCENE_COPY[scene];
 
   const primary =
     scene === "conflict"
       ? () => void overwrite()
       : scene === "partial"
         ? () => void retryConfirmation()
-        : () => void run();
+        : () => void program();
 
   return (
-    <div className="nfc-sheet" role="dialog" aria-modal="true" aria-labelledby="nfc-title">
-      <div className="nfc-sheet__panel" data-nfc-phase={phase} data-nfc-scene={scene}>
-        <NfcCard working={working} status={working ? "READY TO SCAN" : "NFC TAG"} />
-
-        <div className="nfc-sheet__stage">
-          {scene === "done" ? <SuccessCheck /> : null}
-          {working ? <ReaderIndicator /> : null}
-
-          <p className="nfc-sheet__title" id="nfc-title" aria-live="polite">
-            {copy.title}
-          </p>
-          {body ? <p className="nfc-sheet__body">{body}</p> : null}
-        </div>
-
-        {/* The success scene has no controls at all — it is finished, and it
-            leaves on its own. Everywhere else, one obvious action. */}
-        {scene === "done" ? null : (
-          <div className="nfc-sheet__actions">
-            {copy.action ? (
-              <Button variant="action" size="lg" onClick={primary}>
-                {copy.action}
-              </Button>
-            ) : null}
-            {copy.dismiss ? (
-              <Button variant="secondary" size="lg" onClick={onClose}>
-                {copy.dismiss}
-              </Button>
-            ) : null}
-          </div>
-        )}
-      </div>
-    </div>
+    <NfcSheetView scene={scene} phase={phase} copy={copy} onPrimary={primary} onDismiss={close} />
   );
 }
 
@@ -294,16 +336,23 @@ export function ProgramTagSheet({
  * because the difference between "nothing is on it" and "we did not find out"
  * is the difference between a safe write and destroying someone's data.
  */
-async function readTag(standUrl: string): Promise<TagContents> {
+async function readTag(
+  standUrl: string,
+  signal: AbortSignal,
+): Promise<{ contents: TagContents; failure?: NfcFailure }> {
   try {
     // @ts-expect-error Web NFC is not in lib.dom yet.
     const reader = new NDEFReader();
     const controller = new AbortController();
+    const stop = () => controller.abort();
+    signal.addEventListener("abort", stop, { once: true });
 
-    const records = await new Promise<ReadRecord[] | null>((resolve) => {
+    const outcome = await new Promise<
+      { records: ReadRecord[] } | { failure: NfcFailure }
+    >((resolve) => {
       const timer = setTimeout(() => {
         controller.abort();
-        resolve(null);
+        resolve({ failure: "timeout" });
       }, READ_TIMEOUT_MS);
 
       reader.addEventListener(
@@ -311,7 +360,7 @@ async function readTag(standUrl: string): Promise<TagContents> {
         (event: { message?: { records?: Array<{ recordType: string; data?: BufferSource; encoding?: string }> } }) => {
           clearTimeout(timer);
           const found = event.message?.records ?? [];
-          resolve(found.map(decodeRecord));
+          resolve({ records: found.map(decodeRecord) });
           controller.abort();
         },
         { once: true },
@@ -321,21 +370,26 @@ async function readTag(standUrl: string): Promise<TagContents> {
         "readingerror",
         () => {
           clearTimeout(timer);
-          resolve(null);
+          resolve({ failure: "unreadable" });
           controller.abort();
         },
         { once: true },
       );
 
-      reader.scan({ signal: controller.signal }).catch(() => {
+      Promise.resolve(reader.scan({ signal: controller.signal })).catch((caught: unknown) => {
         clearTimeout(timer);
-        resolve(null);
+        resolve({ failure: webFailureFromError(caught, "read") });
       });
     });
 
-    return classifyTagContents(records ?? [], standUrl, records !== null);
-  } catch {
-    return { kind: "unreadable" };
+    signal.removeEventListener("abort", stop);
+
+    if ("failure" in outcome) {
+      return { contents: { kind: "unreadable" }, failure: outcome.failure };
+    }
+    return { contents: classifyTagContents(outcome.records, standUrl, true) };
+  } catch (caught) {
+    return { contents: { kind: "unreadable" }, failure: webFailureFromError(caught, "read") };
   }
 }
 

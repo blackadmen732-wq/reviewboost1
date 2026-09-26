@@ -15,21 +15,29 @@ import * as Linking from "expo-linking";
 import { useAuth } from "@/data/auth-context";
 import { apiFetch } from "@/data/api";
 import { colors, radii, fonts } from "@/theme";
+import { NfcProgramSheet } from "@/components/nfc-program-sheet";
 import {
   DONE_DWELL_MS,
+  failureCopy,
+  HOLD_HINT,
   NFC_SCENE_COPY,
   sceneForWriteState,
+  tagDetected,
+  writingCopy,
+  type NfcFailure,
+  type NfcPlatform,
+  type SceneCopy,
+  type WriteState,
 } from "@/lib/nfc-scenes";
 import {
-  isNfcSupported,
-  isNfcEnabled,
-  initNfc,
-  readExistingNfcContent,
-  writeNfcTag,
   cancelNfcRequest,
+  initNfc,
+  isNfcEnabled,
+  isNfcSupported,
+  programTag,
 } from "@/lib/nfc";
 
-type WriteState = "idle" | "checking" | "confirm-overwrite" | "writing" | "verifying" | "success" | "partial" | "error";
+const PLATFORM: NfcPlatform = Platform.OS === "ios" ? "ios" : "android";
 
 export default function StandDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,10 +53,18 @@ export default function StandDetailScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const [nfcSupported, setNfcSupported] = useState<boolean | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [writeState, setWriteState] = useState<WriteState>("idle");
-  const [writeError, setWriteError] = useState<string | null>(null);
-  const [existingContentDesc, setExistingContentDesc] = useState<string | null>(null);
-  const cancelledRef = useRef(false);
+  const [failure, setFailure] = useState<NfcFailure | null>(null);
+  const [conflict, setConflict] = useState<{ description: string; tagId: string | null } | null>(
+    null,
+  );
+  /**
+   * Which run is current. Every await checks it, so a run the owner cancelled
+   * — or one a newer run replaced — can never move the screen, or reach the
+   * write, after the fact.
+   */
+  const runRef = useRef(0);
 
   useEffect(() => {
     if (!orgId || !id) return;
@@ -84,145 +100,139 @@ export default function StandDetailScreen() {
     })();
   }, []);
 
-  const retryServerRecord = useCallback(async () => {
-    if (!orgId || !id) return;
-    setWriteState("verifying");
-    try {
-      await apiFetch(`/api/v1/review-stands/${id}/nfc-provision`, orgId, {
-        method: "POST",
-        body: "{}",
-      });
-      if (cancelledRef.current) return;
-      setWriteState("success");
-    } catch {
-      if (cancelledRef.current) return;
-      setWriteState("partial");
-    }
-  }, [orgId, id]);
-
-  const handleWriteNfc = useCallback(async (skipContentCheck = false) => {
-    if (!standUrl || !canProvision) return;
-
-    cancelledRef.current = false;
-    setWriteState("checking");
-    setWriteError(null);
-    setExistingContentDesc(null);
-
-    const supported = await isNfcSupported();
-    if (cancelledRef.current) return;
-    if (!supported) {
-      setWriteState("error");
-      setWriteError("NFC is not supported on this device.");
-      return;
-    }
-
-    const enabled = await isNfcEnabled();
-    if (cancelledRef.current) return;
-    if (!enabled) {
-      setWriteState("error");
-      setWriteError("NFC is turned off. Enable it in Settings.");
-      return;
-    }
-
-    // Check existing content before writing
-    if (!skipContentCheck) {
-      try {
-        const existing = await readExistingNfcContent(standUrl);
-        if (cancelledRef.current) return;
-
-        if (existing.existingContent === "same-url") {
-          if (orgId) {
-            try {
-              await apiFetch(`/api/v1/review-stands/${id}/nfc-provision`, orgId, {
-                method: "POST",
-                body: "{}",
-              });
-            } catch {
-              if (cancelledRef.current) return;
-              setWriteState("partial");
-              return;
-            }
-          }
-          if (cancelledRef.current) return;
-          setWriteState("success");
-          return;
-        }
-
-        if (existing.existingContent === "different") {
-          setExistingContentDesc(existing.description ?? "Unknown content");
-          setWriteState("confirm-overwrite");
-          return;
-        }
-      } catch {
-        if (cancelledRef.current) return;
-        setWriteState("error");
-        setWriteError(
-          "ReviewBoost couldn't safely read this tag. Try again or use a blank NFC tag.",
-        );
-        return;
-      }
-    }
-
-    setWriteState("writing");
-
-    const result = await writeNfcTag(standUrl);
-    if (cancelledRef.current) return;
-
-    if (!result.success) {
-      setWriteState("error");
-      setWriteError(result.error ?? "NFC write failed.");
-      return;
-    }
-
-    if (!result.verified) {
-      setWriteState("error");
-      setWriteError(
-        "Tag was written but verification could not confirm the contents. Please tap the tag with your phone to check it works, then try again.",
-      );
-      return;
-    }
-
-    // Record provisioning on the server
-    if (orgId) {
+  /**
+   * Tell ReviewBoost the Tag is programmed. Separate from the write, so a
+   * failure here is retried on its own: the chip is already correct, and
+   * retrying must never mean writing to it again.
+   */
+  const recordWithServer = useCallback(
+    async (run: number) => {
+      if (!orgId || !id) return;
+      setWriteState("verifying");
       try {
         await apiFetch(`/api/v1/review-stands/${id}/nfc-provision`, orgId, {
           method: "POST",
           body: "{}",
         });
+        if (run !== runRef.current) return;
+        setWriteState("success");
       } catch {
-        if (cancelledRef.current) return;
+        if (run !== runRef.current) return;
         setWriteState("partial");
+      }
+    },
+    [orgId, id],
+  );
+
+  const retryServerRecord = useCallback(() => {
+    const run = ++runRef.current;
+    void recordWithServer(run);
+  }, [recordWithServer]);
+
+  /**
+   * One press, one operation: read, decide, write, read back, record. The
+   * owner sees Writing throughout; only a Tag that already carries something
+   * stops to ask, and `replace` is how their answer comes back in.
+   */
+  const program = useCallback(
+    async (replace: { tagId: string | null; description: string } | null) => {
+      if (!standUrl || !canProvision) return;
+      const run = ++runRef.current;
+      const stale = () => run !== runRef.current;
+
+      setFailure(null);
+      setWriteState("checking");
+
+      if (!(await isNfcSupported())) {
+        if (stale()) return;
+        setFailure("unsupported");
+        setWriteState("error");
         return;
       }
-    }
+      if (!(await isNfcEnabled())) {
+        if (stale()) return;
+        setFailure("nfc-off");
+        setWriteState("error");
+        return;
+      }
+      if (stale()) return;
 
-    if (cancelledRef.current) return;
-    setWriteState("success");
-  }, [standUrl, canProvision, orgId, id]);
+      const outcome = await programTag(standUrl, {
+        platform: PLATFORM,
+        alertMessage: HOLD_HINT[PLATFORM],
+        replace,
+        onDetected: () => {
+          if (!stale()) setWriteState("writing");
+        },
+      });
+      if (stale()) return;
+
+      switch (outcome.kind) {
+        case "cancelled":
+          // The owner closed the iPhone's own sheet: back to Ready, not an error.
+          setWriteState("idle");
+          return;
+        case "conflict":
+          setConflict({ description: outcome.description, tagId: outcome.tagId });
+          setWriteState("confirm-overwrite");
+          return;
+        case "failed":
+          setFailure(outcome.failure);
+          setWriteState("error");
+          return;
+        case "already":
+        case "written":
+          // Past this point the chip is correct whatever happens next.
+          await recordWithServer(run);
+          return;
+      }
+    },
+    [standUrl, canProvision, recordWithServer],
+  );
+
+  const closeSheet = useCallback(() => {
+    runRef.current += 1;
+    void cancelNfcRequest();
+    setSheetOpen(false);
+    setWriteState("idle");
+    setFailure(null);
+    setConflict(null);
+  }, []);
 
   useEffect(() => {
     return () => {
-      cancelNfcRequest();
+      runRef.current += 1;
+      void cancelNfcRequest();
     };
   }, []);
 
   const scene = sceneForWriteState(writeState);
-  const sceneCopy = NFC_SCENE_COPY[scene];
-  // The one place the existing contents are worth naming: the owner is about
-  // to erase them.
-  const sceneBody =
-    scene === "conflict" && existingContentDesc
-      ? `This Tag already has ${existingContentDesc} on it. Replacing it will erase what is there.`
-      : scene === "unreadable" && writeError
-        ? writeError
-        : sceneCopy.body;
+  const sceneCopy: SceneCopy =
+    scene === "writing"
+      ? writingCopy(tagDetected(writeState), PLATFORM)
+      : scene === "error"
+        ? failureCopy(failure)
+        : scene === "conflict" && conflict
+          ? // The one place the existing contents are worth naming: the owner
+            // is about to erase them.
+            {
+              ...NFC_SCENE_COPY.conflict,
+              body: `This Tag already has ${conflict.description} on it. Replacing it will erase what is there.`,
+            }
+          : NFC_SCENE_COPY[scene];
 
-  // Success closes itself, the way the web sheet does.
+  const onPrimary = useCallback(() => {
+    if (scene === "conflict") void program(conflict);
+    else if (scene === "partial") retryServerRecord();
+    else void program(null);
+  }, [conflict, program, retryServerRecord, scene]);
+
+  // Success closes itself, the way the web sheet does, back to Tag detail.
   useEffect(() => {
-    if (scene !== "done") return undefined;
-    const timer = setTimeout(() => setWriteState("idle"), DONE_DWELL_MS);
+    if (scene !== "success") return undefined;
+    const timer = setTimeout(closeSheet, DONE_DWELL_MS);
     return () => clearTimeout(timer);
-  }, [scene]);
+  }, [scene, closeSheet]);
 
   if (loading) {
     return (
@@ -243,66 +253,33 @@ export default function StandDetailScreen() {
           </View>
         ) : null}
 
-        {/* Programming a Tag.
-            One visible operation. The machine underneath still checks the chip,
-            refuses an unreadable one, writes, verifies and records — but
-            "Checking NFC and reading tag…", "Hold your phone to the NFC tag…"
-            and "Verifying…" were three screens for something the owner
-            experiences as holding a Tag against a phone until it says Done. */}
+        {/* Programming a Tag. The button only opens the sheet: scanning
+            starts when the owner presses Program NFC inside it, holding the
+            Tag, and not a moment before. */}
         {Platform.OS !== "web" && nfcSupported && canProvision && (
-          <View style={styles.nfcStage}>
-            {scene === "done" ? (
-              <View style={styles.checkWrap}>
-                <Text style={styles.check}>✓</Text>
-              </View>
-            ) : null}
-
-            <Text style={styles.nfcTitle}>{sceneCopy.title}</Text>
-            {sceneBody ? <Text style={styles.nfcBody}>{sceneBody}</Text> : null}
-
-            {scene === "waiting" ? (
-              <ActivityIndicator
-                size="large"
-                color={colors.brandText}
-                style={{ marginTop: 20 }}
-              />
-            ) : null}
-
-            {/* The success scene has no controls. It is finished, and it leaves
-                on its own — a button there is one more decision after the work
-                is done, and an invitation to program the same Tag twice. */}
-            {scene !== "done" && sceneCopy.action ? (
-              <Pressable
-                style={[styles.nfcButton, { marginTop: 20 }]}
-                disabled={!standUrl}
-                onPress={() => {
-                  if (scene === "conflict") void handleWriteNfc(true);
-                  else if (scene === "partial") void retryServerRecord();
-                  else void handleWriteNfc();
-                }}
-              >
-                <Text style={styles.nfcButtonText}>{sceneCopy.action}</Text>
-              </Pressable>
-            ) : null}
-
-            {scene !== "done" && sceneCopy.dismiss ? (
-              <Pressable
-                style={[styles.nfcButton, styles.cancelButton, { marginTop: 8 }]}
-                onPress={() => {
-                  if (scene === "waiting") {
-                    cancelledRef.current = true;
-                    cancelNfcRequest();
-                  }
-                  setWriteState("idle");
-                }}
-              >
-                <Text style={[styles.nfcButtonText, { color: colors.danger }]}>
-                  {sceneCopy.dismiss}
-                </Text>
-              </Pressable>
-            ) : null}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>NFC</Text>
+            <Text style={styles.sectionDesc}>
+              Program the chip so customers can tap the Tag instead of scanning it.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.nfcButton}
+              disabled={!standUrl}
+              onPress={() => setSheetOpen(true)}
+            >
+              <Text style={styles.nfcButtonText}>Program NFC</Text>
+            </Pressable>
           </View>
         )}
+
+        <NfcProgramSheet
+          visible={sheetOpen}
+          scene={scene}
+          copy={sceneCopy}
+          onPrimary={onPrimary}
+          onDismiss={closeSheet}
+        />
 
         {Platform.OS !== "web" && nfcSupported === false && (
           <View style={styles.section}>
@@ -379,46 +356,6 @@ export default function StandDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  // The programming stage. One centred column so nothing competes with the
-  // Tag the owner is holding against the phone.
-  nfcStage: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 36,
-    paddingHorizontal: 20,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    gap: 6,
-  },
-  checkWrap: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 6,
-    borderColor: colors.success,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  check: {
-    fontSize: 52,
-    lineHeight: 58,
-    color: colors.success,
-    fontWeight: "700",
-  },
-  nfcTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.ink,
-    textAlign: "center",
-  },
-  nfcBody: {
-    fontSize: 15,
-    color: colors.inkMuted,
-    textAlign: "center",
-    maxWidth: 280,
-    marginTop: 4,
-  },
   container: { flex: 1, backgroundColor: colors.canvas },
   center: {
     flex: 1,
@@ -457,12 +394,6 @@ const styles = StyleSheet.create({
     color: colors.onBrand,
     fontSize: 16,
     ...fonts.subheading,
-  },
-  cancelButton: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.dangerBorder,
-    marginTop: 12,
   },
   errorBanner: {
     backgroundColor: colors.dangerBg,

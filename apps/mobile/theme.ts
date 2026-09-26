@@ -9,9 +9,9 @@ export const colors = {
   actionPressed: "#005b39",
   onAction: "#ffffff",
 
-  canvas: "#f8f5f0",
+  canvas: "#F6F7F5",
   surface: "#FFFFFF",
-  surfaceAlt: "#F2EFE9",
+  surfaceAlt: "#F0F2F0",
 
   ink: "#171A18",
   inkMuted: "#5D655F",

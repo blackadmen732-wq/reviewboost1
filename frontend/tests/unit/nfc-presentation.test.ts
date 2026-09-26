@@ -1,14 +1,24 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  failureCopy,
+  HOLD_HINT,
   isWorking,
+  NFC_FAILURE_COPY,
   NFC_SCENE_COPY,
+  NOTHING_CHANGED,
   sceneForPhase,
+  tagDetected,
+  webFailureFromError,
+  writingCopy,
+  type NfcFailure,
   type NfcScene,
 } from "@/lib/owner/nfc-presentation";
 import { PROGRAM_PHASE_COPY, type ProgramPhase } from "@/lib/owner/nfc-phases";
 
 const ALL_PHASES = Object.keys(PROGRAM_PHASE_COPY) as ProgramPhase[];
+const ALL_SCENES: NfcScene[] = ["ready", "writing", "success", "error", "conflict", "partial"];
+const ALL_FAILURES = Object.keys(NFC_FAILURE_COPY) as NfcFailure[];
 
 /**
  * Programming a Tag is one action to the person doing it.
@@ -18,34 +28,28 @@ const ALL_PHASES = Object.keys(PROGRAM_PHASE_COPY) as ProgramPhase[];
  * sequence turned holding a sticker near a phone into something that looked
  * like a firmware update, and invited the owner to intervene mid-write.
  */
-describe("the machine's phases collapse into one owner-visible operation", () => {
-  const WORKING: ProgramPhase[] = [
-    "hold",
-    "looking",
-    "reading",
-    "found",
-    "programming",
-    "checking",
-  ];
+describe("the machine's phases collapse into four owner-visible states", () => {
+  const WORKING: ProgramPhase[] = ["hold", "looking", "reading", "found", "programming", "checking"];
 
-  it("shows a single waiting scene for every step of the work", () => {
+  it("shows a single writing scene for every step of the work", () => {
     for (const phase of WORKING) {
-      expect(sceneForPhase(phase), `${phase} should not be its own screen`).toBe("waiting");
+      expect(sceneForPhase(phase), `${phase} should not be its own screen`).toBe("writing");
     }
-    // The decisive assertion: the owner cannot tell these apart, because to
-    // them there is nothing to tell apart.
     expect(new Set(WORKING.map(sceneForPhase)).size).toBe(1);
   });
 
-  it("treats a Tag that already pointed here as simply done", () => {
-    // No rewrite happened, and the owner has no use for that distinction.
-    expect(sceneForPhase("already")).toBe("done");
-    expect(sceneForPhase("ready")).toBe("done");
+  it("is ready → writing → success or error on the normal path", () => {
+    expect(sceneForPhase("idle")).toBe("ready");
+    expect(sceneForPhase("ready")).toBe("success");
+    expect(sceneForPhase("failed")).toBe("error");
   });
 
-  it("interrupts only where a person actually has to decide", () => {
+  it("treats a Tag that already pointed here as simply ready", () => {
+    expect(sceneForPhase("already")).toBe("success");
+  });
+
+  it("keeps the two exceptions where a person has to decide", () => {
     expect(sceneForPhase("conflict")).toBe("conflict");
-    expect(sceneForPhase("failed")).toBe("unreadable");
     expect(sceneForPhase("unconfirmed")).toBe("partial");
   });
 
@@ -55,49 +59,70 @@ describe("the machine's phases collapse into one owner-visible operation", () =>
     }
   });
 
-  it("marks only the waiting scene as live", () => {
-    const scenes: NfcScene[] = ["start", "waiting", "done", "conflict", "unreadable", "partial"];
-    expect(scenes.filter(isWorking)).toEqual(["waiting"]);
+  it("marks only the writing scene as live", () => {
+    expect(ALL_SCENES.filter(isWorking)).toEqual(["writing"]);
+  });
+
+  it("changes the words, not the screen, once the Tag is found", () => {
+    expect(tagDetected("looking")).toBe(false);
+    expect(tagDetected("reading")).toBe(false);
+    expect(tagDetected("programming")).toBe(true);
+    expect(writingCopy(false, "android").title).toBe("Hold near your Tag");
+    expect(writingCopy(true, "android").title).toBe("Writing Tag…");
+    expect(writingCopy(true, "android").body).toBe("Keep it there while ReviewBoost programs it.");
+  });
+
+  it("tells each phone where its reader is, without assuming Android's", () => {
+    expect(writingCopy(false, "ios").body).toBe("Hold the top of your iPhone near the Tag.");
+    expect(HOLD_HINT.android).not.toMatch(/top|iphone/i);
+    expect(HOLD_HINT.android).toMatch(/back/i);
   });
 });
 
 describe("the copy is for a business owner, not an engineer", () => {
   const TECHNICAL = [
     "NDEF", "RPC", "token", "provision", "endpoint", "payload",
-    "record", "API", "HTTP", "database", "server",
+    "record", "API", "HTTP", "database", "server", "verify",
   ];
 
+  function allCopy(): Array<[string, string]> {
+    const scenes = ALL_SCENES.map((scene): [string, string] => {
+      const copy = NFC_SCENE_COPY[scene];
+      return [scene, [copy.title, copy.body, copy.action, copy.dismiss].filter(Boolean).join(" ")];
+    });
+    const failures = ALL_FAILURES.map((failure): [string, string] => {
+      const copy = failureCopy(failure);
+      return [failure, [copy.title, copy.body, copy.action, copy.dismiss].filter(Boolean).join(" ")];
+    });
+    return [...scenes, ...failures, ["hint", Object.values(HOLD_HINT).join(" ")]];
+  }
+
   it("names no internal machinery anywhere on screen", () => {
-    for (const [scene, copy] of Object.entries(NFC_SCENE_COPY)) {
-      const text = [copy.title, copy.body, copy.action, copy.dismiss]
-        .filter(Boolean)
-        .join(" ");
+    for (const [where, text] of allCopy()) {
       for (const word of TECHNICAL) {
-        expect(
-          text.toLowerCase().includes(word.toLowerCase()),
-          `${scene} says "${word}"`,
-        ).toBe(false);
+        expect(text.toLowerCase().includes(word.toLowerCase()), `${where} says "${word}"`).toBe(false);
       }
     }
   });
 
-  it("never says Stand, which is not what the product calls them", () => {
-    for (const copy of Object.values(NFC_SCENE_COPY)) {
-      const text = [copy.title, copy.body, copy.action, copy.dismiss].filter(Boolean).join(" ");
-      expect(/\bstand(s)?\b/i.test(text)).toBe(false);
+  it("never says Stand, and never claims a distance or a percentage", () => {
+    for (const [where, text] of allCopy()) {
+      expect(/\bstand(s)?\b/i.test(text), `${where} says Stand`).toBe(false);
+      expect(/%|\bcm\b|inch|centimet|closer and closer/i.test(text), `${where} measures`).toBe(false);
     }
   });
 
   it("gives the success scene nothing to press", () => {
-    // It closes itself. A button here is one more decision after the work is
-    // finished, and an invitation to program the same Tag twice.
-    expect(NFC_SCENE_COPY.done.action).toBeUndefined();
-    expect(NFC_SCENE_COPY.done.dismiss).toBeUndefined();
+    expect(NFC_SCENE_COPY.success.action).toBeUndefined();
+    expect(NFC_SCENE_COPY.success.dismiss).toBeUndefined();
   });
 
   it("offers a way out of every scene that can stall", () => {
-    for (const scene of ["start", "waiting", "conflict", "unreadable", "partial"] as NfcScene[]) {
+    for (const scene of ["ready", "writing", "error", "conflict", "partial"] as NfcScene[]) {
       expect(NFC_SCENE_COPY[scene].dismiss, `${scene} traps the owner`).toBeTruthy();
+    }
+    for (const failure of ALL_FAILURES) {
+      expect(failureCopy(failure).dismiss, `${failure} traps the owner`).toBeTruthy();
     }
   });
 
@@ -105,7 +130,45 @@ describe("the copy is for a business owner, not an engineer", () => {
     const partial = NFC_SCENE_COPY.partial;
     expect(partial.title).toMatch(/works/i);
     expect(partial.action).toMatch(/finish/i);
-    // "Try again" here would mean redoing a physical write that succeeded.
     expect(partial.action).not.toMatch(/again|retry|program/i);
+  });
+
+  it("never replaces what is on a Tag without asking", () => {
+    expect(NFC_SCENE_COPY.conflict.action).toBe("Replace");
+    expect(NFC_SCENE_COPY.conflict.dismiss).toBe("Cancel");
+    expect(NFC_SCENE_COPY.conflict.body).toMatch(/erase/i);
+  });
+});
+
+describe("failures say what happened, and only promise what is true", () => {
+  it("says nothing changed wherever the write was never attempted", () => {
+    for (const failure of ALL_FAILURES.filter((f) => f !== "write")) {
+      expect(failureCopy(failure).body, failure).toContain(NOTHING_CHANGED);
+    }
+  });
+
+  it("does not claim nothing changed when a write failed part-way", () => {
+    expect(failureCopy("write").body).not.toContain(NOTHING_CHANGED);
+  });
+
+  it("falls back to the plain error when the reason is unknown", () => {
+    expect(failureCopy(null)).toEqual(NFC_SCENE_COPY.error);
+    expect(failureCopy(null).title).toBe("Couldn’t program this Tag");
+  });
+
+  it("does not offer Try again where trying again cannot help", () => {
+    expect(failureCopy("unsupported").action).toBeUndefined();
+    expect(failureCopy("signed-out").action).toBeUndefined();
+    expect(failureCopy("timeout").action).toBe("Try again");
+  });
+
+  it("reads Chrome's Web NFC errors as reasons", () => {
+    const err = (name: string) => new DOMException("x", name);
+    expect(webFailureFromError(err("NotAllowedError"), "read")).toBe("permission");
+    expect(webFailureFromError(err("NotReadableError"), "read")).toBe("nfc-off");
+    expect(webFailureFromError(err("NotSupportedError"), "read")).toBe("unsupported");
+    expect(webFailureFromError(err("NotSupportedError"), "write")).toBe("not-writable");
+    expect(webFailureFromError(err("NetworkError"), "write")).toBe("write");
+    expect(webFailureFromError(new Error("?"), "read")).toBe("unreadable");
   });
 });
