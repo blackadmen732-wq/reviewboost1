@@ -22,17 +22,20 @@ import { GoogleLinkCare, TestGoogleLinkButton } from "@/features/dashboard/googl
 import {
   GOOGLE_LINK_EMPTY,
   GOOGLE_LINK_INVALID,
+  GOOGLE_LINK_LEGACY,
+  GOOGLE_LINK_NOT_REVIEW_LINK,
 } from "@/features/dashboard/google-link-copy";
 
 const LOCATION_ID = "22222222-2222-2222-2222-222222222222";
-const valid = "https://g.page/corner-cafe";
+const valid = "https://g.page/r/CornerCafe/review";
+const legacy = "https://www.google.com/maps/place/Corner+Cafe";
 const invalid = "https://evil.example/reviews";
 
 describe("GoogleLinkCare", () => {
   it("offers no Change to a role that cannot save", () => {
     render(<GoogleLinkCare value={valid} locationId={LOCATION_ID} readOnly />);
     expect(screen.queryByRole("button", { name: /change/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/corner-cafe/)).toBeInTheDocument();
+    expect(screen.getByText(/CornerCafe/)).toBeInTheDocument();
   });
 
   it("names a missing link and does not offer Open", () => {
@@ -73,6 +76,41 @@ describe("GoogleLinkCare", () => {
     await user.click(screen.getByRole("button", { name: "Open" }));
     expect(open).toHaveBeenCalledWith(valid, "_blank", "noopener,noreferrer");
     vi.unstubAllGlobals();
+  });
+
+  it("keeps a legacy link working, and asks for the upgrade without calling it broken", async () => {
+    const user = userEvent.setup();
+    const open = vi.fn();
+    vi.stubGlobal("open", open);
+
+    render(<GoogleLinkCare value={legacy} locationId={LOCATION_ID} />);
+
+    expect(document.querySelector("[data-google-link-state='legacy']")).not.toBeNull();
+    const note = document.querySelector("[data-google-link-upgrade]");
+    expect(note).toHaveAttribute("role", "status");
+    expect(note).toHaveTextContent("Upgrade this link.");
+    expect(note).toHaveTextContent(GOOGLE_LINK_LEGACY);
+    // Working: no error, and Open still opens it.
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(GOOGLE_LINK_INVALID)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Open" }));
+    expect(open).toHaveBeenCalledWith(legacy, "_blank", "noopener,noreferrer");
+    // The way forward is named.
+    expect(screen.getByRole("button", { name: "Upgrade" })).toBeVisible();
+    vi.unstubAllGlobals();
+  });
+
+  it("refuses a pasted listing link as a new link, and says why", async () => {
+    const user = userEvent.setup();
+    render(<GoogleLinkCare value={legacy} locationId={LOCATION_ID} />);
+    await user.click(screen.getByRole("button", { name: "Upgrade" }));
+    const field = screen.getByLabelText("Google link");
+    await user.clear(field);
+    await user.type(field, "https://maps.app.goo.gl/abc123");
+    expect(screen.getByRole("alert")).toHaveTextContent(GOOGLE_LINK_NOT_REVIEW_LINK);
+    await user.clear(field);
+    await user.type(field, valid);
+    expect(screen.getByText("That is the right kind of link")).toBeVisible();
   });
 
   it("Test refuses a bad draft instead of doing nothing", async () => {

@@ -8,7 +8,7 @@ import type { User } from "@supabase/supabase-js";
 import { tryDecrypt } from "@/lib/server/crypto";
 import { locationLimit, tagLimit } from "@/lib/server/entitlements";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
-import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
+import { isGoogleReviewWritingUrl, isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
 import {
   insightPeriods,
   summarizeInsights,
@@ -777,27 +777,37 @@ export const listLocations = cache(async (orgId: string): Promise<OwnerLocation[
 /**
  * The worst link across every place. Any wrong link reads as wrong, then any
  * missing one as missing; no places at all is missing.
+ *
+ * A legacy link — a Maps listing or short link saved before review links were
+ * required — still counts as set: its Tags work. It is flagged separately so
+ * Home can ask for the upgrade without calling a working setup broken.
  */
-export function ownerGoogleLinkFlagsForAll(urls: ReadonlyArray<string | null | undefined>): {
-  hasGoogleLink: boolean;
-  googleLinkInvalid: boolean;
-} {
-  if (urls.length === 0) return { hasGoogleLink: false, googleLinkInvalid: false };
+export function ownerGoogleLinkFlagsForAll(urls: ReadonlyArray<string | null | undefined>): GoogleLinkFlags {
+  if (urls.length === 0) return { hasGoogleLink: false, googleLinkInvalid: false, googleLinkNeedsUpgrade: false };
   const flags = urls.map(ownerGoogleLinkFlags);
+  const googleLinkNeedsUpgrade = flags.some((flag) => flag.googleLinkNeedsUpgrade);
   if (flags.some((flag) => flag.googleLinkInvalid)) {
-    return { hasGoogleLink: false, googleLinkInvalid: true };
+    return { hasGoogleLink: false, googleLinkInvalid: true, googleLinkNeedsUpgrade };
   }
-  return { hasGoogleLink: flags.every((flag) => flag.hasGoogleLink), googleLinkInvalid: false };
+  return { hasGoogleLink: flags.every((flag) => flag.hasGoogleLink), googleLinkInvalid: false, googleLinkNeedsUpgrade };
 }
 
-export function ownerGoogleLinkFlags(url: string | null | undefined): {
+export interface GoogleLinkFlags {
   hasGoogleLink: boolean;
   googleLinkInvalid: boolean;
-} {
+  /** Works today, but is a listing or short link rather than a review link. */
+  googleLinkNeedsUpgrade: boolean;
+}
+
+export function ownerGoogleLinkFlags(url: string | null | undefined): GoogleLinkFlags {
   const trimmed = url?.trim() ?? "";
-  if (!trimmed) return { hasGoogleLink: false, googleLinkInvalid: false };
+  if (!trimmed) return { hasGoogleLink: false, googleLinkInvalid: false, googleLinkNeedsUpgrade: false };
   const valid = isValidGoogleReviewUrl(trimmed);
-  return { hasGoogleLink: valid, googleLinkInvalid: !valid };
+  return {
+    hasGoogleLink: valid,
+    googleLinkInvalid: !valid,
+    googleLinkNeedsUpgrade: valid && !isGoogleReviewWritingUrl(trimmed),
+  };
 }
 
 // ------------------------------------------------------------- counters ----
@@ -812,6 +822,7 @@ export interface OwnerCounts {
   recentCount: number;
   hasGoogleLink: boolean;
   googleLinkInvalid: boolean;
+  googleLinkNeedsUpgrade: boolean;
 }
 
 /**

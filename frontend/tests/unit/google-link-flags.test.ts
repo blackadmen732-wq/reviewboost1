@@ -16,10 +16,12 @@ describe("the Google link across every place", () => {
     expect(ownerGoogleLinkFlagsForAll([good, good])).toEqual({
       hasGoogleLink: true,
       googleLinkInvalid: false,
+      googleLinkNeedsUpgrade: false,
     });
     expect(ownerGoogleLinkFlagsForAll([good, null])).toEqual({
       hasGoogleLink: false,
       googleLinkInvalid: false,
+      googleLinkNeedsUpgrade: false,
     });
   });
 
@@ -27,6 +29,7 @@ describe("the Google link across every place", () => {
     expect(ownerGoogleLinkFlagsForAll([good, "https://evil.example/r"])).toEqual({
       hasGoogleLink: false,
       googleLinkInvalid: true,
+      googleLinkNeedsUpgrade: false,
     });
   });
 
@@ -34,6 +37,17 @@ describe("the Google link across every place", () => {
     expect(ownerGoogleLinkFlagsForAll([])).toEqual({
       hasGoogleLink: false,
       googleLinkInvalid: false,
+      googleLinkNeedsUpgrade: false,
     });
+  });
+
+  it("counts a legacy listing or short link as set — its Tags work — and flags the upgrade", () => {
+    const legacy = "https://www.google.com/maps/place/Corner+Cafe";
+    expect(ownerGoogleLinkFlagsForAll([good, legacy])).toEqual({
+      hasGoogleLink: true,
+      googleLinkInvalid: false,
+      googleLinkNeedsUpgrade: true,
+    });
+    expect(ownerGoogleLinkFlagsForAll([good, good]).googleLinkNeedsUpgrade).toBe(false);
   });
 });

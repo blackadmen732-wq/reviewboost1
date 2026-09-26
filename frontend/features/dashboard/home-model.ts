@@ -14,6 +14,8 @@ export interface HomeCounts {
   recentCount: number;
   hasGoogleLink: boolean;
   googleLinkInvalid?: boolean;
+  /** A place's link works but is a listing or short link, not a review link. */
+  googleLinkNeedsUpgrade?: boolean;
   ratingsThisWeek?: number;
   ratingsLastWeek?: number;
 }
@@ -30,6 +32,7 @@ export type HomeKind = "empty" | "active";
 
 export type AttentionKind =
   | "google"
+  | "google-upgrade"
   | "unread"
   | "tag-missing"
   | "tag-unprogrammed"
@@ -208,6 +211,17 @@ export function deriveHomeModel({
       kind: "tag-unprogrammed",
       title: "Tag is not programmed yet",
       body: "Print the code or program the tag. Same link either way.",
+    });
+  }
+
+  // Working, so it never blocks setup or takes the one green button; it is a
+  // note that a better link exists, listed after everything that
+  // actually stops a Tag working. Tags are untouched either way.
+  if (counts.hasGoogleLink && counts.googleLinkNeedsUpgrade) {
+    attentions.push({
+      kind: "google-upgrade",
+      title: "Upgrade your Google link",
+      body: "It still works. It opens your Google listing rather than the review box — swap it for your “Ask for reviews” link in Settings. Your Tags stay the same.",
     });
   }
 

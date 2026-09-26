@@ -10,9 +10,13 @@ import { notify } from "@/components/ui/toast";
 import {
   GOOGLE_LINK_BLAST,
   GOOGLE_LINK_INVALID,
+  GOOGLE_LINK_LEGACY,
+  GOOGLE_LINK_LEGACY_TITLE,
+  GOOGLE_LINK_NOT_REVIEW_LINK,
   googleLinkDisplay,
   googleLinkRefusal,
   googleLinkState,
+  googleLinkWorks,
   openGoogleReviewUrl,
 } from "@/features/dashboard/google-link-copy";
 import { GoogleLinkHelp } from "@/features/dashboard/settings-form";
@@ -61,6 +65,9 @@ export function GoogleLinkCare({
 
   const trimmed = draft.trim();
   const draftLooksRight = trimmed !== "" && isGoogleReviewWritingUrl(trimmed);
+  // A listing or short link still works where it is already saved, but cannot
+  // be saved as a new link; say which, rather than calling it "not Google".
+  const draftRefusal = googleLinkState(trimmed) === "legacy" ? GOOGLE_LINK_NOT_REVIEW_LINK : GOOGLE_LINK_INVALID;
   const savedState = googleLinkState(value);
 
   function speakRefusal(message: string) {
@@ -70,7 +77,7 @@ export function GoogleLinkCare({
 
   async function save() {
     if (trimmed !== "" && !draftLooksRight) {
-      setError(GOOGLE_LINK_INVALID);
+      setError(draftRefusal);
       return;
     }
 
@@ -161,7 +168,7 @@ export function GoogleLinkCare({
 
           {trimmed !== "" && !draftLooksRight ? (
             <p role="alert" className="mt-2 text-sm text-danger">
-              {GOOGLE_LINK_INVALID}
+              {draftRefusal}
             </p>
           ) : error ? (
             <p role="alert" className="mt-2 text-sm text-danger">
@@ -201,7 +208,7 @@ export function GoogleLinkCare({
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-muted">Google link</p>
             <p
-              className={`break-words text-base font-medium ${savedState === "valid" ? "text-ink" : "text-muted"}`}
+              className={`break-words text-base font-medium ${googleLinkWorks(savedState) ? "text-ink" : "text-muted"}`}
             >
               {googleLinkDisplay(value)}
             </p>
@@ -209,6 +216,15 @@ export function GoogleLinkCare({
               <p role="alert" className="mt-2 text-sm text-danger">
                 {GOOGLE_LINK_INVALID}
               </p>
+            ) : null}
+            {savedState === "legacy" ? (
+              // Working, so not an error: a status note with the one fix.
+              <div role="status" className="mt-2 flex items-start gap-2 text-sm" data-google-link-upgrade>
+                <span aria-hidden="true" className="mt-1.5 size-2 shrink-0 rounded-full bg-star" />
+                <p className="leading-relaxed text-ink">
+                  <span className="font-semibold">{GOOGLE_LINK_LEGACY_TITLE}.</span> {GOOGLE_LINK_LEGACY}
+                </p>
+              </div>
             ) : null}
             {justSaved ? (
               <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-brand-text">
@@ -233,7 +249,7 @@ export function GoogleLinkCare({
               className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-brand-text transition-colors hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
             >
               <Pencil className="size-4" aria-hidden="true" />
-              Change
+              {savedState === "legacy" ? "Upgrade" : "Change"}
             </button>
           )}
         </div>

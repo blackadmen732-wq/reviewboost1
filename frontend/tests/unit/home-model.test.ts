@@ -380,3 +380,47 @@ describe("customer page photo step", () => {
     expect(photoStep(deriveHomeModel(base))).toBeUndefined();
   });
 });
+
+describe("a legacy Google link (a listing or short link saved before review links were required)", () => {
+  it("still counts as set up — its Tags work — and never takes the primary action", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, activeStands: 1, googleLinkNeedsUpgrade: true },
+      stands: [programmedStand],
+      hasLocation: true,
+    });
+    expect(model.attentions.some((item) => item.kind === "google")).toBe(false);
+    expect(model.primary?.label).not.toBe("Add Google link");
+    expect(model.setup?.find((step) => step.key === "google")?.done).toBe(true);
+  });
+
+  it("asks for the upgrade, saying it still works and that Tags stay the same", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, recentCount: 3, activeStands: 1, googleLinkNeedsUpgrade: true },
+      stands: [programmedStand],
+      hasLocation: true,
+    });
+    const upgrade = model.attentions.find((item) => item.kind === "google-upgrade");
+    expect(upgrade?.title).toBe("Upgrade your Google link");
+    expect(upgrade?.body).toMatch(/^It still works\./);
+    expect(upgrade?.body).toMatch(/Your Tags stay the same\./);
+  });
+
+  it("comes after anything that actually stops a Tag working", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, recentCount: 3, activeStands: 1, unread: 2, googleLinkNeedsUpgrade: true },
+      stands: [{ ...programmedStand, tokenRotatedAt: "2026-09-10T00:00:00.000Z" }],
+      hasLocation: true,
+    });
+    const kinds = model.attentions.map((item) => item.kind);
+    expect(kinds.at(-1)).toBe("google-upgrade");
+  });
+
+  it("is not raised for a direct review link", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, recentCount: 3, activeStands: 1 },
+      stands: [programmedStand],
+      hasLocation: true,
+    });
+    expect(model.attentions.some((item) => item.kind === "google-upgrade")).toBe(false);
+  });
+});
