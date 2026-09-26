@@ -163,8 +163,8 @@ describe("program Tag words", () => {
   it("ends on a check rather than another decision", () => {
     const sheet = source("features/tags/program-tag-sheet.tsx");
     expect(sheet).not.toContain("Test customer page");
-    expect(NFC_SCENE_COPY.done.action).toBeUndefined();
-    expect(NFC_SCENE_COPY.done.dismiss).toBeUndefined();
+    expect(NFC_SCENE_COPY.success.action).toBeUndefined();
+    expect(NFC_SCENE_COPY.success.dismiss).toBeUndefined();
   });
 });
 

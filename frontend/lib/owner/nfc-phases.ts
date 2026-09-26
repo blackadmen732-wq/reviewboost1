@@ -98,13 +98,3 @@ export function describeExistingRecord(recordType: string, text: string | null):
   if (recordType === "mime") return "a file";
   return "something else";
 }
-
-export function programFailureMessage(error: unknown): string {
-  if (error instanceof DOMException && error.name === "NotAllowedError") {
-    return "This phone did not allow tagging. Allow it and try again.";
-  }
-  if (error instanceof DOMException && error.name === "NotSupportedError") {
-    return "This phone cannot program a Tag.";
-  }
-  return "Could not program the Tag. Hold near it and try again.";
-}

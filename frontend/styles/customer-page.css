@@ -659,43 +659,82 @@ html:has(.customer-live) {
   padding-bottom: 24px;
 }
 
+/* A setup moment, not a settings dialog: one large figure, two lines of words,
+   one obvious action. On a phone it takes the whole screen, the way a payment
+   sheet does; on a larger screen it is a centred card. */
 .nfc-sheet {
   position: fixed;
   inset: 0;
   z-index: 60;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  background: rgb(23 26 24 / 55%);
+  align-items: stretch;
+  justify-content: center;
+  background: var(--rb-canvas);
 }
 
 .nfc-sheet__panel {
   display: flex;
-  min-height: 72dvh;
+  width: 100%;
+  min-height: 100dvh;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 32px 24px 28px;
-  background: var(--rb-surface);
-  border-radius: 34px 34px 0 0;
+  padding:
+    calc(env(safe-area-inset-top) + 20px)
+    calc(env(safe-area-inset-right) + 24px)
+    calc(env(safe-area-inset-bottom) + 20px)
+    calc(env(safe-area-inset-left) + 24px);
+  background: var(--rb-canvas);
+  color: var(--rb-ink);
+  /* Longer exception messages may scroll; ordinary scenes never need to. */
+  overflow-y: auto;
 }
 
-/* The stage between the card and the controls. It carries whichever figure the
-   scene owns, so the sheet's shape stays put while the content changes. */
+@media (min-width: 640px) {
+  .nfc-sheet {
+    align-items: center;
+    padding: 24px;
+    background: rgb(12 16 14 / 45%);
+  }
+
+  .nfc-sheet__panel {
+    width: min(440px, 100%);
+    min-height: min(720px, calc(100dvh - 48px));
+    max-height: calc(100dvh - 48px);
+    padding: 28px 32px 32px;
+    border: 1px solid var(--rb-border);
+    border-radius: 32px;
+  }
+}
+
+.nfc-sheet__brand {
+  display: flex;
+  justify-content: center;
+}
+
 .nfc-sheet__stage {
   display: flex;
   flex: 1;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 28px;
+  padding-block: 16px;
   text-align: center;
+}
+
+.nfc-sheet__words {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
 
 .nfc-sheet__title {
   margin: 0;
-  font-size: 1.75rem;
+  font-size: 1.625rem;
   font-weight: 700;
+  line-height: 1.15;
   letter-spacing: -0.03em;
+  text-wrap: balance;
 }
 
 .nfc-sheet__body {
@@ -703,153 +742,220 @@ html:has(.customer-live) {
   max-width: 30ch;
   color: var(--rb-muted);
   font-size: 1.0625rem;
+  line-height: 1.45;
+  text-wrap: pretty;
 }
 
 .nfc-sheet__actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-/* ---------------------------------------------------------- NFC card ----- */
-
-.nfc-card {
-  position: relative;
-  overflow: hidden;
-  padding: 16px 18px 20px;
-  border-radius: 18px;
-  /* Near-black rather than the warm canvas: the card is a physical object in
-     the owner's hand, and the contrast makes the arcs legible at arm's length. */
-  background: #10130F;
-  color: #FFFFFF;
-}
-
-.nfc-card__head {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
+  /* The same height with or without buttons, so the figure does not jump
+     upward when success removes them. */
+  min-height: 118px;
+  justify-content: flex-end;
 }
 
-.nfc-card__name {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
+.nfc-sheet__button {
+  width: 100%;
+  min-height: 54px;
+  border-radius: 999px;
 }
 
-.nfc-card__word {
-  font-size: 1.0625rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
+/* ----------------------------------------------------------- the figure -- */
 
-.nfc-card__word-accent {
-  /* The brand green, not the darker action green: this is identity, not a CTA. */
+.nfc-figure {
+  width: min(220px, 58vw);
+  aspect-ratio: 1;
   color: var(--rb-brand);
 }
 
-.nfc-card__kind {
-  color: rgb(255 255 255 / 62%);
-  font-size: 0.8125rem;
+.nfc-figure[data-scene="error"] {
+  color: var(--rb-danger);
 }
 
-.nfc-card__status {
-  margin-left: auto;
-  padding-top: 2px;
-  color: rgb(255 255 255 / 62%);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+/* A decision, not a failure and not a success: the symbol in ink. */
+.nfc-figure[data-scene="conflict"] {
+  color: var(--rb-muted);
 }
 
-.nfc-card__waves {
-  display: flex;
-  justify-content: center;
-  padding-top: 6px;
-  color: var(--rb-brand);
+.nfc-figure__svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-.nfc-card__wave {
-  opacity: 0.25;
+.nfc-figure__ring {
+  fill: currentColor;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nfc-ring-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.nfc-card[data-working="true"] .nfc-card__wave {
-  animation: nfc-wave 1.8s ease-in-out infinite;
+.nfc-figure__ring--outer {
+  opacity: 0.06;
+}
+
+.nfc-figure__ring--inner {
+  opacity: 0.08;
+  animation-delay: 60ms;
+}
+
+@keyframes nfc-ring-in {
+  from { transform: scale(0.86); opacity: 0; }
+}
+
+.nfc-figure__disc {
+  fill: var(--rb-surface);
+  stroke: var(--rb-border);
+  stroke-width: 1;
+}
+
+.nfc-figure__wave {
+  stroke: currentColor;
+  stroke-width: 9;
+}
+
+/* The indeterminate arc: a fixed slice that turns. It never grows, because
+   nothing is being measured. */
+.nfc-figure__spinner {
+  stroke: currentColor;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 22 78;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: opacity 200ms ease;
+}
+
+.nfc-figure[data-scene="writing"] .nfc-figure__spinner {
+  opacity: 1;
+  animation: nfc-spin 1.1s linear infinite;
+}
+
+.nfc-figure[data-scene="writing"] .nfc-figure__wave {
+  animation: nfc-wave 1.5s ease-in-out infinite;
+}
+
+.nfc-figure[data-scene="writing"] .nfc-figure__wave:nth-child(2) { animation-delay: 0.18s; }
+.nfc-figure[data-scene="writing"] .nfc-figure__wave:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes nfc-spin {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes nfc-wave {
-  0%, 100% { opacity: 0.18; }
+  0%, 100% { opacity: 0.28; }
   45% { opacity: 1; }
 }
 
-/* ------------------------------------------------------ reader + check --- */
-
-.nfc-reader {
-  position: relative;
-  display: grid;
-  place-items: center;
-  color: var(--rb-brand);
-}
-
-.nfc-reader__halo {
-  position: absolute;
-  width: 116px;
-  height: 116px;
-  border: 3px solid currentColor;
-  border-radius: 50%;
-  opacity: 0.9;
-}
-
-.nfc-card[data-working="true"] ~ * .nfc-reader__halo,
-.nfc-sheet__panel[data-nfc-scene="waiting"] .nfc-reader__halo {
-  animation: nfc-halo 2s ease-in-out infinite;
-}
-
-@keyframes nfc-halo {
-  0%, 100% { transform: scale(1); opacity: 0.55; }
-  50% { transform: scale(1.08); opacity: 1; }
-}
-
-.nfc-check {
-  /* The action green every confirming control in the product uses, so success
-     reads as ReviewBoost rather than as a system alert. */
-  color: var(--rb-action);
-}
-
-.nfc-check__ring,
-.nfc-check__tick {
-  stroke-dasharray: var(--len, 300);
+/* Success: the check draws once, and a few specks drift out and fade. */
+.nfc-figure__check-ring,
+.nfc-figure__tick {
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 100;
   stroke-dashoffset: 0;
 }
 
-.nfc-check__ring {
-  --len: 264;
-  animation: nfc-draw 0.42s ease-out both;
+.nfc-figure__check-ring {
+  stroke-width: 7;
+  animation: nfc-draw 420ms ease-out both;
 }
 
-.nfc-check__tick {
-  --len: 76;
-  animation: nfc-draw 0.28s ease-out 0.3s both;
+.nfc-figure__tick {
+  stroke-width: 9;
+  animation: nfc-draw 280ms ease-out 300ms both;
 }
 
 @keyframes nfc-draw {
-  from { stroke-dashoffset: var(--len); }
-  to { stroke-dashoffset: 0; }
+  from { stroke-dashoffset: 100; }
 }
 
-/* Motion here is instructional, never decorative — but somebody who has asked
-   for less of it still needs to see the arcs, the halo and the check, so they
-   are shown in their finished state rather than removed. */
-@media (prefers-reduced-motion: reduce) {
-  .nfc-card[data-working="true"] .nfc-card__wave,
-  .nfc-sheet__panel[data-nfc-scene="waiting"] .nfc-reader__halo,
-  .nfc-check__ring,
-  .nfc-check__tick {
-    animation: none;
+.nfc-figure__particles circle {
+  fill: currentColor;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nfc-speck 900ms ease-out 360ms both;
+}
+
+.nfc-figure__particles circle:nth-child(2n) { animation-delay: 440ms; }
+
+@keyframes nfc-speck {
+  0% { opacity: 0; transform: scale(0.4); }
+  30% { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+
+/* Error: quiet. It fades in; it does not shake. */
+.nfc-figure[data-scene="error"] .nfc-figure__svg {
+  animation: nfc-fade 220ms ease-out both;
+}
+
+.nfc-figure__alert-ring {
+  stroke: currentColor;
+  stroke-width: 6;
+  fill: var(--rb-danger-soft);
+}
+
+.nfc-figure__alert-bar {
+  stroke: currentColor;
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+
+.nfc-figure__alert-dot {
+  fill: currentColor;
+}
+
+@keyframes nfc-fade {
+  from { opacity: 0; }
+}
+
+/* Short phones (an SE, or any phone with the keyboard's worth of browser
+   chrome): a smaller figure and tighter rhythm, so even the longest message
+   fits without scrolling. */
+@media (height < 640px) {
+  .nfc-sheet__stage {
+    gap: 18px;
+    padding-block: 8px;
   }
 
-  .nfc-card[data-working="true"] .nfc-card__wave { opacity: 1; }
-  .nfc-check__ring,
-  .nfc-check__tick { stroke-dashoffset: 0; }
+  .nfc-sheet__title {
+    font-size: 1.4375rem;
+  }
+
+  .nfc-sheet__body {
+    font-size: 1rem;
+  }
+
+  .nfc-figure {
+    width: min(156px, 46vw);
+  }
+}
+
+/* Motion here is instructional, never decorative. Somebody who has asked for
+   less of it still sees every figure, finished: the rings in place, the check
+   drawn, the waves at full strength, and — instead of a turning arc — a still,
+   complete ring, which says "working" without pretending to measure. */
+@media (prefers-reduced-motion: reduce) {
+  .nfc-figure *,
+  .nfc-figure__svg {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .nfc-figure[data-scene="writing"] .nfc-figure__spinner {
+    stroke-dasharray: none;
+    opacity: 0.5;
+  }
+
+  .nfc-figure__particles {
+    display: none;
+  }
 }
 
 /* Inside the sheet every line of the handoff is centred, like the rating. */
