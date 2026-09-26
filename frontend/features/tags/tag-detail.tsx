@@ -17,6 +17,7 @@ import {
 import { ownerOrAdmin } from "@/lib/owner/permissions";
 import type { Stand } from "@/lib/server/owner-data";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { cn } from "@/lib/utils/cn";
 
 /**
  * A Tag. Everything on the managed view — loading the code, printing, saving,
@@ -222,11 +223,41 @@ function QrPanel({
 }) {
   const frame = "mx-auto flex aspect-square w-full max-w-[280px] items-center justify-center";
 
+  // The code fades only when it is actually replaced — a new token after
+  // "Make a new code" — never when it first appears or on a re-render.
+  const [shown, setShown] = useState<{ url: string | null; replaced: boolean }>({ url: objectUrl, replaced: false });
+  if (status === "ready" && objectUrl !== shown.url) {
+    setShown({ url: objectUrl, replaced: shown.url !== null });
+  }
+
+  // Reloading a code already on screen keeps it there, dimmed, rather than
+  // swapping it for a spinner and back: the square never empties or jumps.
+  if (status === "loading" && objectUrl) {
+    return (
+      <div className="relative" aria-busy="true" data-qr-state="replacing">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={objectUrl}
+          alt=""
+          className="mx-auto aspect-square w-full max-w-[280px] opacity-30 transition-opacity duration-150"
+        />
+        <span className="sr-only" role="status">
+          Loading the new code
+        </span>
+      </div>
+    );
+  }
+
   if (status === "ready" && objectUrl) {
     return (
       <div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={objectUrl} alt={`Code for ${label}`} className="mx-auto aspect-square w-full max-w-[280px]" />
+        <img
+          key={objectUrl}
+          src={objectUrl}
+          alt={`Code for ${label}`}
+          className={cn("mx-auto aspect-square w-full max-w-[280px]", shown.replaced && "animate-qr-in")}
+        />
         {needsReprint ? (
           <p className="mt-3 text-center text-sm text-muted" data-qr-state="rotation-required">
             This is the new code. The one already printed no longer works — print

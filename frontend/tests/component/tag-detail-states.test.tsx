@@ -158,4 +158,21 @@ describe("Tag readiness after programming", () => {
     act(() => capturedOnReady?.());
     expect(refresh).toHaveBeenCalled();
   });
+
+  it("keeps the current code on screen, dimmed, while a new one loads, and fades only a replaced code", () => {
+    setQr("ready", "blob:first");
+    const { container, rerender } = render(<TagDetail stand={stand} canManage />);
+    expect(screen.getByAltText("Code for Front counter")).not.toHaveClass("animate-qr-in");
+
+    setQr("loading", "blob:first");
+    rerender(<TagDetail stand={stand} canManage />);
+    expect(container.querySelector('[data-qr-state="replacing"] img')).toHaveAttribute("src", "blob:first");
+    expect(screen.queryByLabelText("Loading code")).toBeNull();
+
+    setQr("ready", "blob:second");
+    rerender(<TagDetail stand={stand} canManage />);
+    const code = screen.getByAltText("Code for Front counter");
+    expect(code).toHaveAttribute("src", "blob:second");
+    expect(code).toHaveClass("animate-qr-in");
+  });
 });
