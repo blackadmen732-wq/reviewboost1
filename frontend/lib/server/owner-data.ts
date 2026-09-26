@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
 import { tryDecrypt } from "@/lib/server/crypto";
+import { locationLimit, tagLimit } from "@/lib/server/entitlements";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
 import { logger } from "@/lib/server/logger";
@@ -1070,6 +1071,16 @@ export interface OwnerBilling {
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
   smsBalance: SmsBalance;
+  /**
+   * What the business is using against what its entitlement allows, counted
+   * the way the database counts when it enforces the cap: Tags that are not
+   * retired, locations that are active. Null when there is no entitlement to
+   * measure against.
+   */
+  usage: {
+    locations: { used: number; limit: number };
+    tags: { used: number; limit: number };
+  } | null;
 }
 
 /**
@@ -1082,16 +1093,28 @@ export interface OwnerBilling {
 export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBilling> => {
   const supabase = await supabaseServer();
 
-  const [entitlement, balance] = await Promise.all([
+  const [entitlement, balance, tags, locations] = await Promise.all([
     supabase
       .from("entitlement_snapshots")
       .select("plan_id, status, cancel_at_period_end, trial_ends_at, current_period_end")
       .eq("org_id", orgId)
       .maybeSingle(),
     readSmsBalance(orgId),
+    supabase
+      .from("review_stands")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .neq("status", "retired"),
+    supabase
+      .from("locations")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "active"),
   ]);
 
   if (entitlement.error) dataFailure("owner_billing", entitlement.error);
+  if (tags.error) dataFailure("owner_billing.tags", tags.error);
+  if (locations.error) dataFailure("owner_billing.locations", locations.error);
 
   const row = entitlement.data as {
     plan_id: OwnerBilling["planId"];
@@ -1108,5 +1131,14 @@ export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBillin
     trialEndsAt: row?.trial_ends_at ?? null,
     currentPeriodEnd: row?.current_period_end ?? null,
     smsBalance: balance,
+    usage: row?.status
+      ? {
+          locations: {
+            used: locations.count ?? 0,
+            limit: locationLimit(row.plan_id, row.status),
+          },
+          tags: { used: tags.count ?? 0, limit: tagLimit(row.plan_id, row.status) },
+        }
+      : null,
   };
 });

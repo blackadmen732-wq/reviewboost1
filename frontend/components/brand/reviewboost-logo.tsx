@@ -34,10 +34,13 @@ const WORD: Record<LogoSize, string> = {
 export function ReviewBoostLogo({
   pose = "full",
   size = "nav",
+  poweredByLabel = "Powered by",
   className,
 }: {
   pose?: LogoPose;
   size?: LogoSize;
+  /** The credit line, for a customer page shown in another language. */
+  poweredByLabel?: string;
   className?: string | undefined;
 }) {
   const mark = MARK_PX[size];
@@ -51,7 +54,7 @@ export function ReviewBoostLogo({
       data-logo-size={size}
     >
       {pose === "poweredBy" ? (
-        <span className="text-[length:var(--rb-text-caption)] text-muted">Powered by</span>
+        <span className="text-[length:var(--rb-text-caption)] text-muted">{poweredByLabel}</span>
       ) : null}
 
       <LogoMark size={mark} />

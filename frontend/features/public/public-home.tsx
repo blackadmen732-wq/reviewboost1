@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { FAQ } from "@/features/public/faq";
-import { PricingTable } from "@/features/public/pricing-table";
+import { PricingSection } from "@/features/public/pricing-table";
 import {
   CLOSE,
   HOW_IT_WORKS,
@@ -111,32 +111,21 @@ export function PublicHome() {
         </div>
       </section>
 
-      <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
-          <p className="text-sm font-medium text-muted">Pricing</p>
-          <h2 className="mt-4 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {PRICING.headline}
-          </h2>
-          <p className="mt-3 max-w-[36ch] text-base leading-relaxed text-muted">{PRICING.lede}</p>
-
-          {/* The prices themselves. This section used to be a headline, a lede
-              and a link — a pricing section with no prices in it, which is the
-              one question a visitor came to answer. */}
-          <div className="mt-10">
-            <PricingTable />
-          </div>
-
-          <p className="mt-6 max-w-[48ch] text-sm leading-relaxed text-muted">{PRICING.caveat}</p>
-          <p className="mt-10">
-            <Link
-              href="/pricing"
-              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
-            >
-              How we charge
-            </Link>
-          </p>
-        </div>
-      </section>
+      {/* The prices themselves, as a full-width dark band. This section used
+          to be a headline, a lede and a link — a pricing section with no
+          prices in it, which is the one question a visitor came to answer. */}
+      <PricingSection headline={PRICING.headline} lede={PRICING.lede}>
+        {/* The trial terms are already on the Starter card and in the line
+            under the cards; a third telling here was repetition. */}
+        <p className="mt-12 text-center text-sm">
+          <Link
+            href="/pricing"
+            className="font-medium text-ink underline-offset-4 transition-colors duration-150 hover:underline"
+          >
+            How we charge
+          </Link>
+        </p>
+      </PricingSection>
 
       <section className="border-t border-border">
         <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
