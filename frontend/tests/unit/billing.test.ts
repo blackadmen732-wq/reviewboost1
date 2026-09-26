@@ -374,3 +374,50 @@ describe("what the owner is told", () => {
     expect(state.smsBalance.purchased).toBe(42);
   });
 });
+
+describe("starting a subscription", () => {
+  async function checkout(planId: "starter" | "growth" | "pro") {
+    const create = vi.fn((params: Record<string, unknown>) => {
+      void params;
+      return Promise.resolve({ url: "https://checkout.stripe.test/session" });
+    });
+    const { __setStripeClientForTests } = await import("@/lib/server/stripe");
+    __setStripeClientForTests({ checkout: { sessions: { create } } } as never);
+
+    // A customer already exists, so no Stripe customer is created here.
+    tableRows.set("billing_customers", [{ stripe_customer_id: "cus_test1" }]);
+
+    const { createCheckoutSession } = await import("@/lib/server/billing-service");
+    const { createClient } = await import("@supabase/supabase-js");
+    try {
+      await createCheckoutSession(
+        { db: createClient("", "") as never, userId: "u" } as never,
+        ORG,
+        planId,
+        `req-${planId}`,
+      );
+    } finally {
+      __setStripeClientForTests(undefined);
+    }
+
+    expect(create).toHaveBeenCalledTimes(1);
+    return create.mock.calls[0]![0] as {
+      payment_method_collection: string;
+      subscription_data: Record<string, unknown>;
+    };
+  }
+
+  it("gives Starter a seven-day trial, with a card required", async () => {
+    const params = await checkout("starter");
+    expect(params.subscription_data["trial_period_days"]).toBe(7);
+    expect(params.payment_method_collection).toBe("always");
+  });
+
+  it("charges Growth and Pro at checkout, with no trial", async () => {
+    for (const planId of ["growth", "pro"] as const) {
+      const params = await checkout(planId);
+      expect(params.subscription_data).not.toHaveProperty("trial_period_days");
+      expect(params.subscription_data["metadata"]).toEqual({ org_id: ORG, plan_id: planId });
+    }
+  });
+});

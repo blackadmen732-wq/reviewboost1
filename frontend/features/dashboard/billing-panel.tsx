@@ -4,9 +4,10 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
+import { PUBLIC_PLANS, type PublicPlanId } from "@/lib/plans";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
-type PlanId = "starter" | "growth" | "pro";
+type PlanId = PublicPlanId;
 type Status = "trialing" | "active" | "past_due" | "cancelled" | "suspended";
 
 interface Billing {
@@ -19,25 +20,11 @@ interface Billing {
 }
 
 /**
- * The locked plans, for the pricing table only.
- *
- * These are the same numbers the database enforces and the API returns. They
- * are written here because a signed-out pricing table has no backend state to
- * read — but nothing about the *current* subscription is taken from this
- * object. What a business has is whatever `billing` says it has.
+ * The pricing table reads the shared plan list. Nothing about the *current*
+ * subscription is taken from it — what a business has is whatever `billing`
+ * says it has.
  */
-const PLANS: ReadonlyArray<{
-  id: PlanId;
-  name: string;
-  priceUsd: number;
-  locations: number;
-  tags: number;
-  sms: number;
-}> = [
-  { id: "starter", name: "Starter", priceUsd: 49, locations: 1, tags: 3, sms: 150 },
-  { id: "growth", name: "Growth", priceUsd: 79, locations: 2, tags: 8, sms: 500 },
-  { id: "pro", name: "Pro", priceUsd: 129, locations: 5, tags: 25, sms: 1500 },
-];
+const PLANS = PUBLIC_PLANS;
 
 function formatDate(value: string | null): string | null {
   if (!value) return null;
@@ -116,7 +103,7 @@ function describe(billing: Billing): { title: string; body: string; tone: "info"
       if (billing.planId === null) {
         return {
           title: "Choose a plan to open your Tags",
-          body: "Your Tags are ready and they are not serving customers yet. Pick a plan below — seven days free, and nothing is charged until the trial ends.",
+          body: "Your Tags are ready and they are not serving customers yet. Pick a plan below — Starter comes with seven days free.",
           tone: "info",
         };
       }
@@ -231,8 +218,8 @@ export function BillingPanel({ billing }: { billing: Billing }) {
             Choose a plan
           </h2>
           <p className="mb-4 text-sm text-muted">
-            Seven days free. A card is needed to start, and you are not charged until the
-            trial ends.
+            Starter has a seven-day free trial: a card is needed to start, and you are not
+            charged until it ends. Growth and Pro are charged when you choose them.
           </p>
           <ul className="grid gap-3 sm:grid-cols-3">
             {PLANS.map((plan) => (
@@ -263,7 +250,7 @@ export function BillingPanel({ billing }: { billing: Billing }) {
                   loadingLabel="Opening…"
                   disabled={busy !== null}
                 >
-                  Start free trial
+                  {plan.trialDays ? `Start ${plan.trialDays}-day trial` : `Choose ${plan.name}`}
                 </Button>
               </li>
             ))}

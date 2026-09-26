@@ -9,6 +9,7 @@ import {
   PLANS,
   type PlanId,
   TRIAL_DAYS,
+  TRIAL_PLAN_ID,
 } from "@/lib/server/entitlements";
 import { planIdForPrice, publicFrontendUrl, stripePriceId } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
@@ -28,7 +29,8 @@ import { serviceRoleClient } from "@/lib/server/supabase";
  * WHAT A TRIAL IS
  * ---------------
  * Seven days, no charge, a card required up front, and a paid plan chosen
- * before it starts. One location, one Tag, and no SMS at all. There is no
+ * before it starts. One location, one Tag, and no SMS at all. Only Starter
+ * has one; Growth and Pro are charged at checkout. There is no
  * permanent free plan and no "we'll figure out the plan later" state — a trial
  * without a chosen plan is a subscription nobody knows how to renew.
  */
@@ -162,7 +164,7 @@ export async function createCheckoutSession(
       // without one is a free plan with a timer.
       payment_method_collection: "always",
       subscription_data: {
-        trial_period_days: TRIAL_DAYS,
+        ...(planId === TRIAL_PLAN_ID ? { trial_period_days: TRIAL_DAYS } : {}),
         metadata: { org_id: orgId, plan_id: planId },
       },
       client_reference_id: orgId,

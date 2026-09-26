@@ -126,6 +126,31 @@ describe("the locked V1 plans", () => {
     expect(TRIAL_DAYS).toBe(7);
   });
 
+  it("publishes the same plans the server enforces", async () => {
+    const { PLANS, TRIAL_LIMITS, TRIAL_DAYS, TRIAL_PLAN_ID } = await import(
+      "@/lib/server/entitlements"
+    );
+    const { PUBLIC_PLANS, PUBLIC_TRIAL_LIMITS } = await import("@/lib/plans");
+
+    // The pricing page and the billing panel read PUBLIC_PLANS. A price or a
+    // limit that changes on the server and not here fails this test rather
+    // than shipping a page that disagrees with checkout.
+    expect(PUBLIC_PLANS.map((plan) => plan.id)).toEqual(Object.keys(PLANS));
+    for (const plan of PUBLIC_PLANS) {
+      const server = PLANS[plan.id];
+      expect(plan.priceUsd * 100).toBe(server.priceUsdCents);
+      expect(plan.locations).toBe(server.locations);
+      expect(plan.tags).toBe(server.tags);
+      expect(plan.sms).toBe(server.monthlySmsSegments);
+      expect(plan.trialDays).toBe(plan.id === TRIAL_PLAN_ID ? TRIAL_DAYS : null);
+    }
+    expect(PUBLIC_TRIAL_LIMITS).toEqual({
+      locations: TRIAL_LIMITS.locations,
+      tags: TRIAL_LIMITS.tags,
+      sms: TRIAL_LIMITS.monthlySmsSegments,
+    });
+  });
+
   it("never falls back to Starter for an unknown or inactive plan", async () => {
     const { tagLimit, locationLimit, monthlySmsSegments } = await import(
       "@/lib/server/entitlements"

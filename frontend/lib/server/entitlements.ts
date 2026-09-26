@@ -58,6 +58,13 @@ export const TRIAL_LIMITS: PlanLimits = {
 
 export const TRIAL_DAYS = 7;
 
+/**
+ * The one plan that starts with a trial. Growth and Pro are charged at
+ * checkout: a trial exists so a single-location business can try a Tag
+ * before paying, and a business choosing more capacity has already decided.
+ */
+export const TRIAL_PLAN_ID: PlanId = "starter";
+
 export interface Entitlement {
   planId: PlanId | null;
   status: EntitlementStatus;
