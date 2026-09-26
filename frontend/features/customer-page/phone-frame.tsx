@@ -24,9 +24,16 @@ const SCREEN_H = 844;
 export function PhoneFrame({
   children,
   label = "Customer page",
+  size = "default",
 }: {
   children: ReactNode;
   label?: string;
+  /**
+   * `editor` draws the phone at a preview size that leaves room for the
+   * photo action and Publish around it; the screen inside is still the real
+   * 390 × 844 page, scaled.
+   */
+  size?: "default" | "editor";
 }) {
   const screenRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.78);
@@ -44,7 +51,7 @@ export function PhoneFrame({
   }, []);
 
   return (
-    <div className="phone-frame" data-phone-frame>
+    <div className={size === "editor" ? "phone-frame phone-frame--editor" : "phone-frame"} data-phone-frame>
       <div className="phone-frame__body">
         <span className="phone-frame__button phone-frame__button--action" aria-hidden="true" />
         <span className="phone-frame__button phone-frame__button--up" aria-hidden="true" />

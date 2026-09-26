@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { PageHeader } from "@/components/ui/page-header";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { CustomerPageEditor } from "@/features/customer-page/customer-page-editor";
 import { getOwnerCounts, requireOwner } from "@/lib/server/owner-data";
@@ -20,10 +19,16 @@ export default async function CustomerPagePage() {
 
   return (
     <OwnerShell unreadCount={counts.unread} businessName={organization.name}>
-      <PageHeader
-        title="Customer page"
-        description="What customers see when they scan one of your Tags."
-      />
+      {/* Tighter than the shared PageHeader: title, description, photo,
+          preview and Publish read as one workflow on a phone. */}
+      <header className="mb-6">
+        <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
+          Customer page
+        </h1>
+        <p className="mt-2 max-w-[40ch] text-base leading-relaxed text-muted">
+          What customers see when they scan one of your Tags.
+        </p>
+      </header>
 
       {canEdit ? (
         <CustomerPageEditor businessName={organization.name} />

@@ -273,18 +273,29 @@ export function CustomerPageEditor({
 
   // Upload → preview → Publish, in that order, in one column. The phone is
   // the owner's preview only; /q/{token} never draws it.
+  //
+  // The phone is drawn at a preview size (PhoneFrame size="editor") so the
+  // three steps read as one short workflow rather than one giant device, and
+  // the column ends with room for the fixed bottom bar and the home-indicator
+  // safe area, so Publish and its status always scroll fully clear of the bar.
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-col gap-5">
+    <div
+      className="mx-auto flex w-full max-w-sm flex-col pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:pb-0"
+      data-customer-page-editor
+    >
       <div>
+        {/* Secondary: quieter and shorter than Publish, still a 44px target. */}
         <Button
           type="button"
           variant="secondary"
+          size="sm"
+          className="font-medium shadow-none"
           disabled={uploading}
           loading={uploading}
           loadingLabel={uploadLabel}
           onClick={() => fileInputRef.current?.click()}
         >
-          <ImageUp className="size-5" aria-hidden="true" />
+          <ImageUp className="size-4" aria-hidden="true" />
           {uploadLabel}
         </Button>
         <input
@@ -301,16 +312,16 @@ export function CustomerPageEditor({
         ) : null}
       </div>
 
-      <div>
+      <div className="mt-5">
         {unpublished ? (
-          <p className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-ink">
+          <p className="mb-2 flex items-center justify-center gap-1.5 text-sm font-medium text-ink">
             <span aria-hidden="true" className="size-2 rounded-full bg-star" />
             Not published yet
           </p>
         ) : null}
         {/* The real customer page — the same CustomerVisitView /q renders —
             with the draft image, inside the preview phone. */}
-        <PhoneFrame label={`${businessName} customer page preview`}>
+        <PhoneFrame label={`${businessName} customer page preview`} size="editor">
           <CustomerVisitView
             heroUrl={heroUrl ?? null}
             transform={DEFAULT_HERO_TRANSFORM}
@@ -328,11 +339,10 @@ export function CustomerPageEditor({
 
       {/* One action. publish() saves the draft first, so there is no separate
           Save step to hold in mind. */}
-      <div>
+      <div className="mt-6">
         <Button
           type="button"
           variant="action"
-          size="lg"
           disabled={publishing || uploading}
           loading={publishing}
           loadingLabel="Publishing…"
