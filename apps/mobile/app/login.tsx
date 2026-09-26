@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -11,6 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Tappable } from "@/components/tappable";
 import { BrandLockup } from "@/components/brand-lockup";
 import { useAuth } from "@/data/auth-context";
 import { colors, radii, fonts } from "@/theme";
@@ -116,7 +116,7 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.inner}>
-          <Pressable
+          <Tappable
             style={[styles.backButton, { top: insets.top + 8 }]}
             onPress={() => {
               setStep("email");
@@ -126,7 +126,7 @@ export default function LoginScreen() {
             accessibilityRole="button"
           >
             <Text style={styles.backText}>← Use a different email</Text>
-          </Pressable>
+          </Tappable>
 
           <Text style={styles.brand}>Check your email</Text>
           <Text style={styles.subtitle}>
@@ -153,7 +153,7 @@ export default function LoginScreen() {
             editable={!submitting}
           />
 
-          <Pressable
+          <Tappable
             style={[styles.button, !canSubmitCode && styles.buttonDisabled]}
             onPress={handleVerify}
             disabled={!canSubmitCode}
@@ -164,9 +164,9 @@ export default function LoginScreen() {
             ) : (
               <Text style={styles.buttonText}>Sign in</Text>
             )}
-          </Pressable>
+          </Tappable>
 
-          <Pressable
+          <Tappable
             style={styles.resendButton}
             onPress={handleResend}
             disabled={secondsLeft > 0 || submitting}
@@ -175,7 +175,7 @@ export default function LoginScreen() {
             <Text style={[styles.resendText, secondsLeft > 0 && styles.resendDisabled]}>
               {secondsLeft > 0 ? `Send a new code in ${secondsLeft}s` : "Send a new code"}
             </Text>
-          </Pressable>
+          </Tappable>
         </View>
       </KeyboardAvoidingView>
     );
@@ -213,7 +213,7 @@ export default function LoginScreen() {
           editable={!submitting}
         />
 
-        <Pressable
+        <Tappable
           style={[styles.button, !canSubmitEmail && styles.buttonDisabled]}
           onPress={handleSendCode}
           disabled={!canSubmitEmail}
@@ -224,7 +224,7 @@ export default function LoginScreen() {
           ) : (
             <Text style={styles.buttonText}>Continue</Text>
           )}
-        </Pressable>
+        </Tappable>
       </View>
     </KeyboardAvoidingView>
   );

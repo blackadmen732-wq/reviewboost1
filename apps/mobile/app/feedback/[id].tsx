@@ -5,10 +5,10 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Pressable,
 } from "react-native";
 import { useLocalSearchParams, Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Tappable } from "@/components/tappable";
 import { useAuth } from "@/data/auth-context";
 import { useFeedbackDetail } from "@/data/use-feedback-detail";
 import { Stars } from "@/components/stars";
@@ -52,9 +52,9 @@ export default function FeedbackDetailScreen() {
         {error ? (
           <View style={styles.centered}>
             <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retryButton} onPress={load} accessibilityRole="button">
+            <Tappable style={styles.retryButton} onPress={load} accessibilityRole="button">
               <Text style={styles.retryText}>Retry</Text>
-            </Pressable>
+            </Tappable>
           </View>
         ) : (
           <ActivityIndicator

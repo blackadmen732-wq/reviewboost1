@@ -5,13 +5,13 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Pressable,
   Platform,
   Share,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams } from "expo-router";
 import * as Linking from "expo-linking";
+import { Tappable } from "@/components/tappable";
 import { useAuth } from "@/data/auth-context";
 import { apiFetch } from "@/data/api";
 import { colors, radii, fonts } from "@/theme";
@@ -262,14 +262,14 @@ export default function StandDetailScreen() {
             <Text style={styles.sectionDesc}>
               Program the chip so customers can tap the Tag instead of scanning it.
             </Text>
-            <Pressable
+            <Tappable
               accessibilityRole="button"
               style={styles.nfcButton}
               disabled={!standUrl}
               onPress={() => setSheetOpen(true)}
             >
               <Text style={styles.nfcButtonText}>Program NFC</Text>
-            </Pressable>
+            </Tappable>
           </View>
         )}
 
@@ -309,14 +309,14 @@ export default function StandDetailScreen() {
             <Text style={styles.sectionDesc}>
               See exactly what a customer sees when they tap or scan this Tag.
             </Text>
-            <Pressable
+            <Tappable
               style={styles.nfcButton}
               onPress={() => void Linking.openURL(standUrl)}
               accessibilityRole="link"
               accessibilityHint="Opens in your browser"
             >
               <Text style={styles.nfcButtonText}>Open customer page</Text>
-            </Pressable>
+            </Tappable>
           </View>
         )}
 
@@ -327,7 +327,7 @@ export default function StandDetailScreen() {
             <Text style={styles.sectionDesc}>
               The same link the QR code and the NFC chip both carry.
             </Text>
-            <Pressable
+            <Tappable
               style={styles.nfcButton}
               accessibilityRole="button"
               onPress={() => {
@@ -343,7 +343,7 @@ export default function StandDetailScreen() {
               }}
             >
               <Text style={styles.nfcButtonText}>Share Link</Text>
-            </Pressable>
+            </Tappable>
           </View>
         )}
 

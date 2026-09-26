@@ -6,11 +6,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useFocusEffect } from "expo-router";
 import * as Linking from "expo-linking";
+import { Tappable } from "@/components/tappable";
 import { useAuth } from "@/data/auth-context";
 import { useBilling } from "@/data/use-billing";
 import { accountView } from "@/data/billing-view";
@@ -92,7 +92,8 @@ export default function AccountScreen() {
             1.5 a way to reach us. Plain rows that open the public pages. */}
         <View style={styles.links}>
           {PUBLIC_LINKS.map((link, index) => (
-            <Pressable
+            <Tappable
+              kind="row"
               key={link.key}
               style={[styles.linkRow, index > 0 ? styles.linkRowDivider : null]}
               onPress={() => void Linking.openURL(link.url)}
@@ -103,26 +104,26 @@ export default function AccountScreen() {
               <Text style={styles.linkChevron} accessibilityElementsHidden importantForAccessibility="no">
                 ›
               </Text>
-            </Pressable>
+            </Tappable>
           ))}
         </View>
 
-        <Pressable
+        <Tappable
           style={styles.signOut}
           onPress={() => void logout()}
           accessibilityRole="button"
         >
           <Text style={styles.signOutText}>Sign out</Text>
-        </Pressable>
+        </Tappable>
 
         {/* Apple 5.1.1(v): an app that creates accounts has to let someone
             start deleting one from inside it. Below sign-out and styled as a
             plain row rather than a second red button, so the destructive one
             is not the thing a thumb finds first. */}
         <Link href="/delete-account" asChild>
-          <Pressable style={styles.deleteRow} accessibilityRole="button">
+          <Tappable kind="row" style={styles.deleteRow} accessibilityRole="button">
             <Text style={styles.deleteText}>Delete account</Text>
-          </Pressable>
+          </Tappable>
         </Link>
       </ScrollView>
     </SafeAreaView>

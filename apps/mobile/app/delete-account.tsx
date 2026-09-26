@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, Stack } from "expo-router";
 
+import { Tappable } from "@/components/tappable";
 import { apiFetch, ApiError } from "@/data/api";
 import { useAuth } from "@/data/auth-context";
 import { colors, fonts, radii } from "@/theme";
@@ -120,7 +120,7 @@ export default function DeleteAccountScreen() {
               </View>
             ) : null}
 
-            <Pressable
+            <Tappable
               style={[styles.destructive, !matches || busy ? styles.disabled : null]}
               disabled={!matches || busy}
               onPress={() => void remove()}
@@ -132,11 +132,11 @@ export default function DeleteAccountScreen() {
               ) : (
                 <Text style={styles.destructiveText}>Delete this business</Text>
               )}
-            </Pressable>
+            </Tappable>
 
-            <Pressable style={styles.cancel} onPress={() => router.back()}>
+            <Tappable style={styles.cancel} onPress={() => router.back()}>
               <Text style={styles.cancelText}>Keep my account</Text>
-            </Pressable>
+            </Tappable>
           </>
         )}
       </ScrollView>

@@ -6,10 +6,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, router } from "expo-router";
+import { Tappable } from "@/components/tappable";
 import { useAuth } from "@/data/auth-context";
 import { useStands } from "@/data/use-stands";
 import { relativeTime } from "@/components/relative-time";
@@ -64,7 +64,8 @@ function NfcStatus({ stand }: { stand: StandItem }) {
 
 function StandCard({ item }: { item: StandItem }) {
   return (
-    <Pressable
+    <Tappable
+      kind="row"
       style={styles.card}
       onPress={() => router.push(`/stand/${item.standId}`)}
       accessibilityRole="button"
@@ -98,7 +99,7 @@ function StandCard({ item }: { item: StandItem }) {
           </Text>
         </View>
       )}
-    </Pressable>
+    </Tappable>
   );
 }
 

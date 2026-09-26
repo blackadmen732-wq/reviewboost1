@@ -1,7 +1,8 @@
-import { View, Text, Pressable, StyleSheet, FlatList, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, FlatList, ActivityIndicator } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Tappable } from "@/components/tappable";
 import { useAuth } from "@/data/auth-context";
 import { colors, radii, fonts } from "@/theme";
 import type { Organization } from "@/data/types";
@@ -38,7 +39,7 @@ export default function SelectOrgScreen() {
             <Text style={styles.greeting}>Welcome back, {name}</Text>
             <Text style={styles.subtitle}>Select an organization</Text>
           </View>
-          <Pressable
+          <Tappable
             style={styles.logoutButton}
             onPress={handleLogout}
             disabled={loggingOut}
@@ -47,7 +48,7 @@ export default function SelectOrgScreen() {
             <Text style={styles.logoutText}>
               {loggingOut ? "Signing out…" : "Sign out"}
             </Text>
-          </Pressable>
+          </Tappable>
         </View>
         {logoutError && <Text style={styles.errorText}>{logoutError}</Text>}
       </View>
@@ -55,14 +56,15 @@ export default function SelectOrgScreen() {
         data={organizations}
         keyExtractor={(item) => item.orgId}
         renderItem={({ item }: { item: Organization }) => (
-          <Pressable
+          <Tappable
+            kind="row"
             style={styles.card}
             onPress={() => handleSelect(item.orgId)}
             accessibilityRole="button"
           >
             <Text style={styles.orgName}>{item.name}</Text>
             <Text style={styles.role}>{item.role}</Text>
-          </Pressable>
+          </Tappable>
         )}
         contentContainerStyle={styles.list}
         ListEmptyComponent={

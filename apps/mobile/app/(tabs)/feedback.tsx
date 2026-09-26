@@ -3,12 +3,12 @@ import {
   View,
   Text,
   FlatList,
-  Pressable,
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { Tappable } from "@/components/tappable";
 import { useAuth } from "@/data/auth-context";
 import { useFeedback } from "@/data/use-feedback";
 import { Stars } from "@/components/stars";
@@ -20,7 +20,8 @@ function FeedbackRow({ item }: { item: FeedbackItem }) {
   const router = useRouter();
 
   return (
-    <Pressable
+    <Tappable
+      kind="row"
       style={[
         styles.card,
         !item.isRead && styles.cardUnread,
@@ -55,7 +56,7 @@ function FeedbackRow({ item }: { item: FeedbackItem }) {
           {item.note}
         </Text>
       )}
-    </Pressable>
+    </Tappable>
   );
 }
 
@@ -89,9 +90,9 @@ export default function FeedbackListScreen() {
     return (
       <SafeAreaView style={styles.centered} edges={["bottom"]}>
         <Text style={styles.errorText}>{error}</Text>
-        <Pressable style={styles.retryButton} onPress={load} accessibilityRole="button">
+        <Tappable style={styles.retryButton} onPress={load} accessibilityRole="button">
           <Text style={styles.retryText}>Retry</Text>
-        </Pressable>
+        </Tappable>
       </SafeAreaView>
     );
   }

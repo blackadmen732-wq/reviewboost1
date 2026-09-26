@@ -6,10 +6,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
+import { Tappable } from "@/components/tappable";
 import { useAuth } from "@/data/auth-context";
 import { useLiveFeed } from "@/data/use-live-feed";
 import { Stars } from "@/components/stars";
@@ -86,9 +86,9 @@ export default function FeedScreen() {
       {error && items.length === 0 ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>Couldn’t load activity.</Text>
-          <Pressable onPress={() => void load()} style={styles.retryButton} accessibilityRole="button">
+          <Tappable onPress={() => void load()} style={styles.retryButton} accessibilityRole="button">
             <Text style={styles.retryText}>Retry</Text>
-          </Pressable>
+          </Tappable>
         </View>
       ) : (
         <FlatList
