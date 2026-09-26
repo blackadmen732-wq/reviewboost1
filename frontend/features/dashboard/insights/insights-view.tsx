@@ -14,12 +14,14 @@ import {
   MIN_SAMPLE,
   plottedPoints,
   ratingsCount,
-  stretchName,
+  unitName,
+  changeSentence,
   type Direction,
   type FeedbackInsights,
   type InsightRange,
 } from "@/lib/owner/insights";
 import { cn } from "@/lib/utils/cn";
+import { localDaysBetween } from "@/lib/utils/local-day";
 
 const DIRECTION_ICON: Record<Direction, typeof ArrowUp> = {
   improving: ArrowUp,
@@ -95,23 +97,38 @@ export function InsightsView({
 
           {state === "full" ? (
             <section aria-labelledby="insights-trend">
-              <h2 id="insights-trend" className="mb-4 text-base font-semibold text-ink">
+              <h2 id="insights-trend" className="text-base font-semibold text-ink">
                 Average rating
               </h2>
+              <p className="mb-5 mt-1 text-sm text-muted">
+                {[changeSentence(insights), `Each point is one ${unitName(insights.trendUnit)}`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
               {plottedPoints(insights.trend) >= 2 ? (
                 <RatingTrendChart
-                  points={insights.trend.map((point) => ({
+                  points={insights.trend.map((point, index) => ({
                     label: formatDateRange(point.startDate, point.endDate),
+                    // A short oldest week is read out, never labelled under the
+                    // axis, where it would crowd the next date.
+                    tick:
+                      index === 0 &&
+                      insights.trendUnit === "week" &&
+                      localDaysBetween(point.startDate, point.endDate) < 6
+                        ? ""
+                        : formatDay(point.startDate),
                     average: point.average,
                     total: point.total,
                   }))}
-                  startLabel={formatDay(periods.current.startDate)}
-                  endLabel={formatDay(periods.current.endDate)}
-                  stretchLabel={stretchName(periods.bucketDays)}
+                  unit={insights.trendUnit}
+                  caption={`Average rating by ${unitName(insights.trendUnit)}, ${formatDateRange(
+                    periods.current.startDate,
+                    periods.current.endDate,
+                  )}`}
                 />
               ) : (
                 <p className="max-w-[40ch] text-base leading-relaxed text-muted">
-                  Not enough ratings in each {stretchName(periods.bucketDays)} to draw a line yet.
+                  Not enough rated {unitName(insights.trendUnit)}s to draw a line yet.
                 </p>
               )}
             </section>

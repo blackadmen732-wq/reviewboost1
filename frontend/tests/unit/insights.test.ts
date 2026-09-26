@@ -10,7 +10,7 @@ import {
   formatAverage,
   formatDateRange,
   insightPeriods,
-  MIN_BUCKET,
+  changeSentence,
   MIN_SAMPLE,
   parseFeedbackFilters,
   parseRange,
@@ -73,12 +73,12 @@ const NOW = new Date("2026-09-24T19:30:00Z");
 
 describe("periods: completed local days, in the business's zone", () => {
   it.each([
-    [7, 1, 7],
-    [30, 5, 6],
-    [90, 10, 9],
-  ] as const)("%i days → %i-day buckets, %i points", (range, bucketDays, count) => {
+    [7, "day", 7],
+    [30, "day", 30],
+    [90, "week", 13],
+  ] as const)("%i days → fetched by %s, %i buckets", (range, unit, count) => {
     const periods = insightPeriods(NY, range, NOW);
-    expect(periods.bucketDays).toBe(bucketDays);
+    expect(periods.unit).toBe(unit);
     expect(periods.buckets).toHaveLength(count);
     // previous start, each bucket start, today's start, tomorrow's start
     expect(periods.bounds).toHaveLength(count + 3);
@@ -88,6 +88,9 @@ describe("periods: completed local days, in the business's zone", () => {
 
   it("ends the current period at midnight this morning, so today never counts", () => {
     const periods = insightPeriods(NY, 30, NOW);
+    // Daily for a month is the largest request: 33 boundaries, within the
+    // database's cap of 64.
+    expect(periods.bounds).toHaveLength(33);
     expect(periods.current.endDate).toBe("2026-09-23"); // yesterday, local
     expect(periods.current.end).toBe(periods.today.start);
     expect(wallClock(NY, periods.today.start)).toBe("2026-09-24, 00:00");
@@ -263,29 +266,93 @@ describe("comparisons", () => {
 });
 
 describe("the trend line", () => {
-  const periods = insightPeriods(NY, 30, NOW);
+  /** One list of star values per day of the 30-day period, oldest first. */
+  function daily(days: number[][]) {
+    const periods = insightPeriods(NY, 30, NOW);
+    return summarizeInsights(periods, rowsFor(periods, { buckets: days }), false);
+  }
 
-  it("draws a gap, not a zero, where a stretch had too few ratings", () => {
-    const insights = summarizeInsights(
-      periods,
-      rowsFor(periods, { buckets: [times(3, 4), times(2, 5), [], times(4, 5), times(MIN_BUCKET, 3), times(5, 4)] }),
-      false,
-    );
-    expect(insights.trend.map((point) => point.average)).toEqual([4, null, null, 5, 3, 4]);
-    expect(insights.trend.map((point) => point.total)).toEqual([3, 2, 0, 4, 3, 5]);
-    expect(plottedPoints(insights.trend)).toBe(4);
+  it("draws 30 days day by day when most days have ratings", () => {
+    const days = Array.from({ length: 30 }, (_, index) => (index % 3 === 2 ? [] : [5, 4]));
+    const insights = daily(days);
+    expect(insights.trendUnit).toBe("day");
+    expect(insights.trend).toHaveLength(30);
+    expect(insights.trend[0]).toMatchObject({ startDate: "2026-08-25", endDate: "2026-08-25" });
   });
 
-  it("labels each point with the local days it covers", () => {
+  it("keeps a day nobody rated as a gap, never a zero and never an interpolation", () => {
+    const days = Array.from({ length: 30 }, () => [4]);
+    days[10] = [];
+    days[11] = [5];
+    const insights = daily(days);
+    expect(insights.trend[10]).toMatchObject({ average: null, total: 0 });
+    expect(insights.trend[9]?.average).toBe(4);
+    expect(insights.trend[11]?.average).toBe(5);
+    // A single rating is a real point: its count travels with it.
+    expect(insights.trend[11]?.total).toBe(1);
+  });
+
+  it("shows real rises and drops, unsmoothed", () => {
+    const pattern = [
+      [5, 4, 4],   // 4.3
+      [4, 4, 4, 5, 4, 4, 4, 4, 4, 4], // 4.1
+      [5, 4, 4, 5, 4], // 4.4
+      [4, 4, 5, 4, 4], // 4.2
+      [5, 5, 4, 4], // 4.5
+    ];
+    const days = Array.from({ length: 30 }, (_, index) => pattern[index % 5]!);
+    const averages = daily(days).trend.slice(0, 5).map((point) => Math.round(point.average! * 10) / 10);
+    expect(averages).toEqual([4.3, 4.1, 4.4, 4.2, 4.5]);
+  });
+
+  it("groups a sparse month into weeks ending yesterday, weighted by ratings", () => {
+    const days: number[][] = Array.from({ length: 30 }, () => []);
+    days[29] = [5, 5, 5]; // yesterday
+    days[23] = [1]; // same week as yesterday (days 23–29)
+    days[1] = [4, 4]; // the short oldest "week": days 0–1
+    const insights = daily(days);
+    expect(insights.trendUnit).toBe("week");
+    expect(insights.trend).toHaveLength(5);
+    expect(insights.trend[0]).toMatchObject({ startDate: "2026-08-25", endDate: "2026-08-26", total: 2, average: 4 });
+    expect(insights.trend.at(-1)).toMatchObject({ startDate: "2026-09-17", endDate: "2026-09-23", total: 4, average: 4 });
+    expect(insights.trend[2]).toMatchObject({ average: null, total: 0 });
+  });
+
+  it("draws 90 days by week: twelve whole weeks and a short oldest one", () => {
+    const periods = insightPeriods(NY, 90, NOW);
     const insights = summarizeInsights(periods, [], false);
-    expect(insights.trend[0]).toMatchObject({ startDate: "2026-08-25", endDate: "2026-08-29" });
-    expect(insights.trend.at(-1)).toMatchObject({ startDate: "2026-09-19", endDate: "2026-09-23" });
+    expect(insights.trendUnit).toBe("week");
+    expect(insights.trend.map((point) => localDaysBetween(point.startDate, point.endDate) + 1)).toEqual([
+      6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    ]);
+    expect(insights.trend.at(-1)?.endDate).toBe("2026-09-23");
+  });
+
+  it("counts plotted points only where somebody rated", () => {
+    const days = Array.from({ length: 30 }, (_, index) => (index < 20 ? [4] : []));
+    expect(plottedPoints(daily(days).trend)).toBe(20);
   });
 
   it("describes periods as dates a person reads", () => {
     expect(formatDateRange("2026-08-25", "2026-09-23")).toBe("Aug 25 – Sep 23");
     expect(formatDateRange("2025-12-20", "2026-01-18")).toBe("Dec 20, 2025 – Jan 18, 2026");
     expect(formatDateRange("2026-09-23", "2026-09-23")).toBe("Sep 23");
+  });
+
+  it("says the change in plain English, from the numbers the summary shows", () => {
+    const periods = insightPeriods(NY, 30, NOW);
+    const at = (current: number, previous: number) =>
+      changeSentence({
+        periods,
+        comparison: compareAverages(
+          { total: 20, average: current, counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 20 } },
+          { total: 20, average: previous, counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 20 } },
+        ),
+      });
+    expect(at(4.3, 4.0)).toBe("Up 0.3 on the previous 30 days");
+    expect(at(3.8, 4.1)).toBe("Down 0.3 on the previous 30 days");
+    expect(at(4.1, 4.0)).toBe("About the same as the previous 30 days");
+    expect(changeSentence({ periods, comparison: null })).toBeNull();
   });
 });
 

@@ -31,8 +31,24 @@ export const DEFAULT_RANGE: InsightRange = 30;
  */
 export const MIN_SAMPLE = 10;
 
-/** A point on the trend line needs this many ratings; fewer is drawn as a gap. */
-export const MIN_BUCKET = 3;
+/**
+ * How the trend is drawn. 7 and 30 days are fetched a day at a time; 90 days a
+ * week at a time, the weeks ending yesterday (so the oldest one is 6 days).
+ *
+ * A day or week with any ratings is a point; one with none is a gap. Nothing
+ * is interpolated across a gap, and every point's rating count is one tap
+ * away, so a day with a single rating reads as exactly that.
+ */
+const TREND_UNIT: Record<InsightRange, TrendUnit> = { 7: "day", 30: "day", 90: "week" };
+
+export type TrendUnit = "day" | "week";
+
+/**
+ * A 30-day view is drawn day by day only when at least half its days had a
+ * rating. Sparser than that, daily points are mostly isolated dots with no
+ * line between them, so the same ratings are shown by week instead.
+ */
+export const DAILY_COVERAGE = 0.5;
 
 /**
  * How far apart two averages, as shown, must be before the screen says
@@ -41,9 +57,6 @@ export const MIN_BUCKET = 3;
  * and nothing on screen may claim one.
  */
 export const MEANINGFUL_CHANGE = 0.2;
-
-/** Trend buckets tile the period exactly: 7 × 1 day, 6 × 5 days, 9 × 10 days. */
-const BUCKET_DAYS: Record<InsightRange, number> = { 7: 1, 30: 5, 90: 10 };
 
 export function parseRange(value: string | undefined | null): InsightRange {
   const days = Number(value);
@@ -60,14 +73,15 @@ export interface InsightWindow {
 
 export interface InsightPeriods {
   range: InsightRange;
-  bucketDays: number;
+  /** What each fetched bucket covers. */
+  unit: TrendUnit;
   /** The last `range` COMPLETED local days: it ends at the start of today. */
   current: InsightWindow;
   /** The `range` completed days immediately before that. */
   previous: InsightWindow;
   /** Today so far. Never part of an average, a trend or a comparison. */
   today: InsightWindow;
-  /** `current`, split into equal trend buckets, oldest first. */
+  /** `current`, split into days or weeks, oldest first, tiling it exactly. */
   buckets: InsightWindow[];
   /**
    * The boundaries handed to rpc_feedback_insights, as instants:
@@ -101,13 +115,14 @@ export function insightPeriods(
   range: InsightRange,
   now: Date = new Date(),
 ): InsightPeriods {
-  const bucketDays = BUCKET_DAYS[range];
-  const bucketCount = range / bucketDays;
+  const unit = TREND_UNIT[range];
+  const step = unit === "day" ? 1 : 7;
 
+  // From yesterday backwards, so the most recent point is always a whole unit;
+  // any remainder is the oldest bucket.
   const buckets: InsightWindow[] = [];
-  for (let index = 0; index < bucketCount; index += 1) {
-    const from = -range + index * bucketDays;
-    buckets.push(daySpan(timezone, from, from + bucketDays, now));
+  for (let end = 0; end > -range; end -= step) {
+    buckets.unshift(daySpan(timezone, Math.max(-range, end - step), end, now));
   }
 
   const current = daySpan(timezone, -range, 0, now);
@@ -116,7 +131,7 @@ export function insightPeriods(
 
   return {
     range,
-    bucketDays,
+    unit,
     current,
     previous,
     today,
@@ -139,7 +154,7 @@ export interface TrendPoint {
   startDate: LocalDate;
   endDate: LocalDate;
   total: number;
-  /** Null when the bucket has fewer than MIN_BUCKET ratings: drawn as a gap. */
+  /** Null when nobody rated in it: drawn as a gap, never as zero. */
   average: number | null;
 }
 
@@ -166,6 +181,8 @@ export interface FeedbackInsights {
   previous: PeriodStats;
   todayTotal: number;
   trend: TrendPoint[];
+  /** What one trend point covers, after any daily-to-weekly fallback. */
+  trendUnit: TrendUnit;
   comparison: Comparison | null;
   state: InsightState;
 }
@@ -256,15 +273,26 @@ export function summarizeInsights(
   const current = stats(currentCounts);
   const previous = stats(previousCounts);
 
-  const trend: TrendPoint[] = periods.buckets.map((bucket, index) => {
+  const fetched: Array<TrendPoint & { weighted: number }> = periods.buckets.map((bucket, index) => {
     const bucketStats = stats(bucketCounts[index] ?? emptyCounts());
     return {
       startDate: bucket.startDate,
       endDate: bucket.endDate,
       total: bucketStats.total,
-      average: bucketStats.total >= MIN_BUCKET ? bucketStats.average : null,
+      average: bucketStats.average,
+      weighted: (bucketStats.average ?? 0) * bucketStats.total,
     };
   });
+
+  const coverage = fetched.filter((point) => point.total > 0).length / Math.max(fetched.length, 1);
+  const byWeek = periods.unit === "day" && periods.range === 30 && coverage < DAILY_COVERAGE;
+  const trendUnit: TrendUnit = byWeek ? "week" : periods.unit;
+  const trend: TrendPoint[] = (byWeek ? weeksFromDays(fetched) : fetched).map((point) => ({
+    startDate: point.startDate,
+    endDate: point.endDate,
+    total: point.total,
+    average: point.average,
+  }));
 
   const state: InsightState =
     current.total >= MIN_SAMPLE
@@ -281,9 +309,28 @@ export function summarizeInsights(
     previous,
     todayTotal,
     trend,
+    trendUnit,
     comparison: state === "full" ? compareAverages(current, previous) : null,
     state,
   };
+}
+
+/** Daily points grouped into weeks ending yesterday; the oldest may be short. */
+function weeksFromDays<T extends TrendPoint & { weighted: number }>(days: readonly T[]): Array<TrendPoint & { weighted: number }> {
+  const weeks: Array<TrendPoint & { weighted: number }> = [];
+  for (let end = days.length; end > 0; end -= 7) {
+    const slice = days.slice(Math.max(0, end - 7), end);
+    const total = slice.reduce((sum, day) => sum + day.total, 0);
+    const weighted = slice.reduce((sum, day) => sum + day.weighted, 0);
+    weeks.unshift({
+      startDate: slice[0]!.startDate,
+      endDate: slice.at(-1)!.endDate,
+      total,
+      weighted,
+      average: total > 0 ? weighted / total : null,
+    });
+  }
+  return weeks;
 }
 
 /** Enough plotted points for a line to say anything: two or more. */
@@ -424,7 +471,21 @@ export function insightsHomeLine(
   return parts.join(" · ");
 }
 
-/** What one trend point covers: "day", "5-day stretch". */
-export function stretchName(bucketDays: number): string {
-  return bucketDays === 1 ? "day" : `${bucketDays}-day stretch`;
+/** What one trend point covers, in words: "day" or "week". */
+export function unitName(unit: TrendUnit): string {
+  return unit;
+}
+
+/**
+ * The chart's plain-English line: "Up 0.3 on the previous 30 days". Built from
+ * the same rounded averages the summary shows, so the two can never disagree.
+ */
+export function changeSentence(insights: Pick<FeedbackInsights, "comparison" | "periods">): string | null {
+  const { comparison, periods } = insights;
+  if (!comparison) return null;
+  const tenths = Math.round((comparison.current - comparison.previous) * 10);
+  const size = (Math.abs(tenths) / 10).toFixed(1);
+  const against = `the previous ${periods.range} days`;
+  if (comparison.direction === "steady") return `About the same as ${against}`;
+  return `${tenths > 0 ? "Up" : "Down"} ${size} on ${against}`;
 }

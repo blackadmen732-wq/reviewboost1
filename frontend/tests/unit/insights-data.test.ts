@@ -77,8 +77,8 @@ describe("getFeedbackInsights", () => {
     const args = rpc!.args as { p_org_id: string; p_bounds: string[]; p_location_id: string | null };
     expect(args.p_org_id).toBe(ORG);
     expect(args.p_location_id).toBeNull();
-    // previous start, nine 10-day bucket starts, today, tomorrow
-    expect(args.p_bounds).toHaveLength(12);
+    // previous start, thirteen week starts, today, tomorrow
+    expect(args.p_bounds).toHaveLength(16);
     for (const bound of args.p_bounds) {
       const clock = new Intl.DateTimeFormat("en-GB", {
         timeZone: "America/New_York",

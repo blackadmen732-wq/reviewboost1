@@ -52,19 +52,19 @@ function build(
 }
 
 /**
- * 84 ratings summing to 358 (4.26, shown 4.3) against 71 summing to 284 (4.0),
- * with one thin stretch.
+ * A realistic month, day by day: 84 ratings on 29 of 30 days (day 10 had
+ * none), averaging 4.27 (shown 4.3), against 71 averaging 4.0.
  */
+const MONTH: number[][] = Array.from({ length: 30 }, (_, day) => {
+  if (day === 10) return [];
+  if (day === 20) return [5, 4, 1];
+  if (day === 5 || day === 15 || day === 25) return [4, 4];
+  return [5, 4, 4];
+});
+
 const FULL = {
   previous: [...times(61, 4), ...times(5, 5), ...times(5, 3)],
-  buckets: [
-    [...times(6, 5), ...times(10, 4)],
-    [...times(6, 5), ...times(9, 4), 2],
-    [4, 5], // too few: a gap
-    [...times(6, 5), ...times(9, 4), 3],
-    [...times(6, 5), ...times(9, 4), 1, 3],
-    [...times(7, 5), ...times(8, 4), 3, 2],
-  ],
+  buckets: MONTH,
 };
 
 function renderView(insights: ReturnType<typeof build>, locations = ONE_PLACE, locationId: string | null = null) {
@@ -137,35 +137,93 @@ describe("10 or more ratings", () => {
     expect(screen.queryByText(/Improving|About the same|Declining/)).toBeNull();
   });
 
-  it("draws one line with a gap where a stretch had too few ratings", () => {
+  it("draws the month day by day, breaking the line where nobody rated", () => {
     const { container } = renderView(full);
-    const chart = screen.getByRole("img", { name: /average rating, aug 25 to sep 23/i });
+    const chart = screen.getByRole("img", { name: /average rating by day, aug 25 – sep 23/i });
     expect(chart).toBeVisible();
-    // Six stretches, the third too thin: two runs of line, five dots.
+    // Day 10 had no ratings: two runs, not one line bridged across it.
     expect(container.querySelectorAll('[data-testid="trend-line"]')).toHaveLength(2);
-    expect(container.querySelectorAll('[data-testid="trend-point"]')).toHaveLength(5);
+    expect(container.querySelectorAll('[data-testid="trend-area"]')).toHaveLength(2);
+    // A clean month line: only the latest point carries a dot until one is chosen.
+    expect(container.querySelectorAll('[data-testid="trend-point"]')).toHaveLength(1);
   });
 
-  it("lists every value in a table, gaps included", () => {
+  it("dates the axis a week apart, counted back from yesterday", () => {
     renderView(full);
-    const table = screen.getByRole("table", { name: "Average rating by 5-day stretch" });
+    expect(screen.getAllByTestId("trend-tick").map((tick) => tick.textContent)).toEqual([
+      "Aug 26",
+      "Sep 2",
+      "Sep 9",
+      "Sep 16",
+      "Sep 23",
+    ]);
+  });
+
+  it("leaves the wash out under short runs between gaps", () => {
+    const gappy = MONTH.map((day, index) => (index % 4 === 1 ? [] : day));
+    const { container } = renderView(build({ ...FULL, buckets: gappy }));
+    expect(container.querySelectorAll('[data-testid="trend-line"]').length).toBeGreaterThan(3);
+    expect(container.querySelectorAll('[data-testid="trend-area"]')).toHaveLength(0);
+  });
+
+  it("puts the change in words beside the chart", () => {
+    renderView(full);
+    expect(screen.getByText("Up 0.3 on the previous 30 days · Each point is one day")).toBeVisible();
+  });
+
+  it("lists every day in a table, gaps included", () => {
+    renderView(full);
+    const table = screen.getByRole("table", { name: "Average rating by day, Aug 25 – Sep 23" });
     const rows = within(table).getAllByRole("row").slice(1);
-    expect(rows).toHaveLength(6);
-    expect(within(rows[2]!).getByText("Too few to average")).toBeInTheDocument();
-    expect(within(rows[2]!).getByText("2")).toBeInTheDocument();
+    expect(rows).toHaveLength(30);
+    expect(within(rows[10]!).getByText("No ratings")).toBeInTheDocument();
+    expect(within(rows[10]!).getByText("0")).toBeInTheDocument();
   });
 
-  it("reads out a stretch on keyboard focus, and moves with the arrows", () => {
+  it("reads out a day on keyboard focus — date, average, ratings — and moves with the arrows", () => {
     renderView(full);
-    const chart = screen.getByRole("img", { name: /average rating/i });
+    const chart = screen.getByRole("img", { name: /average rating by day/i });
     fireEvent.focus(chart);
-    expect(screen.getByTestId("trend-tooltip")).toHaveTextContent("Sep 19 – Sep 23");
+    const tooltip = () => screen.getByTestId("trend-tooltip");
+    expect(tooltip()).toHaveTextContent("Sep 23");
+    expect(tooltip()).toHaveTextContent("4.3 average");
+    expect(tooltip()).toHaveTextContent("3 ratings");
     fireEvent.keyDown(chart, { key: "Home" });
-    expect(screen.getByTestId("trend-tooltip")).toHaveTextContent("Aug 25 – Aug 29");
-    fireEvent.keyDown(chart, { key: "ArrowRight" });
-    fireEvent.keyDown(chart, { key: "ArrowRight" });
-    expect(screen.getByTestId("trend-tooltip")).toHaveTextContent("Too few to average");
+    expect(tooltip()).toHaveTextContent("Aug 25");
+    for (let step = 0; step < 10; step += 1) fireEvent.keyDown(chart, { key: "ArrowRight" });
+    expect(tooltip()).toHaveTextContent("Sep 4");
+    expect(tooltip()).toHaveTextContent("No ratings");
     expect(screen.getByTestId("trend-crosshair")).toBeInTheDocument();
+  });
+
+  it("keeps the real 1–5 scale in view: 5, 4, 3 — and lower only if the data goes lower", () => {
+    const { container, unmount } = renderView(full);
+    const labels = () =>
+      [...container.querySelectorAll("figure span")]
+        .map((span) => span.textContent)
+        .filter((text) => /^[1-5]$/.test(text ?? ""));
+    expect(labels()).toEqual(["5", "4", "3"]);
+    unmount();
+
+    const rough = MONTH.map((day, index) => (index === 3 ? [2, 2, 1] : day));
+    const view = renderView(build({ ...FULL, buckets: rough }));
+    expect(
+      [...view.container.querySelectorAll("figure span")]
+        .map((span) => span.textContent)
+        .filter((text) => /^[1-5]$/.test(text ?? "")),
+    ).toEqual(["5", "4", "3", "2", "1"]);
+  });
+
+  it("dots every day of a week, where each point matters", () => {
+    const week = build({ previous: times(12, 4), buckets: [[5, 4], [4], [4, 4], [], [3, 5], [5, 5], [4, 5]] }, 7);
+    const { container } = renderView(week);
+    expect(container.querySelectorAll('[data-testid="trend-point"]')).toHaveLength(6);
+    expect(screen.getAllByTestId("trend-tick").map((tick) => tick.textContent)).toEqual([
+      "Sep 17",
+      "Sep 19",
+      "Sep 21",
+      "Sep 23",
+    ]);
   });
 
   it("opens the ratings behind each star row in Everything, same days and place", () => {
