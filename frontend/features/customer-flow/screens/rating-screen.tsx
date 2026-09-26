@@ -55,8 +55,8 @@ export function RatingScreen({
         disabled={isSubmitting}
       />
 
-      {/* Status lives in one short, centred line under the stars. The sheet is
-          a fixed 44% of the screen so the stars never move under a thumb; a
+      {/* Status lives in one short, centred line under the stars. The sheet has
+          a fixed height, set by screen width, so the stars never move under a thumb; a
           boxed notice plus a large button did not fit in it, and the error
           was squeezed to a sliver the customer could not read. */}
       <div className="rating-actions" data-rating-actions>

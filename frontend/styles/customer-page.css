@@ -10,7 +10,9 @@ html:has(.customer-live) {
 }
 
 /* Shared customer visit view — owner preview and live /q are this tree.
-   Canvas is 390/844 (Mario SoT). Hero 56% / card 44%. Card never moves. */
+   Approved and locked. The bottom sheet's height comes from the screen's
+   width (~320pt at 390pt wide); the business image takes whatever height is
+   left. A taller phone gets more image, never a taller sheet. */
 
 .visit-stage {
   /* Sizes inside the sheet are relative to the stage, not the browser window,
@@ -170,11 +172,11 @@ html:has(.customer-live) {
   overflow: hidden;
 }
 
-/* 56/44 is the *rating* geometry: the stars sit at a fixed height so the page
- * cannot reflow under the customer's thumb while they choose.
+/* The width-sized sheet is the *rating* geometry: the stars sit at a fixed
+ * height so the page cannot reflow under the customer's thumb while they choose.
  *
  * The handoff screen is a different shape — a heading, two lines of status and
- * the "Open the review page" link. Pinned at 44% of a fixed-height stage, its
+ * the "Open the review page" link. Pinned inside the fixed rating sheet, its
  * content ran to 353px inside a 169px box, so that link was reachable only by
  * scrolling a region most people will not realise scrolls. It is the fallback
  * for when the automatic redirect does not fire, which makes it the last thing
