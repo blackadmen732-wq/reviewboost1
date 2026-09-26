@@ -27,7 +27,8 @@
 #   scripts/backend/local-postgres.sh start          # start a throwaway cluster
 #   scripts/backend/local-postgres.sh reset          # migrations from empty
 #   scripts/backend/local-postgres.sh test           # pgTAP suites (fresh DB)
-#   scripts/backend/local-postgres.sh upgrade <base> # populated-upgrade proof
+#   scripts/backend/local-postgres.sh upgrade <base> [populated|hosted]
+#                                                    # populated-upgrade proof
 #   scripts/backend/local-postgres.sh stop
 #
 # Environment:
@@ -141,6 +142,33 @@ as $$
         (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role')
     )::text
 $$;
+
+-- Supabase Storage, reduced to the two tables and columns the migrations
+-- touch (the Customer Page bucket and its object policies). The real service
+-- owns far more; none of it is referenced here.
+create schema if not exists storage;
+grant usage on schema storage to anon, authenticated, service_role;
+create table if not exists storage.buckets (
+    id                  text primary key,
+    name                text not null,
+    owner               uuid,
+    public              boolean default false,
+    file_size_limit     bigint,
+    allowed_mime_types  text[],
+    created_at          timestamptz default now(),
+    updated_at          timestamptz default now()
+);
+create table if not exists storage.objects (
+    id          uuid primary key default gen_random_uuid(),
+    bucket_id   text references storage.buckets (id),
+    name        text,
+    owner       uuid,
+    metadata    jsonb,
+    created_at  timestamptz default now(),
+    updated_at  timestamptz default now()
+);
+alter table storage.objects enable row level security;
+grant all on all tables in schema storage to service_role;
 SQL
 }
 
@@ -159,16 +187,23 @@ reset_db() {
 # including it. The upgrade proof needs both halves of the same list.
 apply_migrations() {
     local mode="${1:-until}"
+    # Compared by version, so `20260901213000` and
+    # `20260901213000_restore_rpc_create_organization_definer.sql` both mean
+    # "through that migration". Comparing whole filenames silently dropped
+    # the named migration itself from `until` and ran it again under `after`.
     local marker="${2:-}"
+    marker="${marker##*/}"
+    marker="${marker%%_*}"
     local applied=0
     for file in "$REPO_ROOT"/supabase/migrations/*.sql; do
-        local name
+        local name version
         name="$(basename "$file")"
+        version="${name%%_*}"
         if [ -n "$marker" ]; then
-            if [ "$mode" = "until" ] && [[ "$name" > "$marker" ]]; then
+            if [ "$mode" = "until" ] && [[ "$version" > "$marker" ]]; then
                 continue
             fi
-            if [ "$mode" = "after" ] && [[ ! "$name" > "$marker" ]]; then
+            if [ "$mode" = "after" ] && [[ ! "$version" > "$marker" ]]; then
                 continue
             fi
         fi
@@ -183,13 +218,16 @@ apply_migrations() {
 # reset can never answer that question.
 upgrade_proof() {
     local baseline="${1:?baseline migration required}"
+    # Which fixture pair: `populated` (pre-destination, with the old SMS
+    # ledger) or `hosted` (the schema the hosted ledger records).
+    local fixture="${2:-populated}"
     start_cluster >/dev/null
     reset_db "$baseline"
-    echo "Loading the pre-upgrade database..."
-    psql_db -q -f "$REPO_ROOT/supabase/upgrade/populated_baseline.sql" >/dev/null
+    echo "Loading the pre-upgrade database ($fixture)..."
+    psql_db -q -f "$REPO_ROOT/supabase/upgrade/${fixture}_baseline.sql" >/dev/null
     apply_migrations after "$baseline"
     local output
-    output="$(psql_db -q --no-align --tuples-only -f "$REPO_ROOT/supabase/upgrade/populated_upgrade_test.sql" 2>&1)" || {
+    output="$(psql_db -q --no-align --tuples-only -f "$REPO_ROOT/supabase/upgrade/${fixture}_upgrade_test.sql" 2>&1)" || {
         echo "$output" | tail -30
         return 1
     }
@@ -197,7 +235,7 @@ upgrade_proof() {
         echo "$output" | grep -E '^not ok|^# ' | head -40
         return 1
     fi
-    echo "ok    populated upgrade ($(echo "$output" | grep -cE '^ok [0-9]+') assertions)"
+    echo "ok    $fixture upgrade ($(echo "$output" | grep -cE '^ok [0-9]+') assertions)"
 
     # Leave the cluster as every other command expects to find it. The proof's
     # fixtures are realistic old data, and a suite that counts rows without
@@ -244,11 +282,11 @@ case "${1:-}" in
     stop) stop_cluster ;;
     reset) start_cluster >/dev/null; reset_db "${2:-}" ;;
     migrate) apply_migrations "${2:-until}" "${3:-}" ;;
-    upgrade) upgrade_proof "${2:-}" ;;
+    upgrade) upgrade_proof "${2:-}" "${3:-populated}" ;;
     test) run_tests ;;
     psql) shift; psql_db "$@" ;;
     *)
-        echo "usage: $0 {start|stop|reset [until-migration]|migrate [until|after] [migration]|upgrade <baseline-migration>|test|psql}" >&2
+        echo "usage: $0 {start|stop|reset [until-migration]|migrate [until|after] [migration]|upgrade <baseline-migration> [populated|hosted]|test|psql}" >&2
         exit 64
         ;;
 esac
