@@ -134,7 +134,7 @@ grant execute on function public._validate_destination_write(text, text) to auth
 -- Only a destination that is actually being set or changed is checked: a
 -- rename of a location whose older link predates this rule still saves, and
 -- its Tags keep working.
-create or replace function app.require_review_writing_destination()
+create or replace function app.enforce_review_link_destination()
 returns trigger
 language plpgsql
 set search_path = ''
@@ -172,7 +172,7 @@ create trigger locations_writereview_destination
     before insert or update of google_review_url, destination_provider, destination_url
     on public.locations
     for each row
-    execute function app.require_review_writing_destination();
+    execute function app.enforce_review_link_destination();
 
 -- ====================================== Tag identity: rotation only ========
 
