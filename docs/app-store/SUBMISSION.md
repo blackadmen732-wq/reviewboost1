@@ -10,7 +10,7 @@ Everything App Review needs. Fill in the blanks marked **TODO** before submittin
 |---|---|
 | **App name** | ReviewBoost |
 | **Subtitle** | Get more Google reviews |
-| **Bundle identifier** | `fit.reviewboost.fit` |
+| **Bundle identifier** | `fit.reviewboost.app` (must match `ios.bundleIdentifier` in `apps/mobile/app.json`; create the App Store Connect record with exactly this ID) |
 | **SKU** | `reviewboost-ios-v1` |
 | **Primary language** | English (U.S.) |
 | **Category** | Business |
@@ -266,6 +266,28 @@ No other system permissions are requested. No camera, microphone, location, cont
 
 ---
 
+## App icon
+
+App Store Connect has no icon upload: the App Store icon is read from the
+submitted build. The build's icon is `apps/mobile/assets/icon.png`
+(`"icon"` in `app.json`), which Expo prebuild copies unchanged into
+`ios/ReviewBoost/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png`.
+
+| Check | Result |
+|---|---|
+| Size | 1024 × 1024 |
+| Alpha | None (RGB PNG) |
+| Corners | Square; iOS applies the mask |
+| Generated from | `Branding/Mark.svg` by `scripts/brand/generate-brand-assets.mjs` |
+| Verified in prebuild output | `docs/mobile/icon-previews/store-assets-qa.png` (`scripts/brand/render-store-qa.py`) |
+| Reference copy (review notes, press) | `store-assets/app-store/app-icon-1024.png`, pixel-identical to the build icon |
+
+To change the icon, change `Branding/Mark.svg`, rerun the generator, and ship
+a new build. Replacing a PNG by hand is caught by
+`frontend/tests/unit/brand-assets.test.ts`.
+
+---
+
 ## Screenshots checklist
 
 All screenshots must be taken on a real device or Simulator, not mocked.
@@ -345,6 +367,8 @@ help@reviewboost.fit
 - [ ] `.p8` APNs key uploaded to App Store Connect (not in git)
 - [ ] Demo account created in production Supabase
 - [ ] Screenshots captured and uploaded
+- [ ] App Store Connect record uses bundle ID `fit.reviewboost.app`
+- [ ] Build's App Store icon checked on the TestFlight build's product page (source: `apps/mobile/assets/icon.png`)
 - [ ] Privacy policy live at `https://reviewboost.fit/privacy`
 - [ ] Account deletion URL live at `https://reviewboost.fit/delete-account`
 - [ ] Deletion verified end to end on a throwaway account, on device

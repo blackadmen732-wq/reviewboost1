@@ -11,6 +11,7 @@
  *   frontend/components/brand/mark-geometry.ts   (the web mark reads this)
  *   frontend/public/brand/*                      (favicon, PWA, Apple touch, OG)
  *   apps/mobile/assets/*                         (iOS icon, Android adaptive layers)
+ *   store-assets/*                               (Google Play listing icon, App Store reference)
  *
  * Nothing is edited by hand. Change the mark, run this, commit the result:
  *
@@ -222,6 +223,24 @@ await writePng(
   512,
 );
 await writePng("apps/mobile/assets/android-icon-monochrome.png", adaptiveLayer(432, WHITE), 432);
+
+// Store listings. The App Store icon itself is not uploaded: App Store Connect
+// takes it from the submitted build (apps/mobile/assets/icon.png, via the
+// AppIcon asset catalog Expo prebuild writes). The copy here is a reference
+// for review notes and press, byte-for-byte the build's icon.
+await writePng("store-assets/app-store/app-icon-1024.png", appIconSvg, 1024, { opaque: true });
+// Google Play's listing icon is uploaded by hand: 512x512, 32-bit PNG, under
+// 1 MB. Full-bleed square, same artwork; Play applies its own corner mask.
+{
+  const out = "store-assets/google-play/icon-512.png";
+  await sharp(Buffer.from(appIconSvg), { density: 144 })
+    .resize(512, 512)
+    .flatten({ background: BRAND })
+    .ensureAlpha(1)
+    .png({ compressionLevel: 9 })
+    .toFile(join(root, out));
+  written.push(out);
+}
 
 // The in-app mark (BrandLockup): 48pt tall at 1x, 2x and 3x, so it is sharp
 // at any height the app sets up to that.

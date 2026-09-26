@@ -169,3 +169,23 @@ describe("app icons are OS-ready", () => {
     }
   });
 });
+
+describe("store listing assets", () => {
+  it("the Google Play icon is 512 square, 32-bit, under 1 MB", () => {
+    // Colour type 6 is RGBA, the "32-bit PNG" Play asks for.
+    expect(pngHeader("store-assets/google-play/icon-512.png")).toEqual({ width: 512, height: 512, colourType: 6 });
+    expect(readFileSync(join(REPO, "store-assets/google-play/icon-512.png")).length).toBeLessThan(1024 * 1024);
+  });
+
+  it("the App Store reference copy is the build's icon, byte for byte", () => {
+    const reference = readFileSync(join(REPO, "store-assets/app-store/app-icon-1024.png"));
+    expect(reference.equals(readFileSync(join(REPO, "apps/mobile/assets/icon.png")))).toBe(true);
+  });
+
+  it("the store docs name the real bundle ID and the generated icon", () => {
+    const appStore = read("docs/app-store/SUBMISSION.md");
+    expect(appStore).toContain("`fit.reviewboost.app`");
+    expect(appStore).not.toContain("fit.reviewboost.fit");
+    expect(read("docs/google-play/SUBMISSION.md")).toContain("store-assets/google-play/icon-512.png");
+  });
+});

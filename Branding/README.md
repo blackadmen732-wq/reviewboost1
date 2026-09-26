@@ -15,8 +15,9 @@ and `Wordmark.svg` is generated.
 
 The generator also writes the web mark's geometry
 (`frontend/components/brand/mark-geometry.ts`), every favicon, PWA and link
-preview image in `frontend/public/brand/`, and the iOS icon, Android adaptive
-layers and in-app mark rasters in `apps/mobile/assets/`.
+preview image in `frontend/public/brand/`, the iOS icon, Android adaptive
+layers and in-app mark rasters in `apps/mobile/assets/`, and the store
+listing assets in `store-assets/` (Google Play icon, App Store reference).
 
 ## Changing the brand
 
@@ -49,6 +50,8 @@ the mark on its own.
   the same artwork under two OS masks.
 - The mark's counter is a hole, so it works on any background. On brand green
   the mark is white; everywhere else it is brand green.
+- Store QA: after `npx expo prebuild`, `scripts/brand/render-store-qa.py`
+  checks and renders what the iOS and Android builds actually ship.
 - Minimum size: 16px tall. The QA sheet in `docs/mobile/icon-previews/brand-qa.png`
   shows it from 16px up.
 - Clearspace around the mark or lockup: a quarter of the mark's height.

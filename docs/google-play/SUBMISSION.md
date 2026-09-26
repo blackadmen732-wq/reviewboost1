@@ -98,7 +98,7 @@ opposite plainly is cheaper than being mistaken for one.
 
 | Asset | Requirement | Status |
 |---|---|---|
-| App icon | 512×512 PNG, 32-bit | Generate from `assets/icon.png` |
+| App icon | 512×512 PNG, 32-bit, ≤ 1 MB | **Ready:** `store-assets/google-play/icon-512.png` (7 KB, full-bleed square; Play adds the rounded mask) |
 | Feature graphic | 1024×500 PNG or JPEG, no alpha | **TODO** — required, listing cannot publish without it |
 | Phone screenshots | 2–8, min 320px, 16:9 or 9:16 | **TODO** — capture on device |
 | Tablet screenshots | Optional | Optional |
@@ -107,6 +107,10 @@ Adaptive icon layers already exist and are declared in `app.json`:
 `android-icon-foreground.png`, `android-icon-background.png`, and
 `android-icon-monochrome.png` for themed icons on Android 13+. The background
 colour is the one ReviewBoost green, `#00A86B` (see `Branding/README.md`).
+All of these, and the listing icon, are generated from `Branding/Mark.svg` by
+`scripts/brand/generate-brand-assets.mjs`; the prebuild output is checked
+under circle, squircle, rounded-square and teardrop masks in
+`docs/mobile/icon-previews/store-assets-qa.png`.
 
 **Shots to capture** (same list as the App Store package, so one session covers
 both):
@@ -267,6 +271,7 @@ quoting a number for here.
 - [ ] Play Console app created for `fit.reviewboost.app` **[EXTERNAL]**
 - [ ] Service account JSON at `credentials/google-play-service-account.json`, not in git
 - [ ] `EXPO_PUBLIC_SUPABASE_ANON_KEY` set in EAS, not in git
+- [ ] Listing icon uploaded: `store-assets/google-play/icon-512.png`
 - [ ] Feature graphic produced (1024×500, no alpha)
 - [ ] Phone screenshots captured on a real device
 - [ ] Store listing text pasted from above
