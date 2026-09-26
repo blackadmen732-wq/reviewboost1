@@ -24,19 +24,19 @@
 
 :root {
   color-scheme: light dark;
-  --rb-canvas: #f8f5f0;
+  --rb-canvas: #f6f7f5;
   --rb-surface: #ffffff;
-  --rb-quiet: #f2efe9;
-  --rb-ink: #1a1712;
-  --rb-muted: #5c5349;
-  --rb-border: #e8e1d7;
-  --rb-border-strong: #cfc5b6;
+  --rb-quiet: #f0f2f0;
+  --rb-ink: #171a18;
+  --rb-muted: #66706a;
+  --rb-border: #dce2de;
+  --rb-border-strong: #b9c3bd;
   --rb-brand: #00a86b;
   --rb-brand-hover: #009a61;
   --rb-brand-active: #008f5b;
-  --rb-brand-soft: #e5f6ef;
-  /* Brand green as *text* is only 2.83:1 on cream. This darker green is
-     4.96:1, so links and inline emphasis stay readable. */
+  --rb-brand-soft: #e3f5ec;
+  /* Brand green as *text* is only 2.87:1 on the canvas. This darker green is
+     5.02:1, so links and inline emphasis stay readable. */
   --rb-brand-text: #007a4d;
   /* Dark ink on brand green is 6.13:1. White would be 3.08:1 — large text
      only — so primary buttons never use white labels. */
@@ -44,46 +44,47 @@
   /* Deliberately deeper than the #F2A900 in the brand sheet. That gold is
      2.01:1 on white — below the 3:1 floor for a meaningful graphic — and the
      star rating is the single most important thing on the screen, read on a
-     phone in daylight. This is 3.42:1 on white, 3.14:1 on cream, and still
+     phone in daylight. This is 3.42:1 on white, 3.18:1 on the canvas, and still
      unmistakably gold. Unfilled stars stay outline-only, so filled versus
      unfilled is a shape difference and never colour alone. */
   --rb-star: #bf7d00;
-  --rb-warning: #9a6417;
+  --rb-warning: #9a6415;
   --rb-danger: #b33a3a;
-  --rb-danger-soft: #faeaea;
-  --rb-info: #356d8c;
+  --rb-danger-soft: #fce8e8;
+  --rb-info: #2663a0;
   --rb-focus-soft: rgb(0 168 107 / 28%);
   --radius-control: 14px;
   --radius-card: 20px;
-  --shadow-control: 0 1px 2px rgb(38 32 24 / 4%);
+  --shadow-control: 0 1px 2px rgb(20 28 24 / 4%);
   --shadow-button:
     0 2px 0 rgb(0 74 47 / 22%), 0 8px 18px -10px rgb(0 168 107 / 70%);
   --shadow-button-hover:
     0 2px 0 rgb(0 62 39 / 26%), 0 12px 24px -12px rgb(0 168 107 / 76%);
   --shadow-card:
-    0 1px 2px rgb(38 32 24 / 3%), 0 18px 50px -28px rgb(38 32 24 / 20%);
-  --shadow-float: 0 -12px 36px -28px rgb(38 32 24 / 28%);
+    0 1px 2px rgb(20 28 24 / 3%), 0 18px 50px -28px rgb(20 28 24 / 20%);
+  --shadow-float: 0 -12px 36px -28px rgb(20 28 24 / 28%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --rb-canvas: #14120f;
-    --rb-surface: #1c1915;
-    --rb-quiet: #262119;
-    --rb-ink: #f7f4ee;
-    --rb-muted: #b5aea2;
-    --rb-border: #332e26;
-    --rb-border-strong: #4f483c;
+    --rb-canvas: #0c100e;
+    --rb-surface: #131816;
+    --rb-quiet: #19201c;
+    --rb-ink: #f7f9f7;
+    --rb-muted: #abb5af;
+    --rb-border: #303a34;
+    --rb-border-strong: #465149;
     --rb-brand: #00a86b;
-    --rb-brand-hover: #17c07f;
-    --rb-brand-active: #21cf8c;
-    --rb-brand-soft: #123b2c;
-    --rb-brand-text: #4fd69b;
-    --rb-on-brand: #06231a;
-    --rb-star: #f7b928;
-    --rb-danger: #f08a8a;
+    --rb-brand-hover: #2fcc91;
+    --rb-brand-active: #32cf94;
+    --rb-brand-soft: #143729;
+    --rb-brand-text: #32cf94;
+    --rb-on-brand: #071b13;
+    --rb-star: #f2b94b;
+    --rb-warning: #f0b45a;
+    --rb-danger: #ff8f8f;
     --rb-danger-soft: #452323;
-    --rb-info: #8bc2df;
+    --rb-info: #78b5f4;
     --rb-focus-soft: rgb(0 168 107 / 34%);
     --shadow-control: 0 1px 2px rgb(0 0 0 / 24%);
     --shadow-button:
@@ -98,19 +99,19 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --rb-canvas: #f8f5f0;
-  --rb-surface: #fff;
-  --rb-quiet: #f2efe9;
-  --rb-ink: #111;
-  --rb-muted: #555;
-  --rb-border: #e8e1d7;
-  --rb-border-strong: #cfc5b6;
+  --rb-canvas: #f6f7f5;
+  --rb-surface: #ffffff;
+  --rb-quiet: #f0f2f0;
+  --rb-ink: #171a18;
+  --rb-muted: #66706a;
+  --rb-border: #dce2de;
+  --rb-border-strong: #b9c3bd;
   --rb-brand: #00a86b;
   --rb-brand-hover: #009a61;
   --rb-brand-active: #008f5b;
-  --rb-brand-soft: #e5f6ef;
-  /* Brand green as *text* is only 2.83:1 on cream. This darker green is
-     4.96:1, so links and inline emphasis stay readable. */
+  --rb-brand-soft: #e3f5ec;
+  /* Brand green as *text* is only 2.87:1 on the canvas. This darker green is
+     5.02:1, so links and inline emphasis stay readable. */
   --rb-brand-text: #007a4d;
   /* Dark ink on brand green is 6.13:1. White would be 3.08:1 — large text
      only — so primary buttons never use white labels. */
@@ -118,35 +119,37 @@
   /* Deliberately deeper than the #F2A900 in the brand sheet. That gold is
      2.01:1 on white — below the 3:1 floor for a meaningful graphic — and the
      star rating is the single most important thing on the screen, read on a
-     phone in daylight. This is 3.42:1 on white, 3.14:1 on cream, and still
+     phone in daylight. This is 3.42:1 on white, 3.18:1 on the canvas, and still
      unmistakably gold. Unfilled stars stay outline-only, so filled versus
      unfilled is a shape difference and never colour alone. */
   --rb-star: #bf7d00;
+  --rb-warning: #9a6415;
   --rb-danger: #b33a3a;
-  --rb-danger-soft: #faeaea;
-  --rb-info: #356d8c;
+  --rb-danger-soft: #fce8e8;
+  --rb-info: #2663a0;
   --rb-focus-soft: rgb(0 168 107 / 28%);
 }
 :root[data-theme="dark"],
 .dark {
   color-scheme: dark;
-  --rb-canvas: #14120f;
-  --rb-surface: #1c1915;
-  --rb-quiet: #262119;
-  --rb-ink: #f7f4ee;
-  --rb-muted: #b5aea2;
-  --rb-border: #332e26;
-  --rb-border-strong: #4f483c;
+  --rb-canvas: #0c100e;
+  --rb-surface: #131816;
+  --rb-quiet: #19201c;
+  --rb-ink: #f7f9f7;
+  --rb-muted: #abb5af;
+  --rb-border: #303a34;
+  --rb-border-strong: #465149;
   --rb-brand: #00a86b;
-  --rb-brand-hover: #17c07f;
-  --rb-brand-active: #21cf8c;
-  --rb-brand-soft: #123b2c;
-  --rb-brand-text: #4fd69b;
-  --rb-on-brand: #06231a;
-  --rb-star: #f7b928;
-  --rb-danger: #f08a8a;
+  --rb-brand-hover: #2fcc91;
+  --rb-brand-active: #32cf94;
+  --rb-brand-soft: #143729;
+  --rb-brand-text: #32cf94;
+  --rb-on-brand: #071b13;
+  --rb-star: #f2b94b;
+  --rb-warning: #f0b45a;
+  --rb-danger: #ff8f8f;
   --rb-danger-soft: #452323;
-  --rb-info: #8bc2df;
+  --rb-info: #78b5f4;
   --rb-focus-soft: rgb(0 168 107 / 34%);
 }
 
@@ -315,6 +318,13 @@ html {
      navigating from a short screen to a long one does not shift the whole
      layout sideways by 15px. Ignored on phones, where scrollbars are overlays. */
   scrollbar-gutter: stable;
+}
+
+/* A page that renders inside `.dark` on its own (the public pricing page)
+   paints the document too, so the reserved scrollbar gutter and iOS
+   overscroll show the dark canvas instead of a light strip. */
+html:has(body .dark[data-dark-page]) {
+  background-color: #0c100e;
 }
 
 body {

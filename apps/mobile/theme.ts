@@ -5,11 +5,11 @@ export const colors = {
   brandHover: "#009a61",
   brandActive: "#008f5b",
 
-  canvas: "#f8f5f0",
+  canvas: "#f6f7f5",
   surface: "#FFFFFF",
-  surfaceAlt: "#F5F3EF",
+  surfaceAlt: "#F0F2F0",
 
-  ink: "#1a1712",
+  ink: "#171a18",
   inkMuted: "#6B7280",
   inkFaint: "#9CA3AF",
 
