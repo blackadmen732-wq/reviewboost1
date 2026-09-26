@@ -295,7 +295,41 @@ describe("filters", () => {
       "Coral Springs",
     ]);
     fireEvent.change(picker, { target: { value: "loc-coral" } });
-    expect(push).toHaveBeenCalledWith("/feedback/insights?location=loc-coral");
+    expect(push).toHaveBeenCalledWith("/feedback/insights?location=loc-coral", { scroll: false });
+  });
+
+  it("changes period in place: one request, no jump to the top, one pill that moves", () => {
+    push.mockClear();
+    const { container } = renderView(build(FULL, 30), TWO_PLACES, "loc-coral");
+    const period = screen.getByRole("navigation", { name: "Period" });
+    const pills = container.querySelectorAll("[data-period-pill]");
+    expect(pills).toHaveLength(1);
+    expect(pills[0]).toHaveAttribute("aria-hidden", "true");
+    expect((pills[0] as HTMLElement).style.transform).toBe("translateX(100%)");
+
+    const sevenDays = within(period).getByRole("link", { name: "7 days" });
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    sevenDays.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith("/feedback/insights?days=7&location=loc-coral", { scroll: false });
+  });
+
+  it("leaves a modified click to the browser, so a new tab still opens", () => {
+    push.mockClear();
+    renderView(build(FULL, 30), TWO_PLACES);
+    const link = screen.getByRole("link", { name: "90 days" });
+    let leftToBrowser = false;
+    // Record what the app did, then stop jsdom, which cannot open a tab.
+    const record = (event: Event) => {
+      leftToBrowser = !event.defaultPrevented;
+      event.preventDefault();
+    };
+    document.addEventListener("click", record);
+    link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0, metaKey: true }));
+    document.removeEventListener("click", record);
+    expect(leftToBrowser).toBe(true);
+    expect(push).not.toHaveBeenCalled();
   });
 
   it("names an empty location rather than the whole business", () => {
@@ -307,6 +341,21 @@ describe("filters", () => {
 });
 
 describe("Feedback tabs", () => {
+  it("move one underline rather than drawing one per tab once it is placed", () => {
+    const { container } = render(<FeedbackTabs active="everything" />);
+    const underline = container.querySelectorAll("[data-tab-indicator]");
+    expect(underline).toHaveLength(1);
+    expect(underline[0]).toHaveAttribute("aria-hidden", "true");
+    // Placed: the row stops drawing the tab's own underline.
+    expect(container.querySelector("ul")).toHaveAttribute("data-placed");
+    expect(screen.getByRole("link", { name: "Everything" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("while loading, mark no tab current rather than guess", () => {
+    render(<FeedbackTabs />);
+    for (const link of screen.getAllByRole("link")) expect(link).not.toHaveAttribute("aria-current");
+  });
+
   it("are Needs you, Everything and Insights, one of them current", () => {
     render(<FeedbackTabs active="insights" />);
     const nav = screen.getByRole("navigation", { name: "Feedback views" });

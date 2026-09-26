@@ -1,6 +1,11 @@
 import { ArrowDown, ArrowRight, ArrowUp } from "lucide-react";
 import Link from "next/link";
 
+import {
+  InsightsFigures,
+  InsightsNavigationProvider,
+  PeriodSwitch,
+} from "@/features/dashboard/insights/insights-navigation";
 import { LocationPicker } from "@/features/dashboard/insights/location-picker";
 import { RatingTrendChart } from "@/features/dashboard/insights/rating-trend-chart";
 import { RatingBreakdown } from "@/features/dashboard/rating-breakdown";
@@ -20,7 +25,6 @@ import {
   type FeedbackInsights,
   type InsightRange,
 } from "@/lib/owner/insights";
-import { cn } from "@/lib/utils/cn";
 import { localDaysBetween } from "@/lib/utils/local-day";
 
 const DIRECTION_ICON: Record<Direction, typeof ArrowUp> = {
@@ -55,97 +59,101 @@ export function InsightsView({
   const place = locationId ? locations.find((location) => location.locationId === locationId)?.name : null;
 
   return (
-    <div className="flex flex-col gap-10">
-      {/* A business that has never had a rating has nothing to filter. One
-          looking at a single empty location keeps the way back. */}
-      {state !== "none" || locationId !== null ? (
-        <Filters range={periods.range} locations={locations} locationId={locationId} />
-      ) : null}
+    <InsightsNavigationProvider>
+      <div className="flex flex-col gap-10">
+        {/* A business that has never had a rating has nothing to filter. One
+            looking at a single empty location keeps the way back. */}
+        {state !== "none" || locationId !== null ? (
+          <Filters range={periods.range} locations={locations} locationId={locationId} />
+        ) : null}
 
-      {state === "none" ? (
-        <section className="max-w-[36rem]">
-          <h2 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {place ? `No customer feedback for ${place} yet.` : "No customer feedback yet."}
-          </h2>
-          <p className="mt-2 max-w-[36ch] text-base leading-relaxed text-muted">
-            Your insights will appear as customers respond.
-          </p>
-        </section>
-      ) : state === "quiet" ? (
-        <section className="max-w-[36rem]">
-          <h2 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            No ratings in the last {periods.range} days.
-          </h2>
-          <p className="mt-2 text-base leading-relaxed text-muted">
-            {formatDateRange(periods.current.startDate, periods.current.endDate)}
-          </p>
-          <TodayNote count={insights.todayTotal} />
-          {periods.range < 90 ? (
-            <p className="mt-4">
-              <Link
-                href={rangeHref(90, locationId)}
-                className="inline-flex min-h-11 items-center text-base font-medium text-brand-text underline-offset-4 hover:underline"
-              >
-                See the last 90 days
-              </Link>
-            </p>
-          ) : null}
-        </section>
-      ) : (
-        <>
-          <Summary insights={insights} />
-
-          {state === "full" ? (
-            <section aria-labelledby="insights-trend">
-              <h2 id="insights-trend" className="text-base font-semibold text-ink">
-                Average rating
+        <InsightsFigures>
+          {state === "none" ? (
+            <section className="max-w-[36rem]">
+              <h2 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
+                {place ? `No customer feedback for ${place} yet.` : "No customer feedback yet."}
               </h2>
-              <p className="mb-5 mt-1 text-sm text-muted">
-                {[changeSentence(insights), `Each point is one ${unitName(insights.trendUnit)}`]
-                  .filter(Boolean)
-                  .join(" · ")}
+              <p className="mt-2 max-w-[36ch] text-base leading-relaxed text-muted">
+                Your insights will appear as customers respond.
               </p>
-              {plottedPoints(insights.trend) >= 2 ? (
-                <RatingTrendChart
-                  points={insights.trend.map((point, index) => ({
-                    label: formatDateRange(point.startDate, point.endDate),
-                    // A short oldest week is read out, never labelled under the
-                    // axis, where it would crowd the next date.
-                    tick:
-                      index === 0 &&
-                      insights.trendUnit === "week" &&
-                      localDaysBetween(point.startDate, point.endDate) < 6
-                        ? ""
-                        : formatDay(point.startDate),
-                    average: point.average,
-                    total: point.total,
-                  }))}
-                  unit={insights.trendUnit}
-                  caption={`Average rating by ${unitName(insights.trendUnit)}, ${formatDateRange(
-                    periods.current.startDate,
-                    periods.current.endDate,
-                  )}`}
-                />
-              ) : (
-                <p className="max-w-[40ch] text-base leading-relaxed text-muted">
-                  Not enough rated {unitName(insights.trendUnit)}s to draw a line yet.
-                </p>
-              )}
             </section>
-          ) : null}
+          ) : state === "quiet" ? (
+            <section className="max-w-[36rem]">
+              <h2 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
+                No ratings in the last {periods.range} days.
+              </h2>
+              <p className="mt-2 text-base leading-relaxed text-muted">
+                {formatDateRange(periods.current.startDate, periods.current.endDate)}
+              </p>
+              <TodayNote count={insights.todayTotal} />
+              {periods.range < 90 ? (
+                <p className="mt-4">
+                  <Link
+                    href={rangeHref(90, locationId)}
+                    className="inline-flex min-h-11 items-center text-base font-medium text-brand-text underline-offset-4 hover:underline"
+                  >
+                    See the last 90 days
+                  </Link>
+                </p>
+              ) : null}
+            </section>
+          ) : (
+            <>
+              <Summary insights={insights} />
 
-          <section aria-labelledby="insights-breakdown">
-            <h2 id="insights-breakdown" className="mb-3 text-base font-semibold text-ink">
-              How customers rated you
-            </h2>
-            <RatingBreakdown
-              counts={insights.current.counts}
-              rowHref={(rating) => drilldownHref({ rating, locationId, period: periods.current })}
-            />
-          </section>
-        </>
-      )}
-    </div>
+              {state === "full" ? (
+                <section aria-labelledby="insights-trend">
+                  <h2 id="insights-trend" className="text-base font-semibold text-ink">
+                    Average rating
+                  </h2>
+                  <p className="mb-5 mt-1 text-sm text-muted">
+                    {[changeSentence(insights), `Each point is one ${unitName(insights.trendUnit)}`]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  {plottedPoints(insights.trend) >= 2 ? (
+                    <RatingTrendChart
+                      points={insights.trend.map((point, index) => ({
+                        label: formatDateRange(point.startDate, point.endDate),
+                        // A short oldest week is read out, never labelled under the
+                        // axis, where it would crowd the next date.
+                        tick:
+                          index === 0 &&
+                          insights.trendUnit === "week" &&
+                          localDaysBetween(point.startDate, point.endDate) < 6
+                            ? ""
+                            : formatDay(point.startDate),
+                        average: point.average,
+                        total: point.total,
+                      }))}
+                      unit={insights.trendUnit}
+                      caption={`Average rating by ${unitName(insights.trendUnit)}, ${formatDateRange(
+                        periods.current.startDate,
+                        periods.current.endDate,
+                      )}`}
+                    />
+                  ) : (
+                    <p className="max-w-[40ch] text-base leading-relaxed text-muted">
+                      Not enough rated {unitName(insights.trendUnit)}s to draw a line yet.
+                    </p>
+                  )}
+                </section>
+              ) : null}
+
+              <section aria-labelledby="insights-breakdown">
+                <h2 id="insights-breakdown" className="mb-3 text-base font-semibold text-ink">
+                  How customers rated you
+                </h2>
+                <RatingBreakdown
+                  counts={insights.current.counts}
+                  rowHref={(rating) => drilldownHref({ rating, locationId, period: periods.current })}
+                />
+              </section>
+            </>
+          )}
+        </InsightsFigures>
+      </div>
+    </InsightsNavigationProvider>
   );
 }
 
@@ -172,25 +180,13 @@ function Filters({
 }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <nav aria-label="Period">
-        <ul className="grid grid-cols-3 rounded-full border border-border bg-surface p-1 sm:inline-grid">
-          {INSIGHT_RANGES.map((option) => (
-            <li key={option}>
-              <Link
-                href={rangeHref(option, locationId)}
-                aria-current={option === range ? "true" : undefined}
-                className={cn(
-                  "flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-medium tabular-nums transition-colors duration-150",
-                  "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
-                  option === range ? "bg-ink text-canvas" : "text-muted hover:text-ink",
-                )}
-              >
-                {option} days
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <PeriodSwitch
+        options={INSIGHT_RANGES.map((option) => ({
+          label: `${option} days`,
+          href: rangeHref(option, locationId),
+          current: option === range,
+        }))}
+      />
 
       {locations.length > 1 ? (
         <LocationPicker locations={locations} selected={locationId} range={range} />

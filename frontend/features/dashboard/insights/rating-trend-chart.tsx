@@ -59,7 +59,11 @@ function tickIndices(count: number, unit: "day" | "week"): number[] {
  * of a week, isolated points, the latest point, the one you are on); about
  * five dates along the bottom. Pointing, tapping or the arrow keys give the
  * day, its average and how many ratings it rests on. One series in ink, no
- * colour that reads as good or bad, and nothing animates.
+ * colour that reads as good or bad.
+ *
+ * The line is never drawn in on arrival and nothing loops. The readout fades
+ * in over 120ms when it first appears and then follows the pointer exactly;
+ * a readout that lagged behind the finger would be a readout of the wrong day.
  *
  * Positions are percentages of the plot box, so it fills any width at a fixed
  * height and never scrolls sideways; strokes don't scale with the box.
@@ -273,7 +277,7 @@ export function RatingTrendChart({
           {shown ? (
             <div
               className={cn(
-                "pointer-events-none absolute top-0 z-10 w-max max-w-[12rem] rounded-[var(--radius-control)] border border-border bg-surface px-3 py-2 shadow-[var(--shadow-control)]",
+                "animate-fade-in pointer-events-none absolute top-0 z-10 w-max max-w-[12rem] rounded-[var(--radius-control)] border border-border bg-surface px-3 py-2 shadow-[var(--shadow-control)]",
                 edge(shownX),
               )}
               style={{ left: `${shownX}%` }}

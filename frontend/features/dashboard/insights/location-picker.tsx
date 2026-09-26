@@ -1,8 +1,9 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useId } from "react";
+
+import { useInsightsNavigation } from "@/features/dashboard/insights/insights-navigation";
 
 /**
  * All locations, or one — for a business with more than one.
@@ -10,6 +11,9 @@ import { useId } from "react";
  * A native select on purpose: on a phone it opens the system's own picker from
  * the bottom of the screen, reachable with the thumb that is holding the
  * phone, and it is keyboard- and screen-reader-complete without any help.
+ *
+ * It shows the place just picked while that place's figures load; bound to the
+ * URL alone it flicked back to the old place until the new page arrived.
  */
 export function LocationPicker({
   locations,
@@ -20,8 +24,19 @@ export function LocationPicker({
   selected: string | null;
   range: number;
 }) {
-  const router = useRouter();
+  const { target, go } = useInsightsNavigation();
   const id = useId();
+  const href = (value: string) => {
+    const params = new URLSearchParams();
+    if (range !== 30) params.set("days", String(range));
+    if (value) params.set("location", value);
+    const query = params.toString();
+    return `/feedback/insights${query ? `?${query}` : ""}`;
+  };
+  const pendingValue =
+    target !== null
+      ? (["", ...locations.map((location) => location.locationId)].find((value) => href(value) === target) ?? null)
+      : null;
 
   return (
     <div className="relative w-full sm:w-auto">
@@ -30,14 +45,8 @@ export function LocationPicker({
       </label>
       <select
         id={id}
-        value={selected ?? ""}
-        onChange={(event) => {
-          const params = new URLSearchParams();
-          if (range !== 30) params.set("days", String(range));
-          if (event.target.value) params.set("location", event.target.value);
-          const query = params.toString();
-          router.push(`/feedback/insights${query ? `?${query}` : ""}`);
-        }}
+        value={pendingValue ?? selected ?? ""}
+        onChange={(event) => go(href(event.target.value))}
         className="min-h-11 w-full appearance-none rounded-full border border-border bg-surface py-2 pl-4 pr-10 text-sm font-medium text-ink transition-colors duration-150 hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] sm:w-auto sm:min-w-[12rem]"
       >
         <option value="">All locations</option>
