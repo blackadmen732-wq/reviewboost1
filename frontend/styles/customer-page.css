@@ -57,12 +57,24 @@ html:has(.customer-live) {
   .visit-hero__image { transition: none; }
 }
 
-/* No image uploaded yet: a plain neutral area. The top of the page is only
-   ever the owner's own image; ReviewBoost draws nothing there. */
+/* No image uploaded yet: plain white. The top of the page is only ever the
+   owner's own image; ReviewBoost draws nothing there — no logo, no name, no
+   placeholder art. The hero's own field stays dark only while a photo that
+   does exist is downloading. */
+.visit-hero:has(.visit-hero__empty) {
+  background: #ffffff;
+}
+
 .visit-hero__empty {
   width: 100%;
   height: 100%;
-  background: #1c1d1d;
+  background: #ffffff;
+}
+
+/* On the white top the translucent backing reads mid-grey, and white text on
+   it falls under 4.5:1. The same pill, dark enough to stay readable. */
+.visit-hero:has(.visit-hero__empty) .visit-language .language-selector {
+  background: rgb(10 12 11 / 78%);
 }
 
 .visit-language {
@@ -113,8 +125,9 @@ html:has(.customer-live) {
  * box. So the whole set is pinned, and anything added to the card inherits a
  * consistent light palette rather than whichever tokens someone remembered.
  *
- * The hero above is dark artwork in both modes for the same reason: this is a
- * printed-feeling page a customer sees once, not a themed surface. */
+ * The hero above is the owner's artwork, or plain white, in both modes for the
+ * same reason: this is a printed-feeling page a customer sees once, not a
+ * themed surface. */
 .visit-card {
   --rb-canvas: #f6f7f5;
   --rb-surface: #ffffff;
@@ -291,11 +304,11 @@ html:has(.customer-live) {
   letter-spacing: 0.02em;
 }
 
-/* The mark sits where the reference's bolt did, at the same height; its width
-   follows the mark's own proportions (290.09 x 269.09). */
-.visit-powered .visit-powered__mark {
-  width: calc(3.72cqi * 290.09 / 269.09);
+/* The reference's small grey bolt — not the green R mark. */
+.visit-powered svg {
+  width: 3.72cqi;
   height: 3.72cqi;
+  fill: #626262;
 }
 
 .visit-powered > span {
@@ -303,12 +316,10 @@ html:has(.customer-live) {
   top: 0.33cqi;
 }
 
-/* The logotype sits on the text's baseline at the reference's 1.032em name
-   size; "Review" takes this ink. */
-.visit-powered .visit-powered__word {
+.visit-powered strong {
   color: #111111;
-  position: relative;
-  top: 0.33cqi;
+  font-size: 1.032em;
+  font-weight: 600;
 }
 
 
@@ -584,6 +595,17 @@ html:has(.customer-live) {
   color: #fff;
   pointer-events: none;
   text-shadow: 0 0 6px rgb(0 0 0 / 35%);
+}
+
+/* Over the plain white top a real iPhone draws its status bar dark; so does
+   the preview, or the time and icons vanish white-on-white. */
+.phone-frame__device:has(.visit-hero__empty) .phone-frame__status {
+  color: #111111;
+  text-shadow: none;
+}
+
+.phone-frame__device:has(.visit-hero__empty) .phone-frame__icons svg {
+  filter: none;
 }
 
 .phone-frame__time {
