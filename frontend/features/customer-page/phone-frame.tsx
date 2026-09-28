@@ -57,16 +57,21 @@ export function PhoneFrame({
         <span className="phone-frame__button phone-frame__button--up" aria-hidden="true" />
         <span className="phone-frame__button phone-frame__button--down" aria-hidden="true" />
         <span className="phone-frame__button phone-frame__button--power" aria-hidden="true" />
-        <div className="phone-frame__bezel">
-          <div ref={screenRef} className="phone-frame__screen" role="img" aria-label={label}>
-            <div
-              className="phone-frame__device"
-              style={{ width: SCREEN_W, height: SCREEN_H, transform: `scale(${scale})` }}
-            >
-              {children}
-              <StatusBar />
-              <div className="phone-frame__island" aria-hidden="true" />
-              <div className="phone-frame__home" aria-hidden="true" />
+        {/* The polished inner lip where the titanium meets the glass. */}
+        <div className="phone-frame__band">
+          <div className="phone-frame__bezel">
+            <div ref={screenRef} className="phone-frame__screen" role="img" aria-label={label}>
+              <div
+                className="phone-frame__device"
+                style={{ width: SCREEN_W, height: SCREEN_H, transform: `scale(${scale})` }}
+              >
+                {children}
+                <StatusBar />
+                <div className="phone-frame__island" aria-hidden="true">
+                  <span className="phone-frame__lens" />
+                </div>
+                <div className="phone-frame__home" aria-hidden="true" />
+              </div>
             </div>
           </div>
         </div>

@@ -500,9 +500,29 @@ html:has(.customer-live) {
    the screen (see phone-frame.tsx), so everything inside the device is in
    real device points. */
 .phone-frame {
+  /* The device's own proportions are in cqi: 1cqi is 1% of the phone's width,
+     so the rim, bezel and corners are the same object at 250px or 340px. */
+  container-type: inline-size;
+  position: relative;
+  isolation: isolate;
   width: min(100%, 340px);
   margin-inline: auto;
   padding-inline: 4px;
+}
+
+/* The soft shadow the phone casts on the surface it lies on. */
+.phone-frame::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 12%;
+  right: 12%;
+  bottom: -2.4%;
+  height: 5%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(0 0 0 / 32%), rgb(0 0 0 / 0%));
+  filter: blur(5px);
+  pointer-events: none;
 }
 
 /* In the owner editor the phone is a preview, not a life-size device: about
@@ -519,30 +539,85 @@ html:has(.customer-live) {
   }
 }
 
+/* A black-titanium iPhone, drawn in layers from the outside in:
+ *
+ *   body   the titanium band — brushed metal whose brightness changes around
+ *          the corners as it catches the light, brighter on its outer curve
+ *          than toward the glass, with a bright hairline on the outer edge
+ *   band   the polished lip where the metal meets the glass: a thin bright
+ *          line, as on the real phone
+ *   bezel  the black border under the glass, thin and even
+ *   screen the display, with a real iPhone's corner (55pt on a 393pt screen)
+ *
+ * Corners are concentric: each radius is the one inside it plus that layer's
+ * thickness, so the rim is the same width all the way round the curve. */
 .phone-frame__body {
   position: relative;
-  border-radius: 15.5% / 7.2%;
-  padding: 1%;
-  background: linear-gradient(135deg, #6b6f6d 0%, #2a2c2b 22%, #1a1b1b 50%, #2a2c2b 78%, #5c605e 100%);
+  border-radius: 17.2cqi;
+  padding: 1.55cqi;
+  background:
+    linear-gradient(
+      135deg,
+      rgb(255 255 255 / 24%) 0%,
+      rgb(255 255 255 / 0%) 16%,
+      rgb(255 255 255 / 0%) 82%,
+      rgb(255 255 255 / 12%) 100%
+    ),
+    conic-gradient(
+      from 225deg,
+      #4a4a4e,
+      #262629 12%,
+      #5e5e63 22%,
+      #2c2c2f 34%,
+      #3a3a3e 46%,
+      #76767c 55%,
+      #28282b 66%,
+      #4f4f54 78%,
+      #2a2a2d 90%,
+      #4a4a4e
+    );
   box-shadow:
-    0 0 0 1px rgb(0 0 0 / 55%),
-    0 28px 56px -22px rgb(0 0 0 / 50%),
-    0 10px 20px -10px rgb(0 0 0 / 30%);
+    inset 0 0 0 0.7px rgb(255 255 255 / 36%),
+    inset 0 0 1.1cqi 0.1cqi rgb(255 255 255 / 16%),
+    inset 0 0.8px 0.6px rgb(255 255 255 / 42%),
+    inset 0 -0.8px 0.6px rgb(0 0 0 / 55%),
+    0 0 0 0.5px rgb(0 0 0 / 70%),
+    0 1px 2px rgb(0 0 0 / 22%),
+    0 18px 36px -14px rgb(0 0 0 / 40%),
+    0 42px 80px -36px rgb(0 0 0 / 36%);
 }
 
+.phone-frame__band {
+  border-radius: 15.65cqi;
+  padding: 0.4cqi;
+  background: linear-gradient(
+    160deg,
+    #b4b4b9 0%,
+    #505054 16%,
+    #1c1c1e 42%,
+    #2b2b2e 62%,
+    #6e6e73 86%,
+    #a6a6ab 100%
+  );
+}
+
+/* The glass reaches the band, so the black border carries a faint sheen along
+   its upper edge where the glass catches the same light as the metal. */
 .phone-frame__bezel {
   overflow: hidden;
-  border-radius: 14.6% / 6.8%;
-  background: #030303;
-  padding: 3.6%;
+  border-radius: 15.25cqi;
+  padding: 2.55cqi;
+  background: linear-gradient(150deg, #1b1b1d 0%, #060607 15%, #030303 60%, #0c0c0d 100%);
+  box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 90%);
 }
 
+/* The page inside is never tinted: the screen shows exactly what /q renders. */
 .phone-frame__screen {
   position: relative;
   aspect-ratio: 390 / 844;
   width: 100%;
   overflow: hidden;
-  border-radius: 11.6% / 5.4%;
+  border-radius: 12.7cqi;
   background: #121513;
 }
 
@@ -553,34 +628,69 @@ html:has(.customer-live) {
   transform-origin: top left;
 }
 
+/* Side buttons stand just proud of the band, lit along their length like the
+   metal around them: a highlight on top, a shadow underneath, and a hairline
+   where they meet the frame. Only their outer ~70% shows past the band, so
+   the highlight sits in that part. */
 .phone-frame__button {
   position: absolute;
-  width: 0.9%;
-  border-radius: 2px;
-  background: linear-gradient(90deg, #111, #3d403f);
+  z-index: -1;
+  width: 1.1cqi;
+  background: linear-gradient(90deg, #3a3a3e 0%, #808086 32%, #5c5c61 58%, #2e2e31 100%);
+  box-shadow:
+    inset 0 0.6px 0 rgb(255 255 255 / 32%),
+    inset 0 -0.6px 0 rgb(0 0 0 / 55%),
+    0 0 0 0.4px rgb(0 0 0 / 60%);
 }
 
-.phone-frame__button--action { left: -0.7%; top: 15.5%; height: 4.4%; }
-.phone-frame__button--up { left: -0.7%; top: 22.5%; height: 8%; }
-.phone-frame__button--down { left: -0.7%; top: 32%; height: 8%; }
+.phone-frame__button--action,
+.phone-frame__button--up,
+.phone-frame__button--down {
+  left: -0.8cqi;
+  border-radius: 0.7cqi 0 0 0.7cqi;
+}
+
+.phone-frame__button--action { top: 15.5%; height: 4.4%; }
+.phone-frame__button--up { top: 22.5%; height: 8%; }
+.phone-frame__button--down { top: 32%; height: 8%; }
 .phone-frame__button--power {
-  right: -0.7%;
+  right: -0.8cqi;
   top: 25%;
   height: 12%;
-  background: linear-gradient(270deg, #111, #3d403f);
+  border-radius: 0 0.7cqi 0.7cqi 0;
+  background: linear-gradient(270deg, #3a3a3e 0%, #808086 32%, #5c5c61 58%, #2e2e31 100%);
 }
 
-/* Real iPhone metrics, in points. */
+/* Real iPhone metrics, in points: the Dynamic Island, with the front camera's
+   lens at its right end. */
 .phone-frame__island {
   position: absolute;
   top: 11px;
   left: 50%;
   z-index: 5;
-  width: 124px;
-  height: 36px;
+  width: 126px;
+  height: 37px;
   border-radius: 999px;
   background: #000;
   transform: translateX(-50%);
+}
+
+.phone-frame__lens {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 36% 32%,
+    #7c8bb4 0 7%,
+    #2a3556 20%,
+    #0c1120 52%,
+    #030407 80%
+  );
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 5%);
+  transform: translateY(-50%);
 }
 
 .phone-frame__status {

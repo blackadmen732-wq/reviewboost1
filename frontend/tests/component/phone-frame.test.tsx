@@ -38,6 +38,10 @@ describe("PhoneFrame", () => {
       expect(element?.getAttribute("aria-hidden")).toBe("true");
     }
     expect(container.querySelector(".phone-frame__time")?.textContent).toBe("9:41");
+    // The camera lens sits in the Dynamic Island, and the polished lip wraps
+    // the glass: the details that make it read as a phone, not a rectangle.
+    expect(container.querySelector(".phone-frame__island .phone-frame__lens")).toBeTruthy();
+    expect(container.querySelector(".phone-frame__band > .phone-frame__bezel")).toBeTruthy();
     expect(container.querySelector("[role='img']")?.getAttribute("aria-label")).toBe(
       "Mario’s preview",
     );
