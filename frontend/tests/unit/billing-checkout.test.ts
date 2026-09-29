@@ -29,7 +29,14 @@ vi.mock("@/lib/server/stripe", () => ({
 
 vi.mock("@/lib/server/supabase", () => ({
   serviceRoleClient: () => ({
-    from: () => builder({ stripe_customer_id: "cus_existing" }),
+    // The existing Stripe customer is looked up through the definer RPC, not
+    // a direct table read (see service-role-containment.test.ts).
+    rpc: (name: string) =>
+      Promise.resolve(
+        name === "rpc_billing_customer_for_org"
+          ? { data: "cus_existing", error: null }
+          : { data: null, error: null },
+      ),
   }),
 }));
 
