@@ -11,6 +11,7 @@ import { logger } from "@/lib/server/logger";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import { getProviderRate } from "@/lib/server/sms/provider";
 import { estimateMessageCost } from "@/lib/server/sms/cost";
+import { composeTextRequestBody, MessageCompositionError } from "@/lib/server/sms/message";
 import { reviewRequestDedupeKey } from "@/lib/server/sms/dedupe";
 import { normalizePhone, phoneHash, toStoredPhone } from "@/lib/server/sms/phone";
 import { nextAllowedSendTime } from "@/lib/server/sms/quiet-hours";
@@ -28,9 +29,13 @@ import { uuidSchema } from "@/lib/server/validation";
  * by its opaque token; either way the lookup is scoped to the caller's own
  * organization through RLS, so a Tag belonging to another business simply
  * returns no row. Only the *encrypted* rendered message is persisted.
+ *
+ * The rendered message is the final one — business name, link and opt-out
+ * included — built once by `composeTextRequestBody`. Preview and schedule call
+ * the same function, so what the owner is shown, what is reserved, and what
+ * the provider receives are the same string.
  */
 
-const DEFAULT_TEMPLATE = "How was your visit? Tap here to leave a review: {{link}}";
 const DEDUPE_WINDOW_SECONDS = 24 * 60 * 60;
 
 // A national number needs a country to become E.164; the org can carry a
@@ -117,8 +122,41 @@ export const scheduleSchema = z
 export type ScheduleInput = z.infer<typeof scheduleSchema>;
 export type PreviewInput = z.infer<typeof previewSchema>;
 
-function renderMessage(template: string | undefined, link: string): string {
-  return (template ?? DEFAULT_TEMPLATE).replace(/\{\{link\}\}/g, link);
+/**
+ * The business's own name, read through the caller's RLS-scoped client.
+ * A failed read fails closed: a message that cannot say who it is from is
+ * not sent.
+ */
+export async function resolveBusinessName(context: OrganizationContext): Promise<string | null> {
+  const { data, error } = await context.db
+    .from("organizations")
+    .select("name")
+    .eq("id", context.orgId)
+    .maybeSingle();
+
+  if (error) throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
+  return ((data as { name?: string | null } | null)?.name ?? null) as string | null;
+}
+
+/** The final body for a Text Request, or an error an owner can act on. */
+export async function composeFor(
+  context: OrganizationContext,
+  link: string,
+  template: string | undefined,
+): Promise<string> {
+  const businessName = await resolveBusinessName(context);
+  try {
+    return composeTextRequestBody({ businessName, link, template });
+  } catch (error) {
+    if (error instanceof MessageCompositionError) {
+      throw new ApiError(
+        error.reason === "missing_business_name" ? 409 : 400,
+        ERROR_CODE.validationFailed,
+        error.message,
+      );
+    }
+    throw error;
+  }
 }
 
 /** Map a definer-wrapper error message to a clean, opaque client error. */
@@ -232,6 +270,8 @@ export async function resolveStand(
 }
 
 export interface PreviewResult {
+  /** The exact text the customer will receive, and that segments were counted on. */
+  body: string;
   encoding: string;
   unitCount: number;
   segments: number;
@@ -247,10 +287,11 @@ export async function previewTextRequest(
 ): Promise<PreviewResult> {
   const normalized = normalizePhone(input.phone, phoneOptions());
   const stand = await resolveStand(context, input);
-  const body = renderMessage(input.messageTemplate, stand.link);
+  const body = await composeFor(context, stand.link, input.messageTemplate);
   const cost = estimateMessageCost(body, getProviderRate());
 
   return {
+    body,
     encoding: cost.encoding,
     unitCount: cost.unitCount,
     segments: cost.segments,
@@ -278,7 +319,7 @@ export async function scheduleTextRequest(
   const normalized = normalizePhone(input.phone, phoneOptions());
   const stored = toStoredPhone(normalized);
   const stand = await resolveStand(context, input);
-  const body = renderMessage(input.messageTemplate, stand.link);
+  const body = await composeFor(context, stand.link, input.messageTemplate);
   const cost = estimateMessageCost(body, getProviderRate());
 
   // Optional consent assertion, recorded before scheduling through the

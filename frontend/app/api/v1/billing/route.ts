@@ -4,11 +4,13 @@ import { z } from "zod";
 import { requireOrganizationContext, requireRole } from "@/lib/server/auth";
 import {
   createCheckoutSession,
+  createPackCheckoutSession,
   createPortalSession,
   readBillingState,
 } from "@/lib/server/billing-service";
 import { PLAN_IDS } from "@/lib/server/entitlements";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
+import { PACK_IDS } from "@/lib/server/sms-packs";
 import { parseOrThrow } from "@/lib/server/validation";
 
 /**
@@ -19,8 +21,9 @@ import { parseOrThrow } from "@/lib/server/validation";
  * this or renders nothing — it never fills a gap with "Starter", "trialing",
  * "150", or a next invoice date it invented.
  *
- * POST starts either a checkout or a portal session. Neither grants anything:
- * a plan changes when Stripe says so, through the webhook.
+ * POST starts a plan checkout, an SMS pack checkout, or a portal session.
+ * None of them grants anything: a plan or a pack changes when Stripe says
+ * so, through the webhook.
  */
 
 export const runtime = "nodejs";
@@ -30,6 +33,7 @@ const ROUTE = "/api/v1/billing";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("checkout"), planId: z.enum(PLAN_IDS) }),
+  z.strictObject({ action: z.literal("buy_pack"), packId: z.enum(PACK_IDS) }),
   z.strictObject({ action: z.literal("portal") }),
 ]);
 
@@ -51,7 +55,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     const session =
       body.action === "checkout"
         ? await createCheckoutSession(context, context.orgId, body.planId, requestId)
-        : await createPortalSession(context.orgId, requestId);
+        : body.action === "buy_pack"
+          ? await createPackCheckoutSession(context, context.orgId, body.packId, requestId)
+          : await createPortalSession(context.orgId, requestId);
 
     return json(request, requestId, 200, { data: session, requestId });
   });

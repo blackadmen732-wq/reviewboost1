@@ -39,6 +39,16 @@ const PLANS: ReadonlyArray<{
   { id: "pro", name: "Pro", priceUsd: 129, locations: 5, tags: 25, sms: 1500 },
 ];
 
+/**
+ * The pack card, for display. The server's catalog decides what a paid pack
+ * mints (docs/MONEY.md §4.2); this only labels the buttons.
+ */
+const PACKS: ReadonlyArray<{ id: "pack_50" | "pack_200" | "pack_500"; segments: number; priceUsd: number }> = [
+  { id: "pack_50", segments: 50, priceUsd: 4 },
+  { id: "pack_200", segments: 200, priceUsd: 16 },
+  { id: "pack_500", segments: 500, priceUsd: 40 },
+];
+
 function formatDate(value: string | null): string | null {
   if (!value) return null;
   const parsed = new Date(value);
@@ -222,6 +232,34 @@ export function BillingPanel({ billing }: { billing: Billing }) {
             {billing.smsBalance.total === 1 ? "message" : "messages"} left —{" "}
             {billing.smsBalance.monthly} included and {billing.smsBalance.purchased} purchased.
           </p>
+        </section>
+      ) : null}
+
+      {billing.status === "active" ? (
+        <section aria-labelledby="packs-heading">
+          <h2 id="packs-heading" className="mb-1 text-base font-semibold text-ink">
+            Buy more messages
+          </h2>
+          <p className="mb-4 text-sm text-muted">
+            A one-off payment. Purchased messages never expire and are used after the ones
+            included in your plan.
+          </p>
+          <ul className="grid gap-3 sm:grid-cols-3">
+            {PACKS.map((pack) => (
+              <li key={pack.id}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void act({ action: "buy_pack", packId: pack.id }, pack.id)}
+                  loading={busy === pack.id}
+                  loadingLabel="Opening…"
+                  disabled={busy !== null}
+                >
+                  {pack.segments} messages — ${pack.priceUsd}
+                </Button>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
 

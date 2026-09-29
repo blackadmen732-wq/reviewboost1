@@ -261,6 +261,49 @@ export function planIdForPrice(priceId: string | null): "starter" | "growth" | "
   return null;
 }
 
+/**
+ * Stripe price ids for the three SMS packs.
+ *
+ * A pack whose price is not configured cannot be sold. The price's amount is
+ * not trusted either: the database mints only when Stripe collected exactly
+ * the catalog price, so a misconfigured price id produces a visible
+ * paid-without-credit finding rather than a pack sold at the wrong price.
+ */
+export function stripePackPriceId(packId: "pack_50" | "pack_200" | "pack_500"): string {
+  switch (packId) {
+    case "pack_50":
+      return read("STRIPE_PRICE_SMS_PACK_50");
+    case "pack_200":
+      return read("STRIPE_PRICE_SMS_PACK_200");
+    case "pack_500":
+      return read("STRIPE_PRICE_SMS_PACK_500");
+  }
+}
+
+/**
+ * Where operational alerts are POSTed, if anywhere.
+ *
+ * Optional: without it, alerts are still structured `ops.alert` error logs,
+ * which is what a log drain alerts on. With it, a Slack-compatible incoming
+ * webhook receives `{ text }`. HTTPS only — an alert names what is broken,
+ * and that is not something to send in clear.
+ */
+export function opsAlertWebhookUrl(): string | null {
+  const raw = process.env.OPS_ALERT_WEBHOOK_URL?.trim();
+  if (!raw) return null;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new ConfigError("OPS_ALERT_WEBHOOK_URL must be an absolute HTTPS URL.");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new ConfigError("OPS_ALERT_WEBHOOK_URL must use HTTPS.");
+  }
+  return parsed.toString();
+}
+
 export function validateServerConfig(): { ok: true } | { ok: false; problems: string[] } {
   const problems: string[] = [];
 

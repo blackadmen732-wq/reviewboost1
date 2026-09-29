@@ -10,9 +10,15 @@ import {
   type PlanId,
   TRIAL_DAYS,
 } from "@/lib/server/entitlements";
-import { planIdForPrice, publicFrontendUrl, stripePriceId } from "@/lib/server/env";
+import {
+  planIdForPrice,
+  publicFrontendUrl,
+  stripePackPriceId,
+  stripePriceId,
+} from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { logger } from "@/lib/server/logger";
+import { PACK_METADATA_KIND, type PackId, SMS_PACKS } from "@/lib/server/sms-packs";
 import { stripeClient } from "@/lib/server/stripe";
 import { serviceRoleClient } from "@/lib/server/supabase";
 
@@ -95,7 +101,7 @@ function invoicePriceId(invoice: Stripe.Invoice): string | null {
   return line.plan?.id ?? null;
 }
 
-function customerIdOf(value: string | { id: string } | null | undefined): string | null {
+function idOf(value: string | { id: string } | null | undefined): string | null {
   if (!value) return null;
   return typeof value === "string" ? value : value.id;
 }
@@ -182,6 +188,71 @@ export async function createCheckoutSession(
   return { url: session.url };
 }
 
+/**
+ * Buy an SMS pack.
+ *
+ * A one-off payment, never a subscription line: software and SMS do not share
+ * a Stripe price. Only a business whose plan is active may buy one — a trial
+ * includes no SMS at all, and a suspended or cancelled business has no
+ * software to send from. The pack is granted by the webhook, from the
+ * database's own catalog, and only if Stripe collected the catalog price.
+ */
+export async function createPackCheckoutSession(
+  context: AuthenticatedContext,
+  orgId: string,
+  packId: PackId,
+  requestId: string,
+): Promise<{ url: string }> {
+  const { data: entitlement, error } = await context.db
+    .from("entitlement_snapshots")
+    .select("status, trial_ends_at")
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  if (error) {
+    logger.error("billing.pack_entitlement_failed", { requestId, orgId, error });
+    throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
+  }
+
+  const row = entitlement as { status: EntitlementStatus; trial_ends_at: string | null } | null;
+  const status = row ? effectiveStatus(row.status, row.trial_ends_at) : "suspended";
+  if (status !== "active") {
+    throw new ApiError(
+      403,
+      ERROR_CODE.forbidden,
+      "Message packs can be bought once your plan is active.",
+    );
+  }
+
+  const price = stripePackPriceId(packId);
+  const customerId = await ensureStripeCustomer(orgId, requestId);
+  const origin = publicFrontendUrl();
+  const metadata = { org_id: orgId, kind: PACK_METADATA_KIND, pack_id: packId };
+
+  const session = await stripeClient().checkout.sessions.create(
+    {
+      mode: "payment",
+      customer: customerId,
+      line_items: [{ price, quantity: 1 }],
+      client_reference_id: orgId,
+      metadata,
+      // Copied onto the PaymentIntent so a refund or dispute, which Stripe
+      // reports against the charge, can be recognised as a pack.
+      payment_intent_data: { metadata },
+      success_url: `${origin}/settings/billing?pack=complete`,
+      cancel_url: `${origin}/settings/billing?pack=cancelled`,
+    },
+    { idempotencyKey: `pack:${orgId}:${packId}:${requestId}` },
+  );
+
+  if (!session.url) {
+    logger.error("billing.pack_checkout_no_url", { requestId, orgId });
+    throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
+  }
+
+  return { url: session.url };
+}
+
 export async function ensureStripeCustomer(orgId: string, requestId: string): Promise<string> {
   const service = serviceRoleClient();
 
@@ -234,7 +305,145 @@ export type EventOutcome =
   | "stale"
   | "duplicate"
   | "ignored"
-  | "unknown_customer";
+  | "unknown_customer"
+  // A pack was paid for and deliberately not granted — the wrong amount, or a
+  // pack the catalog does not know. Recorded, and surfaced by health.
+  | "paid_without_credit";
+
+/**
+ * Invoices that pay for a billing period. A proration invoice from a plan
+ * change is not one: minting on it would hand an upgrading business a second
+ * full month's allowance inside the same period.
+ */
+const PERIOD_BILLING_REASONS = new Set(["subscription_create", "subscription_cycle"]);
+
+type PackOrg = { kind: "pack"; orgId: string } | { kind: "not_pack" } | { kind: "unknown_customer" };
+
+/**
+ * Whether a PaymentIntent paid for a pack, and whose.
+ *
+ * A pack already recorded answers from the database. Otherwise Stripe is
+ * asked, because a refund can arrive before the payment it refunds and a
+ * dispute names no customer at all. A PaymentIntent that is not a pack — a
+ * subscription invoice's — is not ours to claw back.
+ */
+async function resolvePackOrg(paymentIntentId: string): Promise<PackOrg> {
+  const { data, error } = await serviceRoleClient().rpc("rpc_billing_pack_org", {
+    p_payment_intent_id: paymentIntentId,
+  });
+  if (error) throw error;
+  if (typeof data === "string") return { kind: "pack", orgId: data };
+
+  const intent = await stripeClient().paymentIntents.retrieve(paymentIntentId);
+  if (intent.metadata?.["kind"] !== PACK_METADATA_KIND) return { kind: "not_pack" };
+
+  const orgId = await orgForCustomer(idOf(intent.customer as string | { id: string } | null));
+  return orgId ? { kind: "pack", orgId } : { kind: "unknown_customer" };
+}
+
+/**
+ * Grant one paid pack. Shared by the webhook and by reconciliation, so the
+ * two cannot disagree about what a paid Checkout Session is worth.
+ */
+async function applyPackPayment(
+  session: Stripe.Checkout.Session,
+  eventId: string,
+): Promise<"granted" | "duplicate" | "paid_without_credit" | "not_paid" | "unknown_customer"> {
+  if (session.payment_status !== "paid") return "not_paid";
+
+  const orgId = await orgForCustomer(idOf(session.customer as string | { id: string } | null));
+  if (!orgId) return "unknown_customer";
+
+  // The session's metadata was written by our own server, and the event is
+  // signed. It still has to agree with the customer on record: a pack is
+  // credited to the business that paid, not the one a label names.
+  const labelled = session.metadata?.["org_id"];
+  if (labelled && labelled !== orgId) {
+    throw new Error("pack session org does not match its Stripe customer");
+  }
+
+  const paymentIntentId = idOf(session.payment_intent as string | { id: string } | null);
+  if (!paymentIntentId) throw new Error("paid pack session has no payment intent");
+
+  const { data, error } = await serviceRoleClient().rpc("rpc_billing_apply_pack_payment", {
+    p_org_id: orgId,
+    p_payment_intent_id: paymentIntentId,
+    p_checkout_session_id: session.id,
+    p_pack_id: session.metadata?.["pack_id"] ?? null,
+    p_amount_cents: session.amount_total ?? null,
+    p_currency: session.currency ?? null,
+    p_event_id: eventId,
+  });
+  if (error) throw error;
+
+  if (data === "granted" || data === "duplicate") return data;
+
+  logger.error("billing.pack_paid_without_credit", {
+    orgId,
+    sessionId: session.id,
+    reason: typeof data === "string" ? data : "unknown",
+  });
+  return "paid_without_credit";
+}
+
+async function applyPackRefund(charge: Stripe.Charge, eventId: string): Promise<EventOutcome> {
+  const paymentIntentId = idOf(charge.payment_intent as string | { id: string } | null);
+  if (!paymentIntentId) return "ignored";
+
+  const pack = await resolvePackOrg(paymentIntentId);
+  if (pack.kind === "not_pack") return "ignored";
+  if (pack.kind === "unknown_customer") return "unknown_customer";
+
+  const { data, error } = await serviceRoleClient().rpc("rpc_billing_apply_pack_refund", {
+    p_org_id: pack.orgId,
+    p_payment_intent_id: paymentIntentId,
+    p_charge_amount_cents: charge.amount,
+    p_amount_refunded_cents: charge.amount_refunded ?? 0,
+    p_event_id: eventId,
+  });
+  if (error) throw error;
+
+  logRefundShortfall(pack.orgId, paymentIntentId, data);
+  return "applied";
+}
+
+async function applyPackDispute(
+  dispute: Stripe.Dispute,
+  eventId: string,
+  eventCreated: string,
+): Promise<EventOutcome> {
+  const paymentIntentId = idOf(dispute.payment_intent as string | { id: string } | null);
+  if (!paymentIntentId) return "ignored";
+
+  const pack = await resolvePackOrg(paymentIntentId);
+  if (pack.kind === "not_pack") return "ignored";
+  if (pack.kind === "unknown_customer") return "unknown_customer";
+
+  const { data, error } = await serviceRoleClient().rpc("rpc_billing_apply_pack_dispute", {
+    p_org_id: pack.orgId,
+    p_payment_intent_id: paymentIntentId,
+    p_dispute_id: dispute.id,
+    p_dispute_status: dispute.status,
+    p_event_created: eventCreated,
+    p_event_id: eventId,
+  });
+  if (error) throw error;
+
+  const row = Array.isArray(data) ? (data[0] as { outcome?: string } | undefined) : undefined;
+  logRefundShortfall(pack.orgId, paymentIntentId, data);
+  return row?.outcome === "stale" ? "stale" : "applied";
+}
+
+/** Spent credit that a refund could not take back is an accounting event. */
+function logRefundShortfall(orgId: string, paymentIntentId: string, data: unknown): void {
+  const row = Array.isArray(data)
+    ? (data[0] as { outstanding_segments?: number | string } | undefined)
+    : undefined;
+  const outstanding = Number(row?.outstanding_segments ?? 0);
+  if (outstanding > 0) {
+    logger.warn("billing.pack_clawback_outstanding", { orgId, paymentIntentId, outstanding });
+  }
+}
 
 /**
  * Apply one Stripe event.
@@ -252,7 +461,7 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
       const subscription = event.data.object as Stripe.Subscription;
-      const orgId = await orgForCustomer(customerIdOf(subscription.customer));
+      const orgId = await orgForCustomer(idOf(subscription.customer));
       if (!orgId) return "unknown_customer";
 
       const fields = subscriptionFields(subscription);
@@ -280,7 +489,14 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
 
     case "invoice.paid": {
       const invoice = event.data.object as Stripe.Invoice;
-      const orgId = await orgForCustomer(customerIdOf(invoice.customer));
+
+      // Only an invoice for a billing period mints that period's allowance.
+      // A proration from a mid-period plan change, or a one-off invoice, is
+      // not a new month.
+      const reason = (invoice as { billing_reason?: string | null }).billing_reason ?? null;
+      if (reason !== null && !PERIOD_BILLING_REASONS.has(reason)) return "ignored";
+
+      const orgId = await orgForCustomer(idOf(invoice.customer));
       if (!orgId) return "unknown_customer";
 
       const line = invoice.lines?.data?.[0];
@@ -308,6 +524,33 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
       // race that event and could contradict it.
       return "ignored";
     }
+
+    // ------------------------------------------------------ SMS packs ----
+
+    case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      // Subscription checkouts are applied through their subscription and
+      // invoice events; only a pack's payment session mints anything here.
+      if (session.mode !== "payment" || session.metadata?.["kind"] !== PACK_METADATA_KIND) {
+        return "ignored";
+      }
+      const outcome = await applyPackPayment(session, event.id);
+      if (outcome === "unknown_customer") return "unknown_customer";
+      if (outcome === "paid_without_credit") return "paid_without_credit";
+      // `not_paid` is a delayed payment method: its own success event follows.
+      return outcome === "not_paid" ? "ignored" : "applied";
+    }
+
+    case "charge.refunded":
+      return applyPackRefund(event.data.object as Stripe.Charge, event.id);
+
+    case "charge.dispute.created":
+    case "charge.dispute.updated":
+    case "charge.dispute.closed":
+    case "charge.dispute.funds_withdrawn":
+    case "charge.dispute.funds_reinstated":
+      return applyPackDispute(event.data.object as Stripe.Dispute, event.id, eventCreated);
 
     default:
       return "ignored";
@@ -360,6 +603,122 @@ export async function receiveStripeWebhook(
   }
 }
 
+// -------------------------------------------------------- reconciliation ---
+
+export interface PackReconciliation {
+  ok: boolean;
+  /** Paid pack Checkout Sessions Stripe reported in the window. */
+  checked: number;
+  /** Paid packs with no grant until this run — a webhook that never landed. */
+  healed: number;
+  /** Rows the database says a human should look at. */
+  findings: number;
+  errors: number;
+  byKind: Record<string, number>;
+}
+
+const RECONCILE_LOOKBACK_DAYS = 7;
+
+/**
+ * Stripe's paid pack sessions against the purchased-credit grants.
+ *
+ * Stripe is the record of what was paid; the grants are the record of what
+ * was given. For every paid pack session in the lookback window this applies
+ * the payment through the same idempotent path the webhook uses — so a missed
+ * webhook is healed rather than merely reported — and carries across any
+ * refund or dispute on its charge. Then the database lists anything that
+ * still does not add up, and the run is recorded for health to read.
+ *
+ * Idempotent end to end: a second run changes nothing and reports the same.
+ */
+export async function reconcileSmsPacks(
+  options: { lookbackDays?: number; now?: Date } = {},
+): Promise<PackReconciliation> {
+  const service = serviceRoleClient();
+  const stripe = stripeClient();
+  const startedAt = options.now ?? new Date();
+  const since =
+    Math.floor(startedAt.getTime() / 1000) -
+    (options.lookbackDays ?? RECONCILE_LOOKBACK_DAYS) * 24 * 60 * 60;
+
+  const result: PackReconciliation = {
+    ok: true,
+    checked: 0,
+    healed: 0,
+    findings: 0,
+    errors: 0,
+    byKind: {},
+  };
+
+  const sessions = stripe.checkout.sessions.list({
+    created: { gte: since },
+    limit: 100,
+    expand: ["data.payment_intent.latest_charge"],
+  });
+
+  for await (const session of sessions) {
+    if (session.mode !== "payment" || session.metadata?.["kind"] !== PACK_METADATA_KIND) continue;
+    if (session.payment_status !== "paid") continue;
+    result.checked += 1;
+
+    try {
+      const eventId = `reconcile:${startedAt.toISOString()}`;
+      const outcome = await applyPackPayment(session, eventId);
+      if (outcome === "granted") {
+        result.healed += 1;
+        logger.error("billing.pack_reconcile_healed", { sessionId: session.id });
+      }
+
+      const intent =
+        typeof session.payment_intent === "object" ? session.payment_intent : null;
+      const charge =
+        intent && typeof intent.latest_charge === "object" ? intent.latest_charge : null;
+
+      if (charge && (charge.amount_refunded ?? 0) > 0) {
+        await applyPackRefund(charge, eventId);
+      }
+      if (charge?.disputed && intent) {
+        const disputes = await stripe.disputes.list({ payment_intent: intent.id, limit: 1 });
+        const dispute = disputes.data[0];
+        if (dispute) await applyPackDispute(dispute, eventId, startedAt.toISOString());
+      }
+    } catch (error) {
+      result.errors += 1;
+      logger.error("billing.pack_reconcile_session_failed", { sessionId: session.id, error });
+    }
+  }
+
+  const { data: findings, error: findingsError } = await service.rpc(
+    "rpc_billing_pack_reconciliation_findings",
+  );
+  if (findingsError) {
+    result.errors += 1;
+    logger.error("billing.pack_reconcile_findings_failed", { error: findingsError });
+  } else {
+    for (const row of (findings ?? []) as Array<{ kind: string }>) {
+      result.byKind[row.kind] = (result.byKind[row.kind] ?? 0) + 1;
+      result.findings += 1;
+    }
+  }
+
+  result.ok = result.errors === 0 && result.findings === 0 && result.healed === 0;
+
+  const { error: recordError } = await service.rpc("rpc_billing_record_reconciliation_run", {
+    p_kind: "sms_packs",
+    p_started_at: startedAt.toISOString(),
+    p_ok: result.ok,
+    p_checked: result.checked,
+    p_healed: result.healed,
+    p_findings: result.findings,
+    p_detail: { byKind: result.byKind, errors: result.errors },
+  });
+  if (recordError) {
+    logger.error("billing.pack_reconcile_record_failed", { error: recordError });
+  }
+
+  return result;
+}
+
 // ------------------------------------------------------------- read side ---
 
 export interface BillingState {
@@ -370,6 +729,7 @@ export interface BillingState {
   currentPeriodEnd: string | null;
   smsBalance: { monthly: number; purchased: number; total: number };
   plans: typeof PLANS;
+  packs: typeof SMS_PACKS;
 }
 
 export async function readBillingState(
@@ -423,5 +783,6 @@ export async function readBillingState(
       total: Number(balanceRow?.total ?? 0),
     },
     plans: PLANS,
+    packs: SMS_PACKS,
   };
 }

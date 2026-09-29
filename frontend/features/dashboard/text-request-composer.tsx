@@ -35,6 +35,7 @@ interface TextRequestComposerProps {
 }
 
 interface Preview {
+  body: string;
   segments: number;
   encoding: string;
   unitCount: number;
@@ -51,6 +52,11 @@ interface Preview {
  * browser and dividing by 160 is wrong for any message containing an emoji,
  * a curly quote, or an accented name — and the number it produces is what the
  * business is billed against.
+ *
+ * The preview shows the whole message as the customer will receive it: the
+ * business name first, the Tag link, and the opt-out line. Those are added by
+ * the server and counted with everything else, so the count shown is the
+ * count billed.
  */
 export function TextRequestComposer({ balance, tags, recent }: TextRequestComposerProps) {
   const router = useRouter();
@@ -105,9 +111,7 @@ export function TextRequestComposer({ balance, tags, recent }: TextRequestCompos
         return;
       }
 
-      const payload = (await response.json()) as {
-        data: { segments: number; encoding: string; unitCount: number };
-      };
+      const payload = (await response.json()) as { data: Preview };
       setPreview(payload.data);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Something went wrong.");
@@ -230,13 +234,17 @@ export function TextRequestComposer({ balance, tags, recent }: TextRequestCompos
               />
               <span className="text-xs text-muted">
                 Leave it empty to use the default. Include {"{{link}}"} where the Tag link
-                should go.
+                should go. Your business name and an opt-out line are added to every
+                message — Preview shows exactly what will be sent.
               </span>
             </label>
 
             {preview ? (
               <InlineNotice kind="info">
-                <p>
+                <p className="whitespace-pre-wrap break-words font-medium text-ink">
+                  {preview.body}
+                </p>
+                <p className="mt-2">
                   {preview.segments} {preview.segments === 1 ? "message" : "messages"} will be
                   billed ({preview.unitCount} characters, {preview.encoding.toUpperCase()}).
                 </p>

@@ -1,8 +1,10 @@
 import type { NextRequest } from "next/server";
 
+import { reconcileSmsPacks } from "@/lib/server/billing-service";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json } from "@/lib/server/http";
 import { logger } from "@/lib/server/logger";
+import { raiseAlerts, readHealth, reconciliationExpected } from "@/lib/server/ops-health";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import { workerAuthorized } from "@/lib/server/worker-auth";
 
@@ -11,14 +13,15 @@ import { workerAuthorized } from "@/lib/server/worker-auth";
  *
  * Reconciliation closes out sends whose outcome the provider never told us,
  * dead-letter release gives back credit for messages that never left, and
- * expiry retires monthly allowance at its billing boundary. None of it is
- * driven by a user action, so without a scheduler all three simply never
- * happen — which shows up as credit stuck in reservations and businesses
- * unable to send.
+ * expiry retires monthly allowance at its billing boundary. Pack
+ * reconciliation compares Stripe's paid pack sessions with the credit they
+ * minted, and heals a webhook that never landed. None of it is driven by a
+ * user action, so without a scheduler it simply never happens.
  *
  * Every step is idempotent, so running twice costs nothing and a missed run
  * is caught by the next one. One failing step does not stop the others: an
- * operator needs the rest to have run, and the failure recorded.
+ * operator needs the rest to have run, and the failure recorded. The run ends
+ * by reading health and raising an alert for anything wrong.
  */
 
 export const runtime = "nodejs";
@@ -48,6 +51,30 @@ async function runMaintenance(requestId: string): Promise<Record<string, number 
       continue;
     }
     summary[step.name] = typeof data === "number" ? data : 0;
+  }
+
+  // Stripe is not configured in every environment. Where it is not, there is
+  // nothing to reconcile against — and health does not expect a run.
+  if (reconciliationExpected()) {
+    try {
+      const packs = await reconcileSmsPacks();
+      summary["reconcile_sms_packs"] = packs.ok ? packs.checked : `findings:${packs.findings}`;
+      summary["reconcile_sms_packs_healed"] = packs.healed;
+    } catch (error) {
+      logger.error("maintenance.step_failed", { requestId, step: "reconcile_sms_packs", error });
+      summary["reconcile_sms_packs"] = "failed";
+    }
+  } else {
+    summary["reconcile_sms_packs"] = "skipped";
+  }
+
+  try {
+    const report = await readHealth();
+    summary["health"] = report.ok ? "ok" : report.problems.join(",");
+    await raiseAlerts(report, "maintenance");
+  } catch (error) {
+    logger.error("ops.alert", { source: "maintenance", problems: ["health_unreadable"], error });
+    summary["health"] = "failed";
   }
 
   return summary;
