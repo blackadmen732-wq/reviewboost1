@@ -29,6 +29,39 @@ That file is gitignored; never commit real values.
 |---|---|---|
 | `PUBLIC_FRONTEND_URL` | yes (production) | Origin used in QR codes and NFC tags (`{PUBLIC_FRONTEND_URL}/q/{token}`). Production refuses to start without it. In production this MUST be `https://reviewboost.fit` — never `http://localhost:3000` or a `*.vercel.app` preview URL, because a stand printed against the wrong origin cannot be recalled. Use `http://localhost:3000` only in development. |
 
+## Billing (Stripe)
+
+Server-only. There is no development fallback for any of these: a billing path
+that silently does nothing is how a business ends up believing it is
+subscribed. Money rules: `docs/MONEY.md`.
+
+| Variable | Required | Description |
+|---|---|---|
+| `STRIPE_SECRET_KEY` | yes (billing) | Stripe secret key. Its presence is also what makes maintenance run pack reconciliation and health expect it. |
+| `STRIPE_WEBHOOK_SECRET` | yes (billing) | Signing secret for `/api/v1/webhooks/stripe`. The endpoint must be subscribed to `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`, `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded` and `charge.dispute.*`. |
+| `STRIPE_PRICE_STARTER` / `_GROWTH` / `_PRO` | yes (billing) | Recurring prices for the three plans ($49 / $79 / $129 a month). |
+| `STRIPE_PRICE_SMS_PACK_50` / `_200` / `_500` | yes (packs) | One-time prices for the three SMS packs ($4 / $16 / $40). A pack is minted only if Stripe collected exactly the catalog price, so a wrong price id produces a visible paid-without-credit finding, never a pack sold at the wrong price. |
+
+## Text Requests (SMS) — messaging
+
+| Variable | Required | Description |
+|---|---|---|
+| `SMS_OPT_OUT_FOOTER` | no | Opt-out copy appended to every message. Defaults to `Reply STOP to opt out.` Set it only to match the sample messages registered for the live A2P 10DLC / toll-free campaign. Must name an opt-out keyword in capitals (one the inbound handler honours) and use only GSM-7 characters; anything else is a `ConfigError`. |
+
+The provider, rate and worker variables are documented in
+`docs/backend/TEXT_REQUESTS.md` §20 and `frontend/.env.example`.
+
+## Operations
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPS_ALERT_WEBHOOK_URL` | (unset) | HTTPS Slack-compatible incoming webhook. Maintenance POSTs `{ text }` to it when health finds a problem. Alerts are always also an `ops.alert` error log. |
+| `OPS_DISPATCH_STALL_SECONDS` | `600` | How long a due outbox job may wait before dispatch counts as stalled. The default assumes dispatch every minute; on the once-a-day Hobby cadence set `93600`. |
+| `OPS_PROVIDER_UNKNOWN_MAX_AGE_SECONDS` | `3600` | Oldest unresolved `provider_unknown` send before it is a problem. |
+| `OPS_STRIPE_WEBHOOK_MAX_AGE_SECONDS` | `900` | Oldest unprocessed Stripe event before it is a problem. |
+| `OPS_UNVERIFIED_WEBHOOKS_PER_HOUR` | `10` | Unverifiable Twilio webhooks per hour before it is a problem (a forged burst, or an auth token / public URL that no longer matches). |
+| `OPS_RECONCILIATION_MAX_AGE_SECONDS` | `129600` | How long since the last pack reconciliation before it is a problem (36 h, for a daily run). |
+
 ## Development-only
 
 | Variable | Default | Description |

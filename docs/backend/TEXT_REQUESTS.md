@@ -161,6 +161,13 @@ inbound messages (which Twilio tags `SmsStatus=received`) are classified by thei
 sends still reach a terminal state. **No credentials are committed, and it
 performs no send unless `TWILIO_*` are configured at runtime.**
 
+**The provider must not rewrite the body.** On a Twilio Messaging Service,
+keep *Link Shortening* off and do not enable any feature that appends opt-out
+or brand text: ReviewBoost composes the final body itself (§23) and bills on
+it, and a provider-side rewrite would make every preview and reservation
+wrong. *Smart Encoding* may be on — it only ever lowers a segment count, so the
+reservation stays an upper bound.
+
 ## 11. Quiet hours **[impl][test-ci]**
 
 `isWithinSendWindow` / `nextAllowedSendTime` compute the recipient's local send
@@ -200,6 +207,11 @@ quotes, emoji (surrogate pairs), accented letters, exact boundaries, multi-segme
 
 ## 14. Cost preview **[impl][test-ci]** / pricing **[needs-provider]**
 
+The preview is computed on the **final body** (§23) — business name, link and
+opt-out included — and returns that body, so the owner sees the exact text the
+count was taken on. Schedule reserves on the same string and stores it;
+dispatch sends it unchanged.
+
 `estimateMessageCost` / `previewCost` compute in integer **micro-units** (no
 floats, currency explicit). The per-segment rate is external config
 (`SMS_RATE_PER_SEGMENT_MICROS` / `SMS_RATE_CURRENCY`); **no production price is
@@ -225,6 +237,15 @@ allocations from the projection, and `app.sms_quota_available` discounts any
 not-yet-swept expired allocation — so an allocation past its `expires_at` is never
 spendable. pgTAP asserts an already-expired grant yields zero available and a
 reservation against it is refused.
+
+Since the two-source ledger (`20260915000800`), credit lives in
+`sms_credit_grants` (monthly and purchased) and a grant can be **clawed back**
+(`20260929000100`): a pack refund or chargeback sets `clawback_target`, and the
+grant revokes as much as is unspent — immediately, and again whenever an
+in-flight reservation is released back to it. `consumed + reserved + revoked ≤
+segments` is a constraint, so no balance can go negative; refunded credit that
+was already spent is an explicit `needs_review` accounting state. Money rules:
+`docs/MONEY.md` §5.
 
 ## 16. API endpoints **[impl][test-ci for auth/isolation via pgTAP]**
 
@@ -295,8 +316,9 @@ them trigger on `supabase/**`, `frontend/lib/server/**`, and `frontend/app/api/*
 ## 21. Still missing before a real SMS can be sent
 
 - A configured provider + credentials + verified sending number (above). **[needs-provider]**
-- An allocation of quota per org (`rpc_sms_quota_allocate`) tied to billing — the
-  ledger exists; the purchase/plan integration does not. **[impl: ledger only]**
+- ~~An allocation of quota per org tied to billing~~ — **[impl][test-ci]**: paid
+  invoices mint monthly credit and paid packs mint purchased credit
+  (`docs/MONEY.md`). Live Stripe is **[needs-provider]**.
 - Recording real consent per recipient (an import path or a capture point);
   without `opted_in` consent, every send is correctly suppressed. **[impl: mechanism]**
 - Wiring rating-flow completion to `app.sms_mark_flow_completed` for full
@@ -307,3 +329,55 @@ them trigger on `supabase/**`, `frontend/lib/server/**`, and `frontend/app/api/*
 
 Nothing here should be read as "SMS compliance is done." The technical controls
 exist and are tested; legal review and live verification are separate steps.
+
+## 22. Operational health and alerts **[impl][test-ci]**
+
+`public.rpc_ops_health()` counts what grows silently; `lib/server/ops-health.ts`
+turns counts into named problems. `/api/v1/internal/health` (worker secret)
+returns them — **503 when unhealthy**, so an uptime monitor pointed at it is an
+alert with no further wiring. Every maintenance run ends by reading health and
+raising an `ops.alert` error log, plus a POST to `OPS_ALERT_WEBHOOK_URL` when
+configured.
+
+| Problem | Signal |
+|---|---|
+| `dispatch_stalled` | oldest outbox job that is **due** (`available_at <= now()`) waiting longer than `OPS_DISPATCH_STALL_SECONDS`. Jobs deferred to a future send window do not count |
+| `dispatch_leases_expired` | a leased job whose lease ran out — a worker died holding it |
+| `dispatch_stuck_sending` | a request in `sending` for over 10 minutes |
+| `dead_letters` / `dead_letters_unreleased` | a dead letter in the last 24 h / one whose reservation was never released |
+| `provider_unknown_backlog` | an unresolved `provider_unknown` older than the threshold |
+| `sms_webhooks_failed` | a verified Twilio webhook that failed processing, or is stuck unprocessed for 5 minutes |
+| `sms_webhooks_unverified` | a burst of unverifiable Twilio webhooks — forgery, or an auth token / URL that no longer matches |
+| `stripe_webhooks_unprocessed` | a Stripe event unprocessed past the threshold |
+| `pack_paid_without_credit` | a pack Stripe took money for with no grant |
+| `pack_refund_needs_review` | refunded or disputed pack credit that was already spent |
+| `pack_refund_without_payment` | a refund or dispute for a payment never seen paid |
+| `pack_reconciliation_stale` / `_findings` | no recent reconciliation run / the last one healed or found something |
+
+Counts and ages only: nothing in the health payload or an alert identifies a
+customer, a phone number or a business.
+
+## 23. The final message **[impl][test-ci]**
+
+`composeTextRequestBody` (`lib/server/sms/message.ts`) builds the one body used
+everywhere:
+
+```
+<Business name>: <owner's message, {{link}} → the Tag URL> <opt-out>
+```
+
+- **Business identity** — the organization's name, one line, at most 40
+  characters, read through the caller's RLS client (a failed read is a 503; a
+  business with no name cannot send). A template that already opens with the
+  name is not prefixed twice.
+- **Opt-out** — `Reply STOP to opt out.` by default, or `SMS_OPT_OUT_FOOTER` to
+  match the sample messages registered for the live campaign. The configured
+  copy must name a keyword `classifyKeyword` treats as STOP, in capitals, and
+  must be GSM-7 — a footer with a curly apostrophe would silently double the
+  cost of every message.
+- The owner's template cannot remove either, and the body is capped at
+  Twilio's 1,600 characters.
+
+Vitest (`sms-message.test.ts`) proves the preview's body, encoding and segment
+count equal what scheduling encrypts and reserves, and that dispatch hands the
+provider the decrypted stored body with nothing appended.

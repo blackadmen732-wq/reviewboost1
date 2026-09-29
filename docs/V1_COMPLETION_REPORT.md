@@ -2,12 +2,40 @@
 
 Living document. Updated at every stage, not written at the end.
 
-**Last updated:** 2026-09-15
-**Integration branch:** `claude/reviewboost-v1-recovery-cokccs`
+**Last updated:** 2026-09-29
+**Integration branch:** `claude/reviewboost-v1-recovery-cokccs` (landed as #71);
+SMS V1 money edges on `ccr-bc149dde-lt2wey`
 **Canonical pull request:** [#71](https://github.com/blackadmen732-wq/reviewboost1/pull/71)
 **`main` at the start of this program:** `6b8adc5`
-**`main` now:** `6b8adc5` — unchanged. Everything below is on the branch, in one
-reviewable PR, and nothing has been merged without review.
+
+## 2026-09-29 — SMS V1 money and reliability edges
+
+Closed before SMS V1 can be called complete. Money rules: `docs/MONEY.md`,
+rewritten to the approved model (the unmerged #65 draft is superseded, not
+merged).
+
+| Edge | Status | Evidence |
+|---|---|---|
+| Pack refunds and chargebacks leave no free credit | **DONE** | `sms_pack_purchases` + grant clawback; full, partial (rounded up), in-flight, refund-before-payment, dispute open/won/lost, out-of-order events. `sms_pack_money_test.sql` §§3–8 |
+| No negative balance; spent refunded credit is an explicit review state | **DONE** | `consumed + reserved + revoked ≤ segments` constraint; `sms_pack_accounting.review_state = needs_review`, audited, resolvable by an operator |
+| Final message names the business and carries opt-out copy for the live config | **DONE** in code (live carrier BLOCKED — EXTERNAL) | `composeTextRequestBody`; `SMS_OPT_OUT_FOOTER` validated against the STOP keyword list and GSM-7. `sms-message.test.ts` |
+| Preview counts the exact body Twilio receives | **DONE** | Preview returns the body; schedule stores and reserves on the same string; dispatch sends it unchanged. `sms-message.test.ts` |
+| Failed first payment after the Starter trial mints zero monthly SMS | **DONE** (proved) | `sms_pack_money_test.sql` §10 and the webhook sequence in `sms-pack-billing.test.ts`; proration invoices no longer mint either |
+| Alerts for stalled dispatch, dead letters, provider_unknown, failed Twilio webhooks, paid-pack-without-credit | **DONE** in code (external paging BLOCKED — needs a webhook URL) | `rpc_ops_health`, `ops-health.ts`; health is a 503 when unhealthy; maintenance raises `ops.alert` and posts to `OPS_ALERT_WEBHOOK_URL` |
+| Reconciliation of Stripe pack payments against grants | **DONE** in code (live Stripe BLOCKED — EXTERNAL) | Daily `reconcileSmsPacks` heals missed webhooks, carries refunds/disputes, records runs; `rpc_billing_pack_reconciliation_findings` |
+| Analytics attribution | **NOT STARTED — post-V1 by decision** | `docs/MONEY.md` §11 |
+
+Verification on this head: 59 migrations from empty; 13 pgTAP suites, 608
+planned assertions, all passing on local PostgreSQL 16; populated-upgrade proof
+30 assertions; web Vitest 38 files / 521 cases; `tsc` and ESLint clean.
+
+Open product decision surfaced by this work (not changed): scheduling a Text
+Request is not gated by entitlement, so a cancelled business can still spend
+purchased credit. `docs/MONEY.md` §11.
+
+---
+
+The sections below are the 2026-09-15 report, kept as the record of that stage.
 
 ## How to read the statuses
 
@@ -114,7 +142,7 @@ its replacement has landed on `main`, and #71 has not been merged.
 | `claude/destination-abstraction-j7nhgo` | Superseded — its resolver change could not have applied to a populated database |
 | #67, #44, #37 | Customer Page reference. The landed version is built fresh |
 | #66 | One-tap handoff — superseded by the landed customer contract |
-| #65 | MONEY.md — superseded by the locked plans in code and SQL |
+| #65 | MONEY.md — superseded; `docs/MONEY.md` was rewritten to the approved model on 2026-09-29 rather than merged |
 | #64, #59, #53, #51, #47, #41 | SMS correctness, used as read-only reference. The landed ledger is two-source, not FIFO |
 | #63, #61 | Scheduler work — superseded by the landed crons |
 | #46 | Fail-closed limiter — landed |

@@ -66,6 +66,15 @@ Vercel Cron only runs against production deployments, so preview deployments
 never dispatch regardless of the schedule — which is what you want, because a
 preview sharing the production database would otherwise send real texts.
 
+## Health thresholds follow the cadence
+
+Health reports `dispatch_stalled` when a *due* job has waited longer than
+`OPS_DISPATCH_STALL_SECONDS` (default 600, which assumes the production
+cadence). On the once-a-day cadence below, set it to `93600` (26 hours), or the
+health endpoint will report a stall every afternoon that is really the plan.
+Maintenance also runs pack reconciliation; health expects a run within
+`OPS_RECONCILIATION_MAX_AGE_SECONDS` (36 hours), which a daily run satisfies.
+
 ## Until that is done
 
 Text Requests are dispatched once a day, within the hour after 19:00 UTC.

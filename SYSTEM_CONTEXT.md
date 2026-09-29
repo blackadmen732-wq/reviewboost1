@@ -195,23 +195,15 @@ worth doing for its own sake.
 
 ## 5. The three revenue lines
 
-### 5.1 Subscription — NOT BUILT
+### 5.1 Subscription and SMS packs — APPROVED; IMPLEMENTED, CI-TESTED — not live-verified
 
-No subscription plans, billing enforcement, trial flow, cancellation flow, or
-Stripe integration exists in the current repository.
-
-#### Subscription requirements — PROPOSED
-
-- Define plans in code so pricing changes appear in a diff.
-- Offer a trial without a card.
-- Store amounts in **integer minor currency units**, with the currency recorded
-  on every entry. Never use floating point.
-- Enforce plans at campaign creation, quota reservation, immediately before each
-  send, during long campaigns, and during reconciliation.
-- Make cancellation self-service, without retention traps.
-
-Any future Stripe behavior must be designed and verified when the integration is
-built.
+The approved money model — plans ($49 / $79 / $129 with 150 / 500 / 1,500
+included segments a month), the seven-day card-required trial with no SMS,
+prepaid SMS packs, and what refunds and chargebacks do — is **`docs/MONEY.md`**,
+the binding money constitution. Stripe checkout, portal, signed webhooks,
+monthly minting from paid invoices, pack purchase, pack refund/chargeback
+clawback, and daily reconciliation are implemented and CI-tested. No live
+Stripe account has been exercised.
 
 ### 5.2 Hardware — NOT BUILT
 
@@ -305,8 +297,9 @@ Compliance obligations — **technical controls IMPLEMENTED and CI-TESTED; not
 live-verified and not a legal certification**: consent recorded with purpose and
 source; STOP/START/HELP honoured (including STOP before any org consent); the
 suppression gate checked immediately before every send; quiet hours in the
-recipient's time zone, re-checked at dispatch; deduplication window; opt-out
-notice still needs owner-facing copy. Live provider behaviour (Twilio Advanced
+recipient's time zone, re-checked at dispatch; deduplication window; every
+message names the business and carries opt-out copy that names a keyword the
+inbound handler honours (`docs/backend/TEXT_REQUESTS.md` §23). Live provider behaviour (Twilio Advanced
 Opt-Out, 10DLC, inbound reliability) is **not live-verified**.
 
 ---
