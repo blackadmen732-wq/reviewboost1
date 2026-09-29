@@ -6,14 +6,18 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 const SCREEN_W = 390;
 const SCREEN_H = 844;
 
+/** The rendered hardware: a transparent front view with the screen cut out. */
+export const HARDWARE_SRC = "/devices/phone-hardware.webp";
+
 /**
  * The phone the owner previews their Customer Page in.
  *
  * Only the owner editor draws this. The live /q page never does: on a
  * customer's own phone, their phone is the frame. The screen inside is the
  * real CustomerVisitView at the 390/844 canvas — the frame only adds what a
- * phone adds on top of a page: the case, the side buttons, the Dynamic
- * Island, the status bar and the home indicator. All of it is decorative.
+ * phone adds on top of a page: the titanium and glass (a rendered picture of
+ * the hardware), the Dynamic Island, the status bar and the home indicator.
+ * All of it is decorative.
  *
  * The page is laid out at the real 390 × 844 and the finished picture is
  * scaled to the column, rather than laid out small. Laid out small, anything
@@ -53,28 +57,32 @@ export function PhoneFrame({
   return (
     <div className={size === "editor" ? "phone-frame phone-frame--editor" : "phone-frame"} data-phone-frame>
       <div className="phone-frame__body">
-        <span className="phone-frame__button phone-frame__button--action" aria-hidden="true" />
-        <span className="phone-frame__button phone-frame__button--up" aria-hidden="true" />
-        <span className="phone-frame__button phone-frame__button--down" aria-hidden="true" />
-        <span className="phone-frame__button phone-frame__button--power" aria-hidden="true" />
-        {/* The polished inner lip where the titanium meets the glass. */}
-        <div className="phone-frame__band">
-          <div className="phone-frame__bezel">
-            <div ref={screenRef} className="phone-frame__screen" role="img" aria-label={label}>
-              <div
-                className="phone-frame__device"
-                style={{ width: SCREEN_W, height: SCREEN_H, transform: `scale(${scale})` }}
-              >
-                {children}
-                <StatusBar />
-                <div className="phone-frame__island" aria-hidden="true">
-                  <span className="phone-frame__lens" />
-                </div>
-                <div className="phone-frame__home" aria-hidden="true" />
-              </div>
+        <div className="phone-frame__shape" aria-hidden="true" />
+        <div className="phone-frame__glass" aria-hidden="true" />
+        <div ref={screenRef} className="phone-frame__screen" role="img" aria-label={label}>
+          <div
+            className="phone-frame__device"
+            style={{ width: SCREEN_W, height: SCREEN_H, transform: `scale(${scale})` }}
+          >
+            {children}
+            <StatusBar />
+            <div className="phone-frame__island" aria-hidden="true">
+              <span className="phone-frame__lens" />
             </div>
+            <div className="phone-frame__home" aria-hidden="true" />
           </div>
         </div>
+        {/* A rendered picture of the hardware (titanium, glass, buttons), with
+            the screen as an exact hole — see scripts/brand/render-phone-hardware.mjs. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className="phone-frame__hardware"
+          src={HARDWARE_SRC}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          decoding="async"
+        />
       </div>
     </div>
   );

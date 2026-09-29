@@ -1,10 +1,10 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { PhoneFrame } from "@/features/customer-page/phone-frame";
+import { HARDWARE_SRC, PhoneFrame } from "@/features/customer-page/phone-frame";
 
 /**
  * The owner previews their page on a phone, drawn at the real device size and
@@ -38,10 +38,15 @@ describe("PhoneFrame", () => {
       expect(element?.getAttribute("aria-hidden")).toBe("true");
     }
     expect(container.querySelector(".phone-frame__time")?.textContent).toBe("9:41");
-    // The camera lens sits in the Dynamic Island, and the polished lip wraps
-    // the glass: the details that make it read as a phone, not a rectangle.
+    // The camera lens sits in the Dynamic Island, and the titanium and glass
+    // are the rendered hardware picture laid over the screen, silent to
+    // assistive tech: the details that make it read as a phone.
     expect(container.querySelector(".phone-frame__island .phone-frame__lens")).toBeTruthy();
-    expect(container.querySelector(".phone-frame__band > .phone-frame__bezel")).toBeTruthy();
+    const hardware = container.querySelector<HTMLImageElement>("img.phone-frame__hardware");
+    expect(hardware?.getAttribute("src")).toBe(HARDWARE_SRC);
+    expect(hardware?.getAttribute("alt")).toBe("");
+    expect(hardware?.getAttribute("aria-hidden")).toBe("true");
+    expect(existsSync(join(process.cwd(), "public", HARDWARE_SRC))).toBe(true);
     expect(container.querySelector("[role='img']")?.getAttribute("aria-label")).toBe(
       "Mario’s preview",
     );

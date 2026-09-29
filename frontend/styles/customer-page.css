@@ -495,19 +495,31 @@ html:has(.customer-live) {
 
 /* ------------------------------------------------ owner phone preview --- */
 
-/* A modern iPhone in CSS: a thin graphite rim, a black bezel, side buttons.
-   The screen content is drawn at the device's real 390 × 844 and scaled into
-   the screen (see phone-frame.tsx), so everything inside the device is in
-   real device points. */
+/* The phone is a rendered picture of real hardware, not a drawing.
+ *
+ * Gradients and box-shadows cannot make metal: metal is what it reflects, along
+ * its curve. So the titanium band, the polished lip, the black glass and the
+ * side buttons are a 3D model lit like a product photograph, rendered once to
+ * a transparent front view (scripts/brand/render-phone-hardware.mjs). Its
+ * screen is an exact hole. The live page sits in that hole, drawn at the
+ * device's real 390 x 844 and scaled (see phone-frame.tsx), so everything
+ * inside the screen is in real device points and is the page itself.
+ *
+ * Every position below is in the render's points — 1pt is --pt, 1/442 of the
+ * picture's width — and comes from the numbers the render script prints:
+ *
+ *   picture 442 x 886   body 428 x 882 at (7, 2), corner 74
+ *   glass   407 x 861 at (17.5, 12.5), corner 63.5
+ *   screen  390 x 844 at (26, 21), corner 55
+ *
+ * Change the scene's sizes and these change with them. */
 .phone-frame {
-  /* The device's own proportions are in cqi: 1cqi is 1% of the phone's width,
-     so the rim, bezel and corners are the same object at 250px or 340px. */
   container-type: inline-size;
   position: relative;
   isolation: isolate;
   width: min(100%, 340px);
   margin-inline: auto;
-  padding-inline: 4px;
+  --pt: calc(100cqi / 442);
 }
 
 /* The soft shadow the phone casts on the surface it lies on. */
@@ -539,85 +551,50 @@ html:has(.customer-live) {
   }
 }
 
-/* A black-titanium iPhone, drawn in layers from the outside in:
- *
- *   body   the titanium band — brushed metal whose brightness changes around
- *          the corners as it catches the light, brighter on its outer curve
- *          than toward the glass, with a bright hairline on the outer edge
- *   band   the polished lip where the metal meets the glass: a thin bright
- *          line, as on the real phone
- *   bezel  the black border under the glass, thin and even
- *   screen the display, with a real iPhone's corner (55pt on a 393pt screen)
- *
- * Corners are concentric: each radius is the one inside it plus that layer's
- * thickness, so the rim is the same width all the way round the curve. */
 .phone-frame__body {
   position: relative;
-  border-radius: 17.2cqi;
-  padding: 1.55cqi;
-  background:
-    linear-gradient(
-      135deg,
-      rgb(255 255 255 / 24%) 0%,
-      rgb(255 255 255 / 0%) 16%,
-      rgb(255 255 255 / 0%) 82%,
-      rgb(255 255 255 / 12%) 100%
-    ),
-    conic-gradient(
-      from 225deg,
-      #4a4a4e,
-      #262629 12%,
-      #5e5e63 22%,
-      #2c2c2f 34%,
-      #3a3a3e 46%,
-      #76767c 55%,
-      #28282b 66%,
-      #4f4f54 78%,
-      #2a2a2d 90%,
-      #4a4a4e
-    );
+  width: 100%;
+  aspect-ratio: 442 / 886;
+}
+
+/* The phone's silhouette: it casts the shadow, and it is what shows for the
+   moment before the picture has loaded. */
+.phone-frame__shape {
+  position: absolute;
+  left: calc(7 * var(--pt));
+  top: calc(2 * var(--pt));
+  width: calc(428 * var(--pt));
+  height: calc(882 * var(--pt));
+  border-radius: calc(74 * var(--pt));
+  background: #2a2a2d;
   box-shadow:
-    inset 0 0 0 0.7px rgb(255 255 255 / 36%),
-    inset 0 0 1.1cqi 0.1cqi rgb(255 255 255 / 16%),
-    inset 0 0.8px 0.6px rgb(255 255 255 / 42%),
-    inset 0 -0.8px 0.6px rgb(0 0 0 / 55%),
-    0 0 0 0.5px rgb(0 0 0 / 70%),
     0 1px 2px rgb(0 0 0 / 22%),
     0 18px 36px -14px rgb(0 0 0 / 40%),
     0 42px 80px -36px rgb(0 0 0 / 36%);
 }
 
-.phone-frame__band {
-  border-radius: 15.65cqi;
-  padding: 0.4cqi;
-  background: linear-gradient(
-    160deg,
-    #b4b4b9 0%,
-    #505054 16%,
-    #1c1c1e 42%,
-    #2b2b2e 62%,
-    #6e6e73 86%,
-    #a6a6ab 100%
-  );
+/* Black under the glass, so no sliver of anything else shows at the soft edge
+   of the screen hole. */
+.phone-frame__glass {
+  position: absolute;
+  left: calc(17.5 * var(--pt));
+  top: calc(12.5 * var(--pt));
+  width: calc(407 * var(--pt));
+  height: calc(861 * var(--pt));
+  border-radius: calc(63.5 * var(--pt));
+  background: #000;
 }
 
-/* The glass reaches the band, so the black border carries a faint sheen along
-   its upper edge where the glass catches the same light as the metal. */
-.phone-frame__bezel {
-  overflow: hidden;
-  border-radius: 15.25cqi;
-  padding: 2.55cqi;
-  background: linear-gradient(150deg, #1b1b1d 0%, #060607 15%, #030303 60%, #0c0c0d 100%);
-  box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 90%);
-}
-
-/* The page inside is never tinted: the screen shows exactly what /q renders. */
+/* The page inside is never tinted: the screen shows exactly what /q renders,
+   with a real iPhone's corner (55pt on the 390pt screen). */
 .phone-frame__screen {
-  position: relative;
+  position: absolute;
+  left: calc(26 * var(--pt));
+  top: calc(21 * var(--pt));
+  width: calc(390 * var(--pt));
   aspect-ratio: 390 / 844;
-  width: 100%;
   overflow: hidden;
-  border-radius: 12.7cqi;
+  border-radius: calc(55 * var(--pt));
   background: #121513;
 }
 
@@ -628,37 +605,15 @@ html:has(.customer-live) {
   transform-origin: top left;
 }
 
-/* Side buttons stand just proud of the band, lit along their length like the
-   metal around them: a highlight on top, a shadow underneath, and a hairline
-   where they meet the frame. Only their outer ~70% shows past the band, so
-   the highlight sits in that part. */
-.phone-frame__button {
+/* The hardware over everything: the screen shows through its hole. */
+.phone-frame__hardware {
   position: absolute;
-  z-index: -1;
-  width: 1.1cqi;
-  background: linear-gradient(90deg, #3a3a3e 0%, #808086 32%, #5c5c61 58%, #2e2e31 100%);
-  box-shadow:
-    inset 0 0.6px 0 rgb(255 255 255 / 32%),
-    inset 0 -0.6px 0 rgb(0 0 0 / 55%),
-    0 0 0 0.4px rgb(0 0 0 / 60%);
-}
-
-.phone-frame__button--action,
-.phone-frame__button--up,
-.phone-frame__button--down {
-  left: -0.8cqi;
-  border-radius: 0.7cqi 0 0 0.7cqi;
-}
-
-.phone-frame__button--action { top: 15.5%; height: 4.4%; }
-.phone-frame__button--up { top: 22.5%; height: 8%; }
-.phone-frame__button--down { top: 32%; height: 8%; }
-.phone-frame__button--power {
-  right: -0.8cqi;
-  top: 25%;
-  height: 12%;
-  border-radius: 0 0.7cqi 0.7cqi 0;
-  background: linear-gradient(270deg, #3a3a3e 0%, #808086 32%, #5c5c61 58%, #2e2e31 100%);
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* Real iPhone metrics, in points: the Dynamic Island, with the front camera's
