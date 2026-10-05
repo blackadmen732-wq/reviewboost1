@@ -26,12 +26,14 @@ import {
  */
 
 /**
- * The heading and "Powered by" face. Red Hat Display carries the reference's
- * straight-tailed y, slanted-cut t and double-storey a at its bold weight.
- * Bundled, latin subset, SIL OFL 1.1 — see lib/fonts/RedHatDisplay-OFL.txt.
+ * The heading and "Powered by" face of the approved reference. Measured
+ * against it pixel for pixel, Inter Tight overlaps the reference heading at 0.80
+ * (Geist, the app face, peaks at 0.34 — it cannot reach the reference's
+ * height at the reference's width). Bundled, latin subset, SIL OFL 1.1 — see
+ * lib/fonts/InterTight-OFL.txt.
  */
 const visitHeadingFont = localFont({
-  src: "../../lib/fonts/RedHatDisplay-latin-variable.woff2",
+  src: "../../lib/fonts/InterTight-latin-variable.woff2",
   variable: "--font-visit-heading",
   weight: "100 900",
   display: "swap",
@@ -82,7 +84,7 @@ export function CustomerVisitView({
         {heroUrl ? (
           <HeroImage src={heroUrl} transform={heroTransformStyle(crop)} />
         ) : (
-          <div className="visit-hero__empty" aria-hidden="true" />
+          <div className="visit-hero__empty" aria-hidden="true" data-hero-empty />
         )}
         {language ? <div className="visit-language">{language}</div> : null}
       </div>
@@ -98,19 +100,17 @@ export function CustomerVisitView({
         ) : null}
         <div className="visit-card__body">{children}</div>
         <footer className="visit-footer">
-          {/* The approved reference, exactly: a grey bolt, "Powered by", and the
-              name in bold ink. This footer never changes with the hero. */}
-          <p className="visit-powered">
-            <svg
-              className="visit-powered__mark"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <path d="M13.5 2 5 13.4h5.6L9.8 22 19 9.9h-5.7z" fill="currentColor" />
+          {/* The approved reference: a small grey bolt, grey "Powered by",
+              and "ReviewBoost" in ink. This is a deliberate exception to the
+              one-mark brand rule — the Customer Page footer is the reference,
+              not the green R mark or the green "Boost" logotype. */}
+          <p className="visit-powered" data-powered-by>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-powered-bolt>
+              <path d="M13.14 1 4.9 13.76h5.97L10.02 23 19.1 9.36h-6.06L13.14 1Z" />
             </svg>
-            <span>Powered by</span>
-            <strong className="visit-powered__word">ReviewBoost</strong>
+            <span>
+              Powered by <strong>ReviewBoost</strong>
+            </span>
           </p>
           <p className="visit-footer__line">{footerLine}</p>
         </footer>

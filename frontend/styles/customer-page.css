@@ -23,8 +23,8 @@ html:has(.customer-live) {
   width: 100%;
   height: 100%;
   min-height: 0;
-  /* Behind the sheet's rounded corners: white, like the empty hero. */
-  background: #ffffff;
+  /* Dark behind the sheet's rounded corners, which sit over the artwork. */
+  background: #121513;
   overflow: hidden;
 }
 
@@ -35,7 +35,7 @@ html:has(.customer-live) {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  background: #ffffff;
+  background: #1a1a1a;
 }
 
 .visit-hero__image {
@@ -58,12 +58,23 @@ html:has(.customer-live) {
 }
 
 /* No image uploaded yet: plain white. The top of the page is only ever the
-   owner's own image; ReviewBoost draws nothing there. The sheet below never
-   changes — only this area does when the owner swaps the picture. */
+   owner's own image; ReviewBoost draws nothing there — no logo, no name, no
+   placeholder art. The hero's own field stays dark only while a photo that
+   does exist is downloading. */
+.visit-hero:has(.visit-hero__empty) {
+  background: #ffffff;
+}
+
 .visit-hero__empty {
   width: 100%;
   height: 100%;
   background: #ffffff;
+}
+
+/* On the white top the translucent backing reads mid-grey, and white text on
+   it falls under 4.5:1. The same pill, dark enough to stay readable. */
+.visit-hero:has(.visit-hero__empty) .visit-language .language-selector {
+  background: rgb(10 12 11 / 78%);
 }
 
 .visit-language {
@@ -114,8 +125,9 @@ html:has(.customer-live) {
  * box. So the whole set is pinned, and anything added to the card inherits a
  * consistent light palette rather than whichever tokens someone remembered.
  *
- * The hero above is dark artwork in both modes for the same reason: this is a
- * printed-feeling page a customer sees once, not a themed surface. */
+ * The hero above is the owner's artwork, or plain white, in both modes for the
+ * same reason: this is a printed-feeling page a customer sees once, not a
+ * themed surface. */
 .visit-card {
   --rb-canvas: #f6f7f5;
   --rb-surface: #ffffff;
@@ -240,8 +252,8 @@ html:has(.customer-live) {
   color: #0a0a0a;
   font-family: var(--font-visit-heading), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   font-size: var(--visit-heading-size, 8.85cqi);
-  font-weight: 750;
-  letter-spacing: -0.025em;
+  font-weight: 620;
+  letter-spacing: -0.02em;
   line-height: 1.1;
 }
 
@@ -288,31 +300,28 @@ html:has(.customer-live) {
   color: #595959;
   font-family: var(--font-visit-heading), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   font-size: 2.664cqi;
-  font-weight: 400;
+  font-weight: 300;
   letter-spacing: 0.02em;
 }
 
-/* The mark sits where the reference's bolt did, at the same height; its width
-   follows the mark's own proportions (290.09 x 269.09). */
-.visit-powered .visit-powered__mark {
-  width: 4.4cqi;
-  height: 4.4cqi;
-  color: #6b6b6b;
+/* The reference's small grey bolt — not the green R mark. */
+.visit-powered svg {
+  width: 3.72cqi;
+  height: 3.72cqi;
+  fill: #626262;
 }
 
 .visit-powered > span {
   position: relative;
-  top: 0.1cqi;
+  top: 0.33cqi;
 }
 
-.visit-powered .visit-powered__word {
+.visit-powered strong {
   color: #111111;
   font-size: 1.032em;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  position: relative;
-  top: 0.1cqi;
+  font-weight: 600;
 }
+
 
 .visit-footer__line {
   margin: 0;
@@ -486,14 +495,46 @@ html:has(.customer-live) {
 
 /* ------------------------------------------------ owner phone preview --- */
 
-/* A modern iPhone in CSS: a thin graphite rim, a black bezel, side buttons.
-   The screen content is drawn at the device's real 390 × 844 and scaled into
-   the screen (see phone-frame.tsx), so everything inside the device is in
-   real device points. */
+/* The phone is a rendered picture of real hardware, not a drawing.
+ *
+ * Gradients and box-shadows cannot make metal: metal is what it reflects, along
+ * its curve. So the titanium band, the polished lip, the black glass and the
+ * side buttons are a 3D model lit like a product photograph, rendered once to
+ * a transparent front view (scripts/brand/render-phone-hardware.mjs). Its
+ * screen is an exact hole. The live page sits in that hole, drawn at the
+ * device's real 390 x 844 and scaled (see phone-frame.tsx), so everything
+ * inside the screen is in real device points and is the page itself.
+ *
+ * Every position below is in the render's points — 1pt is --pt, 1/442 of the
+ * picture's width — and comes from the numbers the render script prints:
+ *
+ *   picture 442 x 886   body 428 x 882 at (7, 2), corner 74
+ *   glass   407 x 861 at (17.5, 12.5), corner 63.5
+ *   screen  390 x 844 at (26, 21), corner 55
+ *
+ * Change the scene's sizes and these change with them. */
 .phone-frame {
+  container-type: inline-size;
+  position: relative;
+  isolation: isolate;
   width: min(100%, 340px);
   margin-inline: auto;
-  padding-inline: 4px;
+  --pt: calc(100cqi / 442);
+}
+
+/* The soft shadow the phone casts on the surface it lies on. */
+.phone-frame::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 12%;
+  right: 12%;
+  bottom: -2.4%;
+  height: 5%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(0 0 0 / 32%), rgb(0 0 0 / 0%));
+  filter: blur(5px);
+  pointer-events: none;
 }
 
 /* In the owner editor the phone is a preview, not a life-size device: about
@@ -512,28 +553,48 @@ html:has(.customer-live) {
 
 .phone-frame__body {
   position: relative;
-  border-radius: 15.5% / 7.2%;
-  padding: 1%;
-  background: linear-gradient(135deg, #6b6f6d 0%, #2a2c2b 22%, #1a1b1b 50%, #2a2c2b 78%, #5c605e 100%);
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / 55%),
-    0 28px 56px -22px rgb(0 0 0 / 50%),
-    0 10px 20px -10px rgb(0 0 0 / 30%);
-}
-
-.phone-frame__bezel {
-  overflow: hidden;
-  border-radius: 14.6% / 6.8%;
-  background: #030303;
-  padding: 3.6%;
-}
-
-.phone-frame__screen {
-  position: relative;
-  aspect-ratio: 390 / 844;
   width: 100%;
+  aspect-ratio: 442 / 886;
+}
+
+/* The phone's silhouette: it casts the shadow, and it is what shows for the
+   moment before the picture has loaded. */
+.phone-frame__shape {
+  position: absolute;
+  left: calc(7 * var(--pt));
+  top: calc(2 * var(--pt));
+  width: calc(428 * var(--pt));
+  height: calc(882 * var(--pt));
+  border-radius: calc(74 * var(--pt));
+  background: #2a2a2d;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 22%),
+    0 18px 36px -14px rgb(0 0 0 / 40%),
+    0 42px 80px -36px rgb(0 0 0 / 36%);
+}
+
+/* Black under the glass, so no sliver of anything else shows at the soft edge
+   of the screen hole. */
+.phone-frame__glass {
+  position: absolute;
+  left: calc(17.5 * var(--pt));
+  top: calc(12.5 * var(--pt));
+  width: calc(407 * var(--pt));
+  height: calc(861 * var(--pt));
+  border-radius: calc(63.5 * var(--pt));
+  background: #000;
+}
+
+/* The page inside is never tinted: the screen shows exactly what /q renders,
+   with a real iPhone's corner (55pt on the 390pt screen). */
+.phone-frame__screen {
+  position: absolute;
+  left: calc(26 * var(--pt));
+  top: calc(21 * var(--pt));
+  width: calc(390 * var(--pt));
+  aspect-ratio: 390 / 844;
   overflow: hidden;
-  border-radius: 11.6% / 5.4%;
+  border-radius: calc(55 * var(--pt));
   background: #121513;
 }
 
@@ -544,34 +605,47 @@ html:has(.customer-live) {
   transform-origin: top left;
 }
 
-.phone-frame__button {
+/* The hardware over everything: the screen shows through its hole. */
+.phone-frame__hardware {
   position: absolute;
-  width: 0.9%;
-  border-radius: 2px;
-  background: linear-gradient(90deg, #111, #3d403f);
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
 }
 
-.phone-frame__button--action { left: -0.7%; top: 15.5%; height: 4.4%; }
-.phone-frame__button--up { left: -0.7%; top: 22.5%; height: 8%; }
-.phone-frame__button--down { left: -0.7%; top: 32%; height: 8%; }
-.phone-frame__button--power {
-  right: -0.7%;
-  top: 25%;
-  height: 12%;
-  background: linear-gradient(270deg, #111, #3d403f);
-}
-
-/* Real iPhone metrics, in points. */
+/* Real iPhone metrics, in points: the Dynamic Island, with the front camera's
+   lens at its right end. */
 .phone-frame__island {
   position: absolute;
   top: 11px;
   left: 50%;
   z-index: 5;
-  width: 124px;
-  height: 36px;
+  width: 126px;
+  height: 37px;
   border-radius: 999px;
   background: #000;
   transform: translateX(-50%);
+}
+
+.phone-frame__lens {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 36% 32%,
+    #7c8bb4 0 7%,
+    #2a3556 20%,
+    #0c1120 52%,
+    #030407 80%
+  );
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 5%);
+  transform: translateY(-50%);
 }
 
 .phone-frame__status {
@@ -586,6 +660,17 @@ html:has(.customer-live) {
   color: #fff;
   pointer-events: none;
   text-shadow: 0 0 6px rgb(0 0 0 / 35%);
+}
+
+/* Over the plain white top a real iPhone draws its status bar dark; so does
+   the preview, or the time and icons vanish white-on-white. */
+.phone-frame__device:has(.visit-hero__empty) .phone-frame__status {
+  color: #111111;
+  text-shadow: none;
+}
+
+.phone-frame__device:has(.visit-hero__empty) .phone-frame__icons svg {
+  filter: none;
 }
 
 .phone-frame__time {
@@ -991,22 +1076,4 @@ html:has(.customer-live) {
   border: 0;
   background: transparent;
   box-shadow: none;
-}
-
-/* No picture yet: the top is white, so the controls drawn over it go dark —
-   the language pill (and, in the owner's phone preview, the status bar). With a
-   picture they keep the white-on-photo look. */
-.visit-stage:has(.visit-hero__empty) .visit-language .language-selector {
-  background: #ffffff;
-  box-shadow: inset 0 0 0 1px #dcdcdc;
-}
-
-.visit-stage:has(.visit-hero__empty) .visit-language .language-selector,
-.visit-stage:has(.visit-hero__empty) .visit-language .language-select {
-  color: #111111;
-}
-
-.phone-frame__device:has(.visit-hero__empty) .phone-frame__status {
-  color: #111111;
-  text-shadow: none;
 }
