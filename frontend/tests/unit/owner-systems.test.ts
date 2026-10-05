@@ -55,6 +55,24 @@ describe("tag readiness", () => {
         tokenRotatedAt: "2026-09-01T00:00:00.000Z",
       }),
     ).toBe("ready");
+    // After "Make a new code" the database clears the programmed date.
+    expect(
+      tagReadiness({ nfcProvisionedAt: null, tokenRotatedAt: "2026-09-08T00:00:00.000Z" }),
+    ).toBe("both");
+    expect(
+      tagReadiness({
+        nfcProvisionedAt: null,
+        tokenRotatedAt: "2026-09-08T00:00:00.000Z",
+        lastOpenedAt: "2026-09-07T00:00:00.000Z",
+      }),
+    ).toBe("both");
+    expect(
+      tagReadiness({
+        nfcProvisionedAt: null,
+        tokenRotatedAt: "2026-09-08T00:00:00.000Z",
+        lastOpenedAt: "2026-09-09T00:00:00.000Z",
+      }),
+    ).toBe("needs-nfc");
     expect(tagReadinessLabel("needs-nfc")).toBe("Needs NFC");
     expect(lastUsedLabel(null)).toBe("Not used yet");
   });

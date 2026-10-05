@@ -424,3 +424,19 @@ describe("a legacy Google link (a listing or short link saved before review link
     expect(model.attentions.some((item) => item.kind === "google-upgrade")).toBe(false);
   });
 });
+
+describe("Home after Make a new code", () => {
+  it("counts a rotated Tag as needing work, as the database records it", () => {
+    // rpc_rotate_stand_token clears nfc_provisioned_at, so a rotated Tag
+    // arrives with a null programmed date. Home's own copy of the rule needed
+    // both dates and never asked for the reprint.
+    const rotated: HomeStand = {
+      standId: "r1",
+      label: "Counter",
+      status: "active",
+      nfcProvisionedAt: null,
+      tokenRotatedAt: "2026-09-10T00:00:00.000Z",
+    };
+    expect(summarizeTags([rotated]).needsRewrite).toBe(1);
+  });
+});
