@@ -26,6 +26,8 @@ let membershipRows: { org_id: string; role: string }[] = [
 /** Memberships left after the organization is deleted. */
 let remainingMemberships: unknown[] = [];
 let rpcError: { message: string } | null = null;
+/** What rpc_delete_organization_check answers. */
+let checkError: { message: string } | null = null;
 let billingRefs: unknown = { stripe_subscription_id: "sub_123", stripe_status: "active" };
 let cancelImpl: (id: string) => Promise<unknown> = (id) => {
   events.push({ kind: "stripe", name: "cancel", value: id });
@@ -66,6 +68,9 @@ function fakeUserClient() {
     },
     rpc: (name: string, args: unknown) => {
       events.push({ kind: "rpc", name, value: args });
+      if (name === "rpc_delete_organization_check") {
+        return Promise.resolve({ data: null, error: checkError });
+      }
       return Promise.resolve({
         data: rpcError ? null : { ratings: 3 },
         error: rpcError,
@@ -81,13 +86,14 @@ vi.mock("@/lib/server/stripe", () => ({
 }));
 
 vi.mock("@/lib/server/supabase", () => ({
+  // No `.schema()` here on purpose: the Data API serves only `public`, so a
+  // route that reaches for another schema fails in production, and must fail
+  // here too.
   serviceRoleClient: () => ({
-    schema: () => ({
-      rpc: (name: string, args: unknown) => {
-        events.push({ kind: "service-rpc", name, value: args });
-        return Promise.resolve({ data: [billingRefs], error: null });
-      },
-    }),
+    rpc: (name: string, args: unknown) => {
+      events.push({ kind: "service-rpc", name, value: args });
+      return Promise.resolve({ data: [billingRefs], error: null });
+    },
     auth: {
       admin: {
         deleteUser: (id: string) => {
@@ -113,6 +119,7 @@ beforeEach(() => {
   membershipRows = [{ org_id: "11111111-1111-1111-1111-111111111111", role: "owner" }];
   remainingMemberships = [];
   rpcError = null;
+  checkError = null;
   billingRefs = { stripe_subscription_id: "sub_123", stripe_status: "active" };
   cancelImpl = (id) => {
     events.push({ kind: "stripe", name: "cancel", value: id });
@@ -149,6 +156,35 @@ describe("deleting an account", () => {
     expect(cancelledAt).toBeGreaterThanOrEqual(0);
     expect(deletedAt).toBeGreaterThanOrEqual(0);
     expect(cancelledAt).toBeLessThan(deletedAt);
+  });
+
+  it("reads the Stripe ids through a public rpc_* function", async () => {
+    const response = await post({ confirmation: "Doomed Diner" });
+
+    expect(response.status).toBe(200);
+    expect(names()).toContain("service-rpc:rpc_billing_refs_for_org");
+  });
+
+  it("checks the typed name before Stripe, and cancels nothing when it is wrong", async () => {
+    checkError = { message: 'raise exception "confirmation_mismatch"' };
+
+    const response = await post({ confirmation: "Old Diner Name" });
+
+    expect(response.status).toBe(400);
+    expect(names()).not.toContain("stripe:cancel");
+    expect(deleted()).toBe(false);
+    const order = names();
+    expect(order.indexOf("rpc:rpc_delete_organization_check")).toBeGreaterThanOrEqual(0);
+  });
+
+  it("cancels nothing for a caller the database will not let delete", async () => {
+    checkError = { message: 'raise exception "not_found_or_forbidden"' };
+
+    const response = await post({ confirmation: "Doomed Diner" });
+
+    expect(response.status).toBe(404);
+    expect(names()).not.toContain("stripe:cancel");
+    expect(deleted()).toBe(false);
   });
 
   it("deletes nothing at all when Stripe cannot be reached", async () => {

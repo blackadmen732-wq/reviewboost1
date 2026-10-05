@@ -336,7 +336,8 @@ describe("live checks", () => {
 
   it("fails when the hosted ledger has only the first 36 migrations (production today)", async () => {
     const report = await live({ appliedMigrations: async () => EXPECTED_MIGRATIONS.slice(0, 36) });
-    expect(problemsOf(report)).toMatch(/missing 30 migration\(s\)/);
+    // Counted from the manifest, so adding a migration does not break this.
+    expect(problemsOf(report)).toContain(`missing ${EXPECTED_MIGRATIONS.length - 36} migration(s)`);
   });
 
   it("fails closed when the ledger cannot be read", async () => {
