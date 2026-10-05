@@ -2,7 +2,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+const refresh = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 const notify = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
 vi.mock("@/components/ui/toast", () => ({ notify }));
 vi.mock("@/lib/supabase/browser", () => ({
@@ -109,5 +110,8 @@ describe("Make a new code", () => {
       "New code ready",
       "The old code no longer works. Print this one and program NFC again.",
     );
+    // The status and the reprint note come from the server's copy of the Tag;
+    // without a refresh they kept saying the old code was fine.
+    expect(refresh).toHaveBeenCalled();
   });
 });

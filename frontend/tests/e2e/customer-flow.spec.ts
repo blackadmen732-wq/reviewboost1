@@ -233,6 +233,129 @@ test.describe("ReviewBoost customer flow", () => {
     });
   }
 
+  /**
+   * The bottom sheet is the approved reference, rebuilt as real UI.
+   *
+   * These lock what has already drifted from it once — the footer's small grey
+   * bolt was swapped for the green R mark under a brand-wide change — and the
+   * geometry that makes it the reference: a sheet sized by the screen's width,
+   * with every line at its measured place inside it. Positions are layout
+   * boxes in points from the sheet's top at a 390pt-wide screen, where the
+   * reference was measured; anything at another width scales by width / 390.
+   */
+  test.describe("the bottom sheet matches the approved reference", () => {
+    test("is 320pt tall at 390 wide, and a taller phone gets more photo, not more sheet", async ({
+      page,
+    }) => {
+      for (const height of [844, 940]) {
+        await page.setViewportSize({ width: 390, height });
+        await openFlow(page, "fixture-valid", { stayOnPage: true });
+        const card = await page.locator("[data-rating-card]").boundingBox();
+        if (!card) throw new Error("No sheet box.");
+        expect(Math.abs(card.height - 320)).toBeLessThanOrEqual(1);
+        expect(Math.abs(card.y + card.height - height)).toBeLessThanOrEqual(1);
+      }
+
+      // Wider phone: the same design, scaled by width.
+      await page.setViewportSize({ width: 412, height: 915 });
+      await openFlow(page, "fixture-valid", { stayOnPage: true });
+      const wide = await page.locator("[data-rating-card]").boundingBox();
+      if (!wide) throw new Error("No sheet box.");
+      expect(Math.abs(wide.height - (412 * 320) / 390)).toBeLessThanOrEqual(1);
+    });
+
+    test("places the heading, instruction, stars and footer where the reference does", async ({
+      page,
+    }) => {
+      for (const width of [390, 412]) {
+        await page.setViewportSize({ width, height: 900 });
+        await openFlow(page, "fixture-valid", { stayOnPage: true });
+        await page.evaluate(() => document.fonts.ready);
+        const card = await page.locator("[data-rating-card]").boundingBox();
+        if (!card) throw new Error("No sheet box.");
+        const k = width / 390;
+
+        for (const [selector, top] of [
+          [".visit-heading", 39.3],
+          [".visit-support", 84.6],
+          [".visit-stars__row", 126.9],
+          [".visit-powered", 252.8],
+          [".visit-footer__line", 274.7],
+        ] as const) {
+          // Polled: the rating screen eases in from a few points lower, so the
+          // settled position is the one that has to match.
+          await expect
+            .poll(
+              async () => {
+                const box = await page.locator(`[data-rating-card] ${selector}`).boundingBox();
+                if (!box) throw new Error(`${selector} has no box.`);
+                return Math.abs(box.y - card.y - top * k);
+              },
+              { message: `${selector} at ${width} wide` },
+            )
+            .toBeLessThanOrEqual(2);
+        }
+      }
+    });
+
+    test("stars are five full-cell targets with no native radio circle showing", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await openFlow(page, "fixture-valid", { stayOnPage: true });
+
+      const inputs = page.locator(".visit-star__input");
+      await expect(inputs).toHaveCount(5);
+      for (let index = 0; index < 5; index += 1) {
+        const input = inputs.nth(index);
+        await expect(input).toHaveCSS("opacity", "0");
+        await expect(input).toHaveCSS("appearance", "none");
+        // The invisible radio covers the whole star cell, so a thumb that lands
+        // beside the glyph still rates.
+        const inputBox = await input.boundingBox();
+        const labelBox = await page.locator(".visit-star__label").nth(index).boundingBox();
+        if (!inputBox || !labelBox) throw new Error(`Star ${index + 1} has no box.`);
+        expect(Math.abs(inputBox.width - labelBox.width)).toBeLessThanOrEqual(1);
+        expect(Math.abs(inputBox.height - labelBox.height)).toBeLessThanOrEqual(1);
+        expect(labelBox.width).toBeGreaterThanOrEqual(44);
+      }
+    });
+
+    test("footer is the grey bolt and the exact promise line — not the green R mark", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await openFlow(page, "fixture-valid", { stayOnPage: true });
+
+      const footer = page.locator("[data-rating-card] .visit-footer");
+      await expect(footer.locator("[data-powered-by]")).toHaveText("Powered by ReviewBoost");
+      // Exactly one graphic, and it is the bolt: the R mark is an svg too.
+      await expect(footer.locator("svg")).toHaveCount(1);
+      await expect(footer.locator("svg[data-powered-bolt]")).toHaveCSS("fill", "rgb(98, 98, 98)");
+      await expect(footer.locator("[data-powered-by] strong")).toHaveCSS("color", "rgb(17, 17, 17)");
+      await expect(footer.locator(".visit-footer__line")).toHaveText(
+        "Real businesses. Real feedback. A brighter tomorrow.",
+      );
+      await expect(footer.locator(".visit-footer__line")).toHaveCSS("text-transform", "uppercase");
+    });
+
+    test("with no photo, the top is plain white with nothing drawn on it", async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await openFlow(page, "fixture-valid", { stayOnPage: true });
+
+      const hero = page.locator("[data-hero-layer]");
+      await expect(hero).toHaveCSS("background-color", "rgb(255, 255, 255)");
+      await expect(hero.locator("[data-hero-empty]")).toHaveCSS(
+        "background-color",
+        "rgb(255, 255, 255)",
+      );
+      // Only the language control sits there: no logo, name or placeholder art.
+      await expect(hero.locator("img")).toHaveCount(0);
+      await expect(hero.locator("svg:not(.visit-language svg)")).toHaveCount(0);
+      await expect(hero).not.toContainText("Mario");
+    });
+  });
+
   test("reduced motion removes star scaling and content movement", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await openFlow(page, "fixture-valid", { stayOnPage: true });

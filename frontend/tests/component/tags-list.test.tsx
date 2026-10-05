@@ -70,4 +70,37 @@ describe("Tags list", () => {
     expect(screen.getByText("Reprint QR")).toBeVisible();
     expect(screen.getByText("Reprogram NFC")).toBeVisible();
   });
+
+  // What the database actually holds after "Make a new code":
+  // rpc_rotate_stand_token stamps token_rotated_at and clears
+  // nfc_provisioned_at. The list used to read that as "QR ready", so a dead
+  // sticker looked fine.
+  it("flags the printed code as dead after a rotation, as the database records it", () => {
+    render(
+      <TagsList
+        stands={[stand({ nfcProvisionedAt: null, tokenRotatedAt: "2026-09-10T00:00:00.000Z" })]}
+      />,
+    );
+
+    expect(screen.getByText("Reprint QR")).toBeVisible();
+    expect(screen.getByText("Reprogram NFC")).toBeVisible();
+    expect(screen.queryByText("QR ready")).toBeNull();
+  });
+
+  it("trusts the printed code again once a customer has opened the new one", () => {
+    render(
+      <TagsList
+        stands={[
+          stand({
+            nfcProvisionedAt: null,
+            tokenRotatedAt: "2026-09-10T00:00:00.000Z",
+            lastOpenedAt: "2026-09-11T00:00:00.000Z",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("QR ready")).toBeVisible();
+    expect(screen.getByText("Reprogram NFC")).toBeVisible();
+  });
 });

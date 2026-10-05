@@ -124,6 +124,17 @@ export async function reviewSignIn(
   const client = keyedDigest(`${day}|${address ?? "unknown"}`, "review_sign_in", tokenDigestKey());
 
   await consume(PER_CLIENT, client, requestId);
+
+  // The mobile app asks this endpoint after every rejected emailed code, for
+  // every user, so most requests are ordinary people's typos. Those must not
+  // spend the shared daily budget the App Review account depends on: only an
+  // attempt on the review address does. A wrong address is answered exactly
+  // like a wrong code.
+  if (!timingSafeEqual(digest(config.email), digest(input.email.trim().toLowerCase()))) {
+    logger.info("review_sign_in.rejected", { requestId });
+    throw new ApiError(401, ERROR_CODE.sessionInvalid, "That code is not right.");
+  }
+
   await consume(OVERALL, "all", requestId);
 
   if (!matchesReviewAccount(config, input.email, input.code)) {

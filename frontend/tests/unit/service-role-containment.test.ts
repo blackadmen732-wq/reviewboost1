@@ -129,4 +129,14 @@ describe("service-role containment", () => {
     );
     expect(hit).toBe(true);
   });
+
+  // supabase/config.toml exposes only `public` to the Data API. A call through
+  // `.schema("...")` reaches nothing in production and every request fails —
+  // which account deletion did, behind a unit test that mocked `.schema()`.
+  it("never asks the Data API for a schema it does not serve", () => {
+    const offenders = files
+      .filter((file) => /\.schema\(\s*["'`]/.test(file.text))
+      .map((file) => file.path);
+    expect(offenders).toEqual([]);
+  });
 });

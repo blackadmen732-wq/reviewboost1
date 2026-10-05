@@ -55,6 +55,7 @@ select set_eq(
         'rpc_customer_page_save_draft(uuid,uuid,jsonb)',
         'rpc_customer_page_unpublish(uuid,uuid)',
         'rpc_delete_organization(uuid,text)',
+        'rpc_delete_organization_check(uuid,text)',
         'rpc_mark_praise_shared(uuid)',
         'rpc_mark_response_read(uuid)',
         'rpc_match_praise(uuid,uuid)',
