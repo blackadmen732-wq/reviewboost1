@@ -196,6 +196,23 @@ describe("the webhook sink", () => {
     expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_complete")).toBe(false);
     expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_fail")).toBe(true);
   });
+
+  it("completes the cancellation that follows an account deletion", async () => {
+    // The deletion route cancels in Stripe and the cascade removes the
+    // customer row, so this event can never be placed. Left unprocessed, it
+    // held /internal/health at 503 forever, because Stripe got a 200 and never
+    // sent it again.
+    rpcResults.set("rpc_billing_org_for_customer", { data: null, error: null });
+    const event = stripeEvent({ type: "customer.subscription.deleted" });
+    (event.data.object as { status: string }).status = "canceled";
+    const { POST } = await import("@/app/api/v1/webhooks/stripe/route");
+    const response = await POST(signedRequest(JSON.stringify(event)) as never);
+
+    expect(response.status).toBe(200);
+    expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_complete")).toBe(true);
+    expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_fail")).toBe(false);
+    expect(rpcCalls.some(({ name }) => name === "rpc_billing_apply_subscription")).toBe(false);
+  });
 });
 
 describe("what each event does", () => {
