@@ -3,8 +3,6 @@
 import localFont from "next/font/local";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { LogoMark } from "@/components/brand/logo-mark";
-import { Wordmark } from "@/components/brand/wordmark";
 import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
 import {
   clampHeroTransform,
@@ -28,14 +26,12 @@ import {
  */
 
 /**
- * The heading and "Powered by" face of the approved reference. Measured
- * against it pixel for pixel, Inter Tight overlaps the reference heading at 0.80
- * (Geist, the app face, peaks at 0.34 — it cannot reach the reference's
- * height at the reference's width). Bundled, latin subset, SIL OFL 1.1 — see
- * lib/fonts/InterTight-OFL.txt.
+ * The heading and "Powered by" face. Red Hat Display carries the reference's
+ * straight-tailed y, slanted-cut t and double-storey a at its bold weight.
+ * Bundled, latin subset, SIL OFL 1.1 — see lib/fonts/RedHatDisplay-OFL.txt.
  */
 const visitHeadingFont = localFont({
-  src: "../../lib/fonts/InterTight-latin-variable.woff2",
+  src: "../../lib/fonts/RedHatDisplay-latin-variable.woff2",
   variable: "--font-visit-heading",
   weight: "100 900",
   display: "swap",
@@ -102,16 +98,19 @@ export function CustomerVisitView({
         ) : null}
         <div className="visit-card__body">{children}</div>
         <footer className="visit-footer">
-          {/* The reference's layout, grey "Powered by" and the name, with the
-              ReviewBoost mark where the reference had a generic bolt: one
-              identity on every surface. The name is the logotype, "Review" in
-              ink and "Boost" in brand green. */}
+          {/* The approved reference, exactly: a grey bolt, "Powered by", and the
+              name in bold ink. This footer never changes with the hero. */}
           <p className="visit-powered">
-            <LogoMark size={14} className="visit-powered__mark" />
-            <span>
-              Powered by <span className="sr-only">ReviewBoost</span>
-            </span>
-            <Wordmark height="0.76em" className="visit-powered__word" />
+            <svg
+              className="visit-powered__mark"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M13.5 2 5 13.4h5.6L9.8 22 19 9.9h-5.7z" fill="currentColor" />
+            </svg>
+            <span>Powered by</span>
+            <strong className="visit-powered__word">ReviewBoost</strong>
           </p>
           <p className="visit-footer__line">{footerLine}</p>
         </footer>

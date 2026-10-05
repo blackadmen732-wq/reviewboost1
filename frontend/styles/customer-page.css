@@ -23,8 +23,8 @@ html:has(.customer-live) {
   width: 100%;
   height: 100%;
   min-height: 0;
-  /* Dark behind the sheet's rounded corners, which sit over the artwork. */
-  background: #121513;
+  /* Behind the sheet's rounded corners: white, like the empty hero. */
+  background: #ffffff;
   overflow: hidden;
 }
 
@@ -35,7 +35,7 @@ html:has(.customer-live) {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  background: #1a1a1a;
+  background: #ffffff;
 }
 
 .visit-hero__image {
@@ -57,12 +57,13 @@ html:has(.customer-live) {
   .visit-hero__image { transition: none; }
 }
 
-/* No image uploaded yet: a plain neutral area. The top of the page is only
-   ever the owner's own image; ReviewBoost draws nothing there. */
+/* No image uploaded yet: plain white. The top of the page is only ever the
+   owner's own image; ReviewBoost draws nothing there. The sheet below never
+   changes — only this area does when the owner swaps the picture. */
 .visit-hero__empty {
   width: 100%;
   height: 100%;
-  background: #1c1d1d;
+  background: #ffffff;
 }
 
 .visit-language {
@@ -239,8 +240,8 @@ html:has(.customer-live) {
   color: #0a0a0a;
   font-family: var(--font-visit-heading), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   font-size: var(--visit-heading-size, 8.85cqi);
-  font-weight: 620;
-  letter-spacing: -0.02em;
+  font-weight: 750;
+  letter-spacing: -0.025em;
   line-height: 1.1;
 }
 
@@ -287,30 +288,31 @@ html:has(.customer-live) {
   color: #595959;
   font-family: var(--font-visit-heading), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   font-size: 2.664cqi;
-  font-weight: 300;
+  font-weight: 400;
   letter-spacing: 0.02em;
 }
 
 /* The mark sits where the reference's bolt did, at the same height; its width
    follows the mark's own proportions (290.09 x 269.09). */
 .visit-powered .visit-powered__mark {
-  width: calc(3.72cqi * 290.09 / 269.09);
-  height: 3.72cqi;
+  width: 4.4cqi;
+  height: 4.4cqi;
+  color: #6b6b6b;
 }
 
 .visit-powered > span {
   position: relative;
-  top: 0.33cqi;
+  top: 0.1cqi;
 }
 
-/* The logotype sits on the text's baseline at the reference's 1.032em name
-   size; "Review" takes this ink. */
 .visit-powered .visit-powered__word {
   color: #111111;
+  font-size: 1.032em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   position: relative;
-  top: 0.33cqi;
+  top: 0.1cqi;
 }
-
 
 .visit-footer__line {
   margin: 0;
@@ -989,4 +991,22 @@ html:has(.customer-live) {
   border: 0;
   background: transparent;
   box-shadow: none;
+}
+
+/* No picture yet: the top is white, so the controls drawn over it go dark —
+   the language pill (and, in the owner's phone preview, the status bar). With a
+   picture they keep the white-on-photo look. */
+.visit-stage:has(.visit-hero__empty) .visit-language .language-selector {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px #dcdcdc;
+}
+
+.visit-stage:has(.visit-hero__empty) .visit-language .language-selector,
+.visit-stage:has(.visit-hero__empty) .visit-language .language-select {
+  color: #111111;
+}
+
+.phone-frame__device:has(.visit-hero__empty) .phone-frame__status {
+  color: #111111;
+  text-shadow: none;
 }
