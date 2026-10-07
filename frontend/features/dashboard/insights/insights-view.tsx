@@ -7,12 +7,10 @@ import {
   PeriodSwitch,
 } from "@/features/dashboard/insights/insights-navigation";
 import { LocationPicker } from "@/features/dashboard/insights/location-picker";
+import { RatingSummaryCard } from "@/features/dashboard/insights/rating-summary-card";
 import { RatingTrendChart } from "@/features/dashboard/insights/rating-trend-chart";
-import { RatingBreakdown } from "@/features/dashboard/rating-breakdown";
 import {
   DIRECTION_LABEL,
-  drilldownHref,
-  formatAverage,
   formatDateRange,
   formatDay,
   INSIGHT_RANGES,
@@ -37,9 +35,10 @@ const DIRECTION_ICON: Record<Direction, typeof ArrowUp> = {
  * Feedback → Insights. What customers are collectively telling the business,
  * readable in about ten seconds.
  *
- * Top to bottom: the period (and place), the average and how many ratings it
- * rests on, whether that moved, one quiet line over time, and how the stars
- * were spread — each row of which opens the ratings behind it.
+ * Top to bottom: the period (and place); the rating card — the average and
+ * how many ratings it rests on, whether that moved, and how the stars were
+ * spread, each row of which opens the ratings behind it; then one quiet line
+ * over time.
  *
  * What it will not do: show an average, a line or a direction on too few
  * ratings to mean anything (MIN_SAMPLE), weigh a half-finished today against
@@ -60,7 +59,7 @@ export function InsightsView({
 
   return (
     <InsightsNavigationProvider>
-      <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-6">
         {/* A business that has never had a rating has nothing to filter. One
             looking at a single empty location keeps the way back. */}
         {state !== "none" || locationId !== null ? (
@@ -99,10 +98,22 @@ export function InsightsView({
             </section>
           ) : (
             <>
-              <Summary insights={insights} />
+              <RatingSummaryCard insights={insights} locationId={locationId}>
+                {insights.comparison ? <ComparisonLine insights={insights} /> : null}
+                <TodayNote count={insights.todayTotal} />
+                {state === "starting" ? (
+                  <p className="mt-4 max-w-[44ch] text-base leading-relaxed text-muted">
+                    You’re starting to collect feedback. The average and the trend appear once a period has{" "}
+                    {MIN_SAMPLE} ratings.
+                  </p>
+                ) : null}
+              </RatingSummaryCard>
 
               {state === "full" ? (
-                <section aria-labelledby="insights-trend">
+                <section
+                  aria-labelledby="insights-trend"
+                  className="rounded-[var(--radius-card)] border border-border bg-surface p-5 sm:p-6"
+                >
                   <h2 id="insights-trend" className="text-base font-semibold text-ink">
                     Average rating
                   </h2>
@@ -139,16 +150,6 @@ export function InsightsView({
                   )}
                 </section>
               ) : null}
-
-              <section aria-labelledby="insights-breakdown">
-                <h2 id="insights-breakdown" className="mb-3 text-base font-semibold text-ink">
-                  How customers rated you
-                </h2>
-                <RatingBreakdown
-                  counts={insights.current.counts}
-                  rowHref={(rating) => drilldownHref({ rating, locationId, period: periods.current })}
-                />
-              </section>
             </>
           )}
         </InsightsFigures>
@@ -195,47 +196,6 @@ function Filters({
   );
 }
 
-function Summary({ insights }: { insights: FeedbackInsights }) {
-  const { current, comparison, periods, state } = insights;
-  const dates = formatDateRange(periods.current.startDate, periods.current.endDate);
-
-  return (
-    <section aria-labelledby="insights-summary">
-      <h2 id="insights-summary" className="sr-only">
-        Customer experience
-      </h2>
-
-      {state === "full" && current.average !== null ? (
-        <p className="flex items-baseline gap-2">
-          <span className="text-[3.5rem] font-semibold leading-none tabular-nums tracking-[-0.04em] text-ink">
-            {formatAverage(current.average)}
-          </span>
-          <span className="text-xl text-muted">/ 5</span>
-        </p>
-      ) : (
-        <p className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-          {ratingsCount(current.total)}
-        </p>
-      )}
-
-      <p className="mt-3 text-base text-muted">
-        {state === "full" ? `${ratingsCount(current.total)} · ${dates}` : dates}
-      </p>
-
-      {comparison ? <ComparisonLine insights={insights} /> : null}
-
-      <TodayNote count={insights.todayTotal} />
-
-      {state === "starting" ? (
-        <p className="mt-5 max-w-[44ch] text-base leading-relaxed text-muted">
-          You’re starting to collect feedback. The average and the trend appear once a period has{" "}
-          {MIN_SAMPLE} ratings.
-        </p>
-      ) : null}
-    </section>
-  );
-}
-
 /**
  * "Improving · from 4.0", and the exact days it was compared with. Ink, never
  * green or red: a direction is information, not a verdict.
@@ -265,7 +225,7 @@ function ComparisonLine({ insights }: { insights: FeedbackInsights }) {
 }
 
 /** Today's ratings, counted but kept out of every number above until tomorrow. */
-function TodayNote({ count }: { count: number }) {
+export function TodayNote({ count }: { count: number }) {
   if (count === 0) return null;
   return (
     <p className="mt-3 text-sm text-muted">

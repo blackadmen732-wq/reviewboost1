@@ -41,9 +41,9 @@ export default async function FeedbackDetailPage({
         All feedback
       </Link>
 
-      <article className="max-w-[36rem]">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <Stars rating={review.rating} size="md" />
+      <article className="max-w-[36rem] rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-raised)] sm:p-6">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <Stars rating={review.rating} size="lg" />
           <time dateTime={review.submittedAt} className="shrink-0 text-sm text-muted">
             {relativeDay(review.submittedAt)}
           </time>
@@ -56,7 +56,7 @@ export default async function FeedbackDetailPage({
         )}
       </article>
 
-      <div className="mt-8 flex items-center justify-between gap-3">
+      <div className="mt-6 flex max-w-[36rem] items-center justify-between gap-3">
         <p key={String(review.isResolved)} className="animate-fade-in text-sm text-muted">
           {review.isResolved ? "Sorted" : "Not sorted yet"}
         </p>

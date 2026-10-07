@@ -261,11 +261,14 @@ describe("what the screen never shows", () => {
     expect(text).not.toMatch(/significan/i);
   });
 
-  it("keeps gold for the star icons and ink for the bars", () => {
+  it("gives every bar one colour, star gold, so no colour grades a rating", () => {
     const { container } = renderView(build(FULL));
-    const bars = container.querySelectorAll("li span.bg-ink\\/70");
+    const bars = [...container.querySelectorAll("li span.h-2\\.5 > span")];
     expect(bars).toHaveLength(5);
-    expect(container.innerHTML).not.toMatch(/bg-\[color:var\(--rb-star\)\]/);
+    expect(new Set(bars.map((bar) => bar.className)).size).toBe(1);
+    expect(bars[0]!.className).toContain("bg-[color:var(--rb-star)]");
+    const breakdown = bars[0]!.closest("ul")!;
+    expect(breakdown.innerHTML).not.toMatch(/danger|success|warning|red-|green-/);
   });
 });
 
@@ -341,13 +344,10 @@ describe("filters", () => {
 });
 
 describe("Feedback tabs", () => {
-  it("move one underline rather than drawing one per tab once it is placed", () => {
-    const { container } = render(<FeedbackTabs active="everything" />);
-    const underline = container.querySelectorAll("[data-tab-indicator]");
-    expect(underline).toHaveLength(1);
-    expect(underline[0]).toHaveAttribute("aria-hidden", "true");
-    // Placed: the row stops drawing the tab's own underline.
-    expect(container.querySelector("ul")).toHaveAttribute("data-placed");
+  it("fill the current pill, and only that one", () => {
+    render(<FeedbackTabs active="everything" />);
+    const filled = screen.getAllByRole("link").filter((link) => link.className.includes("bg-brand-soft"));
+    expect(filled.map((link) => link.textContent)).toEqual(["Everything"]);
     expect(screen.getByRole("link", { name: "Everything" })).toHaveAttribute("aria-current", "page");
   });
 

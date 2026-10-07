@@ -5,6 +5,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { FeedbackList } from "@/features/dashboard/feedback-list";
 import { FeedbackTabs } from "@/features/dashboard/feedback-tabs";
+import { RatingSummaryCard } from "@/features/dashboard/insights/rating-summary-card";
+import { TodayNote } from "@/features/dashboard/insights/insights-view";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import {
   filterInstants,
@@ -13,7 +15,13 @@ import {
   parseFeedbackFilters,
   type FeedbackFilters,
 } from "@/lib/owner/insights";
-import { getOwnerCounts, listLocations, listReviews, requireOwner } from "@/lib/server/owner-data";
+import {
+  getFeedbackInsights,
+  getOwnerCounts,
+  listLocations,
+  listReviews,
+  requireOwner,
+} from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
   title: "Feedback",
@@ -47,7 +55,11 @@ export default async function FeedbackPage({
   const filtered = filters !== null && hasFeedbackFilters(filters);
   const span = filters ? filterInstants(organization.timezone, filters) : null;
 
-  const [{ items, hasMore }, counts] = await Promise.all([
+  // Everything, unfiltered, opens on the rating card: the last 30 days, the
+  // same numbers Insights and Home show, so there is still one average.
+  const withCard = showAll && !filtered;
+
+  const [{ items, hasMore }, counts, insights] = await Promise.all([
     listReviews(organization.orgId, {
       limit: 50,
       ...(showAll ? {} : { openOnly: true }),
@@ -56,6 +68,7 @@ export default async function FeedbackPage({
       ...(span ? { submittedFrom: span.from, submittedBefore: span.before } : {}),
     }),
     getOwnerCounts(organization.orgId, organization.timezone),
+    withCard ? getFeedbackInsights(organization.orgId, organization.timezone, { range: 30 }) : null,
   ]);
 
   return (
@@ -63,6 +76,14 @@ export default async function FeedbackPage({
       <PageHeader title="Feedback" description="Ratings from your customers." />
 
       <FeedbackTabs active={showAll ? "everything" : "needs-you"} />
+
+      {insights && (insights.state === "full" || insights.state === "starting") ? (
+        <div className="mb-6">
+          <RatingSummaryCard insights={insights}>
+            <TodayNote count={insights.todayTotal} />
+          </RatingSummaryCard>
+        </div>
+      ) : null}
 
       {filtered && filters ? (
         <FilterSummary

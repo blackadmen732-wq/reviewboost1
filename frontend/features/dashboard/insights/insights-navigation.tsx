@@ -70,7 +70,7 @@ export function InsightsFigures({ children }: { children: ReactNode }) {
   return (
     <div
       className={cn(
-        "flex flex-col gap-10 transition-opacity ease-out",
+        "flex flex-col gap-6 transition-opacity ease-out",
         pending ? "opacity-55 duration-150" : "opacity-100 duration-200",
       )}
       aria-busy={pending || undefined}

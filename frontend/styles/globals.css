@@ -91,6 +91,9 @@
   --shadow-button: 0 1px 0 rgb(0 91 57 / 18%);
   --shadow-button-hover: 0 1px 0 rgb(0 91 57 / 24%);
   --shadow-card: none;
+  /* The one lifted surface: the Feedback rating card and rows. Soft and low,
+     so a raised card reads as "a thing you can open", not as decoration. */
+  --shadow-raised: 0 1px 2px rgb(23 26 24 / 4%), 0 16px 40px -28px rgb(23 26 24 / 22%);
   --shadow-float: 0 -1px 0 rgb(23 26 24 / 8%);
 }
 
@@ -126,6 +129,7 @@
     --shadow-button: 0 1px 0 rgb(0 0 0 / 40%);
     --shadow-button-hover: 0 1px 0 rgb(0 0 0 / 50%);
     --shadow-card: none;
+    --shadow-raised: 0 1px 2px rgb(0 0 0 / 30%), 0 20px 48px -28px rgb(0 0 0 / 80%);
     --shadow-float: 0 -1px 0 rgb(0 0 0 / 50%);
   }
 }
@@ -156,6 +160,7 @@
   --rb-info: #2663a0;
   --rb-focus: #005fcc;
   --rb-focus-soft: rgb(0 95 204 / 28%);
+  --shadow-raised: 0 1px 2px rgb(23 26 24 / 4%), 0 16px 40px -28px rgb(23 26 24 / 22%);
 }
 :root[data-theme="dark"],
 .dark {
@@ -186,6 +191,7 @@
   --rb-raised: #202722;
   --rb-focus: #7ab8ff;
   --rb-focus-soft: rgb(77 142 255 / 34%);
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 30%), 0 20px 48px -28px rgb(0 0 0 / 80%);
 }
 
 /* These are resets, so they belong in Tailwind's base layer.

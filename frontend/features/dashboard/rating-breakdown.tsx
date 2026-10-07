@@ -8,12 +8,13 @@ import { cn } from "@/lib/utils/cn";
  *
  * NEUTRALITY IS THE DESIGN CONSTRAINT
  * -----------------------------------
- * Every bar is the same colour, and it is not a colour that means anything:
- * ink, at a tint. The obvious version of this chart runs green at the top to
- * red at the bottom, and that single decision would quietly turn the screen
- * into a scoreboard — teaching an owner to read a 2-star bar as a failure to
- * be suppressed rather than as a customer telling them something. Gold stays
- * on the star icons, where it means "stars" and nothing else.
+ * Every bar is the same colour: star gold, the colour that means "stars" and
+ * nothing else in this product. The obvious version of this chart runs green
+ * at the top to red at the bottom, and that single decision would quietly
+ * turn the screen into a scoreboard — teaching an owner to read a 2-star bar
+ * as a failure to be suppressed rather than as a customer telling them
+ * something. One colour for every row keeps a 1 and a 5 the same kind of
+ * thing: a count of people.
  *
  * That framing is what leads businesses to want rating-dependent behaviour in
  * the first place. This product does not offer that, so its charts should not
@@ -52,9 +53,9 @@ export function RatingBreakdown({
               />
             </span>
 
-            <span className="h-2 flex-1 overflow-hidden rounded-full bg-quiet" aria-hidden="true">
+            <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-quiet" aria-hidden="true">
               <span
-                className="block h-full rounded-full bg-ink/70 transition-[width] duration-300 motion-reduce:transition-none"
+                className="block h-full rounded-full bg-[color:var(--rb-star)] transition-[width] duration-300 motion-reduce:transition-none"
                 style={{ width: `${(count / peak) * 100}%` }}
               />
             </span>

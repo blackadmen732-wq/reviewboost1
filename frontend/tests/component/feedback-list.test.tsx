@@ -35,4 +35,24 @@ describe("FeedbackList", () => {
     expect(container.innerHTML).toContain("--rb-star");
     expect(container.innerHTML).not.toContain("sentiment");
   });
+
+  it("marks unread, sorted and acted-on cards, whatever their stars", () => {
+    render(
+      <FeedbackList
+        items={[
+          { id: "new", rating: 1, note: null, submittedAt: "2026-09-08T12:00:00.000Z", isRead: false, isResolved: false, noteCount: 0 },
+          { id: "done", rating: 5, note: null, submittedAt: "2026-09-07T12:00:00.000Z", isRead: true, isResolved: true, noteCount: 2 },
+        ]}
+      />,
+    );
+
+    const [unread, sorted] = screen.getAllByRole("link");
+    expect(unread).toContainElement(screen.getByRole("img", { name: "Unread" }));
+    expect(unread).not.toHaveTextContent("Sorted");
+    expect(sorted).toHaveTextContent("Sorted");
+    expect(sorted).toHaveTextContent("2 notes");
+    // One unread dot in the list, and no "Rating only" filler on either card.
+    expect(screen.getAllByRole("img", { name: "Unread" })).toHaveLength(1);
+    expect(screen.queryByText(/rating only/i)).toBeNull();
+  });
 });
