@@ -219,6 +219,8 @@ function paginate<T, R extends { id?: string; submitted_at?: string; created_at?
 
 export interface Review {
   responseId: string;
+  /** The Tag the customer rated through. */
+  standId: string;
   rating: number;
   note: string | null;
   submittedAt: string;
@@ -261,7 +263,7 @@ export async function listReviews(
 
   let query = supabase
     .from("customer_responses")
-    .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .select("id, stand_id, rating, note_encrypted, submitted_at, read_at, resolved_at")
     .eq("org_id", orgId)
     .order("submitted_at", { ascending: false })
     .order("id", { ascending: false })
@@ -308,6 +310,7 @@ export async function listReviews(
     limit,
     (row) => ({
       responseId: row.id as string,
+      standId: row.stand_id as string,
       rating: row.rating as number,
       // tryDecrypt, not decrypt: one row encrypted under a rotated key must not
       // take down the whole page.
@@ -396,7 +399,7 @@ export async function getReview(
 
   const { data, error } = await supabase
     .from("customer_responses")
-    .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .select("id, stand_id, rating, note_encrypted, submitted_at, read_at, resolved_at")
     .eq("org_id", orgId)
     .eq("id", responseId)
     .maybeSingle();
@@ -409,6 +412,7 @@ export async function getReview(
   return {
     review: {
       responseId: data.id as string,
+      standId: data.stand_id as string,
       rating: data.rating as number,
       note: tryDecrypt(data.note_encrypted as string | null),
       submittedAt: data.submitted_at as string,

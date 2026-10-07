@@ -22,6 +22,8 @@ export interface FeedbackItem {
   isRead: boolean;
   isResolved: boolean;
   noteCount: number;
+  /** Which Tag it came through — given only when the business has more than one. */
+  tagLabel?: string | null;
 }
 
 export function FeedbackList({ items }: { items: FeedbackItem[] }) {
@@ -71,6 +73,10 @@ export function FeedbackList({ items }: { items: FeedbackItem[] }) {
                   {relativeDay(item.submittedAt)}
                 </time>
               </div>
+
+              {item.tagLabel ? (
+                <p className="mt-1 truncate pl-[1.125rem] text-sm text-muted">{item.tagLabel}</p>
+              ) : null}
 
               {/* A rating with no message is one line. Saying "Rating only,
                   no message" on every such card was the same sentence, over

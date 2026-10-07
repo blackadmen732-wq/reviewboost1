@@ -20,6 +20,7 @@ import {
   getOwnerCounts,
   listLocations,
   listReviews,
+  listStands,
   requireOwner,
 } from "@/lib/server/owner-data";
 
@@ -59,7 +60,7 @@ export default async function FeedbackPage({
   // same numbers Insights and Home show, so there is still one average.
   const withCard = showAll && !filtered;
 
-  const [{ items, hasMore }, counts, insights] = await Promise.all([
+  const [{ items, hasMore }, counts, insights, stands] = await Promise.all([
     listReviews(organization.orgId, {
       limit: 50,
       ...(showAll ? {} : { openOnly: true }),
@@ -69,7 +70,11 @@ export default async function FeedbackPage({
     }),
     getOwnerCounts(organization.orgId, organization.timezone),
     withCard ? getFeedbackInsights(organization.orgId, organization.timezone, { range: 30 }) : null,
+    listStands(organization.orgId),
   ]);
+  // Which Tag a rating came through matters once there is more than one;
+  // with a single Tag it would be the same word on every card.
+  const tagLabels = stands.length > 1 ? new Map(stands.map((stand) => [stand.standId, stand.label])) : null;
 
   return (
     <OwnerShell unreadCount={counts.unread} businessName={organization.name}>
@@ -120,6 +125,7 @@ export default async function FeedbackPage({
               isRead: item.isRead,
               isResolved: item.isResolved,
               noteCount: item.noteCount,
+              tagLabel: tagLabels?.get(item.standId) ?? null,
             }))}
           />
           {hasMore ? (

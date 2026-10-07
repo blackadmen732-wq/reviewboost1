@@ -55,4 +55,20 @@ describe("FeedbackList", () => {
     expect(screen.getAllByRole("img", { name: "Unread" })).toHaveLength(1);
     expect(screen.queryByText(/rating only/i)).toBeNull();
   });
+
+  it("names the Tag a rating came through, when it is given one", () => {
+    render(
+      <FeedbackList
+        items={[
+          { id: "a", rating: 4, note: null, submittedAt: "2026-09-08T12:00:00.000Z", isRead: true, isResolved: false, noteCount: 0, tagLabel: "Patio" },
+          { id: "b", rating: 4, note: null, submittedAt: "2026-09-08T12:00:00.000Z", isRead: true, isResolved: false, noteCount: 0 },
+        ]}
+      />,
+    );
+
+    const [named, plain] = screen.getAllByRole("link");
+    expect(named).toHaveTextContent("Patio");
+    expect(plain).not.toHaveTextContent("Patio");
+  });
 });
+

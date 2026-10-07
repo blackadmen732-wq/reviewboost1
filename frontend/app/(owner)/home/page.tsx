@@ -47,6 +47,9 @@ export default async function HomePage() {
     getFeedbackInsights(organization.orgId, organization.timezone, { range: 30 }),
   ]);
 
+  // Which Tag a rating came through, only once there is more than one Tag.
+  const tagLabels = stands.length > 1 ? new Map(stands.map((stand) => [stand.standId, stand.label])) : null;
+
   const model = deriveHomeModel({
     counts,
     stands,
@@ -71,6 +74,7 @@ export default async function HomePage() {
           isRead: item.isRead,
           isResolved: item.isResolved,
           noteCount: item.noteCount,
+          tagLabel: tagLabels?.get(item.standId) ?? null,
         }))}
       />
     </OwnerShell>
