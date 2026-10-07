@@ -3,8 +3,6 @@
 import localFont from "next/font/local";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { LogoMark } from "@/components/brand/logo-mark";
-import { Wordmark } from "@/components/brand/wordmark";
 import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
 import {
   clampHeroTransform,
@@ -86,7 +84,7 @@ export function CustomerVisitView({
         {heroUrl ? (
           <HeroImage src={heroUrl} transform={heroTransformStyle(crop)} />
         ) : (
-          <div className="visit-hero__empty" aria-hidden="true" />
+          <div className="visit-hero__empty" aria-hidden="true" data-hero-empty />
         )}
         {language ? <div className="visit-language">{language}</div> : null}
       </div>
@@ -102,16 +100,17 @@ export function CustomerVisitView({
         ) : null}
         <div className="visit-card__body">{children}</div>
         <footer className="visit-footer">
-          {/* The reference's layout, grey "Powered by" and the name, with the
-              ReviewBoost mark where the reference had a generic bolt: one
-              identity on every surface. The name is the logotype, "Review" in
-              ink and "Boost" in brand green. */}
-          <p className="visit-powered">
-            <LogoMark size={14} className="visit-powered__mark" />
+          {/* The approved reference: a small grey bolt, grey "Powered by",
+              and "ReviewBoost" in ink. This is a deliberate exception to the
+              one-mark brand rule — the Customer Page footer is the reference,
+              not the green R mark or the green "Boost" logotype. */}
+          <p className="visit-powered" data-powered-by>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-powered-bolt>
+              <path d="M13.14 1 4.9 13.76h5.97L10.02 23 19.1 9.36h-6.06L13.14 1Z" />
+            </svg>
             <span>
-              Powered by <span className="sr-only">ReviewBoost</span>
+              Powered by <strong>ReviewBoost</strong>
             </span>
-            <Wordmark height="0.76em" className="visit-powered__word" />
           </p>
           <p className="visit-footer__line">{footerLine}</p>
         </footer>

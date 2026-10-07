@@ -281,6 +281,9 @@ export type EventOutcome =
   | "ignored"
   | "unknown_customer";
 
+/** Stripe statuses after which a subscription can never bill again. */
+const ENDED_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set(["canceled", "incomplete_expired"]);
+
 /**
  * Apply one Stripe event.
  *
@@ -298,7 +301,17 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
     case "customer.subscription.deleted": {
       const subscription = event.data.object as Stripe.Subscription;
       const orgId = await orgForCustomer(customerIdOf(subscription.customer));
-      if (!orgId) return "unknown_customer";
+      if (!orgId) {
+        // A subscription that has ended, for a customer we no longer hold, is
+        // what deleting an account produces: the route cancels in Stripe, the
+        // cascade removes `billing_customers`, and Stripe's
+        // `customer.subscription.deleted` arrives a moment later. There is
+        // nothing left to apply. Leaving it unprocessed kept health at 503 for
+        // good — Stripe is answered 200 and never retries it — and the release
+        // gate with it. A live subscription we cannot place is still left
+        // visible, because that one is money nobody is accounting for.
+        return ENDED_SUBSCRIPTION_STATUSES.has(subscription.status) ? "ignored" : "unknown_customer";
+      }
 
       const fields = subscriptionFields(subscription);
       // The price decides the plan, and the database owns that mapping

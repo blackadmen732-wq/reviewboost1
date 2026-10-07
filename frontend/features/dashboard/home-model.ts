@@ -6,6 +6,7 @@
  */
 
 import { GOOGLE_LINK_INVALID } from "@/features/dashboard/google-link-copy";
+import { tagNeedsRewrite } from "@/lib/owner/tag-readiness";
 
 export interface HomeCounts {
   ratingsToday: number;
@@ -93,10 +94,9 @@ export function isHomeEmpty(counts: Pick<HomeCounts, "recentCount" | "ratingsTod
   return counts.recentCount === 0 && counts.ratingsToday === 0;
 }
 
-export function tagNeedsRewrite(stand: HomeStand): boolean {
-  if (stand.nfcProvisionedAt === null || stand.tokenRotatedAt === null) return false;
-  return new Date(stand.tokenRotatedAt) > new Date(stand.nfcProvisionedAt);
-}
+// One rule for Home and the Tags list. Home kept its own copy, which is how
+// both missed that a rotation clears the programmed date.
+export { tagNeedsRewrite };
 
 export function tagProgramPhase(stand: HomeStand): TagProgramPhase {
   if (stand.nfcProvisionedAt === null) return "not-programmed";

@@ -117,6 +117,11 @@ function ManagedTagDetail({ stand }: { stand: Stand }) {
       return;
     }
     qr.reload();
+    // The old link is dead on the printed code and on any chip. Drop the
+    // "just programmed" override, which would keep the header at Ready, and
+    // fetch the Tag again so the status and the reprint note say so.
+    setJustProgrammedAt(null);
+    router.refresh();
     notify.success("New code ready", "The old code no longer works. Print this one and program NFC again.");
   }
 

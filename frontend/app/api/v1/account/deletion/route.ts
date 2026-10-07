@@ -94,6 +94,15 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const { confirmation } = parseOrThrow(bodySchema, await readJsonBody(request));
 
+    // The name and the owner check run in the database before Stripe is
+    // touched. Cancelling is irreversible; a rejected confirmation after it
+    // used to leave the business with all its data and no paid plan.
+    const check = await context.db.rpc("rpc_delete_organization_check", {
+      p_org_id: context.orgId,
+      p_confirmation: confirmation,
+    });
+    if (check.error) throwDeletionRefusal(check.error, requestId);
+
     await cancelBillingBeforeDeleting(context.orgId, requestId);
 
     const { data, error } = await context.db.rpc("rpc_delete_organization", {
@@ -101,21 +110,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       p_confirmation: confirmation,
     });
 
-    if (error) {
-      const message = error.message ?? "";
-      if (message.includes("confirmation_mismatch")) {
-        throw new ApiError(400, ERROR_CODE.validationFailed, "That is not the business name.", {
-          details: [
-            { field: "confirmation", message: "Type the business name exactly as it appears." },
-          ],
-        });
-      }
-      if (message.includes("not_found_or_forbidden")) {
-        throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
-      }
-      logger.error("account.delete_failed", { requestId, error: message });
-      throw new ApiError(500, ERROR_CODE.internalError, "Something went wrong on our side.");
-    }
+    if (error) throwDeletionRefusal(error, requestId);
 
     const signInRemoved = await removeSignInIfLastAccount(context, requestId);
 
@@ -132,20 +127,36 @@ export async function POST(request: NextRequest): Promise<Response> {
   });
 }
 
+/** The database's refusals, as the caller should hear them. */
+function throwDeletionRefusal(error: { message?: string }, requestId: string): never {
+  const message = error.message ?? "";
+  if (message.includes("confirmation_mismatch")) {
+    throw new ApiError(400, ERROR_CODE.validationFailed, "That is not the business name.", {
+      details: [{ field: "confirmation", message: "Type the business name exactly as it appears." }],
+    });
+  }
+  if (message.includes("not_found_or_forbidden")) {
+    throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
+  }
+  logger.error("account.delete_failed", { requestId, error: message });
+  throw new ApiError(500, ERROR_CODE.internalError, "Something went wrong on our side.");
+}
+
 /**
  * Cancel the subscription, or refuse to continue.
  *
- * Reads the Stripe ids through a service-role function rather than a table
- * query, keeping `billing_customers` unreadable by members and keeping the
- * service-role client to its rule of calling narrow `app.*` functions.
+ * Reads the Stripe ids through a service-role `public.rpc_*` function rather
+ * than a table query, keeping `billing_customers` unreadable by members. It is
+ * `public` because the Data API serves nothing else: the earlier
+ * call into the `app` schema failed on every request.
  */
 async function cancelBillingBeforeDeleting(orgId: string, requestId: string): Promise<void> {
   let refs: BillingRefs | null = null;
 
   try {
-    const { data, error } = await serviceRoleClient()
-      .schema("app")
-      .rpc("billing_refs_for_org", { p_org_id: orgId });
+    const { data, error } = await serviceRoleClient().rpc("rpc_billing_refs_for_org", {
+      p_org_id: orgId,
+    });
     if (error) throw new Error(error.message);
     refs = (Array.isArray(data) ? data[0] : data) ?? null;
   } catch (error) {
