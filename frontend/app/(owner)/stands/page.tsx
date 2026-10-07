@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { AddStandButton } from "@/features/dashboard/add-stand-button";
 import { TagsList } from "@/features/tags/tags-list";
+import { tagLimitMessage } from "@/lib/owner/entitlements";
 import { ownerOrAdmin, permissionsFor } from "@/lib/owner/permissions";
 import { getEntitlementSnapshot } from "@/lib/server/entitlements-service";
 import { listStands, listLocations, requireOwner } from "@/lib/server/owner-data";
@@ -48,7 +49,7 @@ export default async function StandsPage() {
         <p className="mb-6 text-base text-ink">
           {entitlements.status === "cancelled"
             ? "This plan is cancelled. Your Tags are still here."
-            : `This plan includes ${entitlements.tagLimit} Tags. You are at the limit.`}
+            : tagLimitMessage(entitlements.tagLimit)}
         </p>
       ) : null}
 

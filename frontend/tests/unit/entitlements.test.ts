@@ -285,3 +285,11 @@ describe("createLocation", () => {
     expect(rpcCalls.find(({ name }) => name === "rpc_create_location")?.args["p_org_id"]).toBe(ORG);
   });
 });
+
+describe("tagLimitMessage", () => {
+  it("says Tag for one and Tags for more", async () => {
+    const { tagLimitMessage } = await import("@/lib/owner/entitlements");
+    expect(tagLimitMessage(1)).toBe("This plan includes 1 Tag. You are at the limit.");
+    expect(tagLimitMessage(3)).toBe("This plan includes 3 Tags. You are at the limit.");
+  });
+});

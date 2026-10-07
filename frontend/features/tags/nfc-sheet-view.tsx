@@ -1,3 +1,7 @@
+"use client";
+
+import { createPortal } from "react-dom";
+
 import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
 import { Button } from "@/components/ui/button";
 import { NfcFigure } from "@/features/tags/nfc-visuals";
@@ -13,6 +17,11 @@ import type { NfcScene, SceneCopy } from "@/lib/owner/nfc-presentation";
  * Composition, top to bottom: the logo, one large figure, a title and at most
  * one supporting sentence, then the actions pinned near the thumb. The success
  * scene has no controls at all — it is finished, and it leaves on its own.
+ *
+ * Rendered into <body>, not where it is used. The Tag page sits inside the
+ * owner shell's animated content, which is its own stacking context: the
+ * sheet's z-index could not climb out of it, so the bottom bar was drawn over
+ * the sheet — and over its Cancel button, the one way out of a write.
  */
 export function NfcSheetView({
   scene,
@@ -30,7 +39,7 @@ export function NfcSheetView({
 }) {
   const controls = scene !== "success";
 
-  return (
+  return createPortal(
     <div className="nfc-sheet" role="dialog" aria-modal="true" aria-labelledby="nfc-title">
       <div className="nfc-sheet__panel" data-nfc-phase={phase} data-nfc-scene={scene}>
         <div className="nfc-sheet__brand">
@@ -61,6 +70,7 @@ export function NfcSheetView({
           ) : null}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

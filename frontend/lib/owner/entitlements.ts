@@ -83,3 +83,8 @@ function capabilityState(
 }
 
 export { PLAN_CATALOG };
+
+/** What an owner at the Tag limit is told, on the Tags screen and by the API. */
+export function tagLimitMessage(limit: number): string {
+  return `This plan includes ${limit} ${limit === 1 ? "Tag" : "Tags"}. You are at the limit.`;
+}

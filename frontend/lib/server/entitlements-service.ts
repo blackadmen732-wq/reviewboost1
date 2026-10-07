@@ -1,6 +1,6 @@
 import "server-only";
 
-import { buildEntitlementSnapshot, type EntitlementSnapshot } from "@/lib/owner/entitlements";
+import { buildEntitlementSnapshot, tagLimitMessage, type EntitlementSnapshot } from "@/lib/owner/entitlements";
 import { isPlanId, type PlanId } from "@/lib/owner/plan-catalog";
 import type { AuthenticatedContext } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
@@ -107,7 +107,7 @@ export function assertCanCreateTag(snapshot: EntitlementSnapshot): void {
     throw new ApiError(
       403,
       ERROR_CODE.limitReached,
-      `This plan includes ${snapshot.tagLimit} Tags. You are at the limit.`,
+      tagLimitMessage(snapshot.tagLimit),
     );
   }
 }
