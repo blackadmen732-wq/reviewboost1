@@ -1,0 +1,187 @@
+name: Database backup
+
+# Nightly copy of the production database, kept outside Supabase, encrypted,
+# and restored into an empty database every night to prove it restores.
+#
+# The Supabase Free plan keeps no backups at all, so until the project is on
+# Pro this is the only copy; after that it is the independent copy that
+# OPERATIONS.md §2 requires. Each night's file is an Actions artifact kept for
+# 30 days: reviewboost-db-<UTC time>.tar.gz.gpg. To open one:
+#
+#   gpg --decrypt reviewboost-db-<time>.tar.gz.gpg | tar -xz
+#
+# using the BACKUP_PASSPHRASE. Storage images (bucket customer-page) are not in
+# a database dump; OPERATIONS.md §2.3 covers them separately.
+#
+# Repository secrets this needs:
+#   SUPABASE_DB_URL    Supabase dashboard > Connect > Session pooler URI, with
+#                      the database password filled in. (GitHub runners have
+#                      no IPv6, so the direct db.<ref>.supabase.co host fails.)
+#   BACKUP_PASSPHRASE  a long random passphrase, kept in a password manager.
+#                      Without it the backups cannot be opened by anyone.
+#
+# Any failure, including a missing secret, keeps one GitHub issue labelled
+# backup-alert open until a night succeeds again.
+
+on:
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      artifact: ${{ steps.encrypt.outputs.artifact }}
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require the backup secrets
+        run: |
+          missing=()
+          [ -n "$SUPABASE_DB_URL" ] || missing+=(SUPABASE_DB_URL)
+          [ -n "$BACKUP_PASSPHRASE" ] || missing+=(BACKUP_PASSPHRASE)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::No backup was taken. Missing repository secrets: ${missing[*]} (see the top of .github/workflows/database-backup.yml)"
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Dump roles, schema and data
+        run: |
+          mkdir -p "$RUNNER_TEMP/backup"
+          cd "$RUNNER_TEMP/backup"
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f roles.sql --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f data.sql --use-copy --data-only
+
+      - name: Check it is a real backup
+        run: bash scripts/ops/verify-backup.sh "$RUNNER_TEMP/backup"
+
+      - name: Encrypt
+        id: encrypt
+        run: |
+          name="reviewboost-db-$(date -u +%Y%m%dT%H%M%SZ)"
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/$name.tar.gz" backup
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 \
+            --output "$RUNNER_TEMP/$name.tar.gz.gpg" "$RUNNER_TEMP/$name.tar.gz" \
+            <<<"$BACKUP_PASSPHRASE"
+          # Nothing unencrypted outlives this step.
+          rm -rf "$RUNNER_TEMP/backup" "$RUNNER_TEMP/$name.tar.gz"
+          echo "artifact=$name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.encrypt.outputs.artifact }}
+          path: ${{ runner.temp }}/${{ steps.encrypt.outputs.artifact }}.tar.gz.gpg
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+  restore-drill:
+    needs: backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.backup.outputs.artifact }}
+          path: ${{ runner.temp }}/download
+
+      - name: Decrypt the backup, as someone restoring it would
+        env:
+          ARTIFACT: ${{ needs.backup.outputs.artifact }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/restore"
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --decrypt "$RUNNER_TEMP/download/$ARTIFACT.tar.gz.gpg" \
+            <<<"$BACKUP_PASSPHRASE" | tar -xz -C "$RUNNER_TEMP/restore"
+
+      # The dump is written by pg_dump 17 inside Supabase's image; restore it
+      # with a psql of the same major version, not whatever the runner has.
+      - name: Install psql 17
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -qq postgresql-client-17 >/dev/null
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Start an empty Supabase database
+        run: |
+          mkdir -p "$RUNNER_TEMP/empty-project"
+          cd "$RUNNER_TEMP/empty-project"
+          supabase init </dev/null
+          supabase db start
+
+      - name: Restore it and account for every row
+        run: |
+          bash scripts/ops/restore-drill.sh "$RUNNER_TEMP/restore/backup" \
+            "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+
+  alert:
+    needs: [backup, restore-drill]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Open the alert
+        if: needs.backup.result != 'success' || needs.restore-drill.result != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          BACKUP: ${{ needs.backup.result }}
+          DRILL: ${{ needs.restore-drill.result }}
+        run: |
+          {
+            echo "Last night's database backup did not complete."
+            echo
+            echo "- Backup: **$BACKUP**"
+            echo "- Restore drill: **$DRILL**"
+            echo
+            if [ "$BACKUP" = "success" ]; then
+              echo "The encrypted backup was saved; only the restore check failed. Look at the run before relying on that file."
+            else
+              echo "No backup was saved tonight. The run log names the step that failed; a missing secret is explained at the top of .github/workflows/database-backup.yml."
+            fi
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            echo "This issue closes itself after the next good night. cc @$OWNER"
+          } > "$RUNNER_TEMP/issue.md"
+          bash scripts/ops/alert-issue.sh open backup-alert \
+            "Database backup failed" "$RUNNER_TEMP/issue.md"
+
+      - name: Close the alert
+        if: needs.backup.result == 'success' && needs.restore-drill.result == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          bash scripts/ops/alert-issue.sh close backup-alert \
+            "Recovered: backed up and restore-checked at $(date -u +%Y-%m-%dT%H:%MZ). $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

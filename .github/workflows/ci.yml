@@ -171,6 +171,15 @@ jobs:
       - name: Run staging seed script tests
         run: node --test scripts/backend/__tests__/seed-stand-remote.test.mjs
 
+      - name: Check the production watch and backup scripts
+        run: |
+          node --check scripts/ops/watch-production.mjs
+          for script in scripts/ops/*.sh; do
+            bash -n "$script"
+          done
+          shellcheck -x --source-path=SCRIPTDIR scripts/ops/*.sh
+          node --test scripts/ops/__tests__/*.test.mjs
+
   dev-script-tests:
     runs-on: ubuntu-latest
     steps:

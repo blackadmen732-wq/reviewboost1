@@ -1,8 +1,16 @@
 # Operations: monitoring, backup, recovery
 
-Status of everything here: **written, not yet running.** No monitor, alert
-route, backup verification or restore drill has been performed. See
-LAUNCH_GATE.md for the state of each.
+Status: **built, waiting on three repository secrets.** Two scheduled
+workflows run once they are on `main` and the secrets below are set:
+
+| Workflow | What it does | Needs |
+|---|---|---|
+| `production-watch.yml`, every 3 h | homepage 200; with the secret, readiness and health too. Keeps one `production-alert` issue open while failing, closes it on recovery | `PRODUCTION_CRON_SECRET` (= Vercel `CRON_SECRET`) for the deep checks |
+| `database-backup.yml`, nightly 07:17 UTC | `supabase db dump` (roles, schema, data) → checked → AES-256 encrypted → 30-day artifact; then restores it into an empty Supabase database and compares every table's row count. One `backup-alert` issue while failing | `SUPABASE_DB_URL` (session pooler URI), `BACKUP_PASSPHRASE` |
+
+GitHub notifies the repository owner of a new issue by email and in the
+mobile app; that is the alert route. Neither workflow has run against
+production yet. See LAUNCH_GATE.md for the state of each row.
 
 ## 1. Monitoring
 
@@ -19,10 +27,17 @@ A monitor must treat **anything but 200 with `data.ok === true`** as down.
 Health returns 503 whenever `ok` is false precisely so status-code-only
 monitors cannot read a broken product as fine.
 
-Recommended: an uptime monitor (Better Stack, Checkly, UptimeRobot or
-similar) polling health every minute with the bearer header and a JSON
-assertion on `data.ok`, paging after 2 consecutive failures; readiness every
-15 minutes.
+In place: `.github/workflows/production-watch.yml` runs
+`scripts/ops/watch-production.mjs` every three hours (retrying a failed
+check once a minute later before alerting). Three hours, not one minute,
+because every run costs Actions minutes from a private repository's free
+allowance.
+
+Recommended on top: a free external uptime monitor (Better Stack, Checkly,
+UptimeRobot or similar) polling `https://reviewboost.fit/` every few minutes,
+for outage alerts within minutes rather than hours. If its plan allows request
+headers, point it at health with the bearer header and a JSON assertion on
+`data.ok` instead.
 
 ### Health problems and thresholds
 
@@ -78,8 +93,11 @@ message bodies, notes, encryption keys, Stripe or Twilio secrets.
    add-on if an RPO under 24 h is required. Verify in the dashboard that a
    backup from the last 24 h exists. *Unverified.*
 2. **Independent copy:** nightly `supabase db dump` (schema + data + roles)
-   to storage outside Supabase (e.g. an S3 bucket with versioning and a
-   different account), encrypted. Protects against account-level loss.
+   outside Supabase, encrypted. Protects against account-level loss.
+   *Built:* `.github/workflows/database-backup.yml` keeps 30 nights as
+   encrypted Actions artifacts and restore-checks each one (below). Needs the
+   `SUPABASE_DB_URL` and `BACKUP_PASSPHRASE` repository secrets; the
+   passphrase belongs with the keys in item 4, not with the backups.
 3. **Storage:** nightly copy of bucket `customer-page` to the same external
    store (S3-compatible API or `supabase storage cp -r`). Object paths are
    stored in `customer_page_assets.storage_path`; restore must preserve them.
@@ -87,6 +105,15 @@ message bodies, notes, encryption keys, Stripe or Twilio secrets.
    with at least two people able to retrieve them, **separately** from the
    database backups (a stolen backup must not come with its keys). Record key
    versions alongside.
+
+### Nightly restore check (automated)
+
+Every backup is decrypted, restored into an empty local Supabase database
+with Supabase's documented restore command, and every `public` table plus
+`auth.users` must come back with exactly the rows the dump holds
+(`scripts/ops/restore-drill.sh`). The run log records the restore time. This
+proves the file restores; it does not prove the application works on top of
+it — that is the full drill below.
 
 ### Restore drill (to perform on a non-production project)
 

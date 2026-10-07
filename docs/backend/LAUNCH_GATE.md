@@ -180,16 +180,16 @@ forward migration before step 6, not an edit.
 | Real Stripe test-mode flow | **BLOCKED** — no Stripe credentials or egress | §6 script |
 | Real Twilio flow | **BLOCKED** — no Twilio account, phone, or egress | §6 script |
 | Webhook retry / out-of-order | TESTED at DB and handler; not against Stripe | |
-| Monitoring and alerts active | **BLOCKED** — thresholds defined (OPERATIONS.md); no monitor exists yet | |
-| Backups active | **FAILED** — LIVE VERIFIED that the Free plan has no automated backups. Needs Pro, or a scheduled off-site `supabase db dump` | OPERATIONS.md |
-| Restore drill | **BLOCKED** — not performed; RPO/RTO undefined until it is | OPERATIONS.md |
+| Monitoring and alerts active | IMPLEMENTED — `production-watch.yml` every 3 h, alerts as a GitHub issue; deep checks need `PRODUCTION_CRON_SECRET`. Not yet run against production | OPERATIONS.md §1, `scripts/ops/__tests__` |
+| Backups active | IMPLEMENTED — nightly encrypted off-site `supabase db dump` (`database-backup.yml`); needs `SUPABASE_DB_URL` + `BACKUP_PASSPHRASE` secrets. Supabase Free plan still keeps none of its own | OPERATIONS.md §2 |
+| Restore drill | IMPLEMENTED (file level) — every nightly backup is restored into an empty Supabase database and checked row for row; script TESTED against the local shim. Application-level drill not performed; RPO/RTO undefined until it is | OPERATIONS.md §2 |
 | Storage recovery | **BLOCKED** — procedure written, not drilled; bucket not created by any migration | OPERATIONS.md |
 | Security advisor findings reviewed | TESTED on local head; hosted advisor **BLOCKED** | SECURITY_REVIEW.md |
 | Service-role usage contained | TESTED (static guard) | `service-role-containment.test.ts` |
 | Security docs match reality | TESTED for MFA claims | `mfa-claims.test.ts`; SYSTEM_CONTEXT §9 corrected |
 | MFA / step-up on sensitive operations | NOT IMPLEMENTED, not claimed — design in MFA_DESIGN.md | |
 | Dependency vulnerabilities (web) | TESTED — 0 prod advisories after upgrading next/sharp/fast-uri; CI blocks on high | `ci.yml` dependency-audit |
-| Dependency vulnerabilities (mobile) | **FAILED** — 7 high in production deps; reported, not blocking | `npm audit --omit=dev` in `apps/mobile` |
+| Dependency vulnerabilities (mobile) | **FAILED**, reduced — the critical and every high with a released fix patched; 20 high remain, all from build-time `braces` 3.0.3 and `node-forge` 1.4.0 (no fixed release exists) and `image-size` 1.2.1 (pinned by metro). None ships in the app binary | `npm audit --omit=dev` in `apps/mobile` |
 | Load tests | **BLOCKED** — need a staging deployment; not performed | SCALING.md |
 | Production smoke-test runbook | IMPLEMENTED | §5 |
 

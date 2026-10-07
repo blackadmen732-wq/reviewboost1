@@ -1,0 +1,73 @@
+name: Production watch
+
+# Every three hours: is reviewboost.fit up, and is it healthy? While it is not,
+# one GitHub issue labelled production-alert stays open; GitHub tells the
+# repository owner about a new issue by email and in the mobile app. When the
+# next check passes, the issue is closed with the time it recovered.
+#
+# Three hours keeps this to about 240 Actions minutes a month, which matters on
+# a private repository's free allowance. For minute-level outage alerts, point
+# a free external uptime monitor at the homepage as well (OPERATIONS.md §1).
+#
+# Without the PRODUCTION_CRON_SECRET repository secret only the homepage is
+# checked. With it (the same value as CRON_SECRET in Vercel), readiness and
+# health are read too: database, scheduler, queues, unprocessed Stripe events
+# and configuration drift.
+
+on:
+  schedule:
+    - cron: "41 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: production-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check production
+        id: probe
+        env:
+          SITE_URL: ${{ vars.PRODUCTION_URL || 'https://reviewboost.fit' }}
+          WORKER_SECRET: ${{ secrets.PRODUCTION_CRON_SECRET }}
+          REPORT_FILE: ${{ runner.temp }}/report.md
+        run: node scripts/ops/watch-production.mjs
+
+      - name: Open the alert
+        if: failure() && steps.probe.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          {
+            cat "$RUNNER_TEMP/report.md"
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            echo "This issue closes itself when a later check passes. cc @$OWNER"
+          } > "$RUNNER_TEMP/issue.md"
+          bash scripts/ops/alert-issue.sh open production-alert \
+            "Production is down or unhealthy" "$RUNNER_TEMP/issue.md"
+
+      - name: Close the alert
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          bash scripts/ops/alert-issue.sh close production-alert \
+            "Recovered: the check at $(date -u +%Y-%m-%dT%H:%MZ) passed. $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
