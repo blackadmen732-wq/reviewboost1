@@ -86,15 +86,6 @@ describe("Customer page editor", () => {
     // No location clutter on the customer page.
     expect(screen.queryByText(/location/i)).not.toBeInTheDocument();
   });
-
-  it("previews the business name where the photo goes until one is added", async () => {
-    render(<CustomerPageEditor businessName="Mario’s Pizza" />);
-
-    await waitFor(() =>
-      expect(document.querySelector("[data-hero-fallback]")).toHaveTextContent("Mario’s Pizza"),
-    );
-    expect(document.querySelector("[data-hero-layer] img")).toBeNull();
-  });
 });
 
 /**

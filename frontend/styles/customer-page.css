@@ -57,33 +57,12 @@ html:has(.customer-live) {
   .visit-hero__image { transition: none; }
 }
 
-/* No image uploaded yet: the business's own name on a plain neutral area.
-   The top of the page is only ever the business — its photo, or until there
-   is one, its name — never ReviewBoost. Without the name a customer who
-   scanned a counter code had nothing telling them whose visit they rated. */
+/* No image uploaded yet: a plain neutral area. The top of the page is only
+   ever the owner's own image; ReviewBoost draws nothing there. */
 .visit-hero__empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 100%;
   height: 100%;
-  /* In cqi like the sheet below, so the owner's phone preview scales the
-     same way the customer's phone does. */
-  padding: 14cqi 6cqi 10cqi;
   background: #1c1d1d;
-}
-
-.visit-hero__name {
-  max-width: 100%;
-  margin: 0;
-  color: #f6f7f5;
-  font-family: var(--font-visit-heading), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 9cqi;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  text-align: center;
-  overflow-wrap: anywhere;
 }
 
 .visit-language {
