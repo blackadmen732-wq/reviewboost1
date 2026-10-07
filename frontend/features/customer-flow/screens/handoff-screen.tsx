@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleCheck, ExternalLink } from "lucide-react";
+import { Check, ExternalLink } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { CustomerActionBar } from "@/features/customer-flow/customer-action-bar";
@@ -21,6 +21,9 @@ interface HandoffScreenProps {
  * state by the time this renders. The link is a fallback for a browser that
  * refused the programmatic navigation, and for a customer who came back with
  * the back button; it is not a step anyone has to take.
+ *
+ * A check that draws itself, the thanks, a bar that says the review page is
+ * on its way, and the link. The motion is the same for every rating too.
  */
 export function HandoffScreen({
   businessName,
@@ -28,28 +31,28 @@ export function HandoffScreen({
   messages,
 }: HandoffScreenProps) {
   return (
-    <section className="flow-screen" data-flow-screen="handoff">
-      <div className="success-mark" aria-hidden="true">
-        <CircleCheck size={28} strokeWidth={2.1} />
-      </div>
-      <div className="screen-heading-group">
-        <h1 className="customer-question" data-screen-heading tabIndex={-1}>
-          {messages.thanksHeading}
-        </h1>
-        <p className="customer-support">
-          {messages.feedbackSent(businessName)}
-        </p>
+    <section className="flow-screen visit-handoff" data-flow-screen="handoff">
+      <div className="visit-handoff__mark" aria-hidden="true">
+        <Check size={30} strokeWidth={2.75} />
       </div>
 
-      <p className="customer-support" role="status">
-        {messages.handoffBody}
-      </p>
+      <h1 className="visit-handoff__heading" data-screen-heading tabIndex={-1}>
+        {messages.thanksHeading}
+      </h1>
+      <p className="visit-handoff__sent">{messages.feedbackSent(businessName)}</p>
+
+      <div className="visit-handoff__progress">
+        <span className="visit-handoff__bar" aria-hidden="true" />
+        <p className="visit-handoff__status" role="status">
+          {messages.handoffBody}
+        </p>
+      </div>
 
       <CustomerActionBar>
         <a
           className={cn(
-            buttonVariants({ variant: "primary", size: "lg" }),
-            "google-review-link",
+            buttonVariants({ variant: "action" }),
+            "google-review-link visit-handoff__link",
           )}
           href={destinationUrl}
           rel="noopener noreferrer"

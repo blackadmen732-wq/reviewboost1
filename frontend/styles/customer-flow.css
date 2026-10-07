@@ -374,60 +374,6 @@
   font-size: 0.9375rem;
   line-height: 1.4;
 }
-.loading-header {
-  display: flex;
-  min-height: 58px;
-  align-items: center;
-  gap: 12px;
-  margin-inline: -20px;
-  margin-block: -18px 36px;
-  padding: 18px 20px 16px;
-  border-block-end: 1px solid var(--rb-border);
-}
-.loading-avatar {
-  width: 56px;
-  height: 56px;
-  flex: 0 0 56px;
-  border-radius: 17px;
-}
-.loading-business-copy {
-  display: grid;
-  width: 152px;
-  gap: 8px;
-}
-.loading-business-name {
-  width: 100%;
-  height: 17px;
-}
-.loading-location-name {
-  width: 62%;
-  height: 13px;
-}
-.loading-heading {
-  width: 78%;
-  height: 42px;
-  margin-inline: auto;
-}
-.loading-support {
-  width: 60%;
-  height: 17px;
-  margin-inline: auto;
-}
-.loading-stars {
-  display: flex;
-  justify-content: center;
-  gap: clamp(3px, 1.5vw, 8px);
-  color: var(--rb-border-strong);
-}
-.loading-stars span {
-  display: grid;
-  width: clamp(52px, 16vw, 68px);
-  height: clamp(56px, 17vw, 70px);
-  place-items: center;
-  border: 1px solid var(--rb-border);
-  border-radius: 15px;
-  background: var(--rb-surface);
-}
 .opening-message {
   min-height: 24px;
   margin: 0;
@@ -475,8 +421,7 @@
     min-height: 36px;
     padding: 4px 16px;
   }
-  .customer-header,
-  .loading-header {
+  .customer-header {
     margin-inline: -30px;
     margin-block-start: -28px;
     padding-inline: 30px;
@@ -495,13 +440,11 @@
   .customer-card {
     padding-inline: 16px;
   }
-  .customer-header,
-  .loading-header {
+  .customer-header {
     margin-inline: -16px;
     padding-inline: 16px;
   }
-  .business-avatar,
-  .loading-avatar {
+  .business-avatar {
     width: 50px;
     height: 50px;
     flex-basis: 50px;

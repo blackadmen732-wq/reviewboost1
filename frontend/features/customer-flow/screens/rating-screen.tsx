@@ -58,10 +58,12 @@ export function RatingScreen({
       {/* Status lives in one short, centred line under the stars. The sheet has
           a fixed height, set by screen width, so the stars never move under a thumb; a
           boxed notice plus a large button did not fit in it, and the error
-          was squeezed to a sliver the customer could not read. */}
+          was squeezed to a sliver the customer could not read. "Sending…"
+          floats in the space under the stars, so the footer stays put. */}
       <div className="rating-actions" data-rating-actions>
         {isSubmitting ? (
-          <p className="visit-status" role="status">
+          <p className="visit-status visit-status--sending" role="status">
+            <span className="visit-progress" aria-hidden="true" />
             {messages.sending}
           </p>
         ) : null}
@@ -78,7 +80,7 @@ export function RatingScreen({
         ) : null}
 
         {isOffline ? (
-          <p id="feedback-status" className="visit-status" role="status">
+          <p id="feedback-status" className="visit-status visit-status--offline" role="status">
             {messages.offline}
           </p>
         ) : null}

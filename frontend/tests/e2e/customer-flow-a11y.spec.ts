@@ -11,7 +11,27 @@ async function stayOnHandoff(page: Page) {
   await page.route(DESTINATION_PATTERN, (route) => route.fulfill({ status: 204 }));
 }
 
+/**
+ * The page eases its lines in over a few hundred milliseconds. Axe measures
+ * contrast on whatever frame it lands on, and half-faded text is not what a
+ * customer reads, so it waits for every entrance to finish. Looping
+ * indicators (the progress bar, a loading shimmer) never finish and are left
+ * running.
+ */
+async function settle(page: Page) {
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (animation) =>
+          animation.playState !== "running" ||
+          animation.effect?.getComputedTiming().iterations === Infinity,
+      ),
+  );
+}
+
 async function expectNoSeriousViolations(page: Page) {
+  await settle(page);
   const results = await new AxeBuilder({ page }).analyze();
   const blocking = results.violations.filter(
     ({ impact }) => impact === "serious" || impact === "critical",

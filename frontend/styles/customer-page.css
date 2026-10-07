@@ -30,15 +30,22 @@ html:has(.customer-live) {
 
 /* The business's image takes whatever height the sheet leaves. A taller
    phone shows more of the photo — the ReviewBoost sheet does not grow. */
+/* While a photo downloads the hero is a quiet light grey, and the photo fades
+   in over it. The page opens on a white placeholder (see CustomerLoading), so
+   a dark field here flashed white, then black, then the photo. */
 .visit-hero {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  background: #1a1a1a;
+  background: #eceeed;
 }
 
+/* The photo (or the white) fills the hero rather than sizing it, so the hero
+   is only ever as tall as the space the sheet leaves. */
 .visit-hero__image {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -66,8 +73,8 @@ html:has(.customer-live) {
 }
 
 .visit-hero__empty {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   background: #ffffff;
 }
 
@@ -82,6 +89,11 @@ html:has(.customer-live) {
   top: 8px;
   right: 8px;
   z-index: 2;
+  animation: visit-fade 400ms ease-out 200ms backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visit-language { animation: none; }
 }
 
 .visit-language .language-selector,
@@ -178,9 +190,15 @@ html:has(.customer-live) {
   height: calc(82.05cqi + max(0px, env(safe-area-inset-bottom) - 10cqi));
   z-index: 2;
   margin-top: -28px;
-  background: #f9f9f9;
-  border-radius: 7cqi 7cqi 0 0;
-  box-shadow: 0 -6px 20px rgb(0 0 0 / 16%);
+  background: #ffffff;
+  border-radius: 7.5cqi 7.5cqi 0 0;
+  /* Layered and tinted rather than one grey smudge: a hairline that holds the
+     edge against a white top, a close soft shadow, and a long faint one that
+     lifts the sheet off any photo. */
+  box-shadow:
+    0 -1px 0 rgb(18 28 22 / 7%),
+    0 -4px 14px -6px rgb(18 28 22 / 12%),
+    0 -18px 44px -20px rgb(18 28 22 / 18%);
   padding: 10.075cqi 0 0;
   overflow: hidden;
 }
@@ -188,16 +206,18 @@ html:has(.customer-live) {
 /* The width-sized sheet is the *rating* geometry: the stars sit at a fixed
  * height so the page cannot reflow under the customer's thumb while they choose.
  *
- * The handoff screen is a different shape — a heading, two lines of status and
+ * The handoff screen is a different shape — a heading, a line of status and
  * the "Open the review page" link. Pinned inside the fixed rating sheet, its
  * content ran to 353px inside a 169px box, so that link was reachable only by
  * scrolling a region most people will not realise scrolls. It is the fallback
  * for when the automatic redirect does not fire, which makes it the last thing
  * that may be hidden.
  *
- * So once the rating is taken, the stage stops being a fixed canvas: it grows
- * with its content and the page scrolls normally. Nothing is clipped at any
- * size, and the rating screen keeps the geometry that matters to it. */
+ * So once the rating is taken, the stage stops being a fixed canvas: the sheet
+ * is as tall as its content (never shorter than the rating sheet), the photo
+ * keeps whatever height is left, and when a short screen cannot hold both the
+ * page scrolls. Nothing is clipped at any size, and the sheet grows by only
+ * what the handoff needs instead of jumping to a different page shape. */
 .customer-live:has([data-flow-screen="handoff"]),
 .customer-live:has([data-flow-screen="blocking"]) {
   align-items: start;
@@ -210,12 +230,8 @@ html:has(.customer-live) {
   max-height: none;
 }
 
-/* Flex is what squeezes: the column keeps dividing a fixed height however the
-   card is sized. On these screens the stage is ordinary block flow instead, so
-   the card is exactly as tall as its content and the page scrolls if it must. */
 .visit-stage:has([data-flow-screen="handoff"]),
 .visit-stage:has([data-flow-screen="blocking"]) {
-  display: block;
   height: auto;
   min-height: 100dvh;
   overflow: visible;
@@ -223,18 +239,19 @@ html:has(.customer-live) {
 
 .visit-stage:has([data-flow-screen="handoff"]) .visit-card,
 .visit-stage:has([data-flow-screen="blocking"]) .visit-card {
-  display: block;
   height: auto;
-  /* The sheet runs to the bottom of the screen, whatever its content. */
-  min-height: calc(68dvh + 30px);
+  min-height: 82.05cqi;
   max-height: none;
+  padding-bottom: max(6cqi, calc(env(safe-area-inset-bottom) + 2cqi));
   overflow: visible;
 }
 
+/* The photo fills what the sheet leaves, from nothing up — never from the
+   photo's own size — and keeps a strip of itself on even the shortest phone. */
 .visit-stage:has([data-flow-screen="handoff"]) .visit-hero,
 .visit-stage:has([data-flow-screen="blocking"]) .visit-hero {
-  height: 32vh;
-  min-height: 160px;
+  flex: 1 1 0;
+  min-height: max(112px, 18dvh);
 }
 
 .visit-stage:has([data-flow-screen="handoff"]) .visit-card__body,
@@ -245,6 +262,28 @@ html:has(.customer-live) {
 .visit-card__copy {
   flex: 0 0 auto;
   text-align: center;
+}
+
+/* The question arrives first, then its instruction, then the stars: a short
+   cascade that reads top to bottom, the way the eye should. Backwards fill
+   only, so nothing is held after it lands. */
+.visit-card__copy > * {
+  animation: visit-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.visit-card__copy > .visit-heading {
+  animation-delay: 30ms;
+}
+
+.visit-card__copy > .visit-support {
+  animation-delay: 110ms;
+}
+
+@keyframes visit-rise {
+  from {
+    opacity: 0;
+    transform: translateY(2.6cqi);
+  }
 }
 
 .visit-heading {
@@ -284,12 +323,22 @@ html:has(.customer-live) {
   margin-top: var(--visit-stars-gap, 7.39cqi);
 }
 
+/* 15.9cqi under the reference's 16.4cqi stars; the stars grew by 1.2cqi, so
+   the footer keeps its measured place. It does not animate: it is already on
+   the loading sheet, in the same place, and must not blink when the page's
+   details arrive. */
 .visit-footer {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
   gap: var(--visit-footer-gap, 1.49cqi);
-  margin-top: var(--visit-footer-top, 15.9cqi);
+  margin-top: var(--visit-footer-top, 14.7cqi);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visit-card__copy > * {
+    animation: none;
+  }
 }
 
 .visit-powered {
@@ -342,14 +391,22 @@ html:has(.customer-live) {
   padding: 0;
 }
 
+/* Holds the gold gradient the stars paint with. Present, never visible. */
+.visit-stars__defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 /* Five stars, on a 320px phone as much as a 430px one. Fixed 52px targets with
    an 18px gap needed 332px of card and clipped the fifth star below that. Sizes
-   follow the stage width, and never drop below a 48px target. */
+   follow the stage width, and never drop below a 44px target. */
 .visit-stars__row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1.66cqi;
+  gap: 1.35cqi;
 }
 
 .visit-star {
@@ -384,64 +441,247 @@ html:has(.customer-live) {
   cursor: default;
 }
 
+/* 68.6pt on a 390pt screen (star ink ~60pt, a touch bigger than the
+   reference's 56pt); the target never under Apple's 44pt. */
 .visit-star__label {
   display: grid;
-  /* 58pt on a 390pt screen; never under Apple's 44pt target. */
-  /* Star ink 56pt on a 390pt screen; the target never under Apple's 44pt. */
-  width: max(44px, 16.4cqi);
-  height: max(44px, 16.4cqi);
+  width: max(44px, 17.6cqi);
+  height: max(44px, 17.6cqi);
   place-items: center;
-  color: #494949;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Motion lives on the drawing, never on the label: the label is the measured
+   target, and it holds still. */
 .visit-star__label svg {
   width: 100%;
   height: 100%;
   overflow: visible;
-  fill: #f6f6f6;
-  filter: drop-shadow(0 1.3cqi 1.1cqi rgb(0 0 0 / 20%));
-  transition: transform 110ms ease-out, color 140ms ease-out, fill 140ms ease-out;
+  filter: drop-shadow(0 0.9cqi 1.2cqi rgb(28 40 33 / 15%));
+  transition:
+    transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 220ms ease-out;
+  /* Arrive one by one after the question, with a little spring. Backwards
+     fill only, so hover and press still move the star once it has landed. */
+  animation: visit-star-in 640ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation-delay: calc(120ms + var(--star-index, 0) * 65ms);
 }
 
-/* Rating gold: a warm fill with a darker edge so the shape still holds 3:1
-   against the white sheet. Never green or red — a two is not a failure. */
-.visit-star__label[data-filled="true"] {
-  color: #b27405;
+/* The empty star: white falling to a soft grey (a slight raise, like a key),
+   with a quiet edge that still holds 3:1 against the sheet, so the shape
+   reads as a control. */
+.visit-star__base {
+  stroke: #858b88;
+}
+
+/* The chosen gold: light and warm, not orange. Its thin edge keeps the filled
+   shape at 3:1 on white. Every filled star is the same gold — a two is not a
+   failure, and nothing here is green or red. */
+.visit-star__gold {
+  stroke: #c08a0e;
+  opacity: 0;
+  transform: scale(0.35);
+  transform-box: fill-box;
+  transform-origin: 50% 55%;
+  transition:
+    opacity 160ms ease-out,
+    transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.visit-star__body {
+  transform-box: fill-box;
+  transform-origin: 50% 70%;
+  /* One gentle wave across the row, once, just after the stars land: the
+     only thing on the page that says "touch these". */
+  animation: visit-star-wave 620ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  animation-delay: calc(1250ms + var(--star-index, 0) * 75ms);
+}
+
+.visit-stars__row:has(:checked) .visit-star__body,
+.visit-stars:disabled .visit-star__body {
+  animation: none;
 }
 
 .visit-star__label[data-filled="true"] svg {
-  fill: #f5b422;
-  filter: drop-shadow(0 3px 5px rgb(184 121 11 / 28%));
-  animation: visit-star-fill 160ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
-  animation-delay: calc(var(--star-index, 0) * 20ms);
+  filter: drop-shadow(0 1.1cqi 1.6cqi rgb(214 150 24 / 30%));
+}
+
+/* The fill lands on the chosen star at once, then runs back along the row,
+   each star with a small bounce. */
+.visit-star__label[data-filled="true"] .visit-star__gold {
+  opacity: 1;
+  transform: none;
+  animation: visit-star-fill 460ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation-delay: calc(var(--fill-order, 0) * 50ms);
+}
+
+/* The chosen star answers with one soft ring. The same ring for every star. */
+.visit-star__input:checked + .visit-star__label::after {
+  position: absolute;
+  inset: 6%;
+  border: max(2px, 0.55cqi) solid rgb(255 200 63 / 85%);
+  border-radius: 50%;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  animation: visit-star-ring 620ms cubic-bezier(0.2, 0.7, 0.2, 1) 60ms forwards;
+}
+
+/* With a mouse, the stars up to the pointer show a soft preview of the fill
+   and the one under it lifts. Touch screens skip this: a phone's "hover" is
+   a tap that already chose. */
+@media (hover: hover) and (pointer: fine) {
+  .visit-stars:not(:disabled) .visit-stars__row:not(:has(:checked)) .visit-star:is(:hover, :has(~ .visit-star:hover)) .visit-star__gold {
+    opacity: 0.55;
+    transform: none;
+  }
+
+  .visit-stars:not(:disabled) .visit-star:hover .visit-star__label svg {
+    transform: translateY(-0.7cqi) scale(1.06);
+  }
 }
 
 /* The thumb gets an answer the instant it lands, before any network. */
-.visit-star__input:active + .visit-star__label svg {
+.visit-stars:not(:disabled) .visit-star__input:active + .visit-star__label svg {
   transform: scale(0.88);
+  transition-duration: 90ms;
+}
+
+@keyframes visit-star-in {
+  from {
+    opacity: 0;
+    transform: translateY(2.4cqi) scale(0.6);
+  }
 }
 
 @keyframes visit-star-fill {
-  0% { transform: scale(0.86); }
-  60% { transform: scale(1.06); }
-  100% { transform: scale(1); }
+  0% { opacity: 0; transform: scale(0.35); }
+  55% { opacity: 1; transform: scale(1.16); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes visit-star-ring {
+  0% { opacity: 0.9; transform: scale(0.55); }
+  100% { opacity: 0; transform: scale(1.45); }
+}
+
+@keyframes visit-star-wave {
+  0%, 100% { transform: none; }
+  40% { transform: translateY(-1.1px) scale(1.05); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .visit-star__label svg { transition: none; }
-  .visit-star__label[data-filled="true"] svg { animation: none; }
-  .visit-star__input:active + .visit-star__label svg { transform: none; }
+  .visit-star__label svg,
+  .visit-star__gold {
+    transition: none;
+    animation: none;
+  }
+
+  .visit-star__label[data-filled="true"] .visit-star__gold,
+  .visit-star__body {
+    animation: none;
+  }
+
+  .visit-star__input:checked + .visit-star__label::after {
+    display: none;
+  }
+
+  .visit-stars:not(:disabled) .visit-star:hover .visit-star__label svg,
+  .visit-stars:not(:disabled) .visit-star__input:active + .visit-star__label svg {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .visit-star__base {
+    fill: Canvas;
+    stroke: CanvasText;
+  }
+
+  .visit-star__gold {
+    fill: Highlight;
+    stroke: CanvasText;
+  }
 }
 
 .visit-star__input:focus-visible + .visit-star__label {
   outline: 2px solid var(--rb-focus);
   outline-offset: 3px;
-  border-radius: 8px;
+  border-radius: 12px;
+}
+
+/* ------------------------------------------------ loading placeholder --- */
+
+/* Bars where the question and instruction will be, each exactly the height of
+   the line it stands in for, so the stars below sit where they will stay. A
+   column, so the bars' margins add up instead of collapsing into each other. */
+.visit-card__copy--placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.visit-skeleton {
+  display: block;
+  margin-inline: auto;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #eef0ef 0%, #f7f8f7 40%, #eef0ef 80%);
+  background-size: 240% 100%;
+  animation: visit-shimmer 1.5s ease-in-out infinite;
+}
+
+/* 7 + 2 x 1.37 = 9.74cqi, the heading's line box. */
+.visit-skeleton--heading {
+  width: 72cqi;
+  height: 7cqi;
+  margin-block: 1.37cqi;
+}
+
+/* 1.885cqi gap + a 3.46cqi line box, like the instruction. */
+.visit-skeleton--support {
+  width: 62cqi;
+  height: 2.4cqi;
+  margin-block: calc(1.885cqi + 0.53cqi) 0.53cqi;
+}
+
+.visit-star--placeholder .visit-star__label {
+  cursor: default;
+}
+
+.visit-star--placeholder .visit-star__label svg {
+  filter: none;
+  animation: visit-placeholder 1.5s ease-in-out infinite;
+  animation-delay: calc(var(--star-index, 0) * 90ms);
+}
+
+.visit-star--placeholder path {
+  fill: #f2f4f3;
+  stroke: #dfe4e1;
+}
+
+@keyframes visit-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -140% 0; }
+}
+
+@keyframes visit-placeholder {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visit-skeleton,
+  .visit-star--placeholder .visit-star__label svg {
+    animation: none;
+  }
 }
 
 /* ------------------------------------------------ rating status line --- */
+
+.visit-card__body {
+  position: relative;
+}
 
 .visit-card .rating-actions {
   display: grid;
@@ -455,6 +695,16 @@ html:has(.customer-live) {
   display: none;
 }
 
+/* "Sending…" sits in the calm space under the stars without taking any of
+   it: the footer stays where it is, inside the sheet, while the rating saves. */
+.visit-card .rating-actions:has(> .visit-status--sending, > .opening-message) {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  margin-top: 3.2cqi;
+}
+
 .visit-status {
   margin: 0;
   max-width: 34ch;
@@ -462,6 +712,56 @@ html:has(.customer-live) {
   font-size: 0.875rem;
   line-height: 1.4;
   text-align: center;
+}
+
+.visit-status--sending {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  animation: visit-fade 240ms ease-out both;
+}
+
+/* A thin bar with light running along it: something is happening, without
+   pretending to know how long it will take. */
+.visit-progress {
+  position: relative;
+  display: block;
+  width: min(30cqi, 128px);
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef0ee;
+}
+
+.visit-progress::after {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffd765, #f0b323);
+  content: "";
+  animation: visit-progress-run 1050ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes visit-progress-run {
+  from { transform: translateX(-105%); }
+  to { transform: translateX(245%); }
+}
+
+@keyframes visit-fade {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visit-status--sending {
+    animation: none;
+  }
+
+  .visit-progress::after {
+    width: 100%;
+    opacity: 0.6;
+    animation: none;
+  }
 }
 
 .visit-status--error {
@@ -472,10 +772,10 @@ html:has(.customer-live) {
   font-weight: 650;
 }
 
-/* An error needs its message and its retry on screen together. The stars no
-   longer have to hold still — the customer has already tapped — so the sheet
-   grows into the artwork instead of clipping either. */
-.visit-card:has(.visit-status--error) {
+/* An error, or being offline, needs its message (and a retry) on screen. The
+   stars no longer have to hold still — the customer has already tapped — so
+   the sheet grows into the artwork instead of clipping either. */
+.visit-card:has(.visit-status--error, .visit-status--offline) {
   flex: 0 0 auto;
   height: auto;
   min-height: 82.05cqi;
@@ -483,7 +783,7 @@ html:has(.customer-live) {
   padding-bottom: max(6cqi, calc(env(safe-area-inset-bottom) + 2cqi));
 }
 
-.visit-card:has(.visit-status--error) .visit-card__body {
+.visit-card:has(.visit-status--error, .visit-status--offline) .visit-card__body {
   overflow: visible;
 }
 
@@ -1062,18 +1362,176 @@ html:has(.customer-live) {
   }
 }
 
-/* Inside the sheet every line of the handoff is centred, like the rating. */
-.visit-card [data-flow-screen="handoff"] .customer-support {
+/* ------------------------------------------------------------ handoff --- */
+
+/* The moment between the star and Google: a check that draws itself, the
+   thanks, a bar that says the review page is on its way, and the link for a
+   browser that did not follow. Identical for every rating, motion included. */
+.visit-card .visit-handoff {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding-inline: 7cqi;
   text-align: center;
 }
 
+.visit-handoff__mark {
+  position: relative;
+  display: grid;
+  width: max(54px, 15.4cqi);
+  height: max(54px, 15.4cqi);
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #edf9f3, #d6f1e3);
+  color: #007a4d;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 85%),
+    0 12px 26px -14px rgb(0 122 77 / 55%);
+  animation: visit-mark-in 560ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+/* One ring breathes out from the check as it lands. */
+.visit-handoff__mark::after {
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgb(0 168 107 / 38%);
+  border-radius: 50%;
+  content: "";
+  opacity: 0;
+  animation: visit-mark-ring 900ms cubic-bezier(0.2, 0.7, 0.2, 1) 280ms both;
+}
+
+.visit-handoff__mark svg path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 0;
+  animation: visit-check-draw 420ms cubic-bezier(0.65, 0, 0.35, 1) 230ms backwards;
+}
+
+@keyframes visit-mark-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+@keyframes visit-mark-ring {
+  0% { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.75); }
+}
+
+@keyframes visit-check-draw {
+  from { stroke-dashoffset: 24; }
+}
+
+/* The same face as "How was your visit?", a size down. */
+.visit-handoff__heading {
+  margin: 5.2cqi 0 0;
+  color: #0a0a0a;
+  font-family: var(--font-visit-heading), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: max(24px, 7.4cqi);
+  font-weight: 640;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  text-wrap: balance;
+  animation: visit-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) 90ms backwards;
+}
+
+.visit-handoff__heading:focus {
+  outline: none;
+}
+
+.visit-handoff__sent {
+  max-width: 30ch;
+  margin: 1.8cqi 0 0;
+  color: #59615d;
+  font-size: max(15px, 4cqi);
+  line-height: 1.45;
+  text-wrap: pretty;
+  animation: visit-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) 160ms backwards;
+}
+
+.visit-handoff__progress {
+  display: grid;
+  justify-items: center;
+  gap: 2.4cqi;
+  width: 100%;
+  margin-top: 6.4cqi;
+  animation: visit-fade 500ms ease-out 260ms backwards;
+}
+
+.visit-handoff__bar {
+  position: relative;
+  display: block;
+  width: min(56cqi, 240px);
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e6eee9;
+}
+
+.visit-handoff__bar::after {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3cc792, #00a86b);
+  content: "";
+  animation: visit-progress-run 1100ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+.visit-handoff__status {
+  margin: 0;
+  color: #59615d;
+  font-size: max(14px, 3.6cqi);
+  line-height: 1.4;
+}
+
 /* The sheet already keeps its action in view; a sticky bar with the old card's
-   negative margins sat on top of the ReviewBoost footer. */
+   negative margins sat on top of the ReviewBoost footer — and with no side
+   padding in the sheet, the button ran into both edges of the screen. */
 .visit-card .customer-action-bar {
   position: static;
-  margin: 16px 0 0;
+  width: 100%;
+  margin: 6.4cqi 0 0;
   padding: 0;
   border: 0;
   background: transparent;
   box-shadow: none;
+  animation: visit-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) 320ms backwards;
+}
+
+/* The page's one action is a pill, raised, with a press you can feel. */
+.visit-card .visit-handoff__link,
+.visit-card .visit-retry {
+  border-radius: 999px;
+  box-shadow:
+    0 1px 0 rgb(0 74 47 / 22%),
+    0 14px 26px -14px rgb(0 122 77 / 60%);
+}
+
+.visit-stage:has([data-flow-screen="handoff"]) .visit-footer {
+  margin-top: 9cqi;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visit-handoff__mark,
+  .visit-handoff__mark::after,
+  .visit-handoff__mark svg path,
+  .visit-handoff__heading,
+  .visit-handoff__sent,
+  .visit-handoff__progress,
+  .visit-card .customer-action-bar {
+    animation: none;
+  }
+
+  .visit-handoff__mark::after {
+    display: none;
+  }
+
+  .visit-handoff__bar::after {
+    width: 100%;
+    opacity: 0.55;
+    animation: none;
+  }
 }

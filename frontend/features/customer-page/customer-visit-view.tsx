@@ -60,6 +60,11 @@ export interface CustomerVisitViewProps {
   footerLine: string;
   children: ReactNode;
   language?: ReactNode;
+  /**
+   * While the page's details load: the same sheet, with soft bars where the
+   * question and instruction will be, so nothing jumps when they arrive.
+   */
+  placeholder?: boolean;
 }
 
 export function CustomerVisitView({
@@ -70,6 +75,7 @@ export function CustomerVisitView({
   footerLine,
   children,
   language,
+  placeholder = false,
 }: CustomerVisitViewProps) {
   const crop = clampHeroTransform(transform);
 
@@ -90,7 +96,12 @@ export function CustomerVisitView({
       </div>
 
       <section className="visit-card" data-rating-card>
-        {heading ? (
+        {placeholder ? (
+          <div className="visit-card__copy visit-card__copy--placeholder" aria-hidden="true">
+            <span className="visit-skeleton visit-skeleton--heading" />
+            <span className="visit-skeleton visit-skeleton--support" />
+          </div>
+        ) : heading ? (
           <div className="visit-card__copy">
             <h1 className="visit-heading" data-screen-heading tabIndex={-1}>
               {heading}

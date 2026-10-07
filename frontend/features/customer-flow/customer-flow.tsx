@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { LazyMotion, domAnimation, m, useReducedMotion } from "motion/react";
+import { preconnect } from "react-dom";
 import {
   useCallback,
   useEffect,
@@ -21,6 +22,7 @@ import {
   type CustomerFlowState,
 } from "@/features/customer-flow/customer-flow-state";
 import { navigateToDestination } from "@/features/customer-flow/destination-handoff";
+import { handoffOrigins } from "@/features/customer-flow/handoff-origins";
 import {
   loadCustomerDraft,
   safeInitialCustomerState,
@@ -120,6 +122,14 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   });
 
   const destinationUrl = contextQuery.data?.destination.url ?? null;
+
+  // Open the road to Google while the customer reads the question: the name
+  // lookup and the secure handshake for the review page's host are finished
+  // before the tap, so the handoff starts on a connection that is already
+  // open. React adds each hint once, however often this renders.
+  if (destinationUrl) {
+    for (const origin of handoffOrigins(destinationUrl)) preconnect(origin);
+  }
 
   useEffect(() => {
     const animationFrame = window.requestAnimationFrame(() => {
