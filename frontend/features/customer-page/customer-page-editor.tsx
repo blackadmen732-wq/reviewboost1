@@ -324,6 +324,7 @@ export function CustomerPageEditor({
         <PhoneFrame label={`${businessName} customer page preview`} size="editor">
           <CustomerVisitView
             heroUrl={heroUrl ?? null}
+            businessName={businessName}
             transform={DEFAULT_HERO_TRANSFORM}
             heading={previewMessages.ratingHeading}
             // The live page always says this line; a leftover draft tagline

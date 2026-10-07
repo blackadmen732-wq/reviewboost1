@@ -56,6 +56,9 @@ const visitCapsFont = localFont({
 
 export interface CustomerVisitViewProps {
   heroUrl: string | null;
+  /** Shown where the photo would be until the business uploads one, so a
+      customer always knows whose counter they are rating. */
+  businessName: string;
   transform: HeroTransform;
   heading: string;
   support: string;
@@ -66,6 +69,7 @@ export interface CustomerVisitViewProps {
 
 export function CustomerVisitView({
   heroUrl,
+  businessName,
   transform,
   heading,
   support,
@@ -86,7 +90,9 @@ export function CustomerVisitView({
         {heroUrl ? (
           <HeroImage src={heroUrl} transform={heroTransformStyle(crop)} />
         ) : (
-          <div className="visit-hero__empty" aria-hidden="true" />
+          <div className="visit-hero__empty" data-hero-fallback>
+            <p className="visit-hero__name">{businessName}</p>
+          </div>
         )}
         {language ? <div className="visit-language">{language}</div> : null}
       </div>

@@ -62,6 +62,16 @@ describe("one-tap customer flow", () => {
     expect(new Set(handoffMarkup).size).toBe(1);
   });
 
+  it("names the business above the stars until it uploads a photo", async () => {
+    await openRating();
+
+    // The fixture business has no photo. A blank dark half-page left a
+    // customer with nothing saying whose counter code they had scanned.
+    const fallback = document.querySelector<HTMLElement>("[data-hero-fallback]");
+    expect(fallback).toHaveTextContent("Mario’s Pizza");
+    expect(document.querySelector("[data-hero-layer] img")).toBeNull();
+  });
+
   it("asks for nothing between the star and the destination", async () => {
     const user = await openRating();
     await tapStar(user, 2);
