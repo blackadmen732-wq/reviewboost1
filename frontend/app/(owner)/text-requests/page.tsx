@@ -4,7 +4,7 @@ import { AppShell } from "@/features/dashboard/app-shell";
 import { TextRequestComposer } from "@/features/dashboard/text-request-composer";
 import { permissionsFor } from "@/lib/owner/permissions";
 import { listStands, requireOwner } from "@/lib/server/owner-data";
-import { readSmsBalance, listRecentTextRequests } from "@/lib/server/owner-data";
+import { listRecentTextRequests, readOwnerBilling } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
   title: "Text Requests",
@@ -27,8 +27,8 @@ export const dynamic = "force-dynamic";
 export default async function TextRequestsPage() {
   const { organization } = await requireOwner("/text-requests");
 
-  const [balance, stands, recent] = await Promise.all([
-    readSmsBalance(organization.orgId),
+  const [billing, stands, recent] = await Promise.all([
+    readOwnerBilling(organization.orgId),
     listStands(organization.orgId),
     listRecentTextRequests(organization.orgId),
   ]);
@@ -45,7 +45,8 @@ export default async function TextRequestsPage() {
       </div>
 
       <TextRequestComposer
-        balance={balance}
+        balance={billing.smsBalance}
+        onTrial={billing.status === "trialing"}
         tags={sendable.map((stand) => ({
           standId: stand.standId,
           label: stand.label,

@@ -157,7 +157,7 @@ export default async function SettingsPage() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-base font-medium text-ink">Billing</p>
-            <p className="text-sm text-muted">Your plan, messages left, and payment.</p>
+            <p className="text-sm text-muted">Your plan, texts left, and payment.</p>
           </div>
         </Link>
       </section>

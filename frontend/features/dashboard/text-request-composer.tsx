@@ -45,6 +45,8 @@ interface TextRequestComposerProps {
    * else sees the balance and the recent list, and no form that would 403.
    */
   canSendRequests: boolean;
+  /** A trial includes no texts; an empty balance then means "not yet", not "used up". */
+  onTrial?: boolean;
 }
 
 interface Preview {
@@ -70,6 +72,7 @@ export function TextRequestComposer({
   tags,
   recent,
   canSendRequests,
+  onTrial = false,
 }: TextRequestComposerProps) {
   const router = useRouter();
   const [phone, setPhone] = useState("");
@@ -247,7 +250,12 @@ export function TextRequestComposer({
 
           {balance.total === 0 ? (
             <InlineNotice kind="info">
-              <p>You have no texts left. Buy more or wait for your next billing date.</p>
+              {/* There is no way to buy texts yet, so the notice never offers one. */}
+              <p>
+                {onTrial
+                  ? "Your free trial doesn’t include texts. They start when your plan begins."
+                  : "You have no texts left. More arrive at the start of your next billing period."}
+              </p>
             </InlineNotice>
           ) : null}
 

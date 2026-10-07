@@ -44,3 +44,19 @@ describe("Recent Text Requests", () => {
     expect(screen.getAllByText("Delivered")).toHaveLength(2);
   });
 });
+
+describe("An empty balance", () => {
+  const empty = { monthly: 0, purchased: 0, total: 0 };
+
+  it("on a trial says texts start with the plan, and offers nothing to buy", () => {
+    render(<TextRequestComposer balance={empty} tags={tags} recent={[]} canSendRequests onTrial />);
+    expect(screen.getByText("Your free trial doesn’t include texts. They start when your plan begins.")).toBeVisible();
+    expect(screen.queryByText(/buy/i)).toBeNull();
+  });
+
+  it("on a plan says when more arrive, and offers nothing to buy", () => {
+    render(<TextRequestComposer balance={empty} tags={tags} recent={[]} canSendRequests />);
+    expect(screen.getByText("You have no texts left. More arrive at the start of your next billing period.")).toBeVisible();
+    expect(screen.queryByText(/buy/i)).toBeNull();
+  });
+});
