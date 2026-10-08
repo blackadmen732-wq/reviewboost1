@@ -1241,25 +1241,14 @@ html:has(.customer-live) {
 
 /* ------------------------------------------------------------ handoff --- */
 
-/* Where the stars were: nothing to tap. A quiet link appears only if the page
-   is still here a few seconds after the tap (a browser that did not follow),
-   or at once for a customer who came back. Same height as the star row, so
-   the footer does not move. */
+/* Only seen after coming back, or if the browser did not leave: a plain link
+   where the stars were, the same height as the star row. */
 .visit-card .visit-handoff {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0;
   height: max(44px, 17.6cqi);
-}
-
-.visit-handoff__fallback {
-  margin: 0;
-  animation: visit-fallback-in 400ms ease-out 2600ms backwards;
-}
-
-.visit-handoff__fallback[data-returned] {
-  animation: none;
 }
 
 .visit-handoff__link {
@@ -1271,7 +1260,6 @@ html:has(.customer-live) {
   font-size: max(15px, 3.9cqi);
   font-weight: 560;
   text-decoration: underline;
-  text-decoration-color: rgb(63 71 67 / 40%);
   text-underline-offset: 4px;
 }
 
@@ -1279,17 +1267,4 @@ html:has(.customer-live) {
   outline: 2px solid var(--rb-focus);
   outline-offset: 2px;
   border-radius: 8px;
-}
-
-@keyframes visit-fallback-in {
-  from {
-    opacity: 0;
-    visibility: hidden;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .visit-handoff__fallback {
-    animation: none;
-  }
 }

@@ -52,11 +52,11 @@ interface CustomerFlowProps {
 }
 
 /**
- * How long the stars show the tap before a page that is still on screen says
- * it is opening Google. The browser is already navigating; this only decides
- * what a customer on a slow connection looks at meanwhile.
+ * The tap sends the customer straight to Google; the page just shows the
+ * filled stars until Google replaces it. Only if the browser has still not
+ * left after this long (a blocked navigation) does it offer a plain link.
  */
-const LEAVING_MS = 320;
+const LEAVING_MS = 3000;
 
 /** A refusal the server would give again however often the page re-sent. */
 function isFinalRefusal(error: unknown): boolean {
@@ -113,7 +113,6 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   // Resolved with the context, so the tap can start its request synchronously,
   // before the navigation, without waiting on a promise.
   const apiRef = useRef<CustomerFlowApi | null>(null);
-  const [returned, setReturned] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const messages = customerMessages[state.locale];
@@ -153,8 +152,6 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
       if (recovered) {
         hadRecoveredDraft.current = true;
         dispatch({ type: "restore", state: recovered });
-        // Back from the destination: the way there is offered at once.
-        if (recovered.screen === "handoff") setReturned(true);
       }
       setRecoveryReady(true);
     });
@@ -273,7 +270,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     [leave, state],
   );
 
-  // A page still on screen a moment after the tap says where it is going.
+  // A browser that has not left after a few seconds gets a plain link.
   useEffect(() => {
     if (state.feedbackStatus !== "leaving") return;
     const timer = window.setTimeout(() => dispatch({ type: "rating-sent" }), LEAVING_MS);
@@ -303,7 +300,6 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     function onPageShow(event: PageTransitionEvent) {
       if (!event.persisted) return;
       left.current = false;
-      setReturned(true);
       if (state.feedbackStatus === "leaving") dispatch({ type: "rating-sent" });
       if (state.pending && navigator.onLine !== false) send(state.pending);
     }
@@ -369,7 +365,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
         // The handoff keeps the sheet exactly as it was — same place, same
         // size — with its words changed, so nothing moves as the page leaves.
         heading={state.screen === "rating" ? messages.ratingHeading : messages.thanksHeading}
-        support={state.screen === "rating" ? messages.ratingSupport : messages.openingGoogle}
+        support={state.screen === "rating" ? messages.ratingSupport : ""}
         footerLine={messages.footerPromise}
         language={
           <LanguageSelector
@@ -394,7 +390,6 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
               <HandoffScreen
                 destinationUrl={context.destination.url}
                 messages={messages}
-                returned={returned}
               />
             )}
           </m.div>

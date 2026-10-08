@@ -40,7 +40,6 @@ describe("customer flow accessibility", () => {
         <HandoffScreen
           destinationUrl="https://search.google.com/local/writereview?placeid=abc"
           messages={messages}
-          returned
         />
       </CustomerFrame>,
     );
