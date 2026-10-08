@@ -50,11 +50,12 @@ export function FeedbackTabs({ active }: { active?: FeedbackView | undefined }) 
               aria-current={tab.view === active ? "page" : undefined}
               className={cn(
                 "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium",
-                "transition-colors duration-150 motion-reduce:transition-none",
+                "transition-[background-color,border-color,color,box-shadow,transform] duration-200",
+                "active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100",
                 "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
                 tab.view === chosen
-                  ? "border-transparent bg-brand-soft text-brand-text"
-                  : "border-border bg-surface text-muted hover:border-[color:var(--rb-border-strong)] hover:text-ink",
+                  ? "border-transparent bg-brand-soft text-brand-text shadow-[inset_0_0_0_1px_rgb(0_122_77/12%)]"
+                  : "border-border bg-surface text-muted shadow-[var(--shadow-control)] hover:border-[color:var(--rb-border-strong)] hover:text-ink",
               )}
             >
               {tab.label}

@@ -112,7 +112,8 @@ export function InsightsView({
               {state === "full" ? (
                 <section
                   aria-labelledby="insights-trend"
-                  className="rounded-[var(--radius-card)] border border-border bg-surface p-5 sm:p-6"
+                  className="rb-rise rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6"
+                  style={{ "--rb-rise-delay": "140ms" } as React.CSSProperties}
                 >
                   <h2 id="insights-trend" className="text-base font-semibold text-ink">
                     Average rating

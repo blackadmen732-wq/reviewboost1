@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils/cn";
  * emphasis that quietly teaches an owner to read low ratings as failures of the
  * customer rather than information.
  *
- * Every star uses the same gold. Only the count differs.
+ * Every star uses the same gold — a light, warm body with a darker gold edge
+ * that keeps the shape at 3:1 — and only the count differs.
  *
  * The empty stars are drawn rather than omitted so that "3" and "3 out of 5"
  * cannot be confused at a glance — as soft solid shapes, so the filled ones
@@ -31,24 +32,33 @@ export function Stars({
   rating,
   size = "sm",
   className,
+  animated = false,
+  delay = 0,
 }: {
   rating: number;
   size?: keyof typeof SIZES;
   className?: string;
+  /** The stars fill one by one as they arrive. The same for every rating. */
+  animated?: boolean;
+  /** When the first star starts, in ms, so the stars can follow a card in. */
+  delay?: number;
 }) {
   return (
     <span
-      className={cn("flex items-center gap-0.5", className)}
+      className={cn("flex items-center gap-0.5", animated && "rb-stars-pop", className)}
+      style={animated && delay ? ({ "--rb-stars-delay": `${delay}ms` } as React.CSSProperties) : undefined}
       role="img"
       aria-label={`${rating} out of 5`}
     >
       {[1, 2, 3, 4, 5].map((position) => (
         <Star
           key={position}
+          // A finer edge than the icon default, so the gold body leads.
+          strokeWidth={1.6}
           className={cn(
             SIZES[size],
             position <= rating
-              ? "fill-[color:var(--rb-star)] text-[color:var(--rb-star)]"
+              ? "fill-[color:var(--rb-star-fill)] text-[color:var(--rb-star)]"
               : "fill-[color:var(--rb-border)] text-[color:var(--rb-border)]",
           )}
           aria-hidden="true"

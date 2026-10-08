@@ -26,6 +26,9 @@ import { cn } from "@/lib/utils/cn";
  * rows carry counts, never percentages.
  *
  * With `rowHref`, each row with ratings in it opens those ratings in the inbox.
+ *
+ * The bars grow out from their baseline as the card arrives, top row first,
+ * a beat apart: the same growth for every row.
  */
 export function RatingBreakdown({
   counts,
@@ -39,7 +42,7 @@ export function RatingBreakdown({
 
   return (
     <ul className="flex flex-col">
-      {rows.map(({ rating, count }) => {
+      {rows.map(({ rating, count }, index) => {
         const label = `${rating} ${rating === 1 ? "star" : "stars"}: ${count} ${count === 1 ? "rating" : "ratings"}`;
         const href = rowHref && count > 0 ? rowHref(rating) : null;
 
@@ -48,15 +51,15 @@ export function RatingBreakdown({
             <span className="flex w-10 shrink-0 items-center gap-1 text-sm font-medium tabular-nums text-ink">
               {rating}
               <Star
-                className="size-3.5 fill-[color:var(--rb-star)] text-[color:var(--rb-star)]"
+                className="size-3.5 fill-[color:var(--rb-star-fill)] text-[color:var(--rb-star)]"
                 aria-hidden="true"
               />
             </span>
 
             <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-quiet" aria-hidden="true">
               <span
-                className="block h-full rounded-full bg-[color:var(--rb-star)] transition-[width] duration-300 motion-reduce:transition-none"
-                style={{ width: `${(count / peak) * 100}%` }}
+                className="rb-bar block h-full rounded-full bg-[image:var(--rb-star-bar)] transition-[width] duration-300 motion-reduce:transition-none"
+                style={{ width: `${(count / peak) * 100}%`, "--rb-i": index } as React.CSSProperties}
               />
             </span>
 

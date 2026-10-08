@@ -266,7 +266,7 @@ describe("what the screen never shows", () => {
     const bars = [...container.querySelectorAll("li span.h-2\\.5 > span")];
     expect(bars).toHaveLength(5);
     expect(new Set(bars.map((bar) => bar.className)).size).toBe(1);
-    expect(bars[0]!.className).toContain("bg-[color:var(--rb-star)]");
+    expect(bars[0]!.className).toContain("bg-[image:var(--rb-star-bar)]");
     const breakdown = bars[0]!.closest("ul")!;
     expect(breakdown.innerHTML).not.toMatch(/danger|success|warning|red-|green-/);
   });

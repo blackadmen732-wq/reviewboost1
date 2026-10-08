@@ -41,9 +41,11 @@ export default async function FeedbackDetailPage({
         All feedback
       </Link>
 
-      <article className="max-w-[36rem] rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-raised)] sm:p-6">
+      {/* The rating arrives as a card that rises in, its stars filling one by
+          one, then what the team can do about it. */}
+      <article className="rb-rise max-w-[36rem] rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-raised)] sm:p-6">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <Stars rating={review.rating} size="lg" />
+          <Stars rating={review.rating} size="lg" animated delay={160} />
           <time dateTime={review.submittedAt} className="shrink-0 text-sm text-muted">
             {relativeDay(review.submittedAt)}
           </time>
@@ -56,14 +58,19 @@ export default async function FeedbackDetailPage({
         )}
       </article>
 
-      <div className="mt-6 flex max-w-[36rem] items-center justify-between gap-3">
+      <div
+        className="rb-rise mt-6 flex max-w-[36rem] items-center justify-between gap-3"
+        style={{ "--rb-rise-delay": "180ms" } as React.CSSProperties}
+      >
         <p key={String(review.isResolved)} className="animate-fade-in text-sm text-muted">
           {review.isResolved ? "Sorted" : "Not sorted yet"}
         </p>
         <ResolveButton responseId={review.responseId} isResolved={review.isResolved} />
       </div>
 
-      <ActionThread responseId={review.responseId} actions={actions} />
+      <div className="rb-rise" style={{ "--rb-rise-delay": "280ms" } as React.CSSProperties}>
+        <ActionThread responseId={review.responseId} actions={actions} />
+      </div>
     </OwnerShell>
   );
 }

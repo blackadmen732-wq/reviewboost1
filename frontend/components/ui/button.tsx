@@ -9,7 +9,9 @@ export const buttonVariants = cva(
   [
     "button relative inline-flex w-full select-none items-center justify-center gap-2 overflow-hidden",
     "rounded-[var(--radius-control)] border px-5 font-semibold tracking-[-0.01em]",
-    "transition-[background-color,border-color,color,box-shadow,transform] duration-150",
+    // `translate` and `scale` are their own properties in Tailwind 4, so the
+    // hover lift and the press compose instead of fighting over transform.
+    "transition-[background-color,border-color,color,box-shadow,transform,translate,scale] duration-150",
     "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
     "disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] motion-reduce:active:scale-100",
   ],
@@ -19,15 +21,15 @@ export const buttonVariants = cva(
         primary:
           // Customer flow still uses this variant. Brand green cannot carry a
           // white label (3.08:1). Owner CTAs use `action` instead.
-          "border-brand bg-brand text-on-brand shadow-[var(--shadow-button)] hover:border-brand-hover hover:bg-brand-hover hover:shadow-[var(--shadow-button-hover)] active:bg-brand-active disabled:border-border disabled:bg-quiet disabled:text-muted disabled:shadow-none disabled:opacity-100",
+          "border-brand bg-brand text-on-brand shadow-[var(--shadow-button)] hover:border-brand-hover hover:bg-brand-hover hover:shadow-[var(--shadow-button-hover)] motion-safe:hover:-translate-y-px active:bg-brand-active motion-safe:active:translate-y-0 disabled:border-border disabled:bg-quiet disabled:text-muted disabled:shadow-none disabled:opacity-100",
         action:
           // Disabled is neutral grey, not faded green: a washed-out green
           // reads as broken, grey reads as "not yet".
           // Constitution Action green. White on #007A4D is ~5.4:1 — AA for
           // normal text. Brand green (#00A86B) is never used here.
-          "border-action bg-action text-on-action shadow-[var(--shadow-button)] hover:border-action-hover hover:bg-action-hover hover:shadow-[var(--shadow-button-hover)] active:bg-action-pressed focus-visible:ring-[color:var(--rb-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:border-border disabled:bg-quiet disabled:text-muted disabled:shadow-none disabled:opacity-100",
+          "border-action bg-action text-on-action shadow-[var(--shadow-button)] hover:border-action-hover hover:bg-action-hover hover:shadow-[var(--shadow-button-hover)] motion-safe:hover:-translate-y-px active:bg-action-pressed motion-safe:active:translate-y-0 focus-visible:ring-[color:var(--rb-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:border-border disabled:bg-quiet disabled:text-muted disabled:shadow-none disabled:opacity-100",
         secondary:
-          "border-border bg-surface text-ink shadow-[var(--shadow-control)] hover:border-[color:var(--rb-border-strong)] hover:bg-quiet",
+          "border-border bg-surface text-ink shadow-[var(--shadow-control)] hover:border-[color:var(--rb-border-strong)] hover:bg-quiet hover:shadow-[var(--shadow-card)]",
         outline:
           "border-[color:var(--rb-border-strong)] bg-transparent text-ink hover:border-brand hover:bg-brand-soft",
         ghost: "border-transparent bg-transparent text-ink hover:bg-quiet",

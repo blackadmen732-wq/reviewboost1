@@ -61,9 +61,11 @@ function tickIndices(count: number, unit: "day" | "week"): number[] {
  * day, its average and how many ratings it rests on. One series in ink, no
  * colour that reads as good or bad.
  *
- * The line is never drawn in on arrival and nothing loops. The readout fades
- * in over 120ms when it first appears and then follows the pointer exactly;
- * a readout that lagged behind the finger would be a readout of the wrong day.
+ * The line draws in once, left to right, as the card arrives (the wash and
+ * the dots with it, the latest value just after), and nothing loops; under
+ * reduced motion it is simply there. The readout fades in over 120ms when it
+ * first appears and then follows the pointer exactly; a readout that lagged
+ * behind the finger would be a readout of the wrong day.
  *
  * Positions are percentages of the plot box, so it fills any width at a fixed
  * height and never scrolls sideways; strokes don't scale with the box.
@@ -195,6 +197,7 @@ export function RatingTrendChart({
               />
             ))}
 
+            <g className="rb-wipe" style={{ "--rb-wipe-delay": "420ms" } as React.CSSProperties}>
             {/* A barely-there wash under runs long enough to read as a line: depth,
                 not a second series. Under short runs between gaps it read as
                 blocks, so those go without. */}
@@ -214,6 +217,8 @@ export function RatingTrendChart({
               ) : null,
             )}
 
+            </g>
+
             {shown ? (
               <line
                 x1={shownX}
@@ -227,6 +232,7 @@ export function RatingTrendChart({
               />
             ) : null}
 
+            <g className="rb-wipe" style={{ "--rb-wipe-delay": "420ms" } as React.CSSProperties}>
             {runs.map((segment, index) =>
               segment.length > 1 ? (
                 <polyline
@@ -257,18 +263,23 @@ export function RatingTrendChart({
                 </g>
               );
             })}
+            </g>
           </svg>
 
-          {/* The latest value, at the end of the line, while nothing is pointed at. */}
-          {last && last.average !== null && active === null ? (
+          {/* The latest value, at the end of the line, while nothing is pointed
+              at. Hidden rather than removed while something is, so it arrives
+              once, after the line, and not again each time the pointer leaves. */}
+          {last && last.average !== null ? (
             <span
               className={cn(
-                "pointer-events-none absolute text-xs font-semibold tabular-nums text-ink",
+                "rb-rise pointer-events-none absolute text-xs font-semibold tabular-nums text-ink [--rb-rise-delay:1250ms]",
                 labelBelow ? "translate-y-[10px]" : "-translate-y-[calc(100%+10px)]",
                 edge(xOf(lastIndex!)),
+                active !== null && "invisible",
               )}
               style={{ left: `${xOf(lastIndex!)}%`, top: `${yOf(last.average)}%` }}
               aria-hidden="true"
+              data-testid="trend-latest"
             >
               {oneDecimal(last.average)}
             </span>

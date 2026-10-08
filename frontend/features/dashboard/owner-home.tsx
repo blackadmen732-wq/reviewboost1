@@ -228,8 +228,10 @@ function ActiveHome({
 }) {
   const [firstAttention, ...otherAttentions] = model.attentions;
 
+  // The sections rise in one after another, top to bottom: the answer to
+  // "does anything need me" first, then the rest.
   return (
-    <div className="flex flex-col gap-10">
+    <div className="rb-stagger flex flex-col gap-10">
       <section className="max-w-[36rem]">
         <StateLabel calm={!firstAttention} />
         {firstAttention ? (
@@ -265,7 +267,7 @@ function ActiveHome({
         <section>
           <Link
             href="/feedback/insights"
-            className="group -mx-2 flex min-h-14 items-center gap-3 rounded-[var(--radius-control)] px-2 transition-colors hover:bg-quiet active:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+            className="rb-lift group flex min-h-16 items-center gap-3 rounded-[var(--radius-card)] border border-border bg-surface px-4 py-3 shadow-[var(--shadow-card)] hover:border-[color:var(--rb-border-strong)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
           >
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-medium text-muted">Last 30 days</span>
@@ -290,7 +292,7 @@ function ActiveHome({
       <section>
         <Link
           href="/stands"
-          className="group -mx-2 flex min-h-14 items-center gap-3 rounded-[var(--radius-control)] px-2 transition-colors hover:bg-quiet active:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+          className="rb-lift group flex min-h-16 items-center gap-3 rounded-[var(--radius-card)] border border-border bg-surface px-4 py-3 shadow-[var(--shadow-card)] hover:border-[color:var(--rb-border-strong)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
         >
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium text-muted">Tags</span>

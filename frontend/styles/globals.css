@@ -87,14 +87,22 @@
   --rb-motion-fast: 150ms;
   --rb-motion-page: 180ms;
   --rb-logo-clearspace: 0.25;
-  --shadow-control: 0 1px 0 rgb(23 26 24 / 4%);
-  --shadow-button: 0 1px 0 rgb(0 91 57 / 18%);
-  --shadow-button-hover: 0 1px 0 rgb(0 91 57 / 24%);
-  --shadow-card: none;
-  /* The one lifted surface: the Feedback rating card and rows. Soft and low,
-     so a raised card reads as "a thing you can open", not as decoration. */
+  /* Shadows are tinted with the ink, never pure black, and layered: a close
+     edge that defines the shape and a long soft fall that lifts it. */
+  --shadow-control: 0 1px 2px rgb(23 26 24 / 5%), 0 1px 1px rgb(23 26 24 / 3%);
+  --shadow-button: 0 1px 0 rgb(0 74 47 / 22%), 0 6px 16px -8px rgb(0 122 77 / 45%);
+  --shadow-button-hover: 0 1px 0 rgb(0 74 47 / 26%), 0 10px 22px -10px rgb(0 122 77 / 55%);
+  --shadow-card: 0 1px 2px rgb(23 26 24 / 4%), 0 8px 24px -14px rgb(23 26 24 / 14%);
+  /* The lifted surface: the Feedback rating card and unread rows. Soft and
+     low, so a raised card reads as "a thing you can open", not decoration. */
   --shadow-raised: 0 1px 2px rgb(23 26 24 / 4%), 0 16px 40px -28px rgb(23 26 24 / 22%);
+  /* Under a pointer: the card comes up to meet it. */
+  --shadow-lifted: 0 2px 4px rgb(23 26 24 / 5%), 0 18px 40px -20px rgb(23 26 24 / 26%);
   --shadow-float: 0 -1px 0 rgb(23 26 24 / 8%);
+  /* The body of a star and of the rating bars: a light, warm gold. --rb-star
+     stays the edge (3:1 on white), so every star keeps its shape. */
+  --rb-star-fill: #ffcd4f;
+  --rb-star-bar: linear-gradient(90deg, #ffd96e, #f3b12c);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -125,12 +133,15 @@
   --rb-raised: #202722;
     --rb-focus: #7ab8ff;
     --rb-focus-soft: rgb(77 142 255 / 34%);
-    --shadow-control: 0 1px 0 rgb(0 0 0 / 40%);
-    --shadow-button: 0 1px 0 rgb(0 0 0 / 40%);
-    --shadow-button-hover: 0 1px 0 rgb(0 0 0 / 50%);
-    --shadow-card: none;
+    --shadow-control: 0 1px 2px rgb(0 0 0 / 45%);
+    --shadow-button: 0 1px 0 rgb(0 0 0 / 40%), 0 8px 18px -10px rgb(50 207 148 / 32%);
+    --shadow-button-hover: 0 1px 0 rgb(0 0 0 / 50%), 0 12px 24px -12px rgb(50 207 148 / 42%);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 12px 28px -16px rgb(0 0 0 / 70%);
     --shadow-raised: 0 1px 2px rgb(0 0 0 / 30%), 0 20px 48px -28px rgb(0 0 0 / 80%);
+    --shadow-lifted: 0 2px 4px rgb(0 0 0 / 40%), 0 22px 44px -20px rgb(0 0 0 / 85%);
     --shadow-float: 0 -1px 0 rgb(0 0 0 / 50%);
+    --rb-star-fill: #f2b94b;
+    --rb-star-bar: linear-gradient(90deg, #f7cb6b, #f2b94b);
   }
 }
 
@@ -160,7 +171,15 @@
   --rb-info: #2663a0;
   --rb-focus: #005fcc;
   --rb-focus-soft: rgb(0 95 204 / 28%);
+  --shadow-control: 0 1px 2px rgb(23 26 24 / 5%), 0 1px 1px rgb(23 26 24 / 3%);
+  --shadow-button: 0 1px 0 rgb(0 74 47 / 22%), 0 6px 16px -8px rgb(0 122 77 / 45%);
+  --shadow-button-hover: 0 1px 0 rgb(0 74 47 / 26%), 0 10px 22px -10px rgb(0 122 77 / 55%);
+  --shadow-card: 0 1px 2px rgb(23 26 24 / 4%), 0 8px 24px -14px rgb(23 26 24 / 14%);
   --shadow-raised: 0 1px 2px rgb(23 26 24 / 4%), 0 16px 40px -28px rgb(23 26 24 / 22%);
+  --shadow-lifted: 0 2px 4px rgb(23 26 24 / 5%), 0 18px 40px -20px rgb(23 26 24 / 26%);
+  --shadow-float: 0 -1px 0 rgb(23 26 24 / 8%);
+  --rb-star-fill: #ffcd4f;
+  --rb-star-bar: linear-gradient(90deg, #ffd96e, #f3b12c);
 }
 :root[data-theme="dark"],
 .dark {
@@ -191,7 +210,15 @@
   --rb-raised: #202722;
   --rb-focus: #7ab8ff;
   --rb-focus-soft: rgb(77 142 255 / 34%);
+  --shadow-control: 0 1px 2px rgb(0 0 0 / 45%);
+  --shadow-button: 0 1px 0 rgb(0 0 0 / 40%), 0 8px 18px -10px rgb(50 207 148 / 32%);
+  --shadow-button-hover: 0 1px 0 rgb(0 0 0 / 50%), 0 12px 24px -12px rgb(50 207 148 / 42%);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 12px 28px -16px rgb(0 0 0 / 70%);
   --shadow-raised: 0 1px 2px rgb(0 0 0 / 30%), 0 20px 48px -28px rgb(0 0 0 / 80%);
+  --shadow-lifted: 0 2px 4px rgb(0 0 0 / 40%), 0 22px 44px -20px rgb(0 0 0 / 85%);
+  --shadow-float: 0 -1px 0 rgb(0 0 0 / 50%);
+  --rb-star-fill: #f2b94b;
+  --rb-star-bar: linear-gradient(90deg, #f7cb6b, #f2b94b);
 }
 
 /* These are resets, so they belong in Tailwind's base layer.
@@ -543,4 +570,167 @@ textarea {
 
 .animate-page-enter {
   animation: page-enter 180ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/* ----------------------------------------------------------- owner motion ---
+ * One vocabulary for the owner screens: things rise into place in reading
+ * order, numbers count up (see CountUp), bars grow from their baseline, stars
+ * fill one by one, a trend line draws from left to right, and cards come up
+ * to meet the pointer. Transform, opacity and clip only; nothing loops.
+ *
+ * Each kind takes its own start time (--rb-rise-delay, --rb-stagger-delay,
+ * --rb-stars-delay, --rb-bar-delay, --rb-wipe-delay), so a card and the
+ * stars and bars inside it can follow one another.
+ *
+ * Every entrance fills backwards only, so nothing is held after it lands:
+ * hover and press still move a card that has arrived. Under reduced motion
+ * none of it runs — everything is simply in place, with no delays either.
+ */
+@keyframes rb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes rb-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rb-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes rb-wipe {
+  from {
+    clip-path: inset(-12% 100% -12% -2%);
+  }
+  to {
+    clip-path: inset(-12% -2% -12% -2%);
+  }
+}
+
+.rb-rise {
+  animation: rb-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: var(--rb-rise-delay, 0ms);
+}
+
+/* Children rise one after another, 55ms apart. Past the twelfth they arrive
+   together, so a long list never makes anyone wait for the bottom of it. */
+.rb-stagger > * {
+  animation: rb-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--rb-stagger-delay, 0ms) + 660ms);
+}
+.rb-stagger > :nth-child(1) { animation-delay: calc(var(--rb-stagger-delay, 0ms) + 0ms); }
+.rb-stagger > :nth-child(2) { animation-delay: calc(var(--rb-stagger-delay, 0ms) + 55ms); }
+.rb-stagger > :nth-child(3) { animation-delay: calc(var(--rb-stagger-delay, 0ms) + 110ms); }
+.rb-stagger > :nth-child(4) { animation-delay: calc(var(--rb-stagger-delay, 0ms) + 165ms); }
+.rb-stagger > :nth-child(5) { animation-delay: calc(var(--rb-stagger-delay, 0ms) + 220ms); }
+.rb-stagger > :nth-child(6) { animation-delay: calc(var(--rb-stagger-delay, 0ms) + 275ms); }
+.rb-stagger > :nth-child(7) { animation-delay: calc(var(--rb-stagger-delay, 0ms) + 330ms); }
+.rb-stagger > :nth-child(8) { animation-delay: calc(var(--rb-stagger-delay, 0ms) + 385ms); }
+.rb-stagger > :nth-child(9) { animation-delay: calc(var(--rb-stagger-delay, 0ms) + 440ms); }
+.rb-stagger > :nth-child(10) { animation-delay: calc(var(--rb-stagger-delay, 0ms) + 495ms); }
+.rb-stagger > :nth-child(11) { animation-delay: calc(var(--rb-stagger-delay, 0ms) + 550ms); }
+.rb-stagger > :nth-child(12) { animation-delay: calc(var(--rb-stagger-delay, 0ms) + 605ms); }
+
+/* Stars fill one by one, with a small bounce. */
+.rb-stars-pop > * {
+  animation: rb-pop 480ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+.rb-stars-pop > :nth-child(1) { animation-delay: calc(var(--rb-stars-delay, 0ms) + 0ms); }
+.rb-stars-pop > :nth-child(2) { animation-delay: calc(var(--rb-stars-delay, 0ms) + 70ms); }
+.rb-stars-pop > :nth-child(3) { animation-delay: calc(var(--rb-stars-delay, 0ms) + 140ms); }
+.rb-stars-pop > :nth-child(4) { animation-delay: calc(var(--rb-stars-delay, 0ms) + 210ms); }
+.rb-stars-pop > :nth-child(5) { animation-delay: calc(var(--rb-stars-delay, 0ms) + 280ms); }
+
+/* A bar grows out from its baseline; rows a beat apart (--rb-i). */
+.rb-bar {
+  transform-origin: left center;
+  animation: rb-grow-x 900ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--rb-bar-delay, 0ms) + var(--rb-i, 0) * 80ms);
+}
+
+/* A line drawn from left to right. */
+.rb-wipe {
+  animation: rb-wipe 1100ms cubic-bezier(0.65, 0, 0.35, 1) backwards;
+  animation-delay: var(--rb-wipe-delay, 0ms);
+}
+
+/* Something new announces itself: a ring breathes out of it, twice, and stops. */
+@keyframes rb-ping {
+  from {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.8);
+  }
+}
+
+.rb-ping {
+  position: relative;
+}
+
+.rb-ping::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  animation: rb-ping 1000ms cubic-bezier(0, 0, 0.2, 1) 2;
+  animation-delay: var(--rb-ping-delay, 500ms);
+}
+
+/* A card under the pointer comes up to meet it, and gives under a press. */
+.rb-lift {
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 220ms ease-out,
+    border-color 150ms ease-out,
+    background-color 150ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rb-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lifted);
+  }
+}
+
+.rb-lift:active {
+  transform: scale(0.985);
+  transition-duration: 90ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-rise,
+  .rb-stagger > *,
+  .rb-stars-pop > *,
+  .rb-bar,
+  .rb-wipe,
+  .rb-ping::after {
+    animation: none !important;
+  }
+
+  .rb-lift:hover,
+  .rb-lift:active {
+    transform: none;
+  }
 }

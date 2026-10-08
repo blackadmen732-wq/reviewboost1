@@ -12,6 +12,9 @@ import { cn } from "@/lib/utils/cn";
  * column of separate cards reads that way at a glance. Unread cards stand
  * forward (stronger edge, lifted) and carry the dot; sorted ones step back.
  * Nothing about a card depends on its star value.
+ *
+ * The cards rise in one after another as the list arrives, an unread dot
+ * pings twice to say "new", and a card comes up to meet the pointer.
  */
 
 export interface FeedbackItem {
@@ -28,18 +31,16 @@ export interface FeedbackItem {
 
 export function FeedbackList({ items }: { items: FeedbackItem[] }) {
   return (
-    <ul className="flex flex-col gap-2.5">
+    <ul className="rb-stagger flex flex-col gap-2.5">
       {items.map((item) => (
         <li key={item.id}>
           <Link
             href={`/feedback/${item.id}`}
             className={cn(
-              "group flex min-h-16 items-center gap-3 rounded-[var(--radius-card)] border bg-surface px-4 py-3.5",
-              "transition-[border-color,box-shadow,transform] duration-150",
-              "active:scale-[0.995] motion-reduce:transition-none motion-reduce:active:scale-100",
+              "rb-lift group flex min-h-16 items-center gap-3 rounded-[var(--radius-card)] border bg-surface px-4 py-3.5",
               "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
               item.isRead
-                ? "border-border hover:border-[color:var(--rb-border-strong)]"
+                ? "border-border shadow-[var(--shadow-card)] hover:border-[color:var(--rb-border-strong)]"
                 : "border-[color:var(--rb-border-strong)] shadow-[var(--shadow-raised)]",
               item.isResolved && "bg-surface/70",
             )}
@@ -50,7 +51,7 @@ export function FeedbackList({ items }: { items: FeedbackItem[] }) {
                     and unread cards keep their stars lined up down the list. */}
                 <span className="flex w-2 shrink-0 justify-center" aria-hidden={item.isRead || undefined}>
                   {item.isRead ? null : (
-                    <span className="size-2 rounded-full bg-action" aria-label="Unread" role="img" />
+                    <span className="rb-ping size-2 rounded-full bg-action" aria-label="Unread" role="img" />
                   )}
                 </span>
 
