@@ -19,23 +19,16 @@ describe("customer flow accessibility", () => {
           rating={3}
           status="idle"
           onRate={vi.fn()}
-          onRetry={vi.fn()}
         />
       </CustomerFrame>,
     );
     expect((await axe(container)).violations).toEqual([]);
   });
 
-  it("has no Axe violations on the recoverable error state", async () => {
+  it("has no Axe violations on the offline hold", async () => {
     const { container } = render(
       <CustomerFrame poweredBy={messages.poweredBy}>
-        <RatingScreen
-          messages={messages}
-          rating={2}
-          status="error"
-          onRate={vi.fn()}
-          onRetry={vi.fn()}
-        />
+        <RatingScreen messages={messages} rating={2} status="offline" onRate={vi.fn()} />
       </CustomerFrame>,
     );
     expect((await axe(container)).violations).toEqual([]);
@@ -45,9 +38,9 @@ describe("customer flow accessibility", () => {
     const { container } = render(
       <CustomerFrame poweredBy={messages.poweredBy}>
         <HandoffScreen
-          businessName="Mario's Pizza"
           destinationUrl="https://search.google.com/local/writereview?placeid=abc"
           messages={messages}
+          returned
         />
       </CustomerFrame>,
     );

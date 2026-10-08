@@ -79,6 +79,13 @@ export function uuidSchema(message: string) {
   return z.string().regex(UUID_RE, message);
 }
 
+/** The whole tap in one request: see customer-flow-service.ts submitRating. */
+export const submitRatingSchema = z.strictObject({
+  locale: z.enum(SUPPORTED_LOCALES),
+  // Every rating is accepted and stored. Nothing downstream branches on it.
+  rating: z.number().int().min(1).max(5),
+});
+
 export const destinationSelectionSchema = z.strictObject({
   sessionId: opaqueToken,
   responseId: opaqueToken,

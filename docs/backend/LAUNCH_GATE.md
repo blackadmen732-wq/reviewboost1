@@ -257,7 +257,8 @@ schema.** The readiness gate enforces the last part mechanically
    or a restore over live data unless §OPERATIONS restore criteria are met.
 
 **Smoke tests** (production, with a real test business):
-public Tag GET → create session → rating → destination event; owner sign-in
+public Tag GET → tap a star (Google opens at once; one `/ratings` request records
+the session, rating and destination event); owner sign-in
 (6-digit OTP); billing page loads the plan from the backend; Checkout opens
 (test card only on staging); a Text Request to an owned test phone is queued,
 dispatched within 2 minutes, and marked delivered by the Twilio callback;

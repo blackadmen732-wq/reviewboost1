@@ -43,7 +43,6 @@ describe("RatingScreen", () => {
           rating={null}
           status="idle"
           onRate={onRate}
-          onRetry={vi.fn()}
         />,
       );
 
@@ -56,19 +55,17 @@ describe("RatingScreen", () => {
     },
   );
 
-  it("offers recovery — and only recovery — after a failed submit", () => {
-    const sharedProps = {
-      messages: customerMessages.en,
-      rating: 1 as const,
-      onRate: vi.fn(),
-      onRetry: vi.fn(),
-    };
-    const { rerender } = render(<RatingScreen {...sharedProps} status="submitting" />);
-    expect(screen.getByRole("status")).toHaveTextContent("Sending…");
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  it("has nothing to watch and nothing to press after the tap: no Sending, no Try again", () => {
+    const sharedProps = { messages: customerMessages.en, rating: 1 as const, onRate: vi.fn() };
+    const { rerender } = render(<RatingScreen {...sharedProps} status="leaving" />);
+    // Already on its way: a second tap does nothing.
+    expect(screen.getAllByRole("radio").every((radio) => (radio as HTMLInputElement).disabled)).toBe(true);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Sending/)).not.toBeInTheDocument();
 
-    rerender(<RatingScreen {...sharedProps} status="error" />);
-    expect(screen.getByRole("alert")).toHaveTextContent("Your rating is still here");
-    expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+    rerender(<RatingScreen {...sharedProps} status="offline" />);
+    expect(screen.getByRole("status")).toHaveTextContent(customerMessages.en.offline);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

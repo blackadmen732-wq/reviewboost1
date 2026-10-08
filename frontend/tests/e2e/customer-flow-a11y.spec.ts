@@ -59,7 +59,7 @@ for (const colorScheme of ["light", "dark"] as const) {
       await expectNoSeriousViolations(page);
     });
 
-    test("loading, load error, response error, and offline states", async ({ context, page }) => {
+    test("loading, load error, failed save, and offline states", async ({ context, page }) => {
       await page.emulateMedia({ colorScheme });
       await stayOnHandoff(page);
 
@@ -71,10 +71,12 @@ for (const colorScheme of ["light", "dark"] as const) {
       await expect(page.getByRole("heading", { name: "That didn’t go through." })).toBeVisible();
       await expectNoSeriousViolations(page);
 
+      // A failed save is invisible to the customer, who is already on the way
+      // to Google: the handoff is what stays on screen.
       await page.goto("/q/fixture-response-error");
       await expect(page.getByRole("heading", { name: "How was your visit?" })).toBeVisible();
       await page.getByRole("radio", { name: "2 stars — Could be better" }).click();
-      await expect(page.locator("#feedback-status")).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Thanks for sharing." })).toBeVisible();
       await expectNoSeriousViolations(page);
 
       await context.setOffline(true);

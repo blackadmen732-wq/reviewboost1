@@ -89,11 +89,6 @@ html:has(.customer-live) {
   top: 8px;
   right: 8px;
   z-index: 2;
-  animation: visit-fade 400ms ease-out 200ms backwards;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .visit-language { animation: none; }
 }
 
 .visit-language .language-selector,
@@ -205,39 +200,25 @@ html:has(.customer-live) {
 
 /* The width-sized sheet is the *rating* geometry: the stars sit at a fixed
  * height so the page cannot reflow under the customer's thumb while they choose.
- *
- * The handoff screen is a different shape — a heading, a line of status and
- * the "Open the review page" link. Pinned inside the fixed rating sheet, its
- * content ran to 353px inside a 169px box, so that link was reachable only by
- * scrolling a region most people will not realise scrolls. It is the fallback
- * for when the automatic redirect does not fire, which makes it the last thing
- * that may be hidden.
- *
- * So once the rating is taken, the stage stops being a fixed canvas: the sheet
- * is as tall as its content (never shorter than the rating sheet), the photo
- * keeps whatever height is left, and when a short screen cannot hold both the
- * page scrolls. Nothing is clipped at any size, and the sheet grows by only
- * what the handoff needs instead of jumping to a different page shape. */
-.customer-live:has([data-flow-screen="handoff"]),
+ * The handoff keeps that same sheet — same place, same size, new words — so
+ * nothing moves while the browser opens the review page. (The blocking states
+ * below are a different shape and may grow; the page scrolls if it must.) */
 .customer-live:has([data-flow-screen="blocking"]) {
   align-items: start;
 }
 
-.customer-live:has([data-flow-screen="handoff"]) .visit-stage,
 .customer-live:has([data-flow-screen="blocking"]) .visit-stage {
   height: auto;
   min-height: 100dvh;
   max-height: none;
 }
 
-.visit-stage:has([data-flow-screen="handoff"]),
 .visit-stage:has([data-flow-screen="blocking"]) {
   height: auto;
   min-height: 100dvh;
   overflow: visible;
 }
 
-.visit-stage:has([data-flow-screen="handoff"]) .visit-card,
 .visit-stage:has([data-flow-screen="blocking"]) .visit-card {
   height: auto;
   min-height: 82.05cqi;
@@ -246,15 +227,11 @@ html:has(.customer-live) {
   overflow: visible;
 }
 
-/* The photo fills what the sheet leaves, from nothing up — never from the
-   photo's own size — and keeps a strip of itself on even the shortest phone. */
-.visit-stage:has([data-flow-screen="handoff"]) .visit-hero,
 .visit-stage:has([data-flow-screen="blocking"]) .visit-hero {
   flex: 1 1 0;
   min-height: max(112px, 18dvh);
 }
 
-.visit-stage:has([data-flow-screen="handoff"]) .visit-card__body,
 .visit-stage:has([data-flow-screen="blocking"]) .visit-card__body {
   overflow: visible;
 }
@@ -262,28 +239,6 @@ html:has(.customer-live) {
 .visit-card__copy {
   flex: 0 0 auto;
   text-align: center;
-}
-
-/* The question arrives first, then its instruction, then the stars: a short
-   cascade that reads top to bottom, the way the eye should. Backwards fill
-   only, so nothing is held after it lands. */
-.visit-card__copy > * {
-  animation: visit-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
-}
-
-.visit-card__copy > .visit-heading {
-  animation-delay: 30ms;
-}
-
-.visit-card__copy > .visit-support {
-  animation-delay: 110ms;
-}
-
-@keyframes visit-rise {
-  from {
-    opacity: 0;
-    transform: translateY(2.6cqi);
-  }
 }
 
 .visit-heading {
@@ -335,11 +290,7 @@ html:has(.customer-live) {
   margin-top: var(--visit-footer-top, 14.7cqi);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .visit-card__copy > * {
-    animation: none;
-  }
-}
+
 
 .visit-powered {
   display: inline-flex;
@@ -462,10 +413,6 @@ html:has(.customer-live) {
   transition:
     transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1),
     filter 220ms ease-out;
-  /* Arrive one by one after the question, with a little spring. Backwards
-     fill only, so hover and press still move the star once it has landed. */
-  animation: visit-star-in 640ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
-  animation-delay: calc(120ms + var(--star-index, 0) * 65ms);
 }
 
 /* The empty star: white falling to a soft grey (a slight raise, like a key),
@@ -492,8 +439,9 @@ html:has(.customer-live) {
 .visit-star__body {
   transform-box: fill-box;
   transform-origin: 50% 70%;
-  /* One gentle wave across the row, once, just after the stars land: the
-     only thing on the page that says "touch these". */
+  /* One gentle wave across the row, once, a moment after the page opens:
+     the only thing on the page that says "touch these". The stars are
+     already there and already tappable; the wave delays nothing. */
   animation: visit-star-wave 620ms cubic-bezier(0.3, 0.7, 0.4, 1);
   animation-delay: calc(1250ms + var(--star-index, 0) * 75ms);
 }
@@ -546,13 +494,6 @@ html:has(.customer-live) {
 .visit-stars:not(:disabled) .visit-star__input:active + .visit-star__label svg {
   transform: scale(0.88);
   transition-duration: 90ms;
-}
-
-@keyframes visit-star-in {
-  from {
-    opacity: 0;
-    transform: translateY(2.4cqi) scale(0.6);
-  }
 }
 
 @keyframes visit-star-fill {
@@ -695,9 +636,9 @@ html:has(.customer-live) {
   display: none;
 }
 
-/* "Sending…" sits in the calm space under the stars without taking any of
-   it: the footer stays where it is, inside the sheet, while the rating saves. */
-.visit-card .rating-actions:has(> .visit-status--sending, > .opening-message) {
+/* The loading sheet's "Opening the review page…" sits in the calm space
+   under the stars without taking any of it: the footer stays where it is. */
+.visit-card .rating-actions:has(> .opening-message) {
   position: absolute;
   top: 100%;
   right: 0;
@@ -714,68 +655,10 @@ html:has(.customer-live) {
   text-align: center;
 }
 
-.visit-status--sending {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  animation: visit-fade 240ms ease-out both;
-}
-
-/* A thin bar with light running along it: something is happening, without
-   pretending to know how long it will take. */
-.visit-progress {
-  position: relative;
-  display: block;
-  width: min(30cqi, 128px);
-  height: 3px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #eef0ee;
-}
-
-.visit-progress::after {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 42%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #ffd765, #f0b323);
-  content: "";
-  animation: visit-progress-run 1050ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-
-@keyframes visit-progress-run {
-  from { transform: translateX(-105%); }
-  to { transform: translateX(245%); }
-}
-
-@keyframes visit-fade {
-  from { opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .visit-status--sending {
-    animation: none;
-  }
-
-  .visit-progress::after {
-    width: 100%;
-    opacity: 0.6;
-    animation: none;
-  }
-}
-
-.visit-status--error {
-  color: var(--rb-danger);
-}
-
-.visit-status--error strong {
-  font-weight: 650;
-}
-
-/* An error, or being offline, needs its message (and a retry) on screen. The
-   stars no longer have to hold still — the customer has already tapped — so
-   the sheet grows into the artwork instead of clipping either. */
-.visit-card:has(.visit-status--error, .visit-status--offline) {
+/* Being offline needs its message on screen. The stars no longer have to hold
+   still — the customer has already tapped — so the sheet grows into the
+   artwork instead of clipping it. */
+.visit-card:has(.visit-status--offline) {
   flex: 0 0 auto;
   height: auto;
   min-height: 82.05cqi;
@@ -783,14 +666,8 @@ html:has(.customer-live) {
   padding-bottom: max(6cqi, calc(env(safe-area-inset-bottom) + 2cqi));
 }
 
-.visit-card:has(.visit-status--error, .visit-status--offline) .visit-card__body {
+.visit-card:has(.visit-status--offline) .visit-card__body {
   overflow: visible;
-}
-
-.visit-card .visit-retry {
-  width: auto;
-  min-width: 160px;
-  min-height: 44px;
 }
 
 /* ------------------------------------------------ owner phone preview --- */
@@ -1364,174 +1241,55 @@ html:has(.customer-live) {
 
 /* ------------------------------------------------------------ handoff --- */
 
-/* The moment between the star and Google: a check that draws itself, the
-   thanks, a bar that says the review page is on its way, and the link for a
-   browser that did not follow. Identical for every rating, motion included. */
+/* Where the stars were: nothing to tap. A quiet link appears only if the page
+   is still here a few seconds after the tap (a browser that did not follow),
+   or at once for a customer who came back. Same height as the star row, so
+   the footer does not move. */
 .visit-card .visit-handoff {
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 0;
-  padding-inline: 7cqi;
-  text-align: center;
+  height: max(44px, 17.6cqi);
 }
 
-.visit-handoff__mark {
-  position: relative;
-  display: grid;
-  width: max(54px, 15.4cqi);
-  height: max(54px, 15.4cqi);
-  place-items: center;
-  border-radius: 50%;
-  background: linear-gradient(180deg, #edf9f3, #d6f1e3);
-  color: #007a4d;
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 85%),
-    0 12px 26px -14px rgb(0 122 77 / 55%);
-  animation: visit-mark-in 560ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+.visit-handoff__fallback {
+  margin: 0;
+  animation: visit-fallback-in 400ms ease-out 2600ms backwards;
 }
 
-/* One ring breathes out from the check as it lands. */
-.visit-handoff__mark::after {
-  position: absolute;
-  inset: 0;
-  border: 2px solid rgb(0 168 107 / 38%);
-  border-radius: 50%;
-  content: "";
-  opacity: 0;
-  animation: visit-mark-ring 900ms cubic-bezier(0.2, 0.7, 0.2, 1) 280ms both;
+.visit-handoff__fallback[data-returned] {
+  animation: none;
 }
 
-.visit-handoff__mark svg path {
-  stroke-dasharray: 24;
-  stroke-dashoffset: 0;
-  animation: visit-check-draw 420ms cubic-bezier(0.65, 0, 0.35, 1) 230ms backwards;
+.visit-handoff__link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding-inline: 12px;
+  color: #3f4743;
+  font-size: max(15px, 3.9cqi);
+  font-weight: 560;
+  text-decoration: underline;
+  text-decoration-color: rgb(63 71 67 / 40%);
+  text-underline-offset: 4px;
 }
 
-@keyframes visit-mark-in {
+.visit-handoff__link:focus-visible {
+  outline: 2px solid var(--rb-focus);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+@keyframes visit-fallback-in {
   from {
     opacity: 0;
-    transform: scale(0.5);
+    visibility: hidden;
   }
-}
-
-@keyframes visit-mark-ring {
-  0% { opacity: 0.9; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1.75); }
-}
-
-@keyframes visit-check-draw {
-  from { stroke-dashoffset: 24; }
-}
-
-/* The same face as "How was your visit?", a size down. */
-.visit-handoff__heading {
-  margin: 5.2cqi 0 0;
-  color: #0a0a0a;
-  font-family: var(--font-visit-heading), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: max(24px, 7.4cqi);
-  font-weight: 640;
-  letter-spacing: -0.02em;
-  line-height: 1.12;
-  text-wrap: balance;
-  animation: visit-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) 90ms backwards;
-}
-
-.visit-handoff__heading:focus {
-  outline: none;
-}
-
-.visit-handoff__sent {
-  max-width: 30ch;
-  margin: 1.8cqi 0 0;
-  color: #59615d;
-  font-size: max(15px, 4cqi);
-  line-height: 1.45;
-  text-wrap: pretty;
-  animation: visit-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) 160ms backwards;
-}
-
-.visit-handoff__progress {
-  display: grid;
-  justify-items: center;
-  gap: 2.4cqi;
-  width: 100%;
-  margin-top: 6.4cqi;
-  animation: visit-fade 500ms ease-out 260ms backwards;
-}
-
-.visit-handoff__bar {
-  position: relative;
-  display: block;
-  width: min(56cqi, 240px);
-  height: 4px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e6eee9;
-}
-
-.visit-handoff__bar::after {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 40%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #3cc792, #00a86b);
-  content: "";
-  animation: visit-progress-run 1100ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-
-.visit-handoff__status {
-  margin: 0;
-  color: #59615d;
-  font-size: max(14px, 3.6cqi);
-  line-height: 1.4;
-}
-
-/* The sheet already keeps its action in view; a sticky bar with the old card's
-   negative margins sat on top of the ReviewBoost footer — and with no side
-   padding in the sheet, the button ran into both edges of the screen. */
-.visit-card .customer-action-bar {
-  position: static;
-  width: 100%;
-  margin: 6.4cqi 0 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  animation: visit-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) 320ms backwards;
-}
-
-/* The page's one action is a pill, raised, with a press you can feel. */
-.visit-card .visit-handoff__link,
-.visit-card .visit-retry {
-  border-radius: 999px;
-  box-shadow:
-    0 1px 0 rgb(0 74 47 / 22%),
-    0 14px 26px -14px rgb(0 122 77 / 60%);
-}
-
-.visit-stage:has([data-flow-screen="handoff"]) .visit-footer {
-  margin-top: 9cqi;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .visit-handoff__mark,
-  .visit-handoff__mark::after,
-  .visit-handoff__mark svg path,
-  .visit-handoff__heading,
-  .visit-handoff__sent,
-  .visit-handoff__progress,
-  .visit-card .customer-action-bar {
-    animation: none;
-  }
-
-  .visit-handoff__mark::after {
-    display: none;
-  }
-
-  .visit-handoff__bar::after {
-    width: 100%;
-    opacity: 0.55;
+  .visit-handoff__fallback {
     animation: none;
   }
 }

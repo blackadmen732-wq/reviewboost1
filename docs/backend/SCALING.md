@@ -9,7 +9,7 @@ is not to be changed until measurements show it missing an SLO.
 | Path | Target to hold | Tool |
 |---|---|---|
 | Public Tag context GET | p95 < 300 ms, p99 < 800 ms | k6, 50→500 rps ramp |
-| Create session / rating / destination event | p95 < 400 ms | k6 scenario chaining the three |
+| The tap: `POST /ratings` (session + rating + destination event in one request; the customer no longer waits on it) | p95 < 400 ms per step | k6 |
 | Owner dashboard | p95 < 800 ms | k6 with 50 signed-in owners |
 | SMS enqueue | p95 < 500 ms | k6 |
 | Dispatch throughput | ≥ 500 messages/min per invocation (20 × 25 batches) | seed 10k outbox rows, run dispatch, time to empty |

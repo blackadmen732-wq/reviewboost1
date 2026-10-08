@@ -30,6 +30,8 @@ export interface CustomerMessages {
   thanksHeading: string;
   feedbackSent: (businessName: string) => string;
   handoffBody: string;
+  /** The line under the thanks, while the browser opens the review page. */
+  openingGoogle: string;
   openReviewPage: string;
   poweredBy: string;
   footerPromise: string;
@@ -75,6 +77,7 @@ const en: CustomerMessages = {
   thanksHeading: "Thanks for sharing.",
   feedbackSent: (businessName) => `Your rating was sent to ${businessName}.`,
   handoffBody: "Taking you to the public review page…",
+  openingGoogle: "Opening Google…",
   openReviewPage: "Open the review page",
   poweredBy: "Powered by ReviewBoost",
   footerPromise: "Real businesses. Real feedback. A brighter tomorrow.",
@@ -114,6 +117,7 @@ const es: CustomerMessages = {
   thanksHeading: "Gracias por compartir.",
   feedbackSent: (businessName) => `Tu calificación se envió a ${businessName}.`,
   handoffBody: "Te llevamos a la página pública de reseñas…",
+  openingGoogle: "Abriendo Google…",
   openReviewPage: "Abrir la página de reseñas",
   poweredBy: "Con tecnología de ReviewBoost",
   footerPromise: "Negocios reales. Comentarios reales. Un mañana más brillante.",
@@ -153,6 +157,7 @@ const ht: CustomerMessages = {
   thanksHeading: "Mèsi paske ou pataje.",
   feedbackSent: (businessName) => `Nòt ou bay la te voye bay ${businessName}.`,
   handoffBody: "N ap mennen ou sou paj revi piblik la…",
+  openingGoogle: "N ap louvri Google…",
   openReviewPage: "Ouvri paj revi a",
   poweredBy: "ReviewBoost mache paj sa a",
   footerPromise: "Biznis reyèl. Kòmantè reyèl. Yon demen pi klere.",

@@ -14,8 +14,9 @@ physical Tag / QR
   → keyed digest of the token → review_stands row          (the routing record)
   → organization, location                                 (joined at request time)
   → published Customer Page + current destination          (joined at request time)
-  → rating saved (1–5, same flow for every rating)
-  → the same configured destination opens
+  → the same configured destination opens, on the tap itself
+  → the rating (1–5, same flow for every rating) is recorded alongside, in one
+    request (POST /ratings) that outlives the page
 ```
 
 So an owner can change the Google link, publish a new Customer Page, move a Tag

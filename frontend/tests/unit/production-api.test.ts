@@ -8,59 +8,41 @@ afterEach(() => {
 });
 
 describe("production customer API client", () => {
-  it("omits credentials on public requests and sends the stable idempotency key", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ responseId: "response-1" }), {
-        status: 201,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      productionCustomerFlowApi.submitResponse(
-        "fixture-valid",
-        { sessionId: "session-1", rating: 3 },
-        { idempotencyKey: "response-key-123456789" },
-      ),
-    ).resolves.toEqual({ responseId: "response-1" });
-
-    const request = fetchMock.mock.calls[0]?.[0] as Request;
-    expect(request).toBeInstanceOf(Request);
-    expect(request.credentials).toBe("omit");
-    expect(request.headers.get("Idempotency-Key")).toBe("response-key-123456789");
-    await expect(request.clone().json()).resolves.toEqual({
-      sessionId: "session-1",
-      rating: 3,
-    });
-  });
-
-  it("lets the destination selection outlive the page it was sent from", async () => {
+  it("sends the tap as one keepalive request, without credentials, under its idempotency key", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await productionCustomerFlowApi.recordDestinationSelection(
+    const sent = productionCustomerFlowApi.submitRating(
       "fixture-valid",
-      { sessionId: "session-1", responseId: "response-1" },
-      { idempotencyKey: "destination-key-12345678" },
+      { rating: 3, locale: "es" },
+      { idempotencyKey: "rb_rating_key-123456789" },
     );
+    // Started before submitRating returns: the page navigates in the same
+    // tick, and a request not yet begun would never be.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await expect(sent).resolves.toBeUndefined();
 
-    // This is sent a heartbeat before `window.location.assign`. Without
-    // keepalive the browser cancels it on navigation and the business's count
-    // of customers it handed to Google is quietly short — with no error
-    // anywhere, because the tab is already gone.
     const request = fetchMock.mock.calls[0]?.[0] as Request;
+    expect(request).toBeInstanceOf(Request);
+    expect(new URL(request.url).pathname).toBe("/api/v1/public/q/fixture-valid/ratings");
+    expect(request.method).toBe("POST");
+    // Without keepalive the browser cancels it when the review page takes
+    // over, and the rating is quietly lost — with no error anywhere, because
+    // the tab is already gone.
     expect(request.keepalive).toBe(true);
+    expect(request.credentials).toBe("omit");
+    expect(request.headers.get("Idempotency-Key")).toBe("rb_rating_key-123456789");
+    await expect(request.clone().json()).resolves.toEqual({ rating: 3, locale: "es" });
   });
 
   it("never treats an undocumented 202 as completion", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 202 })));
 
     await expect(
-      productionCustomerFlowApi.submitResponse(
+      productionCustomerFlowApi.submitRating(
         "fixture-valid",
-        { sessionId: "session-1", rating: 5 },
-        { idempotencyKey: "response-key-123456789" },
+        { rating: 5, locale: "en" },
+        { idempotencyKey: "rb_rating_key-123456789" },
       ),
     ).rejects.toMatchObject({
       status: 202,

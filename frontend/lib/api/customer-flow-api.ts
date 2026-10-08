@@ -1,10 +1,6 @@
 import type {
-  CreateSessionRequest,
-  CreateSessionResponse,
   CustomerReviewContext,
-  DestinationSelectionRequest,
-  SubmitResponseRequest,
-  SubmitResponseResponse,
+  SubmitRatingRequest,
 } from "@/lib/api/customer-flow-types";
 import { shouldUseCustomerFixtures } from "@/lib/api/fixture-flags";
 import { productionCustomerFlowApi } from "@/lib/api/production-customer-flow-api";
@@ -22,19 +18,14 @@ export interface CustomerFlowApi {
     token: string,
     options?: RequestOptions,
   ): Promise<CustomerReviewContext>;
-  createSession(
+  /**
+   * The whole tap in one request: scan, rating and handoff. It starts its
+   * network request synchronously, before this returns, and keeps going after
+   * the page has navigated away to the review destination.
+   */
+  submitRating(
     token: string,
-    body: CreateSessionRequest,
-    options: IdempotentRequestOptions,
-  ): Promise<CreateSessionResponse>;
-  submitResponse(
-    token: string,
-    body: SubmitResponseRequest,
-    options: IdempotentRequestOptions,
-  ): Promise<SubmitResponseResponse>;
-  recordDestinationSelection(
-    token: string,
-    body: DestinationSelectionRequest,
+    body: SubmitRatingRequest,
     options: IdempotentRequestOptions,
   ): Promise<void>;
 }

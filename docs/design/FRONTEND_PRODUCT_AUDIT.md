@@ -46,9 +46,9 @@ Every step is on the customer's own phone, in its browser:
 2. Scan or tap
 3. `/q/{token}`: the business's photo on top, the ReviewBoost rating card underneath
 4. They tap a star
-5. The rating is saved
-6. The Google handoff, which is the same for every star
-7. They are done
+5. Google opens at once, the same for every star; the rating is saved in that
+   same moment, without anyone waiting for it
+6. They are done
 
 There is no Continue step, no note field and no routing by rating.
 

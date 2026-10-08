@@ -9,14 +9,17 @@ info:
   title: ReviewBoost public customer API
   version: 1.0.0
   description: >-
-    The four anonymous endpoints the customer review page calls. Backend-owned
+    The anonymous endpoints the customer review page calls. Backend-owned
     and authoritative; records the error codes, the idempotency semantics, and
     the review-integrity guarantee.
 
 
-    V1 FLOW: open Tag/QR/NFC → customer taps one star → private rating saved →
-    the business's public review destination opens. One tap, no screen in
-    between. No public note. No active public Team Praise. Historical note and
+    V1 FLOW: open Tag/QR/NFC → customer taps one star → the business's public
+    review destination opens in that same moment, and the private rating is
+    sent alongside it in one request (`/ratings`) that outlives the page. One
+    tap, no screen in between, no wait for a save. The three step-by-step
+    write endpoints (`/sessions`, `/responses`, `/destination-selection`)
+    remain for pages that were already open when the combined write shipped. No public note. No active public Team Praise. Historical note and
     Team Praise data in the database is preserved; these endpoints are simply
     not exposed in the public V1 API.
 
@@ -164,6 +167,46 @@ paths:
         "404": { $ref: "#/components/responses/SessionInvalid" }
         "409": { $ref: "#/components/responses/ResponseConflict" }
         "410": { $ref: "#/components/responses/SessionExpired" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /api/v1/public/q/{token}/ratings:
+    post:
+      operationId: submitCustomerRating
+      tags: [public]
+      summary: Record the scan, the rating and the handoff in one request
+      description: >-
+        What the customer page sends at the moment of the tap, while the browser
+        is already opening the public review destination. It records exactly
+        what `/sessions`, `/responses` and `/destination-selection` record, in
+        that order, with the same validation, rate limits and idempotency — one
+        scan, one rating and one handoff per Idempotency-Key. A retry with the
+        same key replays every step that already happened, so a page that comes
+        back and re-sends cannot rate twice.
+
+
+        Every rating from one to five is stored and handled identically, and
+        the answer does not vary with it. Never redirects: the client owns the
+        navigation, and it has usually left before this request completes, so
+        the request is sent with `keepalive`.
+      parameters:
+        - $ref: "#/components/parameters/ReviewToken"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitRatingRequest" }
+      responses:
+        "204":
+          description: Recorded, on a first request and on a replay alike.
+          headers:
+            X-Request-Id: { $ref: "#/components/headers/RequestId" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "404": { $ref: "#/components/responses/InactiveReviewLink" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
         "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/InternalError" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
@@ -439,6 +482,18 @@ components:
       required: [sessionId, rating]
       properties:
         sessionId: { type: string, minLength: 1, maxLength: 160 }
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Stored exactly as chosen. Nothing downstream branches on it.
+
+    SubmitRatingRequest:
+      type: object
+      additionalProperties: false
+      required: [locale, rating]
+      properties:
+        locale: { $ref: "#/components/schemas/Locale" }
         rating:
           type: integer
           minimum: 1

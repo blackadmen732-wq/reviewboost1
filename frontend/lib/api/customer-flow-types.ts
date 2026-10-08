@@ -6,5 +6,6 @@ export type CreateSessionResponse = components["schemas"]["CreateSessionResponse
 export type SubmitResponseRequest = components["schemas"]["SubmitResponseRequest"];
 export type SubmitResponseResponse = components["schemas"]["SubmitResponseResponse"];
 export type DestinationSelectionRequest = components["schemas"]["DestinationSelectionRequest"];
+export type SubmitRatingRequest = components["schemas"]["SubmitRatingRequest"];
 export type ErrorResponse = components["schemas"]["ErrorResponse"];
 

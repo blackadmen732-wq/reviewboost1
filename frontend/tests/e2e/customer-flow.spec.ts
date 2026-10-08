@@ -103,23 +103,47 @@ test.describe("ReviewBoost customer flow", () => {
     await page.waitForURL(DESTINATION_PATTERN);
   });
 
-  test("recoverable failure keeps the rating and reuses the same idempotency key", async ({
+  test("a failed save never holds the customer back, and is finished under the same key on return", async ({
     page,
   }) => {
+    // The fixture refuses the first request with a 503, then accepts.
     await openFlow(page, "fixture-response-error", { stayOnPage: true });
+    const leaving = page.waitForRequest(DESTINATION_PATTERN);
     await page.getByRole("radio", { name: spokenRatings[1] }).click();
-    await expect(page.locator("#feedback-status")).toContainText("Your rating is still here");
-
-    await page.getByRole("button", { name: "Try again" }).click();
+    // Google is opened on the tap itself, failed save or not.
+    await leaving;
     await expect(page.locator("[data-flow-screen='handoff']")).toBeVisible();
+
+    const pendingKey = () =>
+      page.evaluate(() => {
+        const raw = sessionStorage.getItem("reviewboost:customer-flow:fixture-response-error");
+        return raw ? (JSON.parse(raw) as { pending: { key: string } | null }).pending?.key ?? null : null;
+      });
+    await expect.poll(pendingKey).not.toBeNull();
+
+    // Back from Google through the back-forward cache.
+    await page.evaluate(() =>
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })),
+    );
+    await expect.poll(pendingKey).toBeNull();
 
     const keys = await page.evaluate(() =>
       window.__RB_FIXTURE_CALLS__
-        ?.filter(({ operation }) => operation === "response")
+        ?.filter(({ operation }) => operation === "rating")
         .map(({ idempotencyKey }) => idempotencyKey),
     );
     expect(keys).toHaveLength(2);
     expect(new Set(keys).size).toBe(1);
+  });
+
+  test("Google opens on the tap itself, before the save is answered", async ({ page }) => {
+    // fixture-slow answers after 1.35s; a page that waited for it would be late.
+    await openFlow(page, "fixture-slow", { stayOnPage: true });
+    const leaving = page.waitForRequest(DESTINATION_PATTERN);
+    const tappedAt = Date.now();
+    await page.getByRole("radio", { name: spokenRatings[4] }).click({ noWaitAfter: true });
+    await leaving;
+    expect(Date.now() - tappedAt).toBeLessThan(1000);
   });
 
   test("unknown and inactive links are visually and textually indistinguishable", async ({

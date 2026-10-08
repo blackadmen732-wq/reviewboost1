@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { VisitStars } from "@/features/customer-page/visit-stars";
 import type { SubmissionStatus } from "@/features/customer-flow/customer-flow-state";
 import type {
@@ -13,30 +12,26 @@ interface RatingScreenProps {
   rating: RatingValue | null;
   status: SubmissionStatus;
   onRate: (rating: RatingValue) => void;
-  onRetry: () => void;
   /** Heading lives on the shared visit card so preview and live match. */
   embedInVisit?: boolean;
 }
 
 /**
- * One tap. Choosing a star submits it.
+ * One tap. Choosing a star opens Google.
  *
  * There is no confirm step, because a confirm step is where a flow starts
- * deciding things about the customer. The only buttons that can appear here
- * are recovery from a failed submit — never a gate in front of one.
+ * deciding things about the customer — and there is no "Sending…", no error
+ * and no Try again either: the page does not wait for the save, so there is
+ * nothing to watch and nothing to retry. The one thing that can hold a
+ * customer here is having no connection, which Google would need too.
  */
 export function RatingScreen({
   messages,
   rating,
   status,
   onRate,
-  onRetry,
   embedInVisit = false,
 }: RatingScreenProps) {
-  const isSubmitting = status === "submitting";
-  const isOffline = status === "offline";
-  const hasError = status === "error";
-
   return (
     <section className="flow-screen" data-flow-screen="rating">
       {embedInVisit ? null : (
@@ -52,34 +47,14 @@ export function RatingScreen({
         value={rating}
         onChange={onRate}
         messages={messages}
-        disabled={isSubmitting}
+        // The page is already on its way to Google: a second tap does nothing.
+        disabled={status === "leaving"}
       />
 
-      {/* Status lives in one short, centred line under the stars. The sheet has
-          a fixed height, set by screen width, so the stars never move under a thumb; a
-          boxed notice plus a large button did not fit in it, and the error
-          was squeezed to a sliver the customer could not read. "Sending…"
-          floats in the space under the stars, so the footer stays put. */}
+      {/* One short, centred line under the stars, in the calm space above the
+          footer, so the stars never move under a thumb. */}
       <div className="rating-actions" data-rating-actions>
-        {isSubmitting ? (
-          <p className="visit-status visit-status--sending" role="status">
-            <span className="visit-progress" aria-hidden="true" />
-            {messages.sending}
-          </p>
-        ) : null}
-
-        {hasError ? (
-          <>
-            <p id="feedback-status" className="visit-status visit-status--error" role="alert">
-              <strong>{messages.submitErrorHeading}</strong> {messages.submitErrorBody}
-            </p>
-            <Button type="button" className="visit-retry" onClick={onRetry}>
-              {messages.tryAgain}
-            </Button>
-          </>
-        ) : null}
-
-        {isOffline ? (
+        {status === "offline" ? (
           <p id="feedback-status" className="visit-status visit-status--offline" role="status">
             {messages.offline}
           </p>

@@ -5,9 +5,9 @@ import { createIdempotencyKey } from "@/lib/api/idempotency";
 
 describe("customer mutation safety", () => {
   it("creates unique operation-scoped idempotency keys", () => {
-    const first = createIdempotencyKey("response");
-    const second = createIdempotencyKey("response");
-    expect(first).toMatch(/^rb_response_[0-9a-f-]{36}$/);
+    const first = createIdempotencyKey("rating");
+    const second = createIdempotencyKey("rating");
+    expect(first).toMatch(/^rb_rating_[0-9a-f-]{36}$/);
     expect(second).not.toBe(first);
   });
 

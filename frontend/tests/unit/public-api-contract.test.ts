@@ -4,7 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 /**
- * Contract tests for the four public Route Handlers.
+ * Contract tests for the public Route Handlers.
  *
  * Supabase is mocked, so what these prove is everything above the database:
  * routing, validation, the error envelope, status codes, security headers, the
@@ -134,6 +134,16 @@ async function postGoogleClick(body: unknown, headers?: Record<string, string>) 
   );
 }
 
+async function postRating(body: unknown, headers?: Record<string, string>) {
+  const { POST } = await import("@/app/api/v1/public/q/[token]/ratings/route");
+  return POST(
+    request("POST", `/api/v1/public/q/${TOKEN}/ratings`, {
+      body,
+      ...(headers ? { headers } : { headers: { "idempotency-key": key("rating") } }),
+    }),
+    params(TOKEN),
+  );
+}
 
 describe("GET public context", () => {
   it("returns exactly the contract shape", async () => {
@@ -775,5 +785,153 @@ describe("token digest key rotation", () => {
 
     const resolve = calls.find((call) => call.fn === "rpc_public_resolve_stand");
     expect(resolve?.args["p_previous_token_hash"]).toBeNull();
+  });
+});
+
+describe("the tap in one request (/ratings)", () => {
+  const WRITES = [
+    "rpc_public_create_session",
+    "rpc_public_submit_response",
+    "rpc_public_record_destination_selection",
+  ];
+
+  it("records the scan, the rating and the handoff, in that order, and answers 204 with no body", async () => {
+    const response = await postRating(
+      { rating: 4, locale: "es" },
+      {
+        "idempotency-key": key("rating"),
+        "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148",
+      },
+    );
+
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe("");
+    expect(response.headers.get("location")).toBeNull();
+    expect(calls.map((call) => call.fn).filter((fn) => fn !== "rpc_consume_rate_limit")).toEqual(WRITES);
+
+    const step = (fn: string) => {
+      const call = calls.find((candidate) => candidate.fn === fn);
+      if (!call) throw new Error(`${fn} was not called`);
+      return call;
+    };
+    const [session, submit, selection] = WRITES.map(step) as [RpcCall, RpcCall, RpcCall];
+    expect(session.args["p_locale"]).toBe("es");
+    expect(session.args["p_record_scan"]).toBe(true);
+    expect(submit.args["p_rating"]).toBe(4);
+    // One session threads through all three steps.
+    expect(submit.args["p_session_token_hash"]).toBe(session.args["p_session_token_hash"]);
+    expect(selection.args["p_session_token_hash"]).toBe(session.args["p_session_token_hash"]);
+    expect(selection.args["p_response_token_hash"]).toBe(submit.args["p_response_token_hash"]);
+  });
+
+  it("answers ratings one to five identically, and passes the database the same argument set", async () => {
+    const answers: string[] = [];
+    const argShapes: string[] = [];
+
+    for (const rating of [1, 2, 3, 4, 5]) {
+      calls.length = 0;
+      const response = await postRating({ rating, locale: "en" });
+      answers.push(
+        JSON.stringify({
+          status: response.status,
+          body: await response.text(),
+          cache: response.headers.get("cache-control"),
+        }),
+      );
+      argShapes.push(
+        JSON.stringify(calls.map((call) => [call.fn, Object.keys(call.args).sort()])),
+      );
+      expect(calls.find((call) => call.fn === "rpc_public_submit_response")?.args["p_rating"]).toBe(rating);
+    }
+
+    expect(new Set(answers).size).toBe(1);
+    expect(new Set(argShapes).size).toBe(1);
+  });
+
+  it("keys all three steps from one Idempotency-Key, each in its own namespace, the same on a re-send", async () => {
+    await postRating({ rating: 2, locale: "en" });
+    const first = WRITES.map((fn) => calls.find((call) => call.fn === fn)?.args["p_idempotency_key"]);
+    calls.length = 0;
+    await postRating({ rating: 2, locale: "en" });
+    const second = WRITES.map((fn) => calls.find((call) => call.fn === fn)?.args["p_idempotency_key"]);
+
+    expect(new Set(first).size).toBe(3);
+    expect(second).toEqual(first);
+    expect(JSON.stringify(first)).not.toContain(key("rating"));
+  });
+
+  it("replays a request that already landed as 204, creating nothing", async () => {
+    const { encrypt } = await import("@/lib/server/crypto");
+    rpcHandler = (fn) => {
+      if (fn === "rpc_consume_rate_limit") return allowed();
+      if (fn === "rpc_public_create_session") {
+        return {
+          data: [{ outcome: "replay", response_status: 201, response_body_encrypted: encrypt(JSON.stringify({ sessionId: SESSION_ID })) }],
+          error: null,
+        };
+      }
+      if (fn === "rpc_public_submit_response") {
+        return {
+          data: [{ outcome: "replay", response_status: 201, response_body_encrypted: encrypt(JSON.stringify({ responseId: RESPONSE_ID })) }],
+          error: null,
+        };
+      }
+      return { data: [{ outcome: "replay", response_status: 204, response_body_encrypted: null }], error: null };
+    };
+
+    const response = await postRating({ rating: 5, locale: "en" });
+    expect(response.status).toBe(204);
+  });
+
+  it("stops at a failed step and reports it, so the page keeps the request to re-send", async () => {
+    rpcHandler = (fn) =>
+      fn === "rpc_public_submit_response"
+        ? { data: null, error: { message: "timeout", code: "57014" } }
+        : happyPath(fn);
+
+    const response = await postRating({ rating: 3, locale: "en" });
+    expect(response.status).toBe(503);
+    expect(calls.map((call) => call.fn)).not.toContain("rpc_public_record_destination_selection");
+  });
+
+  it("does not count a crawler's request as a scan", async () => {
+    const { POST } = await import("@/app/api/v1/public/q/[token]/ratings/route");
+    await POST(
+      request("POST", `/api/v1/public/q/${TOKEN}/ratings`, {
+        body: { rating: 3, locale: "en" },
+        headers: { "idempotency-key": key("rating"), "user-agent": "Googlebot/2.1 (+http://www.google.com/bot.html)" },
+      }),
+      params(TOKEN),
+    );
+    expect(calls.find((call) => call.fn === "rpc_public_create_session")?.args["p_record_scan"]).toBe(false);
+  });
+
+  it("requires the Idempotency-Key and a strict body", async () => {
+    expect((await postRating({ rating: 3, locale: "en" }, {})).status).toBe(400);
+    for (const body of [
+      { rating: 3 },
+      { rating: 0, locale: "en" },
+      { rating: 6, locale: "en" },
+      { rating: 3, locale: "fr" },
+      { rating: 3, locale: "en", note: "cold soup" },
+      { rating: 3, locale: "en", phone: "+15555550100" },
+      { rating: 3, locale: "en", email: "a@b.co" },
+    ]) {
+      const response = await postRating(body);
+      expect(response.status, JSON.stringify(body)).toBe(400);
+    }
+    expect(calls.map((call) => call.fn)).not.toContain("rpc_public_create_session");
+  });
+
+  it("returns 429 with Retry-After when a budget is exhausted, and writes nothing", async () => {
+    rpcHandler = (fn) =>
+      fn === "rpc_consume_rate_limit"
+        ? { data: [{ allowed: false, retry_after_seconds: 42 }], error: null }
+        : happyPath(fn);
+
+    const response = await postRating({ rating: 3, locale: "en" });
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("42");
+    expect(calls.map((call) => call.fn).filter((fn) => WRITES.includes(fn))).toEqual([]);
   });
 });

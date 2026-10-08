@@ -28,6 +28,7 @@ describe("review-integrity source boundaries", () => {
     const apiSource = source("lib/api/production-customer-flow-api.ts");
     expect(apiSource).not.toContain("reviewThreshold");
     expect(apiSource).not.toMatch(/\/q\/\{publicId\}|\/rating[\"']/);
-    expect(apiSource).toContain("/api/v1/public/q/{token}/responses");
+    // The tap is one request: scan, rating and handoff, sent as the page leaves.
+    expect(apiSource).toContain("/api/v1/public/q/{token}/ratings");
   });
 });

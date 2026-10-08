@@ -124,9 +124,9 @@ Scan recorded (deduplicated per device over a short window)
         ↓
 "How did we do?"   ★ ★ ★ ★ ★
         ↓
-Rating recorded
-        ↓
-Public Google review opportunity presented — IDENTICAL for every rating
+Public Google review page opens on the tap itself — IDENTICAL for every rating
+(no button, no screen, no wait: the rating is recorded in the same moment, by
+one request that outlives the page, and re-sent if the customer comes back)
         ↓
 Low rating ALSO opens private feedback + owner alert + recovery task
 ```
@@ -369,7 +369,8 @@ creates allocations yet.
 2. Taps the Tag
 3. "How did we do?"
 4. Taps a rating
-5. Public Google review opportunity — same for every rating
+5. Public Google review page opens at once — same for every rating
+   (the rating is recorded in the same moment, not before)
    Low rating additionally: private feedback → owner alert → recovery task
 ```
 

@@ -68,6 +68,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/q/{token}/ratings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record the scan, the rating and the handoff in one request
+         * @description What the customer page sends at the moment of the tap, while the browser is already opening the public review destination. It records exactly what `/sessions`, `/responses` and `/destination-selection` record, in that order, with the same validation, rate limits and idempotency — one scan, one rating and one handoff per Idempotency-Key. A retry with the same key replays every step that already happened, so a page that comes back and re-sends cannot rate twice.
+         *
+         *     Every rating from one to five is stored and handled identically, and the answer does not vary with it. Never redirects: the client owns the navigation, and it has usually left before this request completes, so the request is sent with `keepalive`.
+         */
+        post: operations["submitCustomerRating"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/q/{token}/destination-selection": {
         parameters: {
             query?: never;
@@ -149,6 +171,11 @@ export interface components {
         };
         SubmitResponseRequest: {
             sessionId: string;
+            /** @description Stored exactly as chosen. Nothing downstream branches on it. */
+            rating: number;
+        };
+        SubmitRatingRequest: {
+            locale: components["schemas"]["Locale"];
             /** @description Stored exactly as chosen. Nothing downstream branches on it. */
             rating: number;
         };
@@ -458,6 +485,43 @@ export interface operations {
             404: components["responses"]["SessionInvalid"];
             409: components["responses"]["ResponseConflict"];
             410: components["responses"]["SessionExpired"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    submitCustomerRating: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Mandatory. The customer flow runs on a phone, so a request that times out is the normal case, not the exceptional one — a retry without a key would write a second response or scan. The client must reuse the same key across an offline retry. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Echoed back, so a trace survives the hop. */
+                "X-Request-Id"?: components["parameters"]["RequestId"];
+            };
+            path: {
+                /** @description The stand's public token. At least 256 bits of entropy, stored only as a keyed digest, and never sequential — it is the sole thing authorising a write into a business's data, so guessability is the whole security argument. */
+                token: components["parameters"]["ReviewToken"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitRatingRequest"];
+            };
+        };
+        responses: {
+            /** @description Recorded, on a first request and on a replay alike. */
+            204: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            404: components["responses"]["InactiveReviewLink"];
+            409: components["responses"]["IdempotencyConflict"];
             429: components["responses"]["RateLimited"];
             500: components["responses"]["InternalError"];
             503: components["responses"]["ServiceUnavailable"];

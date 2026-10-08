@@ -26,6 +26,10 @@ import {
  * success status for this operation.
  */
 
+// The customer page now sends the whole tap to /ratings, which records exactly
+// this step among the others. This route stays for pages that were already
+// open when that shipped.
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 

@@ -43,9 +43,11 @@ import {
  * never re-fetched with one — that is the structural reason it cannot vary by
  * rating, rather than a rule someone has to remember.
  *
- * V1 contract: Tag/QR/NFC → rating 1–5 → private rating saved → the business's
- * public review destination. No public note. No Team Praise in the customer
- * path. The same destination is served for every rating, 1 through 5.
+ * V1 contract: Tag/QR/NFC → tap a star (1–5) → the business's public review
+ * destination opens in that same moment, and the private rating is recorded
+ * alongside it (`submitRating`, one request the page sends as it leaves). No
+ * public note. No Team Praise in the customer path. The same destination is
+ * served for every rating, 1 through 5.
  *
  * If a change ever makes a customer-facing value depend on `rating`, that
  * change is wrong.
@@ -53,6 +55,9 @@ import {
  * ATOMICITY
  * ---------
  * Each operation is one RPC, because each PostgREST call is one transaction.
+ * `submitRating` runs three of them in order under one client key; a failure
+ * part way leaves the earlier steps standing and a retry with the same key
+ * replays them and finishes the rest.
  * The idempotency claim, the domain write, and the stored result commit
  * together or not at all — so a timeout on a phone either replays a stored
  * result or performs the operation for the first time, never both.
@@ -527,6 +532,58 @@ export async function recordDestinationSelection(
   }
 
   throwForOutcome(result.outcome);
+}
+
+// ------------------------------------------------------------ the tap --
+
+/**
+ * The whole tap in one request: the scan, the rating and the handoff.
+ *
+ * The customer page sends this at the moment a star is tapped, while the
+ * browser is already opening the public review destination, so nothing here
+ * stands between a customer and Google. It records exactly what the three
+ * step-by-step writes record, through the same functions — the same
+ * validation, rate limits, bot rule for scans, provider-from-location and
+ * fail-closed limiter — so the dashboard's numbers mean what they meant.
+ *
+ * One Idempotency-Key covers all three steps. Each step already namespaces
+ * the key ("session|", "response|", "destination-selection|"), so they cannot
+ * collide, and a retry with the same key replays every step that happened and
+ * finishes the rest: a page that comes back and re-sends cannot rate twice.
+ * If a step fails, the error is returned and the steps before it stand; the
+ * client keeps the request and re-sends it.
+ *
+ * Every rating from 1 to 5 takes this same path and gets the same answer.
+ */
+export async function submitRating(
+  token: string,
+  input: { locale: SupportedLocale; rating: number; idempotencyKey: string },
+  meta: RequestMeta,
+): Promise<OperationResult<null>> {
+  const session = await createSession(
+    token,
+    { locale: input.locale, idempotencyKey: input.idempotencyKey },
+    meta,
+  );
+  const response = await submitResponse(
+    token,
+    {
+      sessionId: session.body.sessionId,
+      rating: input.rating,
+      idempotencyKey: input.idempotencyKey,
+    },
+    meta,
+  );
+  await recordDestinationSelection(
+    token,
+    {
+      sessionId: session.body.sessionId,
+      responseId: response.body.responseId,
+      idempotencyKey: input.idempotencyKey,
+    },
+    meta,
+  );
+  return { status: 204, body: null };
 }
 
 /**

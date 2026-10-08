@@ -1,27 +1,27 @@
 import type { CustomerFlowApi } from "@/lib/api/customer-flow-api";
 import { CustomerApiError } from "@/lib/api/customer-api-error";
-import type {
-  CreateSessionResponse,
-  SubmitResponseResponse,
-} from "@/lib/api/customer-flow-types";
-
-type FixtureOperation = "context" | "session" | "response" | "destination-selection";
+type FixtureOperation = "context" | "rating";
 
 declare global {
   interface Window {
-    __RB_FIXTURE_CALLS__?: Array<{ operation: FixtureOperation; idempotencyKey?: string }>;
+    __RB_FIXTURE_CALLS__?: Array<{
+      operation: FixtureOperation;
+      idempotencyKey?: string;
+      body?: unknown;
+    }>;
   }
 }
 
 const idempotentResults = new Map<string, unknown>();
 const transientFailures = new Set<string>();
 
-function logCall(operation: FixtureOperation, idempotencyKey?: string) {
+function logCall(operation: FixtureOperation, idempotencyKey?: string, body?: unknown) {
   if (typeof window === "undefined") return;
   window.__RB_FIXTURE_CALLS__ ??= [];
   window.__RB_FIXTURE_CALLS__.push({
     operation,
     ...(idempotencyKey ? { idempotencyKey } : {}),
+    ...(body === undefined ? {} : { body }),
   });
 }
 
@@ -72,10 +72,6 @@ function stableResult<T>(operation: FixtureOperation, key: string, create: () =>
   return value;
 }
 
-function shortId(key: string): string {
-  return key.replace(/[^A-Za-z0-9]/g, "").slice(-16) || "fixture";
-}
-
 export const developmentCustomerFlowApi: CustomerFlowApi = {
   async getContext(token) {
     logCall("context");
@@ -120,37 +116,22 @@ export const developmentCustomerFlowApi: CustomerFlowApi = {
     };
   },
 
-  async createSession(token, _body, options) {
-    logCall("session", options.idempotencyKey);
+  // Logged before the first await, as the production client starts its
+  // request before it returns: a test can see the save began before the page
+  // left. The fixture tokens that once failed one step now fail the whole tap
+  // once, then succeed on the re-send with the same key.
+  async submitRating(token, body, options) {
+    logCall("rating", options.idempotencyKey, body);
     assertOnline();
     await delay(token);
-    if (token === "fixture-session-error") {
-      transientFailure("session", token, options.idempotencyKey);
+    if (
+      token === "fixture-session-error" ||
+      token === "fixture-response-error" ||
+      token === "fixture-destination-error"
+    ) {
+      transientFailure("rating", token, options.idempotencyKey);
     }
-    return stableResult<CreateSessionResponse>("session", options.idempotencyKey, () => ({
-      sessionId: `session_${shortId(options.idempotencyKey)}`,
-    }));
-  },
-
-  async submitResponse(token, _body, options) {
-    logCall("response", options.idempotencyKey);
-    assertOnline();
-    await delay(token);
-    if (token === "fixture-response-error") {
-      transientFailure("response", token, options.idempotencyKey);
-    }
-    return stableResult<SubmitResponseResponse>("response", options.idempotencyKey, () => ({
-      responseId: `response_${shortId(options.idempotencyKey)}`,
-    }));
-  },
-
-  async recordDestinationSelection(token, _body, options) {
-    logCall("destination-selection", options.idempotencyKey);
-    assertOnline();
-    if (token === "fixture-destination-error") {
-      transientFailure("destination-selection", token, options.idempotencyKey);
-    }
-    stableResult("destination-selection", options.idempotencyKey, () => true);
+    stableResult("rating", options.idempotencyKey, () => true);
   },
 
 };

@@ -63,63 +63,20 @@ export const productionCustomerFlowApi: CustomerFlowApi = {
     });
   },
 
-  createSession(token, body, options) {
+  submitRating(token, body, options) {
     return safely(async () => {
-      const result = await client.POST("/api/v1/public/q/{token}/sessions", {
+      const result = await client.POST("/api/v1/public/q/{token}/ratings", {
         params: {
           path: { token },
           header: { "Idempotency-Key": options.idempotencyKey },
         },
         body,
-        ...(options.signal ? { signal: options.signal } : {}),
-      });
-
-      if ((result.response.status === 200 || result.response.status === 201) && result.data) {
-        return result.data;
-      }
-      if (result.response.ok) {
-        rejectUnexpectedSuccess(result.response);
-      }
-      throw toCustomerApiError(result.response, result.error);
-    });
-  },
-
-  submitResponse(token, body, options) {
-    return safely(async () => {
-      const result = await client.POST("/api/v1/public/q/{token}/responses", {
-        params: {
-          path: { token },
-          header: { "Idempotency-Key": options.idempotencyKey },
-        },
-        body,
-        ...(options.signal ? { signal: options.signal } : {}),
-      });
-
-      if ((result.response.status === 200 || result.response.status === 201) && result.data) {
-        return result.data;
-      }
-      if (result.response.ok) {
-        rejectUnexpectedSuccess(result.response);
-      }
-      throw toCustomerApiError(result.response, result.error);
-    });
-  },
-
-  recordDestinationSelection(token, body, options) {
-    return safely(async () => {
-      const result = await client.POST("/api/v1/public/q/{token}/destination-selection", {
-        params: {
-          path: { token },
-          header: { "Idempotency-Key": options.idempotencyKey },
-        },
-        body,
-        // This request is made a heartbeat before the page navigates to the
-        // destination, and a normal fetch is cancelled when that happens. The
-        // alternative — waiting for it before handing the customer over —
-        // puts a round trip between a tap and Google, which is the one thing
-        // this flow exists not to do. `keepalive` lets the browser finish it
-        // after the document is gone; the body is a few dozen bytes, far
-        // inside the 64KB that allows.
+        // Sent in the same moment the page starts opening the review
+        // destination, and a normal fetch is cancelled when that navigation
+        // takes over. `keepalive` lets the browser finish it after the
+        // document is gone; the body is a few dozen bytes, far inside the 64KB
+        // that allows. Same origin, so there is no preflight to lose, and
+        // fetch rather than sendBeacon, which cannot carry Idempotency-Key.
         keepalive: true,
         ...(options.signal ? { signal: options.signal } : {}),
       });

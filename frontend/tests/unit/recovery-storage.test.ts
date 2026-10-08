@@ -5,17 +5,21 @@ import {
   loadCustomerDraft,
   saveCustomerDraft,
 } from "@/features/customer-flow/recovery-storage";
-import { initialCustomerFlowState } from "@/features/customer-flow/customer-flow-state";
+import {
+  initialCustomerFlowState,
+  type CustomerFlowState,
+} from "@/features/customer-flow/customer-flow-state";
+
+const PENDING = { key: "rb_rating_1234-5678-key-abcdef", rating: 3 as const, locale: "ht" as const };
 
 describe("same-tab customer recovery", () => {
-  it("retains the draft and stable idempotency keys only for its token", () => {
-    const draft = {
+  it("retains a held tap and its stable idempotency key only for its token", () => {
+    const draft: CustomerFlowState = {
       ...initialCustomerFlowState,
-      rating: 3 as const,
-      sessionKey: "session-key-123456",
-      responseKey: "response-key-123456",
-      feedbackStatus: "error" as const,
-      locale: "ht" as const,
+      rating: 3,
+      pending: PENDING,
+      feedbackStatus: "offline",
+      locale: "ht",
     };
 
     saveCustomerDraft("fixture-valid", draft);
@@ -24,14 +28,31 @@ describe("same-tab customer recovery", () => {
     expect(loadCustomerDraft("another-token")).toBeNull();
   });
 
-  it("converts interrupted submitting state into a recoverable error", () => {
+  it("stores a page caught leaving as the handoff, so the back button finds no form", () => {
     saveCustomerDraft("fixture-valid", {
       ...initialCustomerFlowState,
-      rating: 4,
-      feedbackStatus: "submitting",
+      rating: 3,
+      pending: PENDING,
+      feedbackStatus: "leaving",
     });
 
-    expect(loadCustomerDraft("fixture-valid")?.feedbackStatus).toBe("error");
+    expect(loadCustomerDraft("fixture-valid")).toEqual({
+      ...initialCustomerFlowState,
+      screen: "handoff",
+      rating: null,
+      pending: PENDING,
+      feedbackStatus: "idle",
+    });
+  });
+
+  it("keeps the handoff state so the back button cannot produce a second rating", () => {
+    const handed: CustomerFlowState = {
+      ...initialCustomerFlowState,
+      screen: "handoff",
+      pending: null,
+    };
+    saveCustomerDraft("fixture-valid", handed);
+    expect(loadCustomerDraft("fixture-valid")).toEqual(handed);
   });
 
   it("rejects corrupt storage", () => {
@@ -39,25 +60,31 @@ describe("same-tab customer recovery", () => {
     expect(loadCustomerDraft("fixture-valid")).toBeNull();
   });
 
-  it("rejects a handoff draft that carries no saved response", () => {
+  it("rejects a draft from the step-by-step flow, and a malformed pending request", () => {
     window.sessionStorage.setItem(
       "reviewboost:customer-flow:fixture-valid",
       JSON.stringify({ version: 2, ...initialCustomerFlowState, screen: "handoff" }),
     );
     expect(loadCustomerDraft("fixture-valid")).toBeNull();
+
+    window.sessionStorage.setItem(
+      "reviewboost:customer-flow:fixture-valid",
+      JSON.stringify({
+        version: 3,
+        ...initialCustomerFlowState,
+        screen: "handoff",
+        pending: { key: "short", rating: 9, locale: "fr" },
+      }),
+    );
+    expect(loadCustomerDraft("fixture-valid")).toBeNull();
   });
 
-  it("keeps the handoff state so the back button cannot produce a second rating", () => {
-    const handed = {
-      ...initialCustomerFlowState,
-      screen: "handoff" as const,
-      sessionId: "session-1",
-      responseId: "response-1",
-      destinationKey: "destination-key-123456",
-      destinationPending: false,
-    };
-    saveCustomerDraft("fixture-valid", handed);
-    expect(loadCustomerDraft("fixture-valid")).toEqual(handed);
+  it("rejects an offline hold with nothing held", () => {
+    window.sessionStorage.setItem(
+      "reviewboost:customer-flow:fixture-valid",
+      JSON.stringify({ version: 3, ...initialCustomerFlowState, feedbackStatus: "offline" }),
+    );
+    expect(loadCustomerDraft("fixture-valid")).toBeNull();
   });
 
   it("can explicitly remove a private draft", () => {
@@ -66,4 +93,3 @@ describe("same-tab customer recovery", () => {
     expect(loadCustomerDraft("fixture-valid")).toBeNull();
   });
 });
-
