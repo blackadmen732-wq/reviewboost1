@@ -342,7 +342,7 @@ html:has(.customer-live) {
   padding: 0;
 }
 
-/* Holds the gold gradient the stars paint with. Present, never visible. */
+/* Holds the gold the stars paint with. Present, never visible. */
 .visit-stars__defs {
   position: absolute;
   width: 0;
@@ -403,132 +403,57 @@ html:has(.customer-live) {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Motion lives on the drawing, never on the label: the label is the measured
-   target, and it holds still. */
 .visit-star__label svg {
   width: 100%;
   height: 100%;
   overflow: visible;
   filter: drop-shadow(0 0.9cqi 1.2cqi rgb(28 40 33 / 15%));
-  transition:
-    transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    filter 220ms ease-out;
+  transition: transform 110ms ease-out;
 }
 
-/* The empty star: white falling to a soft grey (a slight raise, like a key),
-   with a quiet edge that still holds 3:1 against the sheet, so the shape
-   reads as a control. */
+/* The empty star: a light fill and a quiet grey edge that still holds 3:1
+   against the sheet, so the shape reads as a control. */
 .visit-star__base {
+  fill: #f5f6f5;
   stroke: #858b88;
 }
 
-/* The chosen gold: light and warm, not orange. Its thin edge keeps the filled
-   shape at 3:1 on white. Every filled star is the same gold — a two is not a
-   failure, and nothing here is green or red. */
+/* The chosen gold: light and warm. Its thin edge keeps the filled shape at
+   3:1 on white. Every filled star is the same gold. */
 .visit-star__gold {
   stroke: #c08a0e;
   opacity: 0;
-  transform: scale(0.35);
   transform-box: fill-box;
-  transform-origin: 50% 55%;
-  transition:
-    opacity 160ms ease-out,
-    transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: center;
 }
 
-.visit-star__body {
-  transform-box: fill-box;
-  transform-origin: 50% 70%;
-  /* One gentle wave across the row, once, a moment after the page opens:
-     the only thing on the page that says "touch these". The stars are
-     already there and already tappable; the wave delays nothing. */
-  animation: visit-star-wave 620ms cubic-bezier(0.3, 0.7, 0.4, 1);
-  animation-delay: calc(1250ms + var(--star-index, 0) * 75ms);
-}
-
-.visit-stars__row:has(:checked) .visit-star__body,
-.visit-stars:disabled .visit-star__body {
-  animation: none;
-}
-
-.visit-star__label[data-filled="true"] svg {
-  filter: drop-shadow(0 1.1cqi 1.6cqi rgb(214 150 24 / 30%));
-}
-
-/* The fill lands on the chosen star at once, then runs back along the row,
-   each star with a small bounce. */
 .visit-star__label[data-filled="true"] .visit-star__gold {
   opacity: 1;
-  transform: none;
-  animation: visit-star-fill 460ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
-  animation-delay: calc(var(--fill-order, 0) * 50ms);
+  animation: visit-star-fill 160ms ease-out backwards;
+  animation-delay: calc(var(--star-index, 0) * 20ms);
 }
 
-/* The chosen star answers with one soft ring. The same ring for every star. */
-.visit-star__input:checked + .visit-star__label::after {
-  position: absolute;
-  inset: 6%;
-  border: max(2px, 0.55cqi) solid rgb(255 200 63 / 85%);
-  border-radius: 50%;
-  content: "";
-  opacity: 0;
-  pointer-events: none;
-  animation: visit-star-ring 620ms cubic-bezier(0.2, 0.7, 0.2, 1) 60ms forwards;
-}
-
-/* With a mouse, the stars up to the pointer show a soft preview of the fill
-   and the one under it lifts. Touch screens skip this: a phone's "hover" is
-   a tap that already chose. */
-@media (hover: hover) and (pointer: fine) {
-  .visit-stars:not(:disabled) .visit-stars__row:not(:has(:checked)) .visit-star:is(:hover, :has(~ .visit-star:hover)) .visit-star__gold {
-    opacity: 0.55;
-    transform: none;
-  }
-
-  .visit-stars:not(:disabled) .visit-star:hover .visit-star__label svg {
-    transform: translateY(-0.7cqi) scale(1.06);
-  }
-}
-
-/* The thumb gets an answer the instant it lands, before any network. */
+/* The thumb gets an answer the instant it lands. */
 .visit-stars:not(:disabled) .visit-star__input:active + .visit-star__label svg {
-  transform: scale(0.88);
-  transition-duration: 90ms;
+  transform: scale(0.9);
 }
 
 @keyframes visit-star-fill {
-  0% { opacity: 0; transform: scale(0.35); }
-  55% { opacity: 1; transform: scale(1.16); }
-  100% { opacity: 1; transform: none; }
-}
-
-@keyframes visit-star-ring {
-  0% { opacity: 0.9; transform: scale(0.55); }
-  100% { opacity: 0; transform: scale(1.45); }
-}
-
-@keyframes visit-star-wave {
-  0%, 100% { transform: none; }
-  40% { transform: translateY(-1.1px) scale(1.05); }
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .visit-star__label svg,
-  .visit-star__gold {
+  .visit-star__label svg {
     transition: none;
+  }
+
+  .visit-star__label[data-filled="true"] .visit-star__gold {
     animation: none;
   }
 
-  .visit-star__label[data-filled="true"] .visit-star__gold,
-  .visit-star__body {
-    animation: none;
-  }
-
-  .visit-star__input:checked + .visit-star__label::after {
-    display: none;
-  }
-
-  .visit-stars:not(:disabled) .visit-star:hover .visit-star__label svg,
   .visit-stars:not(:disabled) .visit-star__input:active + .visit-star__label svg {
     transform: none;
   }
@@ -567,9 +492,7 @@ html:has(.customer-live) {
   display: block;
   margin-inline: auto;
   border-radius: 999px;
-  background: linear-gradient(90deg, #eef0ef 0%, #f7f8f7 40%, #eef0ef 80%);
-  background-size: 240% 100%;
-  animation: visit-shimmer 1.5s ease-in-out infinite;
+  background: #eef0ef;
 }
 
 /* 7 + 2 x 1.37 = 9.74cqi, the heading's line box. */
@@ -592,30 +515,11 @@ html:has(.customer-live) {
 
 .visit-star--placeholder .visit-star__label svg {
   filter: none;
-  animation: visit-placeholder 1.5s ease-in-out infinite;
-  animation-delay: calc(var(--star-index, 0) * 90ms);
 }
 
 .visit-star--placeholder path {
   fill: #f2f4f3;
   stroke: #dfe4e1;
-}
-
-@keyframes visit-shimmer {
-  from { background-position: 100% 0; }
-  to { background-position: -140% 0; }
-}
-
-@keyframes visit-placeholder {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .visit-skeleton,
-  .visit-star--placeholder .visit-star__label svg {
-    animation: none;
-  }
 }
 
 /* ------------------------------------------------ rating status line --- */
