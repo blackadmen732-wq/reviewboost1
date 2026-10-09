@@ -40,6 +40,46 @@ export function twilioConfigured(): boolean {
   return readConfig() !== null;
 }
 
+/**
+ * Everything wrong with the Twilio configuration, as an operator would fix it.
+ * Empty means a production send and its delivery callback can both work.
+ * Values are never echoed: only which variable is wrong.
+ */
+export function twilioConfigProblems(): string[] {
+  const problems: string[] = [];
+  const sid = process.env.TWILIO_ACCOUNT_SID?.trim() ?? "";
+  const token = process.env.TWILIO_AUTH_TOKEN?.trim() ?? "";
+  const service = process.env.TWILIO_MESSAGING_SERVICE_SID?.trim() ?? "";
+  const from = process.env.TWILIO_FROM_NUMBER?.trim() ?? "";
+  const callbackBase = process.env.SMS_PUBLIC_WEBHOOK_BASE_URL?.trim() ?? "";
+
+  if (!/^AC[0-9a-fA-F]{32}$/.test(sid)) problems.push("TWILIO_ACCOUNT_SID must be AC followed by 32 hex characters");
+  if (token.length < 32) problems.push("TWILIO_AUTH_TOKEN is missing or too short");
+  if (!service && !from) {
+    problems.push("a sending identity is required: TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER");
+  }
+  if (service && !/^MG[0-9a-fA-F]{32}$/.test(service)) {
+    problems.push("TWILIO_MESSAGING_SERVICE_SID must be MG followed by 32 hex characters");
+  }
+  if (!service && from && !/^\+[1-9][0-9]{6,14}$/.test(from)) {
+    problems.push("TWILIO_FROM_NUMBER must be an E.164 number");
+  }
+
+  // Without the callback, delivery is never confirmed: every send ends as
+  // provider-unknown and is settled by reconciliation hours later.
+  let callback: URL | null = null;
+  try {
+    callback = callbackBase ? new URL(callbackBase) : null;
+  } catch {
+    callback = null;
+  }
+  if (!callback || callback.protocol !== "https:") {
+    problems.push("SMS_PUBLIC_WEBHOOK_BASE_URL must be an https:// URL Twilio can reach");
+  }
+
+  return problems;
+}
+
 // The public URL Twilio should POST delivery-status callbacks to. Derived from
 // an explicitly configured public base URL; absent means "no callback" rather
 // than a guessed endpoint.

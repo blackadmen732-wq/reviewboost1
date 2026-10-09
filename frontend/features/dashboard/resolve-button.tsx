@@ -72,7 +72,7 @@ export function ResolveButton({
         type="button"
         disabled={busy}
         onClick={() => void setResolved(false)}
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] disabled:opacity-50"
+        className="animate-fade-in inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] disabled:opacity-50"
       >
         <RotateCcw className="size-4" aria-hidden="true" />
         Not sorted after all
@@ -81,7 +81,7 @@ export function ResolveButton({
   }
 
   return (
-    <Button loading={busy} loadingLabel="Saving…" onClick={() => void setResolved(true)}>
+    <Button variant="action" loading={busy} loadingLabel="Saving…" onClick={() => void setResolved(true)}>
       <Check className="size-5" aria-hidden="true" />
       Mark as sorted
     </Button>

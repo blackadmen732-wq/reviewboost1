@@ -216,9 +216,13 @@ select is(
 
 -- Simulate: stand digest upgraded, so token hash changes but stand_id is the same.
 -- The second call uses the same idempotency key — scope_key is stand_id, so replay.
+-- A re-digest always moves to a newer key version (upgrade_stand_token_digest);
+-- the Tag identity guard refuses a hash change that is neither that nor an
+-- explicit rotation.
 select tests.reset_role();
 update public.review_stands
-   set public_token_hash = 'rot-upgraded-hash-2'
+   set public_token_hash = 'rot-upgraded-hash-2',
+       public_token_key_version = 3
  where id = '00000000-a010-0000-0000-000000000004';
 select tests.set_service_role();
 

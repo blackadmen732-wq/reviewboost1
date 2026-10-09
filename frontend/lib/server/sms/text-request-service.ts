@@ -4,9 +4,8 @@ import { z } from "zod";
 
 import type { OrganizationContext } from "@/lib/server/auth";
 import { KEY_VERSION, decrypt, digestStandToken, encrypt } from "@/lib/server/crypto";
-import { publicFrontendUrl } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
-import { standUrl } from "@/lib/server/google-review-url";
+import { canonicalTagUrl } from "@/lib/server/tag-url";
 import { logger } from "@/lib/server/logger";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import { getProviderRate } from "@/lib/server/sms/provider";
@@ -15,6 +14,7 @@ import { reviewRequestDedupeKey } from "@/lib/server/sms/dedupe";
 import { normalizePhone, phoneHash, toStoredPhone } from "@/lib/server/sms/phone";
 import { nextAllowedSendTime } from "@/lib/server/sms/quiet-hours";
 import { uuidSchema } from "@/lib/server/validation";
+import { DEFAULT_TEXT_REQUEST_TEMPLATE } from "@/lib/sms/text-request-message";
 
 /**
  * Owner-facing Text Requests service.
@@ -30,7 +30,7 @@ import { uuidSchema } from "@/lib/server/validation";
  * returns no row. Only the *encrypted* rendered message is persisted.
  */
 
-const DEFAULT_TEMPLATE = "How was your visit? Tap here to leave a review: {{link}}";
+const DEFAULT_TEMPLATE = DEFAULT_TEXT_REQUEST_TEMPLATE;
 const DEDUPE_WINDOW_SECONDS = 24 * 60 * 60;
 
 // A national number needs a country to become E.164; the org can carry a
@@ -226,7 +226,7 @@ export async function resolveStand(
   return {
     standId: data.id as string,
     locationId,
-    link: standUrl(publicFrontendUrl(), token),
+    link: canonicalTagUrl(token),
     timezone: resolveTimezone(loc?.timezone as string | null | undefined),
   };
 }

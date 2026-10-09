@@ -6,8 +6,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
+import { TestGoogleLinkButton } from "@/features/dashboard/google-link-care";
+import {
+  GOOGLE_LINK_BLAST,
+  GOOGLE_LINK_LATER,
+} from "@/features/dashboard/google-link-copy";
 import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
-import { isValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
+import { isGoogleReviewWritingUrl } from "@/lib/security/google-review-url";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -47,7 +52,7 @@ export function OnboardingFlow() {
   const qr = useAuthenticatedQr(created?.standId ?? null);
 
   const trimmedUrl = googleUrl.trim();
-  const urlLooksRight = trimmedUrl !== "" && isValidatedGoogleReviewUrl(trimmedUrl);
+  const urlLooksRight = trimmedUrl !== "" && isGoogleReviewWritingUrl(trimmedUrl);
 
   function slugify(value: string): string {
     // Generated rather than asked for. "Choose a web address" is a question
@@ -64,57 +69,69 @@ export function OnboardingFlow() {
     return base.length >= 3 ? `${base}-${suffix}` : `business-${suffix}`;
   }
 
+  /**
+   * Create the business, and never strand the owner if the network drops.
+   *
+   * The session lookup and the POST used to sit outside any try/catch with
+   * `busy` already set, so a rejected request escaped the voided click handler
+   * and left both Continue and "I will do this later" spinning and disabled,
+   * with no error shown. That is the first screen of the product, and the only
+   * way out was a reload that loses what they typed.
+   */
   async function finish(withUrl: string | undefined) {
     setBusy(true);
     setError(null);
 
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
+    try {
+      const {
+        data: { session },
+      } = await supabaseBrowser().auth.getSession();
 
-    if (!session) {
+      if (!session) {
+        setError("Your session expired. Please sign in again.");
+        return;
+      }
+
+      const response = await fetch("/api/v1/onboarding", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          slug: slugify(name),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          defaultLocale: "en",
+          locationName: name.trim(),
+          ...(withUrl ? { googleReviewUrl: withUrl } : {}),
+        }),
+      });
+
+      if (!response.ok) {
+        setError(
+          response.status === 409
+            ? "That name is already taken. Try adding your street or city."
+            : "Something went wrong. Please try again.",
+        );
+        return;
+      }
+
+      const body = (await response.json()) as { data: Created };
+      setCreated(body.data);
+      setStep("done");
+    } catch {
+      setError("Could not reach ReviewBoost. Check your connection and try again.");
+    } finally {
       setBusy(false);
-      setError("Your session expired. Please sign in again.");
-      return;
     }
-
-    const response = await fetch("/api/v1/onboarding", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        name: name.trim(),
-        slug: slugify(name),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-        defaultLocale: "en",
-        locationName: name.trim(),
-        ...(withUrl ? { googleReviewUrl: withUrl } : {}),
-      }),
-    });
-
-    setBusy(false);
-
-    if (!response.ok) {
-      setError(
-        response.status === 409
-          ? "That name is already taken. Try adding your street or city."
-          : "Something went wrong. Please try again.",
-      );
-      return;
-    }
-
-    const body = (await response.json()) as { data: Created };
-    setCreated(body.data);
-    setStep("done");
   }
 
   // ------------------------------------------------------------ step 1 -----
 
   if (step === "name") {
     return (
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8" data-onboarding-step="name">
         <Progress current={1} />
 
         <div className="flex flex-col gap-2">
@@ -141,6 +158,8 @@ export function OnboardingFlow() {
             }}
             className="h-16 text-lg"
           />
+          {urlLooksRight ? <TestGoogleLinkButton url={trimmedUrl} /> : null}
+
           {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
         </div>
 
@@ -162,7 +181,7 @@ export function OnboardingFlow() {
 
   if (step === "google") {
     return (
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8" data-onboarding-step="google">
         <BackButton onClick={() => setStep("name")} />
         <Progress current={2} />
 
@@ -173,6 +192,7 @@ export function OnboardingFlow() {
           <p className="text-base text-muted">
             This is where customers go to leave you a review.
           </p>
+          <p className="text-sm text-muted">{GOOGLE_LINK_BLAST}</p>
         </div>
 
         {/* Numbered, three steps, no paragraph. Someone who has never done this
@@ -256,6 +276,9 @@ export function OnboardingFlow() {
           <Button variant="ghost" loading={busy} onClick={() => void finish(undefined)}>
             I will do this later
           </Button>
+          <p className="text-sm text-muted" data-google-unset="true">
+            {GOOGLE_LINK_LATER}
+          </p>
         </div>
       </div>
     );
@@ -277,8 +300,8 @@ export function OnboardingFlow() {
             business puts this on the counter and finds out from a customer.
             The door opens when a plan does. */}
         <p className="text-base text-muted">
-          Choose a plan to switch it on. Seven days free, and nothing is
-          charged until the trial ends.
+          Choose a plan to switch it on. Starter is free for seven days,
+          and nothing is charged until the trial ends.
         </p>
       </div>
 

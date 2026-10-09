@@ -37,6 +37,7 @@ export const ERROR_CODE = {
   // Text Requests: the organization has no send credit left. Client-actionable
   // (buy more / wait), so distinct from a generic failure.
   quotaExhausted: "quota_exhausted",
+  limitReached: "limit_reached",
   requestTimeout: "request_timeout",
   internalError: "internal_error",
   serviceUnavailable: "service_unavailable",

@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 
 import { AppShell } from "@/features/dashboard/app-shell";
 import { TextRequestComposer } from "@/features/dashboard/text-request-composer";
+import { permissionsFor } from "@/lib/owner/permissions";
 import { listStands, requireOwner } from "@/lib/server/owner-data";
 import { readSmsBalance, listRecentTextRequests } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Text Requests — ReviewBoost",
+  title: "Text Requests",
   robots: { index: false, follow: false },
 };
 
@@ -51,6 +52,7 @@ export default async function TextRequestsPage() {
           locationName: stand.locationName,
         }))}
         recent={recent}
+        canSendRequests={permissionsFor(organization.role).sendTextRequests}
       />
     </AppShell>
   );

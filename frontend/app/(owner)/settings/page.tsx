@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
-import { Eye, LifeBuoy, Mail, Shield, Trash2 } from "lucide-react";
+import { CreditCard, Eye, ImageUp, LifeBuoy, Mail, Shield, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 import { AppShell } from "@/features/dashboard/app-shell";
-import { EditableRow, GoogleLinkHelp } from "@/features/dashboard/settings-form";
+import { GoogleLinkCare } from "@/features/dashboard/google-link-care";
+import { EditableRow } from "@/features/dashboard/settings-form";
 import { SignOutButton } from "@/features/dashboard/sign-out-button";
-import { getPrimaryLocation, requireOwner } from "@/lib/server/owner-data";
+import { AddLocationButton } from "@/features/settings/add-location-button";
+import { ThemeControl } from "@/features/settings/theme-control";
+import { ownerOrAdmin, permissionsFor } from "@/lib/owner/permissions";
+import { getEntitlementSnapshot } from "@/lib/server/entitlements-service";
+import { listLocations, requireOwner } from "@/lib/server/owner-data";
+import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Settings — ReviewBoost",
+  title: "Settings",
   robots: { index: false, follow: false },
 };
 
@@ -25,6 +31,16 @@ export const dynamic = "force-dynamic";
  * Each row reads as plain text until asked to change — see `settings-form.tsx`
  * for why a wall of live inputs is the wrong shape for this audience.
  *
+ * EVERY PLACE, NAMED
+ * -----------------
+ * Growth and Pro allow more than one location, each with its own name and its
+ * own Google link. Every place is listed and each edit names its location —
+ * this screen used to edit whichever location was created first, which on a
+ * two-location business silently changed the wrong one.
+ *
+ * Only an owner or admin can change these (`api/v1/settings` refuses anyone
+ * else), so a member or viewer sees the same values with no Change controls.
+ *
  * Time zone is deliberately absent. It decides when "today" starts, it was set
  * correctly at signup from the browser, and exposing it invites someone to
  * change it by accident and then wonder why their daily counts moved. It belongs
@@ -32,7 +48,14 @@ export const dynamic = "force-dynamic";
  */
 export default async function SettingsPage() {
   const { user, organization } = await requireOwner("/settings");
-  const location = await getPrimaryLocation(organization.orgId);
+  const supabase = await supabaseServer();
+  const [locations, entitlements] = await Promise.all([
+    listLocations(organization.orgId),
+    getEntitlementSnapshot({ userId: user.id, db: supabase }, organization.orgId),
+  ]);
+  const can = permissionsFor(organization.role);
+  const readOnly = !can.editSettings;
+  const several = locations.length > 1;
 
   return (
     <AppShell businessName={organization.name}>
@@ -44,32 +67,121 @@ export default async function SettingsPage() {
           label="Business"
           value={organization.name}
           placeholder="The Corner Cafe"
+          readOnly={readOnly}
         />
 
-        <EditableRow
-          field="locationName"
-          label="Place"
-          value={location?.name ?? null}
-          placeholder="High Street"
-          {...(location ? { context: { locationId: location.locationId } } : {})}
-        />
+        {readOnly ? (
+          <p className="text-sm text-muted">{ownerOrAdmin("change these settings")}</p>
+        ) : null}
+      </section>
 
-        <div>
-          <EditableRow
-            field="destinationUrl"
-            label="Google link"
-            value={location?.destination?.url ?? null}
-            type="url"
-            placeholder="https://g.page/..."
-            help="Paste the link customers use to review you on Google. Changing it takes effect on the next scan — your printed codes and NFC tags stay exactly as they are. Leave it empty to remove it."
-            emptyText="Not set yet"
-            // The one field where absence is a real problem: without it a code
-            // cannot serve customers at all.
-            warnWhenEmpty
-            {...(location ? { context: { locationId: location.locationId } } : {})}
-          />
-          <GoogleLinkHelp />
+      <section className="mb-6 flex flex-col gap-3" aria-labelledby="places-heading">
+        <h2 id="places-heading" className="text-sm font-semibold uppercase tracking-wide text-muted">
+          {several ? "Places" : "Place"}
+        </h2>
+
+        {locations.map((location, index) => (
+          <div
+            key={location.locationId}
+            className={
+              several && index > 0
+                ? "mt-3 flex flex-col gap-3 border-t border-border pt-6"
+                : "flex flex-col gap-3"
+            }
+            data-location-id={location.locationId}
+          >
+            <EditableRow
+              field="locationName"
+              label={several ? "Place name" : "Place"}
+              value={location.name}
+              placeholder="High Street"
+              context={{ locationId: location.locationId }}
+              readOnly={readOnly}
+            />
+            {/* The Google link gets its own care UX — paste, Test, Open, Save —
+                because this is the one field whose silent mistake sends every
+                customer from that place's Tags to the wrong page. Changing it
+                takes effect on the next scan; printed codes and NFC tags are
+                untouched. */}
+            <GoogleLinkCare
+              value={location.destination?.url ?? null}
+              locationId={location.locationId}
+              readOnly={readOnly}
+            />
+          </div>
+        ))}
+
+        {can.editSettings && entitlements.canCreateLocation ? (
+          <AddLocationButton />
+        ) : can.editSettings && locations.length > 0 ? (
+          <p className="text-sm text-muted">
+            Your plan includes {entitlements.locationLimit}{" "}
+            {entitlements.locationLimit === 1 ? "place" : "places"}.
+          </p>
+        ) : null}
+      </section>
+
+      {/* The Customer Page is reached from here and from Home's setup list —
+          not from the bottom bar, which stays the four things an owner does
+          every day. Everyone can open it; the editor itself tells a member or
+          viewer that only an owner or admin can change it. */}
+      <section className="mb-6 flex flex-col gap-3" aria-labelledby="customer-page-heading">
+        <h2
+          id="customer-page-heading"
+          className="text-sm font-semibold uppercase tracking-wide text-muted"
+        >
+          Customer page
+        </h2>
+        <Link
+          href="/customer-page"
+          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+            <ImageUp className="size-5 text-muted" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-medium text-ink">Your photo</p>
+            <p className="text-sm text-muted">What customers see when they scan a Tag.</p>
+          </div>
+        </Link>
+      </section>
+
+      <section className="mb-6 flex flex-col gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Plan</h2>
+        <Link
+          href="/settings/billing"
+          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+            <CreditCard className="size-5 text-muted" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-medium text-ink">Billing</p>
+            <p className="text-sm text-muted">Your plan, messages left, and payment.</p>
+          </div>
+        </Link>
+      </section>
+
+      <section className="mb-6 flex flex-col gap-3" aria-labelledby="appearance-heading">
+        <h2
+          id="appearance-heading"
+          className="text-sm font-semibold uppercase tracking-wide text-muted"
+        >
+          Appearance
+        </h2>
+        <div className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-base font-medium text-ink">Theme</p>
+            <p className="text-sm text-muted">
+              System follows this device. Your choice is kept on this device only.
+            </p>
+          </div>
+          <ThemeControl />
         </div>
+      </section>
+
+      <section className="mb-6 flex flex-col gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">You</h2>
 
         {/* Not editable. Changing the sign-in address is an account-recovery
             operation, not a setting — done carelessly it locks someone out of
@@ -93,7 +205,7 @@ export default async function SettingsPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Help</h2>
 
         <a
-          href="mailto:help@reviewboost.app"
+          href="mailto:help@reviewboost.fit"
           className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
         >
           <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft">
@@ -101,7 +213,7 @@ export default async function SettingsPage() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-base font-medium text-ink">Ask us anything</p>
-            <p className="text-sm text-muted">We answer every message.</p>
+            <p className="text-sm text-muted">Questions about Tags, billing or your Google link.</p>
           </div>
         </a>
 
@@ -137,20 +249,31 @@ export default async function SettingsPage() {
       <section className="mb-6 flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Account</h2>
 
-        <a
-          href="mailto:privacy@reviewboost.app?subject=Delete%20my%20account&body=Please%20delete%20my%20ReviewBoost%20account%20and%20all%20associated%20data."
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <Trash2 className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Delete account</p>
-            <p className="text-sm text-muted">
-              Permanently removes your account and all customer data within 30 days.
-            </p>
-          </div>
-        </a>
+        {/* Goes to the deletion screen, which does the deletion. It used to
+            open a mail client: a person had to ask us and then wait to be
+            believed, and an app that creates accounts has to let someone close
+            one from inside it. /delete-account stays for anyone already locked
+            out, and for the store listings that need a public URL. */}
+        {can.deleteBusiness ? (
+          <Link
+            href="/settings/delete"
+            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+              <Trash2 className="size-5 text-muted" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-medium text-ink">Delete account</p>
+              {/* No timeframe. "within 30 days" was a retention commitment nobody
+                  had agreed to operationally, and a deletion promise is the worst
+                  place to be approximately right. */}
+              <p className="text-sm text-muted">
+                Removes your account, your Tags and your ratings. Cancelling is the
+                way to stop billing without losing anything.
+              </p>
+            </div>
+          </Link>
+        ) : null}
       </section>
 
       <SignOutButton />

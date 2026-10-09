@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 
 import { AppShell } from "@/features/dashboard/app-shell";
 import { BillingPanel } from "@/features/dashboard/billing-panel";
+import { permissionsFor } from "@/lib/owner/permissions";
 import { readOwnerBilling, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Billing — ReviewBoost",
+  title: "Billing",
   robots: { index: false, follow: false },
 };
 
@@ -26,11 +27,16 @@ export default async function BillingPage() {
   return (
     <AppShell businessName={organization.name}>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Billing</h1>
-        <p className="mt-1 text-base text-muted">Your plan, and what it includes.</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Billing &amp; Usage</h1>
+        <p className="mt-1 text-base text-muted">
+          Your plan, what it includes, and what you are using.
+        </p>
       </div>
 
-      <BillingPanel billing={billing} />
+      <BillingPanel
+        billing={billing}
+        canManage={permissionsFor(organization.role).manageBilling}
+      />
     </AppShell>
   );
 }

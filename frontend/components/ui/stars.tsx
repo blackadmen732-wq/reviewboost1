@@ -16,7 +16,8 @@ import { cn } from "@/lib/utils/cn";
  * Every star uses the same gold. Only the count differs.
  *
  * The empty stars are drawn rather than omitted so that "3" and "3 out of 5"
- * cannot be confused at a glance, and the whole group carries one label instead
+ * cannot be confused at a glance — as soft solid shapes, so the filled ones
+ * carry the row and a column of ratings does not read as a wall of outlines — and the whole group carries one label instead
  * of five, so a screen reader says "4 out of 5" and moves on.
  */
 
@@ -48,7 +49,7 @@ export function Stars({
             SIZES[size],
             position <= rating
               ? "fill-[color:var(--rb-star)] text-[color:var(--rb-star)]"
-              : "text-[color:var(--rb-border-strong)]",
+              : "fill-[color:var(--rb-border)] text-[color:var(--rb-border)]",
           )}
           aria-hidden="true"
         />

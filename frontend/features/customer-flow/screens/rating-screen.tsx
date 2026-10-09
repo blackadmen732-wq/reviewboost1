@@ -1,9 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { InlineNotice } from "@/components/ui/inline-notice";
-import { CustomerActionBar } from "@/features/customer-flow/customer-action-bar";
-import { StarRating } from "@/features/customer-flow/star-rating";
+import { VisitStars } from "@/features/customer-page/visit-stars";
 import type { SubmissionStatus } from "@/features/customer-flow/customer-flow-state";
 import type {
   CustomerMessages,
@@ -16,6 +14,8 @@ interface RatingScreenProps {
   status: SubmissionStatus;
   onRate: (rating: RatingValue) => void;
   onRetry: () => void;
+  /** Heading lives on the shared visit card so preview and live match. */
+  embedInVisit?: boolean;
 }
 
 /**
@@ -31,6 +31,7 @@ export function RatingScreen({
   status,
   onRate,
   onRetry,
+  embedInVisit = false,
 }: RatingScreenProps) {
   const isSubmitting = status === "submitting";
   const isOffline = status === "offline";
@@ -38,50 +39,48 @@ export function RatingScreen({
 
   return (
     <section className="flow-screen" data-flow-screen="rating">
-      <div className="screen-heading-group">
-        <h1 className="customer-question" data-screen-heading tabIndex={-1}>
-          {messages.ratingHeading}
-        </h1>
-        <p className="customer-support">{messages.ratingSupport}</p>
-      </div>
+      {embedInVisit ? null : (
+        <div className="screen-heading-group">
+          <h1 className="customer-question" data-screen-heading tabIndex={-1}>
+            {messages.ratingHeading}
+          </h1>
+          <p className="customer-support">{messages.ratingSupport}</p>
+        </div>
+      )}
 
-      <StarRating
+      <VisitStars
         value={rating}
         onChange={onRate}
         messages={messages}
         disabled={isSubmitting}
       />
 
+      {/* Status lives in one short, centred line under the stars. The sheet has
+          a fixed height, set by screen width, so the stars never move under a thumb; a
+          boxed notice plus a large button did not fit in it, and the error
+          was squeezed to a sliver the customer could not read. */}
       <div className="rating-actions" data-rating-actions>
         {isSubmitting ? (
-          <p className="customer-support" role="status">
+          <p className="visit-status" role="status">
             {messages.sending}
           </p>
         ) : null}
 
         {hasError ? (
-          <InlineNotice
-            id="feedback-status"
-            kind="error"
-            title={messages.submitErrorHeading}
-            blocking
-          >
-            <p>{messages.submitErrorBody}</p>
-          </InlineNotice>
+          <>
+            <p id="feedback-status" className="visit-status visit-status--error" role="alert">
+              <strong>{messages.submitErrorHeading}</strong> {messages.submitErrorBody}
+            </p>
+            <Button type="button" className="visit-retry" onClick={onRetry}>
+              {messages.tryAgain}
+            </Button>
+          </>
         ) : null}
 
         {isOffline ? (
-          <InlineNotice id="feedback-status" kind="offline">
-            <p>{messages.offline}</p>
-          </InlineNotice>
-        ) : null}
-
-        {hasError ? (
-          <CustomerActionBar>
-            <Button type="button" size="lg" onClick={onRetry}>
-              {messages.tryAgain}
-            </Button>
-          </CustomerActionBar>
+          <p id="feedback-status" className="visit-status" role="status">
+            {messages.offline}
+          </p>
         ) : null}
       </div>
     </section>

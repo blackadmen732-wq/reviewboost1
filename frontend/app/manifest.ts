@@ -8,8 +8,10 @@ import type { MetadataRoute } from "next";
  * screenshot of the page as its icon.
  *
  * `maskable` matters: Android crops icons to whatever shape the launcher uses,
- * and an un-maskable icon gets its corners cut off. The square export has the
- * padding to survive that.
+ * and an un-maskable icon gets its corners cut off. Every icon here is the one
+ * full-square app-icon artwork from `scripts/brand/generate-brand-assets.mjs`,
+ * with the mark inside the 40% safe circle, so the maskable entry is the same
+ * picture declared for that purpose.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -18,12 +20,12 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Collect honest reviews for your local business.",
     start_url: "/home",
     display: "standalone",
-    background_color: "#F8F5F0",
+    background_color: "#F6F7F5",
     theme_color: "#00A86B",
     icons: [
       { src: "/brand/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/brand/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/brand/icon-1024-square.png", sizes: "1024x1024", type: "image/png", purpose: "maskable" },
+      { src: "/brand/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

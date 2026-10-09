@@ -42,6 +42,8 @@ interface EditableRowProps {
    * location: the API will not guess which place an owner meant.
    */
   context?: Record<string, string>;
+  /** Shown as text with no Change control, for a role the API would refuse. */
+  readOnly?: boolean;
 }
 
 export function EditableRow({
@@ -54,7 +56,10 @@ export function EditableRow({
   warnWhenEmpty = false,
   type = "text",
   context,
+  readOnly = false,
 }: EditableRowProps) {
+  // Two places each have a name row, so the field alone is not a unique id.
+  const inputId = `setting-${field}${context?.["locationId"] ? `-${context["locationId"]}` : ""}`;
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
@@ -124,7 +129,7 @@ export function EditableRow({
           <p
             className={cn(
               "break-words text-base font-medium",
-              isEmpty && warnWhenEmpty ? "text-[color:var(--rb-warning)]" : "text-ink",
+              isEmpty && warnWhenEmpty ? "text-muted" : "text-ink",
             )}
           >
             {value || emptyText}
@@ -138,30 +143,32 @@ export function EditableRow({
           ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setDraft(value ?? "");
-            setError(null);
-            setEditing(true);
-          }}
-          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-brand-text transition-colors hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <Pencil className="size-4" aria-hidden="true" />
-          Change
-        </button>
+        {readOnly ? null : (
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(value ?? "");
+              setError(null);
+              setEditing(true);
+            }}
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-brand-text transition-colors hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+          >
+            <Pencil className="size-4" aria-hidden="true" />
+            Change
+          </button>
+        )}
       </div>
     );
   }
 
   return (
     <div className="rounded-[var(--radius-card)] border border-brand bg-surface p-4">
-      <label className="block text-sm font-medium text-muted" htmlFor={`setting-${field}`}>
+      <label className="block text-sm font-medium text-muted" htmlFor={inputId}>
         {label}
       </label>
 
       <Input
-        id={`setting-${field}`}
+        id={inputId}
         className="mt-1.5"
         type={type === "url" ? "url" : "text"}
         inputMode={type === "url" ? "url" : "text"}
@@ -170,12 +177,12 @@ export function EditableRow({
         invalid={error !== null}
         placeholder={placeholder ?? ""}
         onChange={(event) => setDraft(event.target.value)}
-        aria-describedby={error ? `setting-${field}-error` : undefined}
+        aria-describedby={error ? `${inputId}-error` : undefined}
         autoFocus
       />
 
       {error ? (
-        <p id={`setting-${field}-error`} role="alert" className="mt-2 text-sm text-danger">
+        <p id={`${inputId}-error`} role="alert" className="mt-2 text-sm text-danger">
           {error}
         </p>
       ) : help ? (
@@ -183,7 +190,7 @@ export function EditableRow({
       ) : null}
 
       <div className="mt-3 flex gap-2">
-        <Button loading={busy} loadingLabel="Saving…" onClick={() => void save()}>
+        <Button variant="action" loading={busy} loadingLabel="Saving…" onClick={() => void save()}>
           Save
         </Button>
         <Button

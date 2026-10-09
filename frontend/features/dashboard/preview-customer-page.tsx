@@ -1,40 +1,61 @@
 "use client";
 
-import Link from "next/link";
-import { Smartphone } from "lucide-react";
+import { useState } from "react";
 
-export function PreviewCustomerPage({ standId }: { standId?: string | null } = {}) {
-  const handlePreviewQr = async () => {
-    if (!standId) return;
-    try {
-      const res = await fetch(`/api/v1/review-stands/${standId}/qr?format=json`);
-      if (res.ok) {
-        const { data } = (await res.json()) as { data: { url?: string } };
-        if (data.url) window.open(data.url, "_blank", "noopener");
-      }
-    } catch {
-      // ignore
+import { supabaseBrowser } from "@/lib/supabase/browser";
+
+/**
+ * Opens the existing public /q page for a stand.
+ *
+ * Uses the reprint/QR JSON endpoint already on the stand. No Looks editor,
+ * no customer-page redesign — a new tab on the live customer URL.
+ */
+export function PreviewCustomerPage({ standId }: { standId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function openPreview() {
+    setBusy(true);
+    setError(null);
+
+    const {
+      data: { session },
+    } = await supabaseBrowser().auth.getSession();
+
+    if (!session) {
+      setBusy(false);
+      setError("Sign in again to preview.");
+      return;
     }
-  };
+
+    try {
+      const response = await fetch(`/api/v1/review-stands/${standId}/qr?format=json`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        credentials: "omit",
+      });
+      if (!response.ok) throw new Error("fetch_failed");
+      const json = (await response.json()) as { data?: { standUrl?: string } };
+      const url = json.data?.standUrl;
+      if (!url) throw new Error("no_url");
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch {
+      setError("Could not open the customer page.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-      <Link
-        href="/customer-page"
-        className="inline-flex h-10 items-center gap-2 rounded-lg border border-[color:var(--rb-border)] bg-white px-4 text-sm font-medium text-[#1a1712] hover:bg-[#faf9f7]"
+    <div className="mt-4">
+      <button
+        type="button"
+        onClick={() => void openPreview()}
+        disabled={busy}
+        className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] disabled:opacity-50"
       >
-        <Smartphone className="size-4" aria-hidden="true" />
-        Edit customer page
-      </Link>
-      {standId && (
-        <button
-          type="button"
-          onClick={() => void handlePreviewQr()}
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-[color:var(--rb-border)] bg-white px-4 text-sm font-medium text-[#1a1712] hover:bg-[#faf9f7]"
-        >
-          Preview customer view
-        </button>
-      )}
+        {busy ? "Opening preview…" : "Preview customer page"}
+      </button>
+      {error ? <p className="mt-2 text-sm text-muted">{error}</p> : null}
     </div>
   );
 }
