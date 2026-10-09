@@ -18,10 +18,10 @@ html:has(.customer-live) {
    crop, scale and loading — nothing is drawn over it but the language control.
 
    The sheet is the product: the same component under a pizzeria, a barber, an
-   HVAC van. It is sized to its content with a 41% floor, so on a tall phone
-   it sits in the lower ~40% like a native sheet, and on a short one it takes
-   what the stars and footer need and the artwork gives way — never the other
-   way round. Nothing inside it is clipped at any size, which is why there is
+   HVAC van. It takes the canvas's 44% share, so on a tall phone it sits in
+   the lower 44% like a native sheet, exactly where the owner's artwork
+   expects it; when its content needs more — an error, the handoff, a short
+   phone — it grows and the artwork gives way, never the other way round. Nothing inside it is clipped at any size, which is why there is
    no longer a separate layout for the handoff screen.
 
    The stage is the query container for everything inside the card. A preview
@@ -135,9 +135,15 @@ html:has(.customer-live) {
   position: relative;
   z-index: 2;
   display: flex;
-  flex: 0 0 auto;
+  /* The canonical share (CUSTOMER_CANVAS.cardShare), so the sheet's top edge
+     sits where the blank artwork template tells owners the stars will be.
+     It is a basis, not a cap: there is deliberately no min-height, height,
+     max-height or overflow here, so the flex item's automatic minimum — its
+     content — lets the sheet grow past 44% when an error notice or the
+     handoff link needs the room on a short phone. Capping it is what once
+     clipped the handoff's fallback link out of reach. */
+  flex: 0 0 44%;
   flex-direction: column;
-  min-height: 41%;
   /* The lip: pulled up over the hero by exactly its own corner radius, so
      the corners round against the artwork rather than against white. */
   margin-top: -32px;
