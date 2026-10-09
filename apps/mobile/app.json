@@ -95,7 +95,12 @@
           "backgroundColor": "#00A86B",
           "image": "./assets/launch-wordmark.png",
           "imageWidth": 296,
-          "resizeMode": "contain"
+          "resizeMode": "contain",
+          "android": {
+            "image": "./assets/android-icon-foreground.png",
+            "imageWidth": 288,
+            "backgroundColor": "#00A86B"
+          }
         }
       ],
       "expo-system-ui",
