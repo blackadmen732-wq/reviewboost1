@@ -92,9 +92,10 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F6F7F5",
-          "image": "./assets/launch-transparent.png",
-          "imageWidth": 1
+          "backgroundColor": "#00A86B",
+          "image": "./assets/launch-wordmark.png",
+          "imageWidth": 296,
+          "resizeMode": "contain"
         }
       ],
       "expo-system-ui",
