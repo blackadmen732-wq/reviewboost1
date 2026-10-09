@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { notify } from "@/components/ui/toast";
+import { settingSurface } from "@/components/ui/setting-list";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils/cn";
 
@@ -44,6 +45,8 @@ interface EditableRowProps {
   context?: Record<string, string>;
   /** Shown as text with no Change control, for a role the API would refuse. */
   readOnly?: boolean;
+  /** True when this row sits inside a SettingGroup card and must not draw its own. */
+  inset?: boolean;
 }
 
 export function EditableRow({
@@ -57,6 +60,7 @@ export function EditableRow({
   type = "text",
   context,
   readOnly = false,
+  inset = false,
 }: EditableRowProps) {
   // Two places each have a name row, so the field alone is not a unique id.
   const inputId = `setting-${field}${context?.["locationId"] ? `-${context["locationId"]}` : ""}`;
@@ -121,7 +125,7 @@ export function EditableRow({
     const isEmpty = !value;
 
     return (
-      <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
+      <div className={cn("flex items-start gap-4", settingSurface({ inset }))}>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-muted">{label}</p>
           {/* break-words, not truncate: a Google URL is long and unrecognisable
@@ -162,7 +166,7 @@ export function EditableRow({
   }
 
   return (
-    <div className="rounded-[var(--radius-card)] border border-brand bg-surface p-4">
+    <div className={settingSurface({ inset, accent: true })}>
       <label className="block text-sm font-medium text-muted" htmlFor={inputId}>
         {label}
       </label>

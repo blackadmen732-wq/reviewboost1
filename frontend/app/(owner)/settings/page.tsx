@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import { CreditCard, Eye, ImageUp, LifeBuoy, Mail, Shield, Trash2 } from "lucide-react";
-import Link from "next/link";
+import { CreditCard, Eye, ImageUp, LifeBuoy, Mail, Palette, Shield, Trash2 } from "lucide-react";
+import { Fragment } from "react";
 
+import { PageHeader } from "@/components/ui/page-header";
+import { SettingGroup, SettingRow } from "@/components/ui/setting-list";
 import { AppShell } from "@/features/dashboard/app-shell";
 import { GoogleLinkCare } from "@/features/dashboard/google-link-care";
 import { EditableRow } from "@/features/dashboard/settings-form";
@@ -31,12 +33,22 @@ export const dynamic = "force-dynamic";
  * Each row reads as plain text until asked to change — see `settings-form.tsx`
  * for why a wall of live inputs is the wrong shape for this audience.
  *
+ * ONE CARD PER GROUP
+ * ------------------
+ * The rows are grouped rather than stacked: a quiet caption names the group and
+ * its rows share a single card, divided by hairlines. See `setting-list.tsx`
+ * for why — in short, six separate bordered cards read as six unrelated things,
+ * and this screen is the one where that cost is highest because almost every
+ * row here is a door rather than a value.
+ *
  * EVERY PLACE, NAMED
  * -----------------
  * Growth and Pro allow more than one location, each with its own name and its
  * own Google link. Every place is listed and each edit names its location —
  * this screen used to edit whichever location was created first, which on a
- * two-location business silently changed the wrong one.
+ * two-location business silently changed the wrong one. With several, each
+ * place gets its own group titled with its name, so there is never a question
+ * about which building a Google link belongs to.
  *
  * Only an owner or admin can change these (`api/v1/settings` refuses anyone
  * else), so a member or viewer sees the same values with no Change controls.
@@ -59,38 +71,33 @@ export default async function SettingsPage() {
 
   return (
     <AppShell businessName={organization.name}>
-      <h1 className="mb-6 text-2xl font-semibold tracking-[-0.02em] text-ink">Settings</h1>
+      <PageHeader title="Settings" />
 
-      <section className="mb-6 flex flex-col gap-3">
+      <SettingGroup label="Business">
         <EditableRow
+          inset
           field="businessName"
           label="Business"
           value={organization.name}
           placeholder="The Corner Cafe"
           readOnly={readOnly}
         />
+      </SettingGroup>
 
-        {readOnly ? (
-          <p className="text-sm text-muted">{ownerOrAdmin("change these settings")}</p>
-        ) : null}
-      </section>
+      {readOnly ? (
+        <p className="-mt-4 mb-7 px-1 text-sm text-muted">
+          {ownerOrAdmin("change these settings")}
+        </p>
+      ) : null}
 
-      <section className="mb-6 flex flex-col gap-3" aria-labelledby="places-heading">
-        <h2 id="places-heading" className="text-sm font-semibold uppercase tracking-wide text-muted">
-          {several ? "Places" : "Place"}
-        </h2>
-
-        {locations.map((location, index) => (
-          <div
-            key={location.locationId}
-            className={
-              several && index > 0
-                ? "mt-3 flex flex-col gap-3 border-t border-border pt-6"
-                : "flex flex-col gap-3"
-            }
-            data-location-id={location.locationId}
-          >
+      {locations.map((location) => (
+        <SettingGroup
+          key={location.locationId}
+          label={several ? location.name || "Place" : "Place"}
+        >
+          <Fragment>
             <EditableRow
+              inset
               field="locationName"
               label={several ? "Place name" : "Place"}
               value={location.name}
@@ -104,177 +111,110 @@ export default async function SettingsPage() {
                 takes effect on the next scan; printed codes and NFC tags are
                 untouched. */}
             <GoogleLinkCare
+              inset
               value={location.destination?.url ?? null}
               locationId={location.locationId}
               readOnly={readOnly}
             />
-          </div>
-        ))}
+          </Fragment>
+        </SettingGroup>
+      ))}
 
-        {can.editSettings && entitlements.canCreateLocation ? (
+      {can.editSettings && entitlements.canCreateLocation ? (
+        <div className="-mt-4 mb-7">
           <AddLocationButton />
-        ) : can.editSettings && locations.length > 0 ? (
-          <p className="text-sm text-muted">
-            Your plan includes {entitlements.locationLimit}{" "}
-            {entitlements.locationLimit === 1 ? "place" : "places"}.
-          </p>
-        ) : null}
-      </section>
+        </div>
+      ) : can.editSettings && locations.length > 0 ? (
+        <p className="-mt-4 mb-7 px-1 text-sm text-muted">
+          Your plan includes {entitlements.locationLimit}{" "}
+          {entitlements.locationLimit === 1 ? "place" : "places"}.
+        </p>
+      ) : null}
 
       {/* The Customer Page is reached from here and from Home's setup list —
           not from the bottom bar, which stays the four things an owner does
           every day. Everyone can open it; the editor itself tells a member or
           viewer that only an owner or admin can change it. */}
-      <section className="mb-6 flex flex-col gap-3" aria-labelledby="customer-page-heading">
-        <h2
-          id="customer-page-heading"
-          className="text-sm font-semibold uppercase tracking-wide text-muted"
-        >
-          Customer page
-        </h2>
-        <Link
+      <SettingGroup label="Your page">
+        <SettingRow
           href="/customer-page"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <ImageUp className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Your photo</p>
-            <p className="text-sm text-muted">What customers see when they scan a Tag.</p>
-          </div>
-        </Link>
-      </section>
+          icon={ImageUp}
+          title="Your photo"
+          description="What customers see when they scan a Tag."
+        />
+      </SettingGroup>
 
-      <section className="mb-6 flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Plan</h2>
-        <Link
+      <SettingGroup label="Plan">
+        <SettingRow
           href="/settings/billing"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <CreditCard className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Billing</p>
-            <p className="text-sm text-muted">Your plan, messages left, and payment.</p>
-          </div>
-        </Link>
-      </section>
+          icon={CreditCard}
+          title="Billing"
+          description="Your plan, messages left, and payment."
+        />
+      </SettingGroup>
 
-      <section className="mb-6 flex flex-col gap-3" aria-labelledby="appearance-heading">
-        <h2
-          id="appearance-heading"
-          className="text-sm font-semibold uppercase tracking-wide text-muted"
-        >
-          Appearance
-        </h2>
-        <div className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-base font-medium text-ink">Theme</p>
-            <p className="text-sm text-muted">
-              System follows this device. Your choice is kept on this device only.
-            </p>
-          </div>
-          <ThemeControl />
-        </div>
-      </section>
+      <SettingGroup label="Appearance">
+        <SettingRow
+          icon={Palette}
+          title="Theme"
+          description="System follows this device. Your choice is kept on this device only."
+          trailing={<ThemeControl />}
+        />
+      </SettingGroup>
 
-      <section className="mb-6 flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">You</h2>
-
-        {/* Not editable. Changing the sign-in address is an account-recovery
-            operation, not a setting — done carelessly it locks someone out of
-            their own business with no way back in. */}
-        <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <Mail className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-muted">Signed in as</p>
-            <p className="break-words text-base font-medium text-ink">{user.email ?? "—"}</p>
-          </div>
-        </div>
-      </section>
+      {/* Not editable. Changing the sign-in address is an account-recovery
+          operation, not a setting — done carelessly it locks someone out of
+          their own business with no way back in. */}
+      <SettingGroup label="You">
+        <SettingRow icon={Mail} title="Signed in as" description={user.email ?? "—"} />
+      </SettingGroup>
 
       {/* A real person to contact, and a plain answer about customer data. A
           barber deciding whether to put our code on their counter wants to know
           who is behind it — a faceless product is one they will not recommend to
           the shop next door. */}
-      <section className="mb-6 flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Help</h2>
-
-        <a
+      <SettingGroup label="Help">
+        <SettingRow
           href="mailto:help@reviewboost.fit"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft">
-            <LifeBuoy className="size-5 text-brand-text" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Ask us anything</p>
-            <p className="text-sm text-muted">Questions about Tags, billing or your Google link.</p>
-          </div>
-        </a>
-
+          icon={LifeBuoy}
+          title="Ask us anything"
+          description="Questions about Tags, billing or your Google link."
+        />
         {/* Seeing exactly what a customer sees is the single thing that makes an
             owner comfortable putting this on their counter. */}
-        <Link
+        <SettingRow
           href="/stands"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <Eye className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">See what customers see</p>
-            <p className="text-sm text-muted">Scan your own code to try it.</p>
-          </div>
-        </Link>
-
-        <Link
+          icon={Eye}
+          title="See what customers see"
+          description="Scan your own code to try it."
+        />
+        <SettingRow
           href="/privacy"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <Shield className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Privacy policy</p>
-            <p className="text-sm text-muted">What we collect and how to delete your account.</p>
-          </div>
-        </Link>
-      </section>
+          icon={Shield}
+          title="Privacy policy"
+          description="What we collect and how to delete your account."
+        />
+      </SettingGroup>
 
-      <section className="mb-6 flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Account</h2>
-
-        {/* Goes to the deletion screen, which does the deletion. It used to
-            open a mail client: a person had to ask us and then wait to be
-            believed, and an app that creates accounts has to let someone close
-            one from inside it. /delete-account stays for anyone already locked
-            out, and for the store listings that need a public URL. */}
-        {can.deleteBusiness ? (
-          <Link
+      {/* Goes to the deletion screen, which does the deletion. It used to
+          open a mail client: a person had to ask us and then wait to be
+          believed, and an app that creates accounts has to let someone close
+          one from inside it. /delete-account stays for anyone already locked
+          out, and for the store listings that need a public URL. */}
+      {can.deleteBusiness ? (
+        <SettingGroup label="Account">
+          <SettingRow
             href="/settings/delete"
-            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-          >
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-              <Trash2 className="size-5 text-muted" aria-hidden="true" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-medium text-ink">Delete account</p>
-              {/* No timeframe. "within 30 days" was a retention commitment nobody
-                  had agreed to operationally, and a deletion promise is the worst
-                  place to be approximately right. */}
-              <p className="text-sm text-muted">
-                Removes your account, your Tags and your ratings. Cancelling is the
-                way to stop billing without losing anything.
-              </p>
-            </div>
-          </Link>
-        ) : null}
-      </section>
+            icon={Trash2}
+            tone="danger"
+            title="Delete account"
+            // No timeframe. "within 30 days" was a retention commitment nobody
+            // had agreed to operationally, and a deletion promise is the worst
+            // place to be approximately right.
+            description="Removes your account, your Tags and your ratings. Cancelling is the way to stop billing without losing anything."
+          />
+        </SettingGroup>
+      ) : null}
 
       <SignOutButton />
     </AppShell>

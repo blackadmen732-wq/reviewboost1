@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { settingSurface } from "@/components/ui/setting-list";
 import { notify } from "@/components/ui/toast";
 import {
   GOOGLE_LINK_BLAST,
@@ -22,6 +23,7 @@ import {
 import { GoogleLinkHelp } from "@/features/dashboard/settings-form";
 import { isGoogleReviewWritingUrl } from "@/lib/security/google-review-url";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { cn } from "@/lib/utils/cn";
 
 /**
  * The Google review link, with Test / Open / Save.
@@ -50,10 +52,13 @@ export function GoogleLinkCare({
   value,
   locationId,
   readOnly = false,
+  inset = false,
 }: {
   value: string | null;
   locationId: string;
   readOnly?: boolean;
+  /** True when this row sits inside a SettingGroup card and must not draw its own. */
+  inset?: boolean;
 }) {
   const inputId = `setting-googleReviewUrl-${locationId}`;
   const router = useRouter();
@@ -139,7 +144,7 @@ export function GoogleLinkCare({
   return (
     <div className="flex flex-col gap-4" data-google-link-state={savedState}>
       {editing ? (
-        <div className="rounded-[var(--radius-card)] border border-brand bg-surface p-4">
+        <div className={settingSurface({ inset, accent: true })}>
           <label className="block text-sm font-medium text-muted" htmlFor={inputId}>
             Google link
           </label>
@@ -204,7 +209,7 @@ export function GoogleLinkCare({
           </div>
         </div>
       ) : (
-        <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
+        <div className={cn("flex items-start gap-4", settingSurface({ inset }))}>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-muted">Google link</p>
             <p

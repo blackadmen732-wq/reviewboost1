@@ -9,6 +9,17 @@ import { cn } from "@/lib/utils/cn";
 /**
  * Phone tabs. Four items, never five, each label on one line:
  * Home · Feedback · Texts · Tags.
+ *
+ * THE ACTIVE STATE IS A PILL
+ * --------------------------
+ * It used to be a quarter-point of extra stroke weight and a colour change,
+ * which on a phone in daylight is close to no signal at all — the one thing a
+ * bar has to answer is "where am I", and this bar answered it in a whisper.
+ *
+ * A soft pill behind the icon says it at a glance and survives both themes.
+ * Not a filled icon: three of these four fill cleanly and QrCode becomes a
+ * solid block, and a bar whose items are styled by whichever icon happens to
+ * fill is not a system. The pill works for any icon the bar ever holds.
  */
 export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
   const pathname = usePathname();
@@ -35,20 +46,26 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2",
-                  "text-xs font-medium transition-colors duration-150",
+                  "text-xs transition-colors duration-150",
                   "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
-                  active ? "text-ink" : "text-muted hover:text-ink",
+                  active ? "font-semibold text-ink" : "font-medium text-muted hover:text-ink",
                 )}
               >
-                <span className="relative">
+                <span
+                  className={cn(
+                    "relative grid h-8 w-16 place-items-center rounded-full",
+                    "transition-colors duration-150",
+                    active ? "bg-brand-soft" : "bg-transparent",
+                  )}
+                >
                   <Icon
-                    className="size-6"
+                    className={cn("size-6", active && "text-brand-text")}
                     strokeWidth={active ? 2.25 : 1.75}
                     aria-hidden="true"
                   />
                   {badge > 0 ? (
                     <span
-                      className="absolute -right-2 -top-1 grid min-w-5 place-items-center rounded-full bg-ink px-1 text-[0.6875rem] font-semibold text-canvas"
+                      className="absolute right-3 top-0 grid min-w-5 place-items-center rounded-full bg-ink px-1 text-[0.6875rem] font-semibold text-canvas"
                       aria-label={`${badge} unread`}
                     >
                       {badge > 9 ? "9+" : badge}
