@@ -3,6 +3,7 @@
 import { ArrowLeft, Check, Download, ExternalLink, Printer, RefreshCw, Store } from "lucide-react";
 import { useState } from "react";
 
+import { PUBLIC_PLANS } from "@/features/public/pricing-plans";
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
@@ -41,7 +42,8 @@ interface Created {
   standId: string;
 }
 
-export function OnboardingFlow() {
+export function OnboardingFlow({ chosenPlan = null }: { chosenPlan?: string | null }) {
+  const chosenPlanName = PUBLIC_PLANS.find((plan) => plan.id === chosenPlan)?.name ?? null;
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState("");
   const [googleUrl, setGoogleUrl] = useState("");
@@ -339,8 +341,15 @@ export function OnboardingFlow() {
       ) : null}
 
       <div className="flex w-full flex-col gap-3">
+        {/* The plan this person picked on the pricing page, if they came that
+            way. Naming it here is the difference between "you are nearly
+            done" and "choose again" — they already chose, on the page that
+            made them sign up. Nothing is charged by arriving: Billing marks
+            the plan and still waits for a deliberate click. */}
         <Button size="lg" asChild>
-          <a href="/settings/billing">Choose a plan</a>
+          <a href={chosenPlan ? `/settings/billing?plan=${chosenPlan}` : "/settings/billing"}>
+            {chosenPlanName ? `Continue with ${chosenPlanName}` : "Choose a plan"}
+          </a>
         </Button>
         <Button variant="secondary" onClick={() => window.print()}>
           <Printer className="size-5" aria-hidden="true" />

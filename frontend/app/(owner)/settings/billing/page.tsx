@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/page-header";
 import { AppShell } from "@/features/dashboard/app-shell";
 import { BillingPanel } from "@/features/dashboard/billing-panel";
+import { PUBLIC_PLANS } from "@/features/public/pricing-plans";
 import { permissionsFor } from "@/lib/owner/permissions";
 import { readOwnerBilling, requireOwner } from "@/lib/server/owner-data";
 
@@ -21,7 +22,22 @@ export const dynamic = "force-dynamic";
  * card — because a page that fills those in when the data is missing is a page
  * that tells a business it is subscribed when it is not.
  */
-export default async function BillingPage() {
+/**
+ * `?plan=` is what this owner chose on the public pricing page, carried here
+ * through setup. It marks a card; it never starts a payment. Validated
+ * against the published plans so the parameter can only name a real one.
+ */
+function chosenPlanFrom(raw: string | undefined): string | null {
+  if (!raw) return null;
+  return PUBLIC_PLANS.some((plan) => plan.id === raw) ? raw : null;
+}
+
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plan?: string }>;
+}) {
+  const { plan } = await searchParams;
   const { organization } = await requireOwner("/settings/billing");
   const billing = await readOwnerBilling(organization.orgId);
 
@@ -36,6 +52,7 @@ export default async function BillingPage() {
       <BillingPanel
         billing={billing}
         canManage={permissionsFor(organization.role).manageBilling}
+        chosenPlan={chosenPlanFrom(plan)}
       />
     </AppShell>
   );

@@ -238,7 +238,18 @@ function count(used: number, limit: number, one: string, many: string): string {
  * badge, what it means, one action), then what the business is using, then —
  * only when there is no subscription behind it — the plans to choose from.
  */
-export function BillingPanel({ billing, canManage }: { billing: Billing; canManage: boolean }) {
+export function BillingPanel({
+  billing,
+  canManage,
+  /** The plan this owner chose on the public pricing page, carried through
+   *  setup. It marks the card and primes nothing else: a subscription still
+   *  starts on a click, never on a URL. */
+  chosenPlan = null,
+}: {
+  billing: Billing;
+  canManage: boolean;
+  chosenPlan?: string | null;
+}) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -459,8 +470,16 @@ export function BillingPanel({ billing, canManage }: { billing: Billing; canMana
               <li
                 key={plan.id}
                 data-plan={plan.id}
-                className="group flex flex-col rounded-[var(--radius-card)] border border-border bg-surface p-6 shadow-[var(--shadow-card)] transition-[border-color,box-shadow,transform] duration-200 ease-out hover:border-action focus-within:border-action motion-safe:hover:-translate-y-0.5 motion-safe:focus-within:-translate-y-0.5"
+                data-chosen={plan.id === chosenPlan ? "true" : undefined}
+                className={`group flex flex-col rounded-[var(--radius-card)] border bg-surface p-6 shadow-[var(--shadow-card)] transition-[border-color,box-shadow,transform] duration-200 ease-out hover:border-action focus-within:border-action motion-safe:hover:-translate-y-0.5 motion-safe:focus-within:-translate-y-0.5 ${
+                  plan.id === chosenPlan ? "border-action" : "border-border"
+                }`}
               >
+                {plan.id === chosenPlan ? (
+                  <p className="mb-2 text-xs font-medium uppercase tracking-[0.1em] text-brand-text">
+                    The plan you chose
+                  </p>
+                ) : null}
                 <p className="text-lg font-semibold text-ink">{plan.name}</p>
                 <p className="mt-0.5 text-sm text-muted">{plan.fit}</p>
                 <p className="mt-5 flex items-baseline gap-1.5">

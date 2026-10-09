@@ -8,6 +8,24 @@
 export const START_HREF = "/login?next=/onboarding";
 export const SIGN_IN_HREF = "/login";
 
+/**
+ * Start, from a plan the visitor has already chosen.
+ *
+ * Every plan button used to point at START_HREF, so the one piece of
+ * information worth having — which plan somebody picked while comparing
+ * prices — was thrown away on the click that signalled it. They signed up,
+ * finished setup, landed on Home, and had to find Billing and choose the same
+ * plan a second time.
+ *
+ * The id rides through `next`, which `safeInternalPath` preserves (it returns
+ * pathname + search + hash) while still refusing anything off-origin. Setup
+ * carries it to Billing, where that plan is the one already marked. Nothing is
+ * charged on the strength of a URL: checkout still needs a deliberate click.
+ */
+export function planHref(planId: string): string {
+  return `/login?next=${encodeURIComponent(`/onboarding?plan=${planId}`)}`;
+}
+
 export const PUBLIC_NAV = [
   { href: "/how-it-works", label: "How it works" },
   { href: "/product", label: "Product" },

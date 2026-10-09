@@ -8,7 +8,7 @@ import {
   TRIAL,
   type PublicPlan,
 } from "@/features/public/pricing-plans";
-import { START_HREF } from "@/features/public/public-copy";
+import { planHref } from "@/features/public/public-copy";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -69,7 +69,7 @@ function PlanCard({ plan }: { plan: PublicPlan }) {
           "group-focus-within:border-action group-focus-within:bg-action group-focus-within:text-on-action",
         )}
       >
-        <Link href={START_HREF}>{cta}</Link>
+        <Link href={planHref(plan.id)}>{cta}</Link>
       </Button>
       <p className="mt-3 text-center text-sm text-muted">{startLine(plan)}</p>
 
