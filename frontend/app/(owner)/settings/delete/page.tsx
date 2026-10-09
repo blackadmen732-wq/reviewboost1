@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { AppShell } from "@/features/dashboard/app-shell";
 import { DeleteAccountFlow } from "@/features/settings/delete-account-flow";
 import { requireOwner } from "@/lib/server/owner-data";
@@ -24,12 +25,11 @@ export default async function DeleteAccountSettingsPage() {
 
   return (
     <AppShell businessName={organization.name}>
-      <h1 className="mb-2 text-2xl font-semibold tracking-[-0.02em] text-ink">
-        Delete {organization.name}
-      </h1>
-      <p className="mb-6 text-base leading-relaxed text-muted">
-        This removes the business, its Tags and everything your customers left.
-      </p>
+      <PageHeader
+        title={`Delete ${organization.name}`}
+        description="This removes the business, its Tags and everything your customers left."
+        tight
+      />
 
       <DeleteAccountFlow
         businessName={organization.name}

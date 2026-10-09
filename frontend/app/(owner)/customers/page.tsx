@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ExternalLink, MessageSquare, Shield, Sparkles, Users } from "lucide-react";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Stars } from "@/components/ui/stars";
 import { AppShell } from "@/features/dashboard/app-shell";
@@ -47,8 +48,7 @@ export default async function CustomersPage() {
 
   return (
     <AppShell>
-      <h1 className="mb-2 text-2xl font-semibold tracking-[-0.02em] text-ink">Customers</h1>
-      <p className="mb-6 text-base text-muted">Everyone who used your code.</p>
+      <PageHeader title="Customers" description="Everyone who used your code." tight />
 
       {summary.visits === 0 ? (
         <EmptyState

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { AppShell } from "@/features/dashboard/app-shell";
 import { BillingPanel } from "@/features/dashboard/billing-panel";
 import { permissionsFor } from "@/lib/owner/permissions";
@@ -26,12 +27,11 @@ export default async function BillingPage() {
 
   return (
     <AppShell businessName={organization.name}>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Billing &amp; Usage</h1>
-        <p className="mt-1 text-base text-muted">
-          Your plan, what it includes, and what you are using.
-        </p>
-      </div>
+      <PageHeader
+        title="Billing & Usage"
+        description="Your plan, what it includes, and what you are using."
+        tight
+      />
 
       <BillingPanel
         billing={billing}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { OrgPicker } from "@/features/auth/org-picker";
 import { safeInternalPath } from "@/lib/security/safe-redirect";
 import { publicFrontendUrl } from "@/lib/server/env";
@@ -33,12 +34,11 @@ export default async function SelectOrgPage({
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
-      <h1 className="mb-2 text-center text-2xl font-semibold tracking-[-0.02em] text-ink">
-        Choose your business
-      </h1>
-      <p className="mb-8 text-center text-base text-muted">
-        You belong to more than one. Pick the one you want to work with now.
-      </p>
+      <PageHeader
+        title="Choose your business"
+        description="You belong to more than one. Pick the one you want to work with now."
+        align="center"
+      />
 
       <OrgPicker organizations={organizations} next={destination} />
     </main>

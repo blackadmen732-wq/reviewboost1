@@ -187,6 +187,7 @@ export function SettingRow({
   external,
   onClick,
   disabled,
+  chevron,
   className,
   ...body
 }: RowBase & {
@@ -195,10 +196,16 @@ export function SettingRow({
   external?: boolean | undefined;
   onClick?: (() => void) | undefined;
   disabled?: boolean | undefined;
+  /**
+   * Overrides the default, which is: a link gets a chevron, a button does not.
+   * Set it on a button that navigates — choosing a business, picking a place —
+   * where the row really is a door and should look like one.
+   */
+  chevron?: boolean | undefined;
 }) {
   if (href) {
     const classes = cn(ROW_SHELL, ROW_INTERACTIVE, className);
-    const content = <RowBody {...body} chevron />;
+    const content = <RowBody {...body} chevron={chevron ?? true} />;
 
     return external || href.startsWith("mailto:") || href.startsWith("tel:") ? (
       <a href={href} className={classes}>
@@ -219,7 +226,7 @@ export function SettingRow({
         disabled={disabled}
         className={cn(ROW_SHELL, ROW_INTERACTIVE, "disabled:opacity-60", className)}
       >
-        <RowBody {...body} chevron={false} />
+        <RowBody {...body} chevron={chevron ?? false} />
       </button>
     );
   }
