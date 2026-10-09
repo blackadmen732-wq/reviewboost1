@@ -310,3 +310,31 @@ export function tagStatusLine(status: TagStatus): string {
   }
   return parts.join(" · ");
 }
+
+/* ---------------------------------------------------------------- setup --
+ *
+ * The four-item version of "is this business actually working yet", used by
+ * the signed-out site's Home preview (features/public/dashboard-preview-
+ * section.tsx) to render the real checklist component rather than a redrawn
+ * mockup.
+ *
+ * Deliberately alongside SetupStep above, not replacing it: the owner Home
+ * screen on this branch runs the five-step model and changing that is a
+ * behaviour change to a screen nobody asked me to touch. When the canonical
+ * checklist lands from its own branch, this is the shape it arrives in.
+ */
+export type SetupChecklistItemId = "subscription" | "destination" | "customerPage" | "firstTag";
+
+export interface SetupChecklistItem {
+  id: SetupChecklistItemId;
+  label: string;
+  complete: boolean;
+  href: string;
+}
+
+export interface SetupChecklist {
+  items: SetupChecklistItem[];
+  completeCount: number;
+  total: 4;
+  nextIncomplete: SetupChecklistItem | null;
+}

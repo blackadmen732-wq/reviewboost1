@@ -8,6 +8,9 @@ import { PwaRegister } from "@/components/pwa-register";
 import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
 import "@/styles/customer-page.css";
+/* Scoped to `.rb-public`, which PublicShell puts on the signed-out chrome, so
+   none of it reaches the owner app or the customer page. */
+import "@/styles/public-showcase.css";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
 const DESCRIPTION =

@@ -1,175 +1,172 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { CustomerPageShowcase } from "@/features/public/customer-page-showcase";
+import { DashboardPreviewSection } from "@/features/public/dashboard-preview-section";
 import { FAQ } from "@/features/public/faq";
+import { Hero } from "@/features/public/hero";
+import { HowItWorksScenes } from "@/features/public/how-it-works-scenes";
 import { PricingSection } from "@/features/public/pricing-table";
 import {
   CLOSE,
-  HOW_IT_WORKS,
   INTEGRITY,
   PRICING,
   PRIVACY,
-  PRODUCT,
-  PUBLIC_HERO,
   SECURITY,
   START_HREF,
 } from "@/features/public/public-copy";
 import { PublicShell } from "@/features/public/public-shell";
+import { Reveal } from "@/features/public/reveal";
+import { ScaleToFit } from "@/features/public/scale-to-fit";
+import { TagTapSection } from "@/features/public/tag-tap-section";
+import { TextRequestSection } from "@/features/public/text-request-section";
 
 /**
  * Signed-out homepage. One idea per band. No testimonials, no invented counts.
+ *
+ * The bands deliberately do not share one template. In order:
+ *
+ *   Hero            split — copy beside the product scene
+ *   Customer page   centred — one large carousel
+ *   How it works    a sequence of three different scenes
+ *   Tag / NFC       the physical objects, on a counter
+ *   Owner Home      editorial split with the real Home UI
+ *   Text Requests   the reverse split — phone first
+ *   Pricing         full-width dark band
+ *   Integrity       quiet, typographic
+ *   Questions       plain two-column list
+ *   Close           dark finish, with the Tag
+ *
+ * Motion is `<Reveal>` only: a band rises into place once. Nothing loops.
  */
+
+const linkClass =
+  "text-sm font-semibold text-brand-text underline-offset-4 transition-colors duration-150 hover:underline";
+
+/** A link that stands on its own line gets a full-size tap target. */
+const standaloneLinkClass = `${linkClass} inline-flex min-h-11 items-center`;
+
 export function PublicHome() {
   return (
     <PublicShell>
-      <section className="mx-auto max-w-[40rem] px-5 pb-20 pt-16 sm:px-8 sm:pb-28 sm:pt-24">
-        <h1 className="text-[2.25rem] font-semibold leading-[1.15] tracking-[-0.035em] text-ink sm:text-[2.5rem]">
-          {PUBLIC_HERO.title}
-        </h1>
-        <p className="mt-5 max-w-[38ch] text-lg leading-relaxed text-muted">{PUBLIC_HERO.lede}</p>
-        <div className="mt-10 flex max-w-xs flex-col gap-3">
-          <Button asChild variant="action" size="lg">
-            <Link href={PUBLIC_HERO.primary.href}>{PUBLIC_HERO.primary.label}</Link>
-          </Button>
-          <Button asChild variant="ghost" size="lg">
-            <Link href={PUBLIC_HERO.secondary.href}>{PUBLIC_HERO.secondary.label}</Link>
-          </Button>
+      <Hero />
+
+      <CustomerPageShowcase />
+
+      <HowItWorksScenes />
+
+      <section className="border-b border-border bg-surface">
+        <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
+          <Reveal>
+            <TagTapSection />
+          </Reveal>
         </div>
       </section>
 
-      <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
-          <p className="text-sm font-medium text-muted">How it works</p>
-          <ol className="mt-8 flex flex-col gap-10">
-            {HOW_IT_WORKS.map((step, index) => (
-              <li key={step.title} className="flex gap-5">
-                <span className="w-6 shrink-0 text-sm font-semibold text-muted">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <div>
-                  <h2 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-                    {step.title}
-                  </h2>
-                  <p className="mt-2 max-w-[36ch] text-base leading-relaxed text-muted">{step.body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-          <p className="mt-10">
-            <Link
-              href="/how-it-works"
-              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
-            >
-              The whole path
-            </Link>
-          </p>
+      <section className="border-b border-border">
+        <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
+          <Reveal className="grid items-center gap-12 md:grid-cols-12 md:gap-12">
+            <div className="min-w-0 md:col-span-5">
+              <p className="text-sm font-semibold text-brand-text">Your Home screen</p>
+              <h2 className="mt-4 text-[clamp(1.9rem,3.4vw,2.75rem)] font-bold leading-[1.08] tracking-[-0.03em] text-ink">
+                One screen, and it tells you what actually needs you.
+              </h2>
+              <p className="mt-5 max-w-[38ch] text-lg leading-relaxed text-muted">
+                Setup is four short things, not a wizard. Once they&apos;re done, this screen gets
+                out of the way and shows the feedback that just came in.
+              </p>
+            </div>
+            <div className="min-w-0 md:col-span-7">
+              <ScaleToFit minWidth={520}>
+                <DashboardPreviewSection />
+              </ScaleToFit>
+            </div>
+          </Reveal>
         </div>
       </section>
 
-      <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
-          <p className="text-sm font-medium text-muted">Product</p>
-          <h2 className="mt-4 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {PRODUCT.headline}
-          </h2>
-          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{PRODUCT.lede}</p>
-          <ul className="mt-10 flex flex-col gap-8">
-            {PRODUCT.items.map((item) => (
-              <li key={item.title}>
-                <h3 className="text-base font-semibold text-ink">{item.title}</h3>
-                <p className="mt-2 max-w-[38ch] text-base leading-relaxed text-muted">{item.body}</p>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-10">
-            <Link
-              href="/product"
-              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
-            >
-              Tags in full
-            </Link>
-          </p>
+      <section className="border-b border-border bg-surface">
+        <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
+          <Reveal>
+            <TextRequestSection />
+          </Reveal>
         </div>
       </section>
 
-      <section className="border-t border-border bg-quiet">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
-          <p className="text-sm font-medium text-muted">Integrity</p>
-          <h2 className="mt-4 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {INTEGRITY.headline}
-          </h2>
-          <p className="mt-4 max-w-[40ch] text-base leading-relaxed text-muted">{INTEGRITY.lede}</p>
-          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{INTEGRITY.body}</p>
-          <p className="mt-10">
-            <Link
-              href="/integrity"
-              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
-            >
-              Why this is the product
-            </Link>
-          </p>
-        </div>
-      </section>
-
-      {/* The prices themselves, as a full-width dark band. This section used
-          to be a headline, a lede and a link — a pricing section with no
-          prices in it, which is the one question a visitor came to answer. */}
       <PricingSection headline={PRICING.headline} lede={PRICING.lede}>
-        {/* The trial terms are already on the Starter card and in the line
-            under the cards; a third telling here was repetition. */}
-        <p className="mt-12 text-center text-sm">
-          <Link
-            href="/pricing"
-            className="font-medium text-ink underline-offset-4 transition-colors duration-150 hover:underline"
-          >
+        <p className="mt-12 text-center">
+          <Link href="/pricing" className={standaloneLinkClass}>
             How we charge
           </Link>
         </p>
       </PricingSection>
 
-      <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
-          <p className="text-sm font-medium text-muted">Security and privacy</p>
-          <h2 className="mt-4 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {SECURITY.headline}
-          </h2>
-          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{SECURITY.lede}</p>
-          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{PRIVACY.lede}</p>
-          <p className="mt-10 flex flex-wrap gap-x-6 gap-y-2">
-            <Link
-              href="/security"
-              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
-            >
-              Security
-            </Link>
-            <Link
-              href="/privacy"
-              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
-            >
-              Privacy
-            </Link>
-          </p>
+      {/* Integrity: typography only. The promise is the design. */}
+      <section className="border-b border-border">
+        <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-8 sm:py-32">
+          <Reveal>
+            <h2 className="max-w-[20ch] text-[clamp(2.25rem,5vw,4.25rem)] font-bold leading-[1.02] tracking-[-0.04em] text-ink">
+              {INTEGRITY.headline}
+            </h2>
+            <div className="mt-12 grid gap-10 border-t border-border pt-10 md:grid-cols-3">
+              <div className="md:col-span-2">
+                <p className="max-w-[46ch] text-xl leading-relaxed text-ink">{INTEGRITY.lede}</p>
+                <p className="mt-4 max-w-[52ch] text-base leading-relaxed text-muted">
+                  {INTEGRITY.body}
+                </p>
+                <p className="mt-6">
+                  <Link href="/integrity" className={standaloneLinkClass}>
+                    Why this is the product
+                  </Link>
+                </p>
+              </div>
+              <div>
+                <p className="text-base font-semibold text-ink">{SECURITY.headline}</p>
+                <p className="mt-2 text-base leading-relaxed text-muted">{SECURITY.lede}</p>
+                <p className="mt-2 text-base leading-relaxed text-muted">{PRIVACY.lede}</p>
+                <p className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
+                  <Link href="/security" className={standaloneLinkClass}>
+                    Security
+                  </Link>
+                  <Link href="/privacy" className={standaloneLinkClass}>
+                    Privacy
+                  </Link>
+                </p>
+              </div>
+            </div>
+          </Reveal>
         </div>
       </section>
 
-      <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
-          <p className="text-sm font-medium text-muted">Questions</p>
+      <section>
+        <div className="mx-auto grid max-w-[1200px] gap-10 px-5 py-20 sm:px-8 sm:py-28 md:grid-cols-12">
+          <div className="md:col-span-4">
+            <h2 className="text-[clamp(1.9rem,3.4vw,2.75rem)] font-bold leading-[1.08] tracking-[-0.03em] text-ink">
+              Questions
+            </h2>
+            <p className="mt-4 max-w-[28ch] text-base leading-relaxed text-muted">
+              Something else?{" "}
+              <Link href="/support" className={linkClass}>
+                Ask us
+              </Link>
+              .
+            </p>
+          </div>
           {/* Plain <details>. It is keyboard accessible and works before any
               JavaScript arrives, which matters on a phone with two bars. */}
-          <div className="mt-8 divide-y divide-border border-y border-border">
+          <div className="divide-y divide-border border-y border-border md:col-span-8">
             {FAQ.map((entry) => (
-              <details key={entry.question} className="group py-4">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-medium text-ink [&::-webkit-details-marker]:hidden">
+              <details key={entry.question} className="group py-5">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-ink [&::-webkit-details-marker]:hidden">
                   {entry.question}
                   <span
                     aria-hidden="true"
-                    className="shrink-0 text-muted transition-transform duration-150 group-open:rotate-45"
+                    className="shrink-0 text-xl text-muted transition-transform duration-200 group-open:rotate-45 motion-reduce:transition-none"
                   >
                     +
                   </span>
                 </summary>
-                <p className="mt-3 max-w-[52ch] text-base leading-relaxed text-muted">
+                <p className="mt-2 max-w-[60ch] text-base leading-relaxed text-muted">
                   {entry.answer}
                 </p>
               </details>
@@ -178,18 +175,25 @@ export function PublicHome() {
         </div>
       </section>
 
-      <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
-          <h2 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
+      {/* The close: a dark band, the promise, one action. */}
+      <section className="rb-public-dark bg-canvas text-ink">
+        <Reveal className="mx-auto flex max-w-[1200px] flex-col items-center px-5 py-24 text-center sm:px-8 sm:py-32">
+          <h2 className="max-w-[16ch] text-[clamp(2.6rem,6vw,5rem)] font-bold leading-[1] tracking-[-0.045em] text-ink">
             {CLOSE.headline}
           </h2>
-          <p className="mt-3 max-w-[36ch] text-base leading-relaxed text-muted">{CLOSE.lede}</p>
-          <div className="mt-8 max-w-xs">
-            <Button asChild variant="action" size="lg">
+          <p className="mt-6 max-w-[44ch] text-lg leading-relaxed text-muted sm:text-xl">{CLOSE.lede}</p>
+          <div className="mt-10 flex w-full max-w-sm flex-col items-center gap-4">
+            <Button asChild variant="action" size="lg" className="rounded-full sm:w-auto sm:px-12">
               <Link href={START_HREF}>Get started</Link>
             </Button>
+            <p className="text-sm text-muted">
+              Starter comes with seven days free. Already set up?{" "}
+              <Link href="/login" className={linkClass}>
+                Sign in
+              </Link>
+            </p>
           </div>
-        </div>
+        </Reveal>
       </section>
     </PublicShell>
   );

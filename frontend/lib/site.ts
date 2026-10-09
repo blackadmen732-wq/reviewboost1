@@ -32,6 +32,10 @@ export const PUBLIC_ROUTES = [
   "/",
   "/product",
   "/how-it-works",
+  // The customer page on five different businesses. The one page that shows a
+  // buyer what they are actually getting, so it is the last one that should be
+  // missing from the sitemap.
+  "/examples",
   "/pricing",
   "/integrity",
   "/security",

@@ -70,8 +70,8 @@ export const PUBLIC_PLANS: readonly PublicPlan[] = [
 ] as const;
 
 /**
- * Starter's trial. Growth and Pro have none — they are charged at checkout.
- * Nothing mints texts during it.
+ * Starter's trial. Not a plan of its own, and nothing mints texts during it.
+ * Growth and Pro have none — they are charged at checkout.
  *
  * One Tag is deliberate — enough to put a real code on a real counter and see
  * real ratings, which is the only thing that decides whether someone subscribes.

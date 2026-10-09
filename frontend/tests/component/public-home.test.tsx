@@ -17,7 +17,8 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-import { PUBLIC_PLANS } from "@/features/public/pricing-plans";
+import { PUBLIC_PLANS, TRIAL } from "@/features/public/pricing-plans";
+import { PLAN_CATALOG } from "@/lib/owner/plan-catalog";
 import { PublicHome } from "@/features/public/public-home";
 import { INTEGRITY, PUBLIC_HERO, SECURITY, START_HREF } from "@/features/public/public-copy";
 
@@ -59,7 +60,21 @@ describe("PublicHome", () => {
       expect(screen.getByText(`$${plan.price}`)).toBeVisible();
     }
     // The trial is Starter's: seven days, a card, and not a free tier.
-    expect(screen.getByText(/Starter free for 7 days/i)).toBeVisible();
+    //
+    // Asserted from TRIAL rather than a frozen phrase. This used to match the
+    // literal "Starter free for 7 days", so a rewrite of the sentence failed
+    // the test while the promise was intact — which teaches people to edit the
+    // assertion, and the next edit is the one that quietly drops the promise.
+    //
+    // The first line is the one that matters: TRIAL.days must come from the
+    // same catalog the owner app and Stripe bill from, so the website cannot
+    // advertise a trial length the product does not honour.
+    expect(TRIAL.days).toBe(PLAN_CATALOG.starter.trialDays);
+    expect(TRIAL.plan).toBe(PLAN_CATALOG.starter.name);
+    // textContent, not getByText: the line is assembled from several JSX
+    // expressions, so no single text node holds the whole sentence.
+    expect(document.body.textContent).toContain(`${TRIAL.plan}: ${TRIAL.days} days free`);
+    expect(screen.getByText(TRIAL.note)).toBeVisible();
     expect(screen.queryByText(/free forever/i)).not.toBeInTheDocument();
     // The FAQ does ask "Is there a free plan?" — and answers No. Matching the
     // phrase would fail on the denial, so this checks the offer instead: every

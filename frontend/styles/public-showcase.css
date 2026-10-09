@@ -1,0 +1,446 @@
+/* Marketing-only styles for the public website. Scoped under `.rb-public`
+ * and `.showcase-*` so nothing here can ever touch the real owner or
+ * customer surfaces. */
+
+/* The public site's palette. The owner app keeps its own tokens (its action
+ * colour is ink); the website keeps ReviewBoost green as the action and cool,
+ * clean neutrals so large surfaces never read beige. Every public component
+ * uses the ordinary token utilities (bg-canvas, text-muted, bg-action...), so
+ * the colours live here once instead of as hex codes in forty class names. */
+.rb-public {
+  color-scheme: light;
+  --rb-canvas: #f6f7f5;
+  --rb-surface: #ffffff;
+  --rb-quiet: #f0f2f0;
+  --rb-ink: #171a18;
+  --rb-muted: #66706a;
+  --rb-border: #dce2de;
+  --rb-border-strong: #b9c3bd;
+  --rb-brand: #00a86b;
+  --rb-brand-soft: #e3f5ec;
+  --rb-brand-text: #007a4d;
+  --rb-action: #007a4d;
+  --rb-action-hover: #006b43;
+  --rb-action-pressed: #005b39;
+  --rb-on-action: #ffffff;
+  --shadow-card: 0 1px 2px rgb(23 26 24 / 4%), 0 18px 48px -24px rgb(23 26 24 / 18%);
+}
+
+/* A dark band inside the light site (pricing, the closing call to action).
+ * Green-black rather than pure black, so it still belongs to ReviewBoost. */
+.rb-public-dark {
+  color-scheme: dark;
+  --rb-canvas: #0c100e;
+  --rb-surface: #131816;
+  --rb-quiet: #19201c;
+  --rb-ink: #f7f9f7;
+  --rb-muted: #abb5af;
+  --rb-border: #2a332e;
+  --rb-border-strong: #465149;
+  --rb-brand-soft: #143729;
+  --rb-brand-text: #32cf94;
+  --rb-action: #32cf94;
+  --rb-action-hover: #4ad8a3;
+  --rb-action-pressed: #2bb885;
+  --rb-on-action: #071b13;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 30%), 0 24px 64px -30px rgb(0 0 0 / 85%);
+}
+
+.showcase-stage {
+  perspective: 1600px;
+}
+
+.showcase-phone-slot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 290px;
+  transition:
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 360ms ease,
+    filter 360ms ease;
+  will-change: transform, opacity;
+}
+
+/* The side phones step back: a touch dimmer and less saturated, so the eye
+ * lands on the centre and the business artwork carries the change. */
+.showcase-phone-slot[data-position="side"] {
+  filter: saturate(0.75) brightness(0.97);
+}
+
+.showcase-phone-slot[data-position="side"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 15.5%/7.2%;
+  background: rgb(255 255 255 / 38%);
+  pointer-events: none;
+  transition: opacity 360ms ease;
+}
+
+.showcase-phone-button {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 44px;
+}
+
+.showcase-phone-button:focus-visible {
+  outline: 3px solid var(--rb-focus);
+  outline-offset: 4px;
+}
+
+.showcase-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 40;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--rb-border);
+  border-radius: 50%;
+  background: var(--rb-surface);
+  color: var(--rb-ink);
+  transform: translateY(-50%);
+  transition:
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+
+.showcase-arrow:hover {
+  background: var(--rb-quiet);
+}
+
+.showcase-arrow:focus-visible {
+  outline: 3px solid var(--rb-focus);
+  outline-offset: 2px;
+}
+
+.showcase-arrow--left {
+  left: calc(50% - 400px);
+}
+
+.showcase-arrow--right {
+  right: calc(50% - 400px);
+}
+
+.showcase-scroller {
+  gap: 16px;
+  padding-inline: 12vw;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.showcase-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.showcase-scroller__item {
+  flex: 0 0 76vw;
+  max-width: 300px;
+  scroll-snap-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .showcase-phone-slot,
+  .showcase-phone-slot::after,
+  .showcase-arrow {
+    transition: none !important;
+  }
+
+  .showcase-scroller {
+    scroll-behavior: auto;
+  }
+}
+
+/* ------------------------------------------------------------ hero stage ---
+ * Atmosphere behind (the counter photograph, blurred and washed back), the
+ * product in front: the owner's Home, the phone, and the Tag touching it.
+ * One aspect-ratio box, everything placed in percentages, so the picture is
+ * the same composition at every width. */
+.hero__backdrop {
+  position: absolute;
+  inset: -40px;
+  z-index: -1;
+  filter: blur(28px) saturate(0.35);
+  opacity: 0.4;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  /* Wash the backdrop to the canvas under the copy, lighter under the product. */
+  background:
+    linear-gradient(90deg, var(--rb-canvas) 0%, rgb(246 247 245 / 94%) 40%, rgb(246 247 245 / 62%) 100%),
+    linear-gradient(0deg, var(--rb-canvas) 0%, transparent 30%);
+}
+
+.hero-stage {
+  position: relative;
+  width: 100%;
+  max-width: 700px;
+  margin-inline: auto;
+  aspect-ratio: 1.12 / 1;
+}
+
+.hero-stage__app {
+  position: absolute;
+  top: 6%;
+  left: 0;
+  width: 72%;
+  height: 84%;
+  overflow: hidden;
+  border-radius: 18px;
+  pointer-events: none;
+  /* The window is a crop of the real screen: it fades out rather than ending
+   * mid-row at the section edge. */
+  mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
+}
+
+.hero-stage__phone {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  width: 38%;
+  filter: drop-shadow(0 30px 40px rgb(23 26 24 / 24%));
+}
+
+.hero-stage__tag {
+  position: absolute;
+  bottom: 1%;
+  left: 38%;
+  z-index: 3;
+  transform: rotate(-5deg);
+}
+
+/* NFC signal between the Tag and the phone above it. Still: the picture is
+ * the moment of the tap, not an animation of it. */
+.hero-stage__arcs {
+  position: absolute;
+  top: -8px;
+  right: -34px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 4px;
+  transform: rotate(40deg);
+}
+
+.hero-stage__arcs span {
+  display: block;
+  height: 9px;
+  border: 2px solid var(--rb-brand);
+  border-bottom: 0;
+  border-radius: 999px 999px 0 0;
+  opacity: 0.7;
+}
+
+.hero-stage__arcs span:nth-child(1) { width: 18px; }
+.hero-stage__arcs span:nth-child(2) { width: 32px; }
+.hero-stage__arcs span:nth-child(3) { width: 46px; }
+
+@media (max-width: 767px) {
+  /* A phone gets the two objects it can read: the Tag and the page. */
+  .hero-stage {
+    aspect-ratio: 1 / 1.02;
+    max-width: 420px;
+  }
+
+  .hero-stage__app {
+    display: none;
+  }
+
+  .hero-stage__phone {
+    left: auto;
+    right: 2%;
+    width: 56%;
+  }
+
+  .hero-stage__tag {
+    left: 0;
+    bottom: 2%;
+    transform: rotate(-5deg) scale(0.78);
+    transform-origin: bottom left;
+  }
+}
+
+/* A Tag reads as an object on a surface: a crisp edge and a contact shadow. */
+.rb-tag {
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 80%) inset,
+    0 2px 4px rgb(23 26 24 / 8%),
+    0 24px 40px -18px rgb(23 26 24 / 35%);
+}
+
+/* ------------------------------------------------------- device phone ---
+ * The physical phone for marketing demonstrations (PhoneFrame `device`).
+ * Sized in container units so the titanium edge, island and status bar are
+ * the same proportions at any width. */
+.phone-frame--device {
+  position: relative;
+  container-type: inline-size;
+  /* Room for the side buttons, which sit just outside the shell. */
+  width: min(calc(100% - 6px), 420px);
+  margin-inline: auto;
+}
+
+.phone-frame--device .phone-frame__bezel {
+  border: 0;
+  padding: 1.1cqw;
+  border-radius: 15.5cqw;
+  overflow: visible;
+  /* Brushed graphite titanium: light catches the top-left edge. */
+  background: linear-gradient(145deg, #74797e 0%, #2b2e31 22%, #4b4f53 48%, #1e2022 74%, #62666a 100%);
+  box-shadow:
+    inset 0 0 0 0.35cqw rgb(255 255 255 / 10%),
+    0 1.4cqw 3cqw -1cqw rgb(15 18 16 / 30%),
+    0 10cqw 22cqw -8cqw rgb(15 18 16 / 45%);
+}
+
+.phone-frame--device .phone-frame__glass {
+  padding: 2.6cqw;
+  border-radius: 14.4cqw;
+  background: #050506;
+  box-shadow: inset 0 0 0 0.3cqw rgb(255 255 255 / 5%);
+}
+
+.phone-frame--device .phone-frame__screen {
+  position: relative;
+  border-radius: 11.8cqw;
+  /* Safari: keep children clipped to the rounded screen while transformed. */
+  isolation: isolate;
+}
+
+.phone-frame--device .phone-frame__island {
+  top: 2.9cqw;
+  width: 30cqw;
+  height: 8.6cqw;
+  border-radius: 999px;
+  background: #000;
+  box-shadow: inset 0 0 0 0.3cqw rgb(255 255 255 / 4%);
+}
+
+/* Scoped to --device. The owner's Customer Page preview renders the same
+   element class names (phone-frame__status, __time, __home, __button*) from
+   customer-page.css, and this file is imported globally, so unscoped these
+   container-unit rules would reach into that preview and resize it. Only the
+   marketing phone carries .phone-frame--device. */
+.phone-frame--device .phone-frame__status {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 3;
+  display: flex;
+  height: 14cqw;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 7.5cqw 0 9.5cqw;
+  color: #fff;
+  font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
+  pointer-events: none;
+  text-shadow: 0 0 2cqw rgb(0 0 0 / 25%);
+}
+
+.phone-frame--device[data-status="dark"] .phone-frame__status {
+  color: #111;
+  text-shadow: none;
+}
+
+.phone-frame--device[data-status="dark"] .phone-frame__glyph {
+  filter: none;
+}
+
+.phone-frame--device .phone-frame__time {
+  font-size: 4.3cqw;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.phone-frame--device .phone-frame__glyphs {
+  display: flex;
+  align-items: center;
+  gap: 1.5cqw;
+}
+
+.phone-frame--device .phone-frame__glyph {
+  height: 3.1cqw;
+  width: auto;
+  filter: drop-shadow(0 0 1cqw rgb(0 0 0 / 25%));
+}
+
+.phone-frame--device .phone-frame__glyph--battery {
+  height: 3.3cqw;
+}
+
+.phone-frame--device .phone-frame__home {
+  position: absolute;
+  bottom: 2.2cqw;
+  left: 50%;
+  z-index: 3;
+  width: 34cqw;
+  height: 1.3cqw;
+  border-radius: 999px;
+  background: #111;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.phone-frame--device .phone-frame__button {
+  position: absolute;
+  z-index: -1;
+  width: 1.4cqw;
+  border-radius: 0.8cqw;
+  background: linear-gradient(90deg, #2a2d30, #5b5f63 60%, #2a2d30);
+}
+
+.phone-frame--device .phone-frame__button--action,
+.phone-frame--device .phone-frame__button--up,
+.phone-frame--device .phone-frame__button--down {
+  left: -0.9cqw;
+}
+
+.phone-frame--device .phone-frame__button--action { top: 19cqw; height: 7cqw; }
+.phone-frame--device .phone-frame__button--up { top: 31cqw; height: 13cqw; }
+.phone-frame--device .phone-frame__button--down { top: 47cqw; height: 13cqw; }
+
+.phone-frame--device .phone-frame__button--power {
+  right: -0.9cqw;
+  top: 34cqw;
+  height: 20cqw;
+}
+
+/* ------------------------------------------------------------ motion ---
+ * One language. The Tag answers when its scene is pointed at or tapped:
+ * the three arcs brighten in sequence (180ms each, 60ms apart), once. */
+.rb-tap-arcs > span {
+  opacity: 0.3;
+  transform: translateY(2px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.rb-tap-scene:hover .rb-tap-arcs > span,
+.rb-tap-scene:active .rb-tap-arcs > span {
+  opacity: 1;
+  transform: none;
+}
+
+.rb-tap-scene:hover .rb-tap-arcs > span:nth-child(2),
+.rb-tap-scene:active .rb-tap-arcs > span:nth-child(2) { transition-delay: 60ms; }
+.rb-tap-scene:hover .rb-tap-arcs > span:nth-child(3),
+.rb-tap-scene:active .rb-tap-arcs > span:nth-child(3) { transition-delay: 120ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-tap-arcs > span {
+    transform: none;
+    transition: opacity 1ms;
+  }
+}

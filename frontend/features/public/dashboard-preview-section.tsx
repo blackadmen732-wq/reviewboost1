@@ -1,0 +1,69 @@
+import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
+import { FeedbackList, type FeedbackItem } from "@/features/dashboard/feedback-list";
+import { HomeSetupChecklist } from "@/features/dashboard/home-setup-checklist";
+import type { SetupChecklist } from "@/features/dashboard/home-model";
+
+/**
+ * A framed look at the real Home screen.
+ *
+ * Renders the actual `HomeSetupChecklist` and `FeedbackList` components with
+ * sample data — not a screenshot, not a redrawn mockup — so this stays true
+ * to the product by construction: if either component changes, this section
+ * changes with it instead of quietly going stale.
+ *
+ * One caveat worth knowing: `FeedbackList` is the same component the owner's
+ * Feedback screen renders, so that half is literally the product. The owner
+ * Home on this branch still runs the five-step `SetupStep` model, so
+ * `HomeSetupChecklist` is currently drawn here and nowhere else. It is the
+ * real component and the real type, waiting on the branch that adopts it —
+ * but until then this section is only half self-updating, and a claim of
+ * "always true" would be the kind of thing nobody checks until it is wrong.
+ *
+ * The frame is `role="img"` with sample data and `pointer-events-none`, the
+ * same pattern `PhoneFrame` uses for the customer page preview elsewhere on
+ * this site: real interactive components, presented as a picture rather than
+ * a second, clickable copy of the app that happens to sit on a marketing page.
+ */
+const SAMPLE_CHECKLIST: SetupChecklist = {
+  items: [
+    { id: "subscription", label: "Subscription active", complete: true, href: "/settings/billing" },
+    { id: "destination", label: "Google review link connected", complete: true, href: "/settings" },
+    { id: "customerPage", label: "Publish your Customer Page", complete: false, href: "/customer-page" },
+    { id: "firstTag", label: "Create your first Tag", complete: false, href: "/stands" },
+  ],
+  completeCount: 2,
+  total: 4,
+  nextIncomplete: {
+    id: "customerPage",
+    label: "Publish your Customer Page",
+    complete: false,
+    href: "/customer-page",
+  },
+};
+
+const HOUR = 1000 * 60 * 60;
+const SAMPLE_FEEDBACK: FeedbackItem[] = [
+  { id: "1", rating: 5, note: null, submittedAt: new Date(Date.now() - HOUR * 2).toISOString(), isRead: false, isResolved: false, noteCount: 0 },
+  { id: "2", rating: 4, note: null, submittedAt: new Date(Date.now() - HOUR * 26).toISOString(), isRead: true, isResolved: false, noteCount: 0 },
+  { id: "3", rating: 5, note: null, submittedAt: new Date(Date.now() - HOUR * 50).toISOString(), isRead: true, isResolved: true, noteCount: 0 },
+];
+
+export function DashboardPreviewSection() {
+  return (
+    <div
+      className="pointer-events-none select-none overflow-hidden rounded-[24px] border border-border bg-surface shadow-[var(--shadow-card)]"
+      role="img"
+      aria-label="ReviewBoost Home screen, showing setup progress and recent feedback"
+    >
+      <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+        <ReviewBoostLogo pose="full" size="footer" />
+        <span className="text-sm font-medium text-muted">Home</span>
+      </div>
+      <div className="bg-canvas p-5 sm:p-7">
+        <HomeSetupChecklist checklist={SAMPLE_CHECKLIST} />
+        <p className="mb-3 text-sm font-medium text-muted">Recent feedback</p>
+        <FeedbackList items={SAMPLE_FEEDBACK} />
+      </div>
+    </div>
+  );
+}
