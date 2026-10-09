@@ -69,9 +69,16 @@ export function SettingGroup({
         </p>
       ) : null}
 
-      {/* overflow-hidden so the first and last rows take the card's corners —
+      {/* divide-[border-strong], not divide-border: inside a card the hairline
+          is the ONLY thing separating one row from the next, and --rb-border on
+          white measures 1.31:1 (1.52:1 in dark) — close to invisible on a phone
+          in daylight. --rb-border-strong is 1.81:1 / 2.17:1. It is an existing
+          palette token, so nothing about the colours changes; it was simply
+          never used where it was needed most.
+
+          overflow-hidden so the first and last rows take the card's corners —
           without it a hover or focus background squares them off. */}
-      <div className="divide-y divide-border overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">
+      <div className="divide-y divide-[color:var(--rb-border-strong)] overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface shadow-[var(--shadow-card)]">
         {children}
       </div>
     </section>

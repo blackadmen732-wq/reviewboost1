@@ -81,7 +81,7 @@
   --rb-text-small: 0.875rem;
   --rb-text-body: 1rem;
   --rb-text-title: 1.5rem;
-  --rb-text-display: 1.75rem;
+  --rb-text-display: 2rem;
   --rb-row: 56px;
   --rb-content: 800px;
   --rb-motion-fast: 150ms;
@@ -90,7 +90,13 @@
   --shadow-control: 0 1px 0 rgb(23 26 24 / 4%);
   --shadow-button: 0 1px 0 rgb(0 91 57 / 18%);
   --shadow-button-hover: 0 1px 0 rgb(0 91 57 / 24%);
-  --shadow-card: none;
+  /* Two layers, light from above, small spread: a tight one for the edge and
+     a wider soft one for the lift. One shadow reads as a sticker. Measured
+     reason for having any: surface #ffffff on canvas #f6f7f5 is 1.07:1 and
+     the border on canvas is 1.22:1, so nothing else separates a card from
+     its page. The palette stays exactly as it is; this is the only lever
+     left that is not colour. */
+  --shadow-card: 0 1px 2px rgb(23 26 24 / 5%), 0 4px 12px rgb(23 26 24 / 4%);
   --shadow-float: 0 -1px 0 rgb(23 26 24 / 8%);
 }
 
@@ -125,7 +131,7 @@
     --shadow-control: 0 1px 0 rgb(0 0 0 / 40%);
     --shadow-button: 0 1px 0 rgb(0 0 0 / 40%);
     --shadow-button-hover: 0 1px 0 rgb(0 0 0 / 50%);
-    --shadow-card: none;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 45%), 0 4px 14px rgb(0 0 0 / 32%);
     --shadow-float: 0 -1px 0 rgb(0 0 0 / 50%);
   }
 }
