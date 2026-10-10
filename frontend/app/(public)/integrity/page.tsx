@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function IntegrityPage() {
   return (
-    <PublicArticle title={INTEGRITY.headline} lede={INTEGRITY.lede}>
+    <PublicArticle eyebrow="Integrity" title={INTEGRITY.headline} lede={INTEGRITY.lede}>
       <p>{INTEGRITY.body}</p>
       <h2>What we help with</h2>
       {/* This said customers leave words you can read and act on. V1 takes a

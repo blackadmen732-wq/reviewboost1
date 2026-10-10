@@ -9,15 +9,27 @@ import { Button } from "@/components/ui/button";
 import { PUBLIC_NAV, START_HREF, SIGN_IN_HREF } from "@/features/public/public-copy";
 
 /**
- * Public header: canvas bar, hairline rule, pill CTA. Mobile collapses nav + sign in + CTA into a toggled panel
- * instead of the old always-visible link wrap, so a phone screen isn't
- * competing with five nav labels above the fold.
+ * Public header.
+ *
+ * `.rb-public-dark` — the same green-black the hero, the showcase, pricing
+ * and the close now use — so the page starts in the field rather than with
+ * a light bar sitting on top of it. The hero's scrim is opaque at its first
+ * pixel, so the two meet with no seam and the deep colour runs from the top
+ * of the browser.
+ *
+ * The lockup needs nothing: "Review" is `currentColor` and follows `--rb-ink`
+ * into the dark scope, and the mark and "Boost" are the one brand green,
+ * which is 6.2:1 here. No second logo, no recolour.
+ *
+ * Mobile collapses nav + sign in + CTA into a toggled panel instead of the
+ * old always-visible link wrap, so a phone screen isn't competing with five
+ * nav labels above the fold.
  */
 export function PublicHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-canvas">
+    <header className="rb-public-dark sticky top-0 z-40 border-b border-border bg-canvas text-ink">
       <div className="mx-auto flex h-20 max-w-[1200px] items-center justify-between gap-4 px-5 sm:px-8">
         <Link
           href="/"

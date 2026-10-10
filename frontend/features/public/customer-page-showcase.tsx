@@ -117,16 +117,20 @@ export function CustomerPageShowcase() {
   }, []);
 
   return (
-    <section className="border-b border-border bg-surface" aria-labelledby="customer-page-showcase-heading">
-      <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
+    <section
+      className="rb-public-dark border-b border-border bg-canvas text-ink"
+      aria-labelledby="customer-page-showcase-heading"
+    >
+      <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-8 sm:py-36">
         <div className="mx-auto max-w-[40rem] text-center">
+          <p className="rb-eyebrow">The customer page</p>
           <h2
             id="customer-page-showcase-heading"
-            className="text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[1.05] tracking-[-0.035em] text-ink"
+            className="mt-6 text-[clamp(2.1rem,4.4vw,3.5rem)] font-bold leading-[1.02] tracking-[-0.04em] text-ink"
           >
             Looks like your business. Works like ReviewBoost.
           </h2>
-          <p className="mx-auto mt-4 max-w-[46ch] text-lg leading-relaxed text-muted">
+          <p className="mx-auto mt-5 max-w-[46ch] text-lg leading-relaxed text-muted">
             The top is yours. The rating underneath is the same for every business.
           </p>
         </div>

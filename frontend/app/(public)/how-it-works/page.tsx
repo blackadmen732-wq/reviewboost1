@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 export default function HowItWorksPage() {
   return (
     <PublicArticle
+      eyebrow="At the counter"
       title="How it works"
       lede="Three steps. The rating never chooses who gets to leave a Google review."
     >

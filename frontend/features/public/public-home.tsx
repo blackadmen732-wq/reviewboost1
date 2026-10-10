@@ -26,16 +26,25 @@ import { TextRequestSection } from "@/features/public/text-request-section";
  *
  * The bands deliberately do not share one template. In order:
  *
- *   Hero            split — copy beside the product scene
- *   Customer page   centred — one large carousel
+ *   Hero            DARK — the counter photograph, copy beside the product
+ *   Customer page   DARK — centred, one large carousel
  *   How it works    a sequence of three different scenes
  *   Tag / NFC       the physical objects, on a counter
  *   Owner Home      editorial split with the real Home UI
  *   Text Requests   the reverse split — phone first
- *   Pricing         full-width dark band
+ *   Pricing         DARK
  *   Integrity       quiet, typographic
  *   Questions       plain two-column list
- *   Close           dark finish, with the Tag
+ *   Close           DARK — the finish
+ *
+ * The dark is `.rb-public-dark`, which already existed for pricing and the
+ * close; it now carries the bar, the opening and the ending, so the page is a
+ * deep green-black field with light bands set inside it rather than a light
+ * page with two dark stripes. No colour was added to the palette to do it.
+ *
+ * The small half of the type contrast is `.rb-eyebrow`: tracked-out caps at
+ * 11px over a very large, very tight headline. It replaced five hand-written
+ * `text-sm font-semibold text-brand-text` eyebrows that had drifted apart.
  *
  * Motion is `<Reveal>` only: a band rises into place once. Nothing loops.
  */
@@ -56,7 +65,7 @@ export function PublicHome() {
       <HowItWorksScenes />
 
       <section className="border-b border-border bg-surface">
-        <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
+        <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-8 sm:py-36">
           <Reveal>
             <TagTapSection />
           </Reveal>
@@ -64,11 +73,11 @@ export function PublicHome() {
       </section>
 
       <section className="border-b border-border">
-        <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
-          <Reveal className="grid items-center gap-12 md:grid-cols-12 md:gap-12">
+        <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-8 sm:py-36">
+          <Reveal className="grid items-center gap-12 md:grid-cols-12 md:gap-16">
             <div className="min-w-0 md:col-span-5">
-              <p className="text-sm font-semibold text-brand-text">Your Home screen</p>
-              <h2 className="mt-4 text-[clamp(1.9rem,3.4vw,2.75rem)] font-bold leading-[1.08] tracking-[-0.03em] text-ink">
+              <p className="rb-eyebrow">Your Home screen</p>
+              <h2 className="mt-6 text-[clamp(1.9rem,3.4vw,2.75rem)] font-bold leading-[1.06] tracking-[-0.032em] text-ink">
                 One screen, and it tells you what actually needs you.
               </h2>
               <p className="mt-5 max-w-[38ch] text-lg leading-relaxed text-muted">
@@ -86,7 +95,7 @@ export function PublicHome() {
       </section>
 
       <section className="border-b border-border bg-surface">
-        <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
+        <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-8 sm:py-36">
           <Reveal>
             <TextRequestSection />
           </Reveal>
@@ -103,12 +112,13 @@ export function PublicHome() {
 
       {/* Integrity: typography only. The promise is the design. */}
       <section className="border-b border-border">
-        <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-8 sm:py-32">
+        <div className="mx-auto max-w-[1200px] px-5 py-28 sm:px-8 sm:py-40">
           <Reveal>
-            <h2 className="max-w-[20ch] text-[clamp(2.25rem,5vw,4.25rem)] font-bold leading-[1.02] tracking-[-0.04em] text-ink">
+            <p className="rb-eyebrow">Integrity</p>
+            <h2 className="mt-6 max-w-[20ch] text-[clamp(2.25rem,5vw,4.25rem)] font-bold leading-[1.02] tracking-[-0.045em] text-ink">
               {INTEGRITY.headline}
             </h2>
-            <div className="mt-12 grid gap-10 border-t border-border pt-10 md:grid-cols-3">
+            <div className="mt-14 grid gap-10 border-t border-border pt-12 md:grid-cols-3">
               <div className="md:col-span-2">
                 <p className="max-w-[46ch] text-xl leading-relaxed text-ink">{INTEGRITY.lede}</p>
                 <p className="mt-4 max-w-[52ch] text-base leading-relaxed text-muted">
@@ -139,9 +149,10 @@ export function PublicHome() {
       </section>
 
       <section>
-        <div className="mx-auto grid max-w-[1200px] gap-10 px-5 py-20 sm:px-8 sm:py-28 md:grid-cols-12">
+        <div className="mx-auto grid max-w-[1200px] gap-10 px-5 py-24 sm:px-8 sm:py-36 md:grid-cols-12">
           <div className="md:col-span-4">
-            <h2 className="text-[clamp(1.9rem,3.4vw,2.75rem)] font-bold leading-[1.08] tracking-[-0.03em] text-ink">
+            <p className="rb-eyebrow">Questions</p>
+            <h2 className="mt-6 text-[clamp(1.9rem,3.4vw,2.75rem)] font-bold leading-[1.06] tracking-[-0.032em] text-ink">
               Questions
             </h2>
             <p className="mt-4 max-w-[28ch] text-base leading-relaxed text-muted">
@@ -177,8 +188,8 @@ export function PublicHome() {
 
       {/* The close: a dark band, the promise, one action. */}
       <section className="rb-public-dark bg-canvas text-ink">
-        <Reveal className="mx-auto flex max-w-[1200px] flex-col items-center px-5 py-24 text-center sm:px-8 sm:py-32">
-          <h2 className="max-w-[16ch] text-[clamp(2.6rem,6vw,5rem)] font-bold leading-[1] tracking-[-0.045em] text-ink">
+        <Reveal className="mx-auto flex max-w-[1200px] flex-col items-center px-5 py-28 text-center sm:px-8 sm:py-44">
+          <h2 className="max-w-[16ch] text-[clamp(2.6rem,6vw,5rem)] font-bold leading-[0.98] tracking-[-0.05em] text-ink">
             {CLOSE.headline}
           </h2>
           <p className="mt-6 max-w-[44ch] text-lg leading-relaxed text-muted sm:text-xl">{CLOSE.lede}</p>

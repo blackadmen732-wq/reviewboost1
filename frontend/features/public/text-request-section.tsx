@@ -53,8 +53,8 @@ export function TextRequestSection() {
       </div>
 
       <div className="md:col-span-6 md:col-start-7">
-        <p className="text-sm font-semibold text-brand-text">Text Requests</p>
-        <h2 className="mt-4 text-[clamp(1.9rem,3.4vw,2.75rem)] font-bold leading-[1.08] tracking-[-0.03em] text-ink">
+        <p className="rb-eyebrow">Text Requests</p>
+        <h2 className="mt-6 text-[clamp(1.9rem,3.4vw,2.75rem)] font-bold leading-[1.06] tracking-[-0.032em] text-ink">
           Didn&apos;t tap on the way out? Text them the same link.
         </h2>
         <p className="mt-5 max-w-[40ch] text-lg leading-relaxed text-muted">

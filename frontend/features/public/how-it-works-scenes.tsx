@@ -21,8 +21,8 @@ const [TAG_STEP, RATE_STEP, CONTINUE_STEP] = HOW_IT_WORKS;
 
 function StepLabel({ number, label }: { number: string; label: string }) {
   return (
-    <p className="flex items-baseline gap-3 text-sm font-semibold text-brand-text">
-      <span className="font-mono text-base tabular-nums text-muted">{number}</span>
+    <p className="rb-eyebrow flex items-baseline gap-3">
+      <span className="font-mono tabular-nums text-muted">{number}</span>
       {label}
     </p>
   );
@@ -131,12 +131,13 @@ function Connector() {
 export function HowItWorksScenes() {
   return (
     <section id="how-it-works" className="scroll-mt-24 border-b border-border">
-      <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
+      <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-8 sm:py-36">
         <Reveal>
-          <h2 className="max-w-[18ch] text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[1.05] tracking-[-0.035em] text-ink">
+          <p className="rb-eyebrow">Three moments</p>
+          <h2 className="mt-6 max-w-[18ch] text-[clamp(2.1rem,4.4vw,3.5rem)] font-bold leading-[1.02] tracking-[-0.04em] text-ink">
             How it works
           </h2>
-          <p className="mt-4 max-w-[44ch] text-lg leading-relaxed text-muted">
+          <p className="mt-5 max-w-[44ch] text-lg leading-relaxed text-muted">
             Three moments at the counter. Nothing to install, nothing to sign up for.
           </p>
         </Reveal>

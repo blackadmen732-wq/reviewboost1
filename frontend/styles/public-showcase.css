@@ -43,7 +43,24 @@
   --rb-action-hover: #4ad8a3;
   --rb-action-pressed: #2bb885;
   --rb-on-action: #071b13;
+  /* The light scope's focus blue is 2.1:1 on this field — invisible, and
+   * below the 3:1 SC 1.4.11 asks of a focus indicator. The dark pair the app
+   * already uses is 9.2:1 here. */
+  --rb-focus: #7ab8ff;
+  --rb-focus-soft: rgb(77 142 255 / 34%);
   --shadow-card: 0 1px 2px rgb(0 0 0 / 30%), 0 24px 64px -30px rgb(0 0 0 / 85%);
+}
+
+/* An eyebrow: the small half of the type contrast. A line of tracked-out
+ * caps over a very large, very tight headline is what separates an editorial
+ * page from a product page, and it costs one class rather than a typeface. */
+.rb-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--rb-brand-text);
 }
 
 .showcase-stage {
@@ -76,6 +93,12 @@
   background: rgb(255 255 255 / 38%);
   pointer-events: none;
   transition: opacity 360ms ease;
+}
+
+/* On the dark field the veil has to go the other way: white over a phone on
+ * green-black makes the side phones the brightest thing on the screen. */
+.rb-public-dark .showcase-phone-slot[data-position="side"]::after {
+  background: rgb(12 16 14 / 52%);
 }
 
 .showcase-phone-button {
@@ -113,6 +136,16 @@
 
 .showcase-arrow:hover {
   background: var(--rb-quiet);
+}
+
+/* #131816 on #0c100e is 1.2:1 — the control disappears into the field. */
+.rb-public-dark .showcase-arrow {
+  border-color: var(--rb-border-strong);
+  background: var(--rb-quiet);
+}
+
+.rb-public-dark .showcase-arrow:hover {
+  background: #232c27;
 }
 
 .showcase-arrow:focus-visible {
@@ -158,50 +191,111 @@
   }
 }
 
-/* ------------------------------------------------------------ hero stage ---
- * Atmosphere behind (the counter photograph, blurred and washed back), the
- * product in front: the owner's Home, the phone, and the Tag touching it.
- * One aspect-ratio box, everything placed in percentages, so the picture is
- * the same composition at every width. */
+/* ------------------------------------------------------------------ hero ---
+ * A deep field, one photograph, two objects, and a lot of air.
+ *
+ * The counter photograph used to be blurred to 28px and washed back to 40%
+ * opacity, which is a way of paying for a photograph and then throwing it
+ * away. It is the subject now: unblurred, at full strength, under a
+ * directional scrim that is nearly opaque where the headline sits and opens
+ * toward the product so the room is still a room.
+ *
+ * The field is `.rb-public-dark` — the same green-black the pricing and
+ * closing bands already use — so the site opens on the brand's own colour
+ * rather than on grey. No new colour was introduced to do it.
+ *
+ * The scrim is `.hero__backdrop::after`, not `.hero::before`. Both used to
+ * sit at `z-index: -1`, where DOM order decides and the pseudo-element loses
+ * to the image; that only looked right because the image was at 40% opacity.
+ * A pseudo-element of the container that holds the image paints over it, and
+ * keeps doing so now the image is opaque. */
 .hero__backdrop {
   position: absolute;
-  inset: -40px;
-  z-index: -1;
-  filter: blur(28px) saturate(0.35);
-  opacity: 0.4;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
 }
 
-.hero::before {
+.hero__backdrop::after {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: -1;
-  /* Wash the backdrop to the canvas under the copy, lighter under the product. */
   background:
-    linear-gradient(90deg, var(--rb-canvas) 0%, rgb(246 247 245 / 94%) 40%, rgb(246 247 245 / 62%) 100%),
-    linear-gradient(0deg, var(--rb-canvas) 0%, transparent 30%);
+    /* Dark where the words are, open where the room is. */
+    linear-gradient(
+      100deg,
+      #0c100e 0%,
+      /* The copy column ends at 43% of the width. Nothing above it is less
+       * than 98% opaque, so the text's contrast does not depend on which
+       * part of the photograph happens to be behind it. */
+      rgb(12 16 14 / 98%) 44%,
+      rgb(12 16 14 / 76%) 66%,
+      rgb(12 16 14 / 50%) 100%
+    ),
+    /* Seat it under the header and into the band below. */
+    linear-gradient(180deg, #0c100e 0%, rgb(12 16 14 / 88%) 6%, transparent 26%),
+    linear-gradient(0deg, #0c100e 0%, rgb(12 16 14 / 34%) 20%, transparent 46%);
 }
 
+/* Below `lg` the hero stacks, so the copy runs the full width and the
+ * horizontal scrim above no longer sits between it and the photograph: the
+ * 18px lede measured 3.7:1 over a bright patch of the counter, under the
+ * 4.5:1 it needs.
+ *
+ * Its own field fixes that, and it is tied to the copy's real height rather
+ * than to a percentage of a section whose height moves with the headline's
+ * line count. `isolation` keeps the `z-index: -1` inside the copy, which is
+ * already painted above the backdrop. */
+@media (max-width: 1023px) {
+  .hero__copy {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .hero__copy::before {
+    content: "";
+    position: absolute;
+    inset: -5rem -50vw -2rem;
+    z-index: -1;
+    background: linear-gradient(180deg, #0c100e 0%, #0c100e 86%, rgb(12 16 14 / 0%) 100%);
+  }
+}
+
+/* The photograph is warm daylight and the field is green-black. A low
+ * saturation green wash over the open side ties them together — the brand
+ * colour at 14%, not a new one. */
+.hero__wash {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(68% 58% at 78% 44%, rgb(0 168 107 / 15%) 0%, transparent 70%),
+    radial-gradient(90% 70% at 6% 8%, rgb(0 168 107 / 8%) 0%, transparent 62%);
+}
+
+/* Two objects, not three. The owner's Home used to float here in a browser
+ * window at 72% width, behind a mask, too small to read — and it already has
+ * a band of its own further down the page where it is legible. Taking it out
+ * is what buys the negative space. */
 .hero-stage {
   position: relative;
   width: 100%;
-  max-width: 700px;
+  max-width: 560px;
   margin-inline: auto;
-  aspect-ratio: 1.12 / 1;
+  aspect-ratio: 1 / 1.08;
 }
 
-.hero-stage__app {
+/* The product stands in its own pool of light rather than on flat black. */
+.hero-stage::before {
+  content: "";
   position: absolute;
-  top: 6%;
-  left: 0;
-  width: 72%;
-  height: 84%;
-  overflow: hidden;
-  border-radius: 18px;
+  inset: -10% -6% -4%;
+  z-index: 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(0 168 107 / 18%), transparent 100%);
+  filter: blur(26px);
   pointer-events: none;
-  /* The window is a crop of the real screen: it fades out rather than ending
-   * mid-row at the section edge. */
-  mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
 }
 
 .hero-stage__phone {
@@ -209,16 +303,16 @@
   top: 0;
   right: 0;
   z-index: 2;
-  width: 38%;
-  filter: drop-shadow(0 30px 40px rgb(23 26 24 / 24%));
+  width: 45%;
+  filter: drop-shadow(0 34px 52px rgb(0 0 0 / 62%));
 }
 
 .hero-stage__tag {
   position: absolute;
-  bottom: 1%;
-  left: 38%;
+  bottom: 0;
+  left: 22%;
   z-index: 3;
-  transform: rotate(-5deg);
+  transform: rotate(-6deg);
 }
 
 /* NFC signal between the Tag and the phone above it. Still: the picture is
@@ -237,10 +331,10 @@
 .hero-stage__arcs span {
   display: block;
   height: 9px;
-  border: 2px solid var(--rb-brand);
+  border: 2px solid var(--rb-brand-text);
   border-bottom: 0;
   border-radius: 999px 999px 0 0;
-  opacity: 0.7;
+  opacity: 0.85;
 }
 
 .hero-stage__arcs span:nth-child(1) { width: 18px; }
@@ -248,36 +342,62 @@
 .hero-stage__arcs span:nth-child(3) { width: 46px; }
 
 @media (max-width: 767px) {
-  /* A phone gets the two objects it can read: the Tag and the page. */
   .hero-stage {
-    aspect-ratio: 1 / 1.02;
-    max-width: 420px;
-  }
-
-  .hero-stage__app {
-    display: none;
+    aspect-ratio: 1 / 1.14;
+    max-width: 400px;
   }
 
   .hero-stage__phone {
-    left: auto;
     right: 2%;
-    width: 56%;
+    width: 50%;
   }
 
   .hero-stage__tag {
     left: 0;
     bottom: 2%;
-    transform: rotate(-5deg) scale(0.78);
+    transform: rotate(-6deg) scale(0.78);
     transform-origin: bottom left;
   }
 }
 
-/* A Tag reads as an object on a surface: a crisp edge and a contact shadow. */
+/* A Tag is a fixed white card in every scope, so every colour inside it has
+ * to be a light-theme colour.
+ *
+ * It used to sit only on light bands and inherit the page's tokens, which was
+ * fine until the hero became `.rb-public-dark`: the lockup's "Review" is
+ * `currentColor`, took the dark scope's `--rb-ink` (#f7f9f7), and went white
+ * on white. `.visit-card` hit exactly this and wrote down the lesson — a
+ * half-pinned palette is two themes in one box — so the whole set is pinned
+ * here too, and anything added to a Tag later inherits a consistent one. */
+.rb-tag {
+  color-scheme: light;
+  --rb-canvas: #f6f7f5;
+  --rb-surface: #ffffff;
+  --rb-quiet: #f0f2f0;
+  --rb-ink: #171a18;
+  --rb-muted: #66706a;
+  --rb-border: #dce2de;
+  --rb-border-strong: #b9c3bd;
+  --rb-brand: #00a86b;
+  --rb-brand-soft: #e3f5ec;
+  --rb-brand-text: #007a4d;
+  color: var(--rb-ink);
+}
+
 .rb-tag {
   box-shadow:
     0 1px 0 rgb(255 255 255 / 80%) inset,
     0 2px 4px rgb(23 26 24 / 8%),
     0 24px 40px -18px rgb(23 26 24 / 35%);
+}
+
+/* A 35% ink shadow is nothing against green-black. On the dark field the Tag
+ * needs a real one, or it reads as a sticker rather than an object. */
+.rb-public-dark .rb-tag {
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 80%) inset,
+    0 2px 6px rgb(0 0 0 / 40%),
+    0 30px 50px -18px rgb(0 0 0 / 70%);
 }
 
 /* ------------------------------------------------------- device phone ---

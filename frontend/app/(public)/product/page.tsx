@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function ProductPage() {
   return (
-    <PublicArticle title="Tags" lede={PRODUCT.lede}>
+    <PublicArticle eyebrow="The object" title="Tags" lede={PRODUCT.lede}>
       <p>{PRODUCT.headline} Setup creates your first one. You can add more later from Tags.</p>
       {PRODUCT.items.map((item) => (
         <div key={item.title}>

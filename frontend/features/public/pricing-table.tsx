@@ -149,8 +149,8 @@ export function PricingSection({
     <section id="pricing" className="rb-public-dark scroll-mt-20 bg-canvas text-ink">
       <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-8 sm:py-28">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-semibold text-brand-text">Pricing</p>
-          <Heading className="mt-4 text-[clamp(2.25rem,4.6vw,3.75rem)] font-bold leading-[1.02] tracking-[-0.04em] text-ink">
+          <p className="rb-eyebrow">Pricing</p>
+          <Heading className="mt-6 text-[clamp(2.25rem,4.6vw,3.75rem)] font-bold leading-[1.02] tracking-[-0.04em] text-ink">
             {headline}
           </Heading>
           <p className="mx-auto mt-5 max-w-[34ch] text-lg leading-relaxed text-muted sm:text-xl">
