@@ -544,3 +544,56 @@ textarea {
 .animate-page-enter {
   animation: page-enter 180ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
+
+/* ------------------------------------------------- Home pulse animation ---
+ * The line draws itself on, the wash fades up behind it, and the split bar
+ * grows from the left. It runs once, on arrival, and never loops: this is a
+ * screen somebody checks between customers.
+ *
+ * Keyframes rather than a state-driven transition, so nothing has to mount,
+ * measure, and re-render to start — and so the whole card stays a server
+ * component with no JavaScript shipped for it at all.
+ *
+ * The segment animates `transform`, not `width`: its real width is the data,
+ * and scaling avoids laying the row out again on every frame. */
+@keyframes rb-pulse-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes rb-pulse-fade {
+  from { opacity: 0; }
+}
+
+@keyframes rb-pulse-grow {
+  from { transform: scaleX(0); }
+}
+
+.rb-pulse-line {
+  /* pathLength is normalised to 1, so this is shape-independent. */
+  stroke-dasharray: 1;
+  animation: rb-pulse-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.rb-pulse-area {
+  opacity: 0.1;
+  animation: rb-pulse-fade 700ms ease 260ms backwards;
+}
+
+.rb-pulse-dot {
+  animation: rb-pulse-fade 300ms ease 820ms backwards;
+}
+
+.rb-pulse-seg {
+  transform-origin: left center;
+  animation: rb-pulse-grow 620ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-pulse-line,
+  .rb-pulse-area,
+  .rb-pulse-dot,
+  .rb-pulse-seg {
+    animation: none;
+  }
+}

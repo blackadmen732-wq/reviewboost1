@@ -183,7 +183,10 @@ html:has(.customer-live) {
   z-index: 2;
   margin-top: -28px;
   background: #f9f9f9;
-  border-radius: 7cqi 7cqi 0 0;
+  /* All four corners, not just the top. The approved reference shows the
+     sheet's bottom corners curving away from the device edge; squaring them
+     made the card read as a rectangle the screen had cut off. */
+  border-radius: 7cqi;
   box-shadow: 0 -6px 20px rgb(0 0 0 / 16%);
   padding: 10.075cqi 0 0;
   overflow: hidden;

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 
+import { HomePulse } from "@/features/dashboard/home-pulse";
 import { OwnerHome } from "@/features/dashboard/owner-home";
 import { deriveHomeModel } from "@/features/dashboard/home-model";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
@@ -62,6 +63,7 @@ export default async function HomePage() {
         businessName={organization.name}
         model={model}
         insightsLine={insightsHomeLine(insights)}
+        pulse={<HomePulse insights={insights} />}
         seenDone={parseSetupSeen((await cookies()).get(SETUP_SEEN_COOKIE)?.value)}
         unreadItems={unread.items.map((item) => ({
           id: item.responseId,

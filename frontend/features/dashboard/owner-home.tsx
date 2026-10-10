@@ -31,10 +31,17 @@ export function OwnerHome({
   unreadItems,
   insightsLine = null,
   seenDone = null,
+  pulse = null,
 }: {
   businessName: string;
   model: HomeModel;
   unreadItems: FeedbackItem[];
+  /**
+   * The 30-day picture: three numbers, the trend, and the split. It replaces
+   * the single "4.3 average · 84 ratings · Improving" line, which answered
+   * "how are we doing" with a sentence an owner had to read rather than see.
+   */
+  pulse?: React.ReactNode;
   /**
    * The setup steps this browser last showed as done, or null if it never has.
    * A step done since then draws its tick once; nothing animates on a first
@@ -55,7 +62,12 @@ export function OwnerHome({
       {model.kind === "empty" ? (
         <EmptyHome model={model} seenDone={seenDone} />
       ) : (
-        <ActiveHome model={model} unreadItems={unreadItems} insightsLine={insightsLine} />
+        <ActiveHome
+          model={model}
+          unreadItems={unreadItems}
+          insightsLine={insightsLine}
+          pulse={pulse}
+        />
       )}
     </div>
   );
@@ -221,10 +233,12 @@ function ActiveHome({
   model,
   unreadItems,
   insightsLine,
+  pulse,
 }: {
   model: HomeModel;
   unreadItems: FeedbackItem[];
   insightsLine: string | null;
+  pulse: React.ReactNode;
 }) {
   const [firstAttention, ...otherAttentions] = model.attentions;
 
@@ -259,9 +273,10 @@ function ActiveHome({
         </section>
       ) : null}
 
-      {/* One quiet line, never a chart: Home answers "does anything need me",
-          and this only points to where the longer answer lives. */}
-      {insightsLine ? (
+      {/* The 30-day picture. It is the one place Home shows numbers, and it
+          shows them as a picture: an owner between customers reads a shape
+          faster than a sentence. */}
+      {pulse ?? (insightsLine ? (
         <section>
           <Link
             href="/feedback/insights"
@@ -278,7 +293,7 @@ function ActiveHome({
             />
           </Link>
         </section>
-      ) : null}
+      ) : null)}
 
       {unreadItems.length > 0 ? (
         <section>
