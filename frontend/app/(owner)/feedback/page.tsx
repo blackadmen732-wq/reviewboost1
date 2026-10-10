@@ -4,6 +4,7 @@ import Link from "next/link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { FeedbackList } from "@/features/dashboard/feedback-list";
+import { FeedbackSummary } from "@/features/dashboard/feedback-summary";
 import { FeedbackTabs } from "@/features/dashboard/feedback-tabs";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import {
@@ -13,7 +14,13 @@ import {
   parseFeedbackFilters,
   type FeedbackFilters,
 } from "@/lib/owner/insights";
-import { getOwnerCounts, listLocations, listReviews, requireOwner } from "@/lib/server/owner-data";
+import {
+  getFeedbackInsights,
+  getOwnerCounts,
+  listLocations,
+  listReviews,
+  requireOwner,
+} from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
   title: "Feedback",
@@ -47,7 +54,7 @@ export default async function FeedbackPage({
   const filtered = filters !== null && hasFeedbackFilters(filters);
   const span = filters ? filterInstants(organization.timezone, filters) : null;
 
-  const [{ items, hasMore }, counts] = await Promise.all([
+  const [{ items, hasMore }, counts, insights] = await Promise.all([
     listReviews(organization.orgId, {
       limit: 50,
       ...(showAll ? {} : { openOnly: true }),
@@ -56,6 +63,8 @@ export default async function FeedbackPage({
       ...(span ? { submittedFrom: span.from, submittedBefore: span.before } : {}),
     }),
     getOwnerCounts(organization.orgId, organization.timezone),
+    // The same 30 days Home's one-liner reports, so the two cannot disagree.
+    getFeedbackInsights(organization.orgId, organization.timezone, { range: 30 }),
   ]);
 
   return (
@@ -63,6 +72,11 @@ export default async function FeedbackPage({
       <PageHeader title="Feedback" description="Ratings from your customers." />
 
       <FeedbackTabs active={showAll ? "everything" : "needs-you"} />
+
+      {/* How much came in, before what came in. Hidden while a filter is on:
+          the summary counts 30 days and the list below would be showing six
+          two-star ratings, which is two different answers on one screen. */}
+      {filtered ? null : <FeedbackSummary insights={insights} />}
 
       {filtered && filters ? (
         <FilterSummary

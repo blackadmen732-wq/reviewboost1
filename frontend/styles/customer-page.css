@@ -38,6 +38,12 @@ html:has(.customer-live) {
   background: #1a1a1a;
 }
 
+/* With no artwork there is nothing decoding, so the dark backdrop has nothing
+   to cover and would show through the empty panel's edges. */
+.visit-hero:has(.visit-hero__empty) {
+  background: #f1f2f1;
+}
+
 .visit-hero__image {
   width: 100%;
   height: 100%;
@@ -59,10 +65,21 @@ html:has(.customer-live) {
 
 /* No image uploaded yet: a plain neutral area. The top of the page is only
    ever the owner's own image; ReviewBoost draws nothing there. */
+/* A business that has not uploaded artwork yet.
+ *
+ * This used to be #1c1d1d, which put a near-black slab above a near-white
+ * sheet and made a page with no photo read as broken rather than as plain.
+ * The sheet is #f9f9f9, so the empty hero is the same family: the screen is
+ * one light surface with the card's rounded shoulder on it, and the photo
+ * when it arrives is the only dark thing.
+ *
+ * `.visit-hero` keeps its dark background — that one sits *behind the
+ * artwork* while it decodes, where a light flash before a dark photo is the
+ * worse end of the trade. */
 .visit-hero__empty {
   width: 100%;
   height: 100%;
-  background: #1c1d1d;
+  background: #f1f2f1;
 }
 
 .visit-language {
