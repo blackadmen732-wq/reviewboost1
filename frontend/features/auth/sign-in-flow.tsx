@@ -114,7 +114,7 @@ export function SignInFlow({
         </button>
 
         <div className="flex flex-col gap-3">
-          <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.02em] text-ink">
+          <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
             Check your email
           </h1>
           <p className="text-base text-muted">
@@ -167,7 +167,7 @@ export function SignInFlow({
       data-auth-intent={intent}
     >
       <div className="flex flex-col gap-3">
-        <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.02em] text-ink">
+        <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.03em] text-ink">
           {intent === "start" ? "Get started" : "Sign in"}
         </h1>
         <p className="text-base leading-relaxed text-muted">

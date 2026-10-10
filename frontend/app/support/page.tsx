@@ -130,7 +130,7 @@ export default function SupportPage() {
   return (
     <PublicShell>
       <main className="mx-auto max-w-[44rem] px-5 py-16 sm:px-8 sm:py-20">
-        <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-ink">Support</h1>
+        <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">Support</h1>
         <p className="mt-3 text-base leading-relaxed text-muted">
           Most problems are one of the things below. If yours is not, email{" "}
           <a

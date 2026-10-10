@@ -87,7 +87,7 @@ function PrimaryAction({ primary }: { primary: HomePrimary | null }) {
 
 function StateTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[2rem] font-semibold leading-[1.1] tracking-[-0.035em] text-ink">
+    <p className="text-[length:var(--rb-text-display)] font-semibold leading-[1.1] tracking-[-0.03em] text-ink">
       {children}
     </p>
   );

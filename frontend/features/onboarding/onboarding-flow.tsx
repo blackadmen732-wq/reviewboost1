@@ -140,7 +140,7 @@ export function OnboardingFlow({ chosenPlan = null }: { chosenPlan?: string | nu
           <div className="mb-2 grid size-14 place-items-center rounded-full bg-brand-soft">
             <Store className="size-7 text-brand-text" aria-hidden="true" />
           </div>
-          <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
+          <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.03em] text-ink">
             What is your business called?
           </h1>
           <p className="text-base text-muted">This is what customers will see.</p>
@@ -188,7 +188,7 @@ export function OnboardingFlow({ chosenPlan = null }: { chosenPlan?: string | nu
         <Progress current={2} />
 
         <div className="flex flex-col gap-2">
-          <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
+          <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.03em] text-ink">
             Your Google link
           </h1>
           <p className="text-base text-muted">
@@ -295,7 +295,7 @@ export function OnboardingFlow({ chosenPlan = null }: { chosenPlan?: string | nu
       </div>
 
       <div className="flex flex-col gap-2">
-        <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
+        <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.03em] text-ink">
           Your Tag is ready
         </h1>
         {/* It is not working yet, and saying "you are all set" would mean a

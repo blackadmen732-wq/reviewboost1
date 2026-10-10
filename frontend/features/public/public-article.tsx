@@ -14,7 +14,7 @@ export function PublicArticle({
   return (
     <PublicShell>
       <article className="mx-auto w-full max-w-[40rem] px-5 pb-24 pt-16 sm:px-8 sm:pt-20">
-        <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink sm:text-[2rem]">
+        <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
           {title}
         </h1>
         {lede ? <p className="mt-4 max-w-[40ch] text-lg leading-relaxed text-muted">{lede}</p> : null}
