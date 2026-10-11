@@ -16,7 +16,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * nothing; it would just render an empty page.
  */
 
-const OWNER_PREFIXES = ["/home", "/feedback", "/praise", "/stands", "/settings", "/onboarding", "/reviews", "/customers", "/select-org"];
+const OWNER_PREFIXES = ["/home", "/feedback", "/praise", "/stands", "/settings", "/onboarding", "/reviews", "/customers", "/select-org", "/text-requests", "/customer-page"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

@@ -3,11 +3,19 @@
 import Link from "next/link";
 import { Smartphone } from "lucide-react";
 
+import { supabaseBrowser } from "@/lib/supabase/browser";
+
 export function PreviewCustomerPage({ standId }: { standId?: string | null } = {}) {
   const handlePreviewQr = async () => {
     if (!standId) return;
     try {
-      const res = await fetch(`/api/v1/review-stands/${standId}/qr?format=json`);
+      const {
+        data: { session },
+      } = await supabaseBrowser().auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/v1/review-stands/${standId}/qr?format=json`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
       if (res.ok) {
         const { data } = (await res.json()) as { data: { url?: string } };
         if (data.url) window.open(data.url, "_blank", "noopener");

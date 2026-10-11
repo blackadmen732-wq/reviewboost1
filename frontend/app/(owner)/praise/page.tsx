@@ -129,7 +129,9 @@ export default async function PraisePage() {
           {handled.length > 0 ? (
             <section>
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-                {totalShared > 0 ? `${totalShared} passed on` : "Matched"}
+                {/* Counts every matched item, so the heading agrees with the list below it. */}
+                {`${handled.length} matched`}
+                {totalShared > 0 ? ` · ${totalShared} passed on` : ""}
               </h2>
 
               <ul className="flex flex-col gap-3">

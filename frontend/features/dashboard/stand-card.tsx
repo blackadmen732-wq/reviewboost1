@@ -277,10 +277,11 @@ export function StandCard({
           Save SVG — best for printing
         </Button>
 
-        {/* PNG download with size picker */}
-        <div className="flex items-center gap-2">
+        {/* PNG download with size picker. Wraps on narrow phones instead of
+            pushing Save PNG past the card edge. */}
+        <div className="flex flex-wrap items-center gap-2">
           {useCustomSize ? (
-            <div className="flex flex-1 items-center gap-2">
+            <div className="flex min-w-[12rem] flex-1 items-center gap-2">
               <input
                 type="number"
                 min={MIN_CUSTOM_PNG}
@@ -301,11 +302,11 @@ export function StandCard({
               </button>
             </div>
           ) : (
-            <div className="flex flex-1 items-center gap-2">
+            <div className="flex min-w-[12rem] flex-1 items-center gap-2">
               <select
                 value={pngSize}
                 onChange={(e) => setPngSize(Number(e.target.value))}
-                className="h-11 flex-1 rounded-[var(--radius-control)] border border-border bg-surface px-3 text-sm text-ink"
+                className="h-11 min-w-0 flex-1 rounded-[var(--radius-control)] border border-border bg-surface px-3 text-sm text-ink"
                 aria-label="PNG size"
               >
                 {PNG_SIZES.map((s) => (

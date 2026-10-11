@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { CustomerPageBranding } from "@/features/customer-flow/customer-page-branding";
 import type { CustomerPageContent } from "@/lib/server/customer-page-service";
+import { supabaseBrowser } from "@/lib/supabase/browser";
 
 interface CustomerPageEditorProps {
   businessName: string;
@@ -12,6 +13,28 @@ interface CustomerPageEditorProps {
 }
 
 type UploadState = "idle" | "signing" | "uploading" | "confirming" | "done" | "error";
+
+const SESSION_EXPIRED = "Your session expired. Please sign in again.";
+
+/**
+ * Every owner API route requires the caller's bearer token; a cookie alone is
+ * rejected with 401. Without this the editor loaded nothing and could not save.
+ */
+async function ownerFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const {
+    data: { session },
+  } = await supabaseBrowser().auth.getSession();
+  if (!session) throw new Error(SESSION_EXPIRED);
+
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${session.access_token}`);
+  return fetch(path, { ...init, headers });
+}
+
+async function errorMessage(res: Response, fallback: string): Promise<string> {
+  const err = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+  return err.error?.message ?? fallback;
+}
 
 /**
  * The preview uses the same CustomerPageBranding component that /q/{token}
@@ -35,12 +58,16 @@ export function CustomerPageEditor({
   const [heroUrl, setHeroUrl] = useState<string | null>(null);
   const [isPublished, setIsPublished] = useState(initialIsPublished);
   const [loaded, setLoaded] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch("/api/v1/customer-page");
-        if (!res.ok) return;
+        const res = await ownerFetch("/api/v1/customer-page");
+        if (!res.ok) {
+          setStatusMsg(await errorMessage(res, "Could not load your page. Refresh to try again."));
+          return;
+        }
         const { data } = (await res.json()) as {
           data: {
             draft: CustomerPageContent;
@@ -52,8 +79,8 @@ export function CustomerPageEditor({
         // not resolved here; only published assets have a public URL).
         if (data.published?.heroUrl) setHeroUrl(data.published.heroUrl);
         setIsPublished(data.published !== null);
-      } catch {
-        // ignore — defaults are fine
+      } catch (error) {
+        setStatusMsg(error instanceof Error ? error.message : "Could not load your page.");
       } finally {
         setLoaded(true);
       }
@@ -64,64 +91,68 @@ export function CustomerPageEditor({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadHero = useCallback(async (file: File) => {
     setUploadError(null);
     setUploadState("signing");
 
-    // Step 1: get signed upload ticket
-    const beginRes = await fetch("/api/v1/customer-page/assets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "hero", contentType: file.type }),
-    });
-    if (!beginRes.ok) {
-      const err = await beginRes.json().catch(() => ({}));
-      setUploadState("error");
-      setUploadError((err as { error?: { message?: string } }).error?.message ?? "Upload failed.");
-      return;
-    }
-    const { data: ticket } = (await beginRes.json()) as {
-      data: { assetId: string; path: string; token: string };
-    };
+    try {
+      // Step 1: get signed upload ticket
+      const beginRes = await ownerFetch("/api/v1/customer-page/assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "hero", contentType: file.type }),
+      });
+      if (!beginRes.ok) {
+        const err = await beginRes.json().catch(() => ({}));
+        setUploadState("error");
+        setUploadError((err as { error?: { message?: string } }).error?.message ?? "Upload failed.");
+        return;
+      }
+      const { data: ticket } = (await beginRes.json()) as {
+        data: { assetId: string; path: string; token: string };
+      };
 
-    // Step 2: upload directly to Supabase Storage
-    setUploadState("uploading");
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const storageUrl = `${supabaseUrl}/storage/v1/object/upload/sign/customer-page/${ticket.path}?token=${ticket.token}`;
-    const putRes = await fetch(storageUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type, "x-upsert": "true" },
-      body: file,
-    });
-    if (!putRes.ok) {
-      setUploadState("error");
-      setUploadError("Storage upload failed. Please try again.");
-      return;
-    }
+      // Step 2: upload directly to Supabase Storage
+      setUploadState("uploading");
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const storageUrl = `${supabaseUrl}/storage/v1/object/upload/sign/customer-page/${ticket.path}?token=${ticket.token}`;
+      const putRes = await fetch(storageUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type, "x-upsert": "true" },
+        body: file,
+      });
+      if (!putRes.ok) {
+        setUploadState("error");
+        setUploadError("Storage upload failed. Please try again.");
+        return;
+      }
 
-    // Step 3: confirm upload server-side
-    setUploadState("confirming");
-    const confirmRes = await fetch("/api/v1/customer-page/assets", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assetId: ticket.assetId, path: ticket.path }),
-    });
-    if (!confirmRes.ok) {
-      const err = await confirmRes.json().catch(() => ({}));
-      setUploadState("error");
-      setUploadError(
-        (err as { error?: { message?: string } }).error?.message ?? "Confirmation failed.",
-      );
-      return;
-    }
+      // Step 3: confirm upload server-side
+      setUploadState("confirming");
+      const confirmRes = await ownerFetch("/api/v1/customer-page/assets", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetId: ticket.assetId, path: ticket.path }),
+      });
+      if (!confirmRes.ok) {
+        const err = await confirmRes.json().catch(() => ({}));
+        setUploadState("error");
+        setUploadError(
+          (err as { error?: { message?: string } }).error?.message ?? "Confirmation failed.",
+        );
+        return;
+      }
 
-    // Show a local preview URL and record the assetId in the draft.
-    setHeroUrl(URL.createObjectURL(file));
-    setDraft((prev) => ({ ...prev, heroAssetId: ticket.assetId }));
-    setUploadState("done");
+      // Show a local preview URL and record the assetId in the draft.
+      setHeroUrl(URL.createObjectURL(file));
+      setDraft((prev) => ({ ...prev, heroAssetId: ticket.assetId }));
+      setUploadState("done");
+    } catch (error) {
+      setUploadState("error");
+      setUploadError(error instanceof Error ? error.message : "Upload failed.");
+    }
   }, []);
 
   const handleFileChange = useCallback(
@@ -140,48 +171,57 @@ export function CustomerPageEditor({
     // Send the full draft so the RPC replace does not drop fields the owner
     // set in a previous session (templateId, logoAssetId, etc.).
     const body: CustomerPageContent = { ...draft, tagline: draft.tagline ?? null };
-    const res = await fetch("/api/v1/customer-page", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setStatusMsg(
-        (err as { error?: { message?: string } }).error?.message ?? "Save failed. Try again.",
-      );
-    } else {
-      setStatusMsg("Draft saved.");
-      onSaved?.();
+    try {
+      const res = await ownerFetch("/api/v1/customer-page", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        setStatusMsg(await errorMessage(res, "Save failed. Try again."));
+      } else {
+        setStatusMsg("Draft saved.");
+        onSaved?.();
+      }
+    } catch (error) {
+      setStatusMsg(error instanceof Error ? error.message : "Save failed. Try again.");
+    } finally {
+      setSaving(false);
     }
   }, [draft, onSaved]);
 
   const publish = useCallback(async () => {
     setPublishing(true);
     setStatusMsg(null);
-    // Save the full draft first so the published snapshot captures everything.
-    await fetch("/api/v1/customer-page", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...draft, tagline: draft.tagline ?? null }),
-    });
+    try {
+      // Save the full draft first so the published snapshot captures everything.
+      // If that save fails, stop: publishing now would put the previous draft live.
+      const saved = await ownerFetch("/api/v1/customer-page", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...draft, tagline: draft.tagline ?? null }),
+      });
+      if (!saved.ok) {
+        setStatusMsg(await errorMessage(saved, "Save failed. Try again."));
+        return;
+      }
 
-    const res = await fetch("/api/v1/customer-page", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    setPublishing(false);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setStatusMsg(
-        (err as { error?: { message?: string } }).error?.message ?? "Publish failed. Try again.",
-      );
-    } else {
-      setStatusMsg("Page is live!");
-      setIsPublished(true);
-      onSaved?.();
+      const res = await ownerFetch("/api/v1/customer-page", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        setStatusMsg(await errorMessage(res, "Publish failed. Try again."));
+      } else {
+        setStatusMsg("Page is live!");
+        setIsPublished(true);
+        onSaved?.();
+      }
+    } catch (error) {
+      setStatusMsg(error instanceof Error ? error.message : "Publish failed. Try again.");
+    } finally {
+      setPublishing(false);
     }
   }, [draft, onSaved]);
 

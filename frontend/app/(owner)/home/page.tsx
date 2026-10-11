@@ -105,10 +105,11 @@ export default async function HomePage() {
                   {average}
                 </span>
               </div>
+              {/* The number is the average of the most recent ratings, not
+                  today's, so the caption says which ones it covers. */}
               <p className="mt-3 text-base text-muted">
-                {counts.ratingsToday === 0
-                  ? "No ratings today yet"
-                  : `${counts.ratingsToday} ${counts.ratingsToday === 1 ? "rating" : "ratings"} today`}
+                {`Your last ${counts.recentCount} ${counts.recentCount === 1 ? "rating" : "ratings"} · `}
+                {counts.ratingsToday === 0 ? "none today yet" : `${counts.ratingsToday} today`}
               </p>
             </>
           )}

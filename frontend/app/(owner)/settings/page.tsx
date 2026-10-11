@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Eye, LifeBuoy, Mail, Shield, Trash2 } from "lucide-react";
+import { CreditCard, Eye, LifeBuoy, Mail, Shield, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 import { AppShell } from "@/features/dashboard/app-shell";
@@ -136,6 +136,20 @@ export default async function SettingsPage() {
 
       <section className="mb-6 flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Account</h2>
+
+        {/* The only way to reach billing once onboarding is over. */}
+        <Link
+          href="/settings/billing"
+          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+            <CreditCard className="size-5 text-muted" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-medium text-ink">Plan and billing</p>
+            <p className="text-sm text-muted">Your plan, messages left, and payment.</p>
+          </div>
+        </Link>
 
         <a
           href="mailto:privacy@reviewboost.app?subject=Delete%20my%20account&body=Please%20delete%20my%20ReviewBoost%20account%20and%20all%20associated%20data."

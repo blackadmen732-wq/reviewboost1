@@ -181,10 +181,26 @@
   gap: clamp(3px, 1.5vw, 8px);
 }
 .star-option {
+  position: relative;
   display: block;
   width: clamp(52px, 16vw, 68px);
   height: clamp(56px, 17vw, 70px);
   flex: 0 0 clamp(52px, 16vw, 68px);
+}
+/* The radio sits invisibly over its star: it keeps keyboard, screen reader
+   and tap behaviour while the label underneath is what people see. */
+.star-option__input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.star-option__input:disabled {
+  cursor: wait;
 }
 .star-option__label {
   display: grid;
@@ -204,7 +220,7 @@
     box-shadow 150ms ease,
     transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.star-option__label:hover {
+.star-option:hover .star-option__label {
   border-color: color-mix(in srgb, var(--rb-star) 64%, var(--rb-border));
   background: color-mix(in srgb, var(--rb-star) 7%, var(--rb-surface));
   color: var(--rb-star);
