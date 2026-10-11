@@ -8,9 +8,9 @@ import {
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Link, useFocusEffect } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import * as Linking from "expo-linking";
-import { Tappable } from "@/components/tappable";
+import { SettingGroup, SettingRow } from "@/components/setting-list";
 import { useAuth } from "@/data/auth-context";
 import { useBilling } from "@/data/use-billing";
 import { accountView } from "@/data/billing-view";
@@ -56,75 +56,50 @@ export default function AccountScreen() {
 
         {view.kind === "ready" && billing ? (
           <>
-            <View style={[styles.card, view.needsAttention ? styles.cardBad : null]}>
-              <Text style={styles.cardLabel}>{view.statusTitle}</Text>
-              <Text style={styles.cardTitle}>{view.planName}</Text>
-              <Text style={styles.cardBody}>{view.statusBody}</Text>
-            </View>
-
-            {included ? (
-              <View style={styles.card}>
-                <Text style={styles.cardLabel}>Your plan includes</Text>
-                <Text style={styles.cardBody}>
-                  {included.locations} {included.locations === 1 ? "place" : "places"} ·{" "}
-                  {included.tags} {included.tags === 1 ? "Tag" : "Tags"} ·{" "}
-                  {included.monthlySmsSegments} messages a month
-                </Text>
-              </View>
-            ) : null}
-
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>Messages left</Text>
-              <Text style={styles.cardTitle}>{billing.smsBalance.total}</Text>
-              <Text style={styles.cardBody}>
-                {billing.smsBalance.monthly} included · {billing.smsBalance.purchased} purchased
-              </Text>
-            </View>
+            <SettingGroup label="Plan">
+              <SettingRow first title={view.planName} description={view.statusBody} value={view.statusTitle} />
+              {included ? (
+                <SettingRow
+                  title="Your plan includes"
+                  description={`${included.locations} ${included.locations === 1 ? "place" : "places"} · ${included.tags} ${included.tags === 1 ? "Tag" : "Tags"} · ${included.monthlySmsSegments} messages a month`}
+                />
+              ) : null}
+              <SettingRow
+                title="Messages left"
+                description={`${billing.smsBalance.monthly} included · ${billing.smsBalance.purchased} purchased`}
+                value={String(billing.smsBalance.total)}
+              />
+            </SettingGroup>
           </>
         ) : null}
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Signed in as</Text>
-          <Text style={styles.cardBody}>{email ?? "—"}</Text>
-        </View>
+        <SettingGroup label="You">
+          <SettingRow first title="Signed in as" value={email ?? "—"} />
+        </SettingGroup>
 
         {/* Apple 5.1.1(i) wants the privacy policy reachable in the app, and
-            1.5 a way to reach us. Plain rows that open the public pages. */}
-        <View style={styles.links}>
+            1.5 a way to reach us. Rows that open the public pages. */}
+        <SettingGroup label="Help">
           {PUBLIC_LINKS.map((link, index) => (
-            <Tappable
-              kind="row"
+            <SettingRow
               key={link.key}
-              style={[styles.linkRow, index > 0 ? styles.linkRowDivider : null]}
+              first={index === 0}
+              title={link.label}
               onPress={() => void Linking.openURL(link.url)}
-              accessibilityRole="link"
               accessibilityHint="Opens in your browser"
-            >
-              <Text style={styles.linkText}>{link.label}</Text>
-              <Text style={styles.linkChevron} accessibilityElementsHidden importantForAccessibility="no">
-                ›
-              </Text>
-            </Tappable>
+            />
           ))}
-        </View>
-
-        <Tappable
-          style={styles.signOut}
-          onPress={() => void logout()}
-          accessibilityRole="button"
-        >
-          <Text style={styles.signOutText}>Sign out</Text>
-        </Tappable>
+        </SettingGroup>
 
         {/* Apple 5.1.1(v): an app that creates accounts has to let someone
-            start deleting one from inside it. Below sign-out and styled as a
-            plain row rather than a second red button, so the destructive one
-            is not the thing a thumb finds first. */}
-        <Link href="/delete-account" asChild>
-          <Tappable kind="row" style={styles.deleteRow} accessibilityRole="button">
-            <Text style={styles.deleteText}>Delete account</Text>
-          </Tappable>
-        </Link>
+            start deleting one from inside it. Below sign out, and tinted
+            rather than given a second red button, so the destructive one is
+            not the thing a thumb finds first. */}
+        <SettingGroup label="Account">
+          <SettingRow first title="Sign out" onPress={() => void logout()} />
+          <SettingRow title="Delete account" tone="danger" href="/delete-account" />
+        </SettingGroup>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -132,45 +107,7 @@ export default function AccountScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  content: { padding: 16, gap: 12 },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-  },
-  cardBad: { borderColor: colors.dangerBorder, backgroundColor: colors.dangerBg },
-  cardLabel: { ...fonts.label, color: colors.inkFaint },
-  cardTitle: { ...fonts.heading, color: colors.ink, marginTop: 2 },
-  cardBody: { ...fonts.body, color: colors.inkMuted, marginTop: 4 },
+  content: { padding: 16, gap: 20 },
   errorBox: { backgroundColor: colors.dangerBg, borderRadius: radii.control, padding: 12 },
   errorText: { ...fonts.body, color: colors.danger },
-  signOut: {
-    marginTop: 8,
-    borderRadius: radii.control,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-    alignItems: "center",
-  },
-  signOutText: { ...fonts.body, color: colors.danger },
-  deleteRow: { padding: 14, alignItems: "center" },
-  links: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  linkRow: {
-    minHeight: 48,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  linkRowDivider: { borderTopWidth: 1, borderTopColor: colors.border },
-  linkText: { ...fonts.body, color: colors.ink, fontSize: 16 },
-  linkChevron: { fontSize: 22, color: colors.inkFaint },
-  deleteText: { ...fonts.body, color: colors.inkMuted },
 });

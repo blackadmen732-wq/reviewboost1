@@ -86,3 +86,57 @@ describe("a colour is written down once", () => {
     expect(mapped.length).toBeGreaterThan(100);
   });
 });
+
+/**
+ * The app is the other door.
+ *
+ * `apps/mobile/theme.ts` is React Native, so it cannot read a CSS custom
+ * property — it keeps its own copy of the colours. That copy had drifted in
+ * three places: border #D8DED9, borderLight #B7C0BA and starFilled #BF7D00
+ * against the web's #dce2de, #b9c3bd and #b97d0c. The stars in the app were
+ * a different gold from the stars on the website.
+ *
+ * It cannot import the palette, so this holds the two together instead. The
+ * mobile-only entries below have no web counterpart and are not checked;
+ * everything that exists on both sides must be the same colour.
+ */
+describe("the app and the website are painted from one palette", () => {
+  const MOBILE_TO_WEB: Record<string, string> = {
+    brand: "brand",
+    brandText: "brand-text",
+    onBrand: "on-brand",
+    brandHover: "brand-hover",
+    brandActive: "brand-active",
+    action: "action",
+    actionHover: "action-hover",
+    actionPressed: "action-pressed",
+    onAction: "on-action",
+    canvas: "canvas",
+    surface: "surface",
+    surfaceAlt: "quiet",
+    ink: "ink",
+    inkFaint: "muted",
+    border: "border",
+    borderLight: "border-strong",
+    danger: "danger",
+    starFilled: "star",
+  };
+
+  it("gives the same name the same colour on both sides", () => {
+    const css = readFileSync(join(process.cwd(), "styles/globals.css"), "utf8");
+    const theme = readFileSync(join(process.cwd(), "../apps/mobile/theme.ts"), "utf8");
+
+    const disagreements: string[] = [];
+    for (const [mobileName, webName] of Object.entries(MOBILE_TO_WEB)) {
+      const web = new RegExp(`--rb-l-${webName}:\\s*(#[0-9a-fA-F]{6})`).exec(css)?.[1];
+      const app = new RegExp(`\\b${mobileName}:\\s*"(#[0-9a-fA-F]{6})"`).exec(theme)?.[1];
+      if (!web || !app) {
+        disagreements.push(`${mobileName}: missing (web ${web ?? "—"}, app ${app ?? "—"})`);
+      } else if (web.toLowerCase() !== app.toLowerCase()) {
+        disagreements.push(`${mobileName}: app ${app} vs web ${web}`);
+      }
+    }
+
+    expect(disagreements).toEqual([]);
+  });
+});

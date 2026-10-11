@@ -20,8 +20,13 @@ export const colors = {
   // darkest surface it sits on.
   inkFaint: "#66706a",
 
-  border: "#D8DED9",
-  borderLight: "#B7C0BA",
+  // The web palette's --rb-border. These three had drifted — #D8DED9,
+  // #B7C0BA and #BF7D00 against the web's #dce2de, #b9c3bd and #b97d0c —
+  // the same names in two places, which is the whole problem. Measured,
+  // the differences are under 0.1:1 on the hairlines and the web's star is
+  // the better one (3.50:1 against 3.42:1, and a star has to clear 3:1).
+  border: "#dce2de",
+  borderLight: "#b9c3bd",
 
   danger: "#b33a3a",
   dangerBg: "#FEF2F2",
@@ -33,7 +38,7 @@ export const colors = {
   infoBg: "#EFF6FF",
   info: "#356d8c",
 
-  starFilled: "#bf7d00",
+  starFilled: "#b97d0c",
   starEmpty: "#D1D5DB",
 
   white: "#FFFFFF",
