@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
@@ -27,10 +28,7 @@ export function FeedbackSummary({ insights }: { insights: FeedbackInsights }) {
   if (total === 0) return null;
 
   return (
-    <section
-      className="mb-8 rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-card)]"
-      aria-labelledby="feedback-summary-heading"
-    >
+    <Card as="section" className="mb-8" aria-labelledby="feedback-summary-heading">
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
           <h2 id="feedback-summary-heading" className="sr-only">
@@ -68,6 +66,6 @@ export function FeedbackSummary({ insights }: { insights: FeedbackInsights }) {
         counts={counts}
         rowHref={(rating) => `/feedback?show=all&rating=${rating}`}
       />
-    </section>
+    </Card>
   );
 }

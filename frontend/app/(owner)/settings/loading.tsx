@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/features/dashboard/app-shell";
@@ -13,14 +14,14 @@ function GroupSkeleton({ rows, labelWidth }: { rows: number; labelWidth: string 
   return (
     <section className="mb-7">
       <Skeleton className={`mb-2 ml-1 h-4 ${labelWidth}`} />
-      <div className="divide-y divide-[color:var(--rb-border-strong)] overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface shadow-[var(--shadow-card)]">
+      <Card pad="none" className="divide-y divide-[color:var(--rb-border-strong)] overflow-hidden">
         {Array.from({ length: rows }, (_, row) => (
           <div key={row} className="flex min-h-14 items-center justify-between gap-4 px-4 py-3">
             <Skeleton className="h-5 w-32" />
             <Skeleton className="h-5 w-24" />
           </div>
         ))}
-      </div>
+      </Card>
     </section>
   );
 }

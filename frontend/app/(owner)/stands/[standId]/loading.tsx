@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import Link from "next/link";
 
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,11 +29,11 @@ export default function TagDetailLoading() {
         </header>
 
         {/* The code card: a square for the code, then the two actions. */}
-        <div className="rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
+        <Card>
           <Skeleton className="mx-auto aspect-square w-full max-w-[280px] rounded-[var(--radius-control)]" />
           <Skeleton className="mt-6 h-14 w-full rounded-[var(--radius-control)]" />
           <Skeleton className="mt-3 h-14 w-full rounded-[var(--radius-control)]" />
-        </div>
+        </Card>
 
         <Skeleton className="h-14 w-full rounded-[var(--radius-control)]" />
       </div>

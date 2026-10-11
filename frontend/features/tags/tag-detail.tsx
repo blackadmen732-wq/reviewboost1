@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { Download, ExternalLink, MoreHorizontal, Printer, Smartphone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -143,7 +144,7 @@ function ManagedTagDetail({ stand }: { stand: Stand }) {
           </button>
         </div>
         {more ? (
-          <div className="mt-3 flex flex-col gap-2 rounded-[var(--radius-card)] border border-border bg-surface p-3">
+          <Card pad="tight" raised={false} className="mt-3 flex flex-col gap-2">
             <Button variant="secondary" onClick={() => window.print()}>
               <Printer className="size-5" aria-hidden="true" />
               Print
@@ -155,11 +156,11 @@ function ManagedTagDetail({ stand }: { stand: Stand }) {
             <Button variant="secondary" onClick={() => setConfirming(true)}>
               Make a new code
             </Button>
-          </div>
+          </Card>
         ) : null}
       </header>
 
-      <section className="rounded-[var(--radius-card)] border border-border bg-surface p-5">
+      <Card as="section" raised={false}>
         {/* The hook already distinguishes loading from expired from failed. The
             view used to collapse all of them into "no objectUrl" and spin
             forever, so an owner whose session had expired watched an
@@ -181,7 +182,7 @@ function ManagedTagDetail({ stand }: { stand: Stand }) {
             Preview customer page
           </Button>
         </div>
-      </section>
+      </Card>
 
       <section>
         <Button variant="action" size="lg" onClick={() => setProgram(true)}>

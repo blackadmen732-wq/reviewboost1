@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
@@ -176,10 +177,7 @@ export function HomePulse({ insights }: { insights: FeedbackInsights }) {
   ].filter((s) => s.n > 0);
 
   return (
-    <section
-      className="rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-card)]"
-      aria-labelledby="home-pulse-heading"
-    >
+    <Card as="section" aria-labelledby="home-pulse-heading">
       <div className="mb-5 flex items-baseline justify-between gap-4">
         <h2 id="home-pulse-heading" className="text-sm font-medium text-muted">
           Last 30 days
@@ -252,6 +250,6 @@ export function HomePulse({ insights }: { insights: FeedbackInsights }) {
           </li>
         ))}
       </ul>
-    </section>
+    </Card>
   );
 }

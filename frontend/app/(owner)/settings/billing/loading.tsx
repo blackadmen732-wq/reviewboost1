@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/features/dashboard/app-shell";
@@ -21,7 +22,7 @@ export default function BillingLoading() {
 
       <div aria-busy="true" aria-label="Loading billing">
         {/* The plan card. */}
-        <div className="rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
+        <Card>
           <div className="flex items-start justify-between gap-4">
             <div>
               <Skeleton className="h-7 w-32" />
@@ -30,18 +31,18 @@ export default function BillingLoading() {
             <Skeleton className="h-6 w-20 rounded-full" />
           </div>
           <Skeleton className="mt-6 h-14 w-full rounded-[var(--radius-control)] sm:max-w-xs" />
-        </div>
+        </Card>
 
         {/* What the plan includes, and what is used of it. */}
         <Skeleton className="mb-3 mt-8 h-4 w-28" />
-        <div className="divide-y divide-[color:var(--rb-border-strong)] overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface shadow-[var(--shadow-card)]">
+        <Card pad="none" className="divide-y divide-[color:var(--rb-border-strong)] overflow-hidden">
           {[0, 1, 2].map((row) => (
             <div key={row} className="flex min-h-14 items-center justify-between gap-4 px-4 py-3">
               <Skeleton className="h-5 w-36" />
               <Skeleton className="h-5 w-16" />
             </div>
           ))}
-        </div>
+        </Card>
       </div>
     </AppShell>
   );

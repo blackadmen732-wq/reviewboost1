@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { ArrowLeft, Check, Download, ExternalLink, Printer, RefreshCw, Store } from "lucide-react";
 import { useState } from "react";
 
@@ -308,7 +309,7 @@ export function OnboardingFlow({ chosenPlan = null }: { chosenPlan?: string | nu
       </div>
 
       {created ? (
-        <div className="w-full rounded-[var(--radius-card)] border border-border bg-surface p-6 shadow-[var(--shadow-card)]">
+        <Card className="w-full">
           {qr.status === "error" || qr.status === "expired" ? (
             <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center">
               <div className="flex flex-col items-center gap-3">
@@ -337,7 +338,7 @@ export function OnboardingFlow({ chosenPlan = null }: { chosenPlan?: string | nu
               <div className="size-8 animate-spin rounded-full border-4 border-border border-t-brand-text" />
             </div>
           )}
-        </div>
+        </Card>
       ) : null}
 
       <div className="flex w-full flex-col gap-3">

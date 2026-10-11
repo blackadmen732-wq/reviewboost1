@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/features/dashboard/app-shell";
@@ -19,7 +20,7 @@ export default function TextRequestsLoading() {
       />
 
       <div aria-busy="true" aria-label="Loading text requests">
-        <div className="rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
+        <Card>
           <Skeleton className="h-4 w-28" />
           <Skeleton className="mt-2 h-7 w-36" />
 
@@ -30,7 +31,7 @@ export default function TextRequestsLoading() {
           <Skeleton className="mt-2 h-14 w-full rounded-[var(--radius-control)]" />
 
           <Skeleton className="mt-6 h-14 w-full rounded-[var(--radius-control)]" />
-        </div>
+        </Card>
 
         <Skeleton className="mb-3 mt-10 h-4 w-24" />
         <div className="divide-y divide-border border-y border-border">

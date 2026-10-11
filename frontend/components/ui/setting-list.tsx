@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -78,9 +79,9 @@ export function SettingGroup({
 
           overflow-hidden so the first and last rows take the card's corners —
           without it a hover or focus background squares them off. */}
-      <div className="divide-y divide-[color:var(--rb-border-strong)] overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface shadow-[var(--shadow-card)]">
+      <Card pad="none" className="divide-y divide-[color:var(--rb-border-strong)] overflow-hidden">
         {children}
-      </div>
+      </Card>
     </section>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { Share, X } from "lucide-react";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
@@ -113,7 +114,7 @@ export function InstallPrompt() {
   const isIos = eligibility === "ios";
 
   return (
-    <div className="mb-6 rounded-[var(--radius-card)] border border-border bg-surface p-4 shadow-[var(--shadow-control)] lg:hidden">
+    <Card pad="tight" raised={false} className="mb-6 shadow-[var(--shadow-control)] lg:hidden">
       <div className="flex items-start gap-3">
         <span className="grid size-11 shrink-0 place-items-center rounded-[22%] bg-brand text-lg font-bold text-on-brand">
           B
@@ -159,6 +160,6 @@ export function InstallPrompt() {
           Add to home screen
         </Button>
       )}
-    </div>
+    </Card>
   );
 }

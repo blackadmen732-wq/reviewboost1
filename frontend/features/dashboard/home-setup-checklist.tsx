@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -22,10 +23,7 @@ export function HomeSetupChecklist({ checklist }: { checklist: SetupChecklist })
   const progress = checklist.completeCount / checklist.total;
 
   return (
-    <section
-      className="mb-12 max-w-[36rem] rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6"
-      aria-labelledby="setup-checklist-heading"
-    >
+    <Card as="section" className="mb-12 max-w-[36rem]" aria-labelledby="setup-checklist-heading">
       <div className="flex items-baseline justify-between gap-4">
         <h2 id="setup-checklist-heading" className="text-base font-semibold text-ink">
           Get set up
@@ -55,7 +53,7 @@ export function HomeSetupChecklist({ checklist }: { checklist: SetupChecklist })
           <ChecklistRow key={item.id} item={item} isNext={checklist.nextIncomplete?.id === item.id} />
         ))}
       </ul>
-    </section>
+    </Card>
   );
 }
 

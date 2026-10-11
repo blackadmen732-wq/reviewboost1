@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { Lock } from "lucide-react";
 import { useState } from "react";
 
@@ -207,7 +208,7 @@ function Meter({
 }) {
   const width = `${Math.round(Math.min(1, Math.max(0, ratio)) * 100)}%`;
   return (
-    <div className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-4 sm:p-5">
+    <Card raised={false} className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-sm text-muted">{label}</p>
         <p className="text-sm font-semibold text-ink tabular-nums">{value}</p>
@@ -221,7 +222,7 @@ function Meter({
         />
       </div>
       {detail ? <p className="text-xs text-muted">{detail}</p> : null}
-    </div>
+    </Card>
   );
 }
 

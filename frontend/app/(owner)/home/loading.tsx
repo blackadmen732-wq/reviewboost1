@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -24,11 +25,7 @@ export default function HomeLoading() {
         </div>
 
         {/* The 30-day pulse: header, three numbers, the band, the split. */}
-        <section
-          className="rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-card)]"
-          aria-busy="true"
-          aria-label="Loading the last 30 days"
-        >
+        <Card as="section" aria-busy="true" aria-label="Loading the last 30 days">
           <div className="mb-5 flex items-baseline justify-between gap-4">
             <Skeleton className="h-5 w-28" />
             <Skeleton className="h-5 w-24" />
@@ -49,7 +46,7 @@ export default function HomeLoading() {
               <Skeleton key={n} className="h-4 w-24" />
             ))}
           </div>
-        </section>
+        </Card>
 
         <section>
           <Skeleton className="mb-2 h-4 w-32" />

@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FeedbackTabs } from "@/features/dashboard/feedback-tabs";
@@ -17,7 +18,7 @@ export default function FeedbackLoading() {
     <OwnerShell>
       <PageHeader title="Feedback" description="Ratings from your customers." />
       <FeedbackTabs />
-      <section className="mb-8 rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
+      <Card as="section" className="mb-8">
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
           <div className="flex items-baseline gap-5">
             <Skeleton className="h-7 w-24" />
@@ -33,7 +34,7 @@ export default function FeedbackLoading() {
             <Skeleton className="h-4 w-10 shrink-0" />
           </div>
         ))}
-      </section>
+      </Card>
 
       <div className="divide-y divide-border border-y border-border" aria-busy="true" aria-label="Loading ratings">
         {[0, 1, 2].map((row) => (
