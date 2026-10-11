@@ -2,6 +2,8 @@ export const colors = {
   brand: "#00a86b",
   brandText: "#007a4d",
   onBrand: "#0d2118",
+  // The web palette's --rb-brand-soft. The tinted circle behind initials.
+  brandSoft: "#e3f5ec",
   brandHover: "#009a61",
   brandActive: "#008f5b",
   action: "#007a4d",

@@ -105,6 +105,7 @@ describe("the app and the website are painted from one palette", () => {
     brand: "brand",
     brandText: "brand-text",
     onBrand: "on-brand",
+    brandSoft: "brand-soft",
     brandHover: "brand-hover",
     brandActive: "brand-active",
     action: "action",

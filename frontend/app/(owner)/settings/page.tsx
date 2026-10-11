@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { CreditCard, Eye, ImageUp, LifeBuoy, Mail, Palette, Shield, Trash2 } from "lucide-react";
+import { CreditCard, Eye, ImageUp, LifeBuoy, Palette, Shield, Trash2 } from "lucide-react";
 import { Fragment } from "react";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { ProfileCard } from "@/features/dashboard/profile-card";
 import { SettingGroup, SettingRow } from "@/components/ui/setting-list";
 import { AppShell } from "@/features/dashboard/app-shell";
 import { GoogleLinkCare } from "@/features/dashboard/google-link-care";
@@ -72,6 +73,8 @@ export default async function SettingsPage() {
   return (
     <AppShell businessName={organization.name}>
       <PageHeader title="Settings" />
+
+      <ProfileCard businessName={organization.name} email={user.email ?? null} />
 
       <SettingGroup label="Business">
         <EditableRow
@@ -160,13 +163,6 @@ export default async function SettingsPage() {
           description="System follows this device. Your choice is kept on this device only."
           trailing={<ThemeControl />}
         />
-      </SettingGroup>
-
-      {/* Not editable. Changing the sign-in address is an account-recovery
-          operation, not a setting — done carelessly it locks someone out of
-          their own business with no way back in. */}
-      <SettingGroup label="You">
-        <SettingRow icon={Mail} title="Signed in as" description={user.email ?? "—"} />
       </SettingGroup>
 
       {/* A real person to contact, and a plain answer about customer data. A

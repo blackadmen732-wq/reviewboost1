@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import * as Linking from "expo-linking";
+import { ProfileCard } from "@/components/profile-card";
 import { SettingGroup, SettingRow } from "@/components/setting-list";
 import { useAuth } from "@/data/auth-context";
 import { useBilling } from "@/data/use-billing";
@@ -54,6 +55,8 @@ export default function AccountScreen() {
           </View>
         ) : null}
 
+        <ProfileCard businessName={activeOrg?.name ?? "Your business"} email={email ?? null} />
+
         {view.kind === "ready" && billing ? (
           <>
             <SettingGroup label="Plan">
@@ -72,10 +75,6 @@ export default function AccountScreen() {
             </SettingGroup>
           </>
         ) : null}
-
-        <SettingGroup label="You">
-          <SettingRow first title="Signed in as" value={email ?? "—"} />
-        </SettingGroup>
 
         {/* Apple 5.1.1(i) wants the privacy policy reachable in the app, and
             1.5 a way to reach us. Rows that open the public pages. */}
