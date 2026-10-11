@@ -132,7 +132,9 @@ describe("one ReviewBoost green", () => {
   it("the Android adaptive background and the web token are that green", () => {
     const app = JSON.parse(read("apps/mobile/app.json"));
     expect(app.expo.android.adaptiveIcon.backgroundColor.toUpperCase()).toBe(BRAND_GREEN);
-    expect(read("frontend/styles/globals.css")).toMatch(/--rb-brand: #00a86b;/i);
+    // The palette declares each colour once; both themes must be the green.
+    expect(read("frontend/styles/globals.css")).toMatch(/--rb-l-brand: #00a86b;/i);
+    expect(read("frontend/styles/globals.css")).toMatch(/--rb-d-brand: #00a86b;/i);
     expect(read("apps/mobile/theme.ts")).toMatch(/brand: "#00a86b"/i);
   });
 

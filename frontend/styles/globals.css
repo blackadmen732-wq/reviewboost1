@@ -28,40 +28,89 @@
   --font-sans: var(--font-geist-sans);
 }
 
+/* ===========================================================================
+   THE PALETTE — the only place in the product a colour is written down.
+   ===========================================================================
+   There used to be eight copies of this. `:root`, the auto dark block, both
+   pinned themes, the website's `.rb-public` and `.rb-public-dark`, the Tag
+   card and the customer card each spelled the same hexes out again, and
+   nothing held them together but hand and memory.
+
+   They had already come apart. The website's dark band carried
+   --rb-border #2a332e and --rb-brand-text #32cf94 while the app's carried
+   #303a34 and #45cf99 — the same two names, two different colours, on the
+   same green-black canvas. Both are unified here on the app's values, which
+   measure better against it (border 1.62:1 against 1.47:1).
+
+   Every scope below now MAPS to these; none of them restates a colour. One
+   house, and the doors open onto the same rooms. `token-sources.test.ts`
+   fails the build if a ninth copy appears. */
+:root {
+  /* light */
+  --rb-l-action: #007a4d;
+  --rb-l-action-hover: #006b43;
+  --rb-l-action-pressed: #005b39;
+  --rb-l-border: #dce2de;
+  --rb-l-border-strong: #b9c3bd;
+  --rb-l-brand: #00a86b;
+  --rb-l-brand-active: #008f5b;
+  --rb-l-brand-hover: #009a61;
+  --rb-l-brand-soft: #e3f5ec;
+  --rb-l-brand-text: #007a4d;
+  --rb-l-canvas: #f6f7f5;
+  --rb-l-danger: #b33a3a;
+  --rb-l-danger-soft: #fce8e8;
+  --rb-l-focus: #005fcc;
+  --rb-l-focus-soft: rgb(0 95 204 / 28%);
+  --rb-l-info: #2663a0;
+  --rb-l-ink: #171a18;
+  --rb-l-muted: #66706a;
+  --rb-l-on-action: #ffffff;
+  --rb-l-on-brand: #0d2118;
+  --rb-l-quiet: #f0f2f0;
+  --rb-l-raised: #ffffff;
+  --rb-l-star: #b97d0c;
+  --rb-l-star-soft: #fff7e5;
+  --rb-l-surface: #ffffff;
+  --rb-l-warning: #9a6415;
+
+  /* dark */
+  --rb-d-action: #32cf94;
+  --rb-d-action-hover: #4ad8a3;
+  --rb-d-action-pressed: #2bb885;
+  --rb-d-border: #303a34;
+  --rb-d-border-strong: #465149;
+  --rb-d-brand: #00a86b;
+  --rb-d-brand-active: #21cf8c;
+  --rb-d-brand-hover: #17c07f;
+  --rb-d-brand-soft: #143729;
+  --rb-d-brand-text: #45cf99;
+  --rb-d-canvas: #0c100e;
+  --rb-d-danger: #ff8f8f;
+  --rb-d-danger-soft: #452323;
+  --rb-d-focus: #7ab8ff;
+  --rb-d-focus-soft: rgb(77 142 255 / 34%);
+  --rb-d-info: #78b5f4;
+  --rb-d-ink: #f7f9f7;
+  --rb-d-muted: #abb5af;
+  --rb-d-on-action: #071b13;
+  --rb-d-on-brand: #071b13;
+  --rb-d-quiet: #19201c;
+  --rb-d-raised: #202722;
+  --rb-d-star: #f2b94b;
+  --rb-d-star-soft: #3a2e14;
+  --rb-d-surface: #131816;
+  --rb-d-warning: #f0b45a;
+}
+
 :root {
   color-scheme: light dark;
   /* Constitution palette, neutrals cooled 2026-09-25: the cream canvas, beige
      quiet surface and brown-gold star read as tan across large areas, and dark
      mode was a warm brown-black. Brand green is identity, never a white-label
      button. Action green is the only filled CTA green. */
-  --rb-canvas: #f6f7f5;
-  --rb-surface: #ffffff;
-  --rb-quiet: #f0f2f0;
-  --rb-ink: #171a18;
-  --rb-muted: #66706a;
-  --rb-border: #dce2de;
-  --rb-border-strong: #b9c3bd;
-  --rb-brand: #00a86b;
-  --rb-brand-hover: #009a61;
-  --rb-brand-active: #008f5b;
-  --rb-brand-soft: #e3f5ec;
-  --rb-brand-text: #007a4d;
-  --rb-on-brand: #0d2118;
-  --rb-action: #007a4d;
-  --rb-action-hover: #006b43;
-  --rb-action-pressed: #005b39;
-  --rb-on-action: #ffffff;
-  --rb-star: #b97d0c;
-  --rb-star-soft: #fff7e5;
-  --rb-warning: #9a6415;
   --rb-warning-soft: #fff6e7;
   --rb-info-soft: #eaf2fb;
-  --rb-raised: #ffffff;
-  --rb-danger: #b33a3a;
-  --rb-danger-soft: #fce8e8;
-  --rb-info: #2663a0;
-  --rb-focus: #005fcc;
-  --rb-focus-soft: rgb(0 95 204 / 28%);
   --radius-control: 12px;
   --radius-card: 16px;
   --rb-space-1: 4px;
@@ -98,100 +147,128 @@
      left that is not colour. */
   --shadow-card: 0 1px 2px rgb(23 26 24 / 5%), 0 4px 12px rgb(23 26 24 / 4%);
   --shadow-float: 0 -1px 0 rgb(23 26 24 / 8%);
+  --rb-action: var(--rb-l-action);
+  --rb-action-hover: var(--rb-l-action-hover);
+  --rb-action-pressed: var(--rb-l-action-pressed);
+  --rb-border: var(--rb-l-border);
+  --rb-border-strong: var(--rb-l-border-strong);
+  --rb-brand: var(--rb-l-brand);
+  --rb-brand-active: var(--rb-l-brand-active);
+  --rb-brand-hover: var(--rb-l-brand-hover);
+  --rb-brand-soft: var(--rb-l-brand-soft);
+  --rb-brand-text: var(--rb-l-brand-text);
+  --rb-canvas: var(--rb-l-canvas);
+  --rb-danger: var(--rb-l-danger);
+  --rb-danger-soft: var(--rb-l-danger-soft);
+  --rb-focus: var(--rb-l-focus);
+  --rb-focus-soft: var(--rb-l-focus-soft);
+  --rb-info: var(--rb-l-info);
+  --rb-ink: var(--rb-l-ink);
+  --rb-muted: var(--rb-l-muted);
+  --rb-on-action: var(--rb-l-on-action);
+  --rb-on-brand: var(--rb-l-on-brand);
+  --rb-quiet: var(--rb-l-quiet);
+  --rb-raised: var(--rb-l-raised);
+  --rb-star: var(--rb-l-star);
+  --rb-star-soft: var(--rb-l-star-soft);
+  --rb-surface: var(--rb-l-surface);
+  --rb-warning: var(--rb-l-warning);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --rb-canvas: #0c100e;
-    --rb-surface: #131816;
-    --rb-quiet: #19201c;
-    --rb-ink: #f7f9f7;
-    --rb-muted: #abb5af;
-    --rb-border: #303a34;
-    --rb-border-strong: #465149;
-    --rb-brand: #00a86b;
-    --rb-brand-hover: #17c07f;
-    --rb-brand-active: #21cf8c;
-    --rb-brand-soft: #143729;
-    --rb-brand-text: #45cf99;
-    --rb-on-brand: #071b13;
-    --rb-action: #32cf94;
-    --rb-action-hover: #4ad8a3;
-    --rb-action-pressed: #2bb885;
-    --rb-on-action: #071b13;
-    --rb-star: #f2b94b;
-    --rb-star-soft: #3a2e14;
-    --rb-danger: #ff8f8f;
-    --rb-danger-soft: #452323;
-    --rb-info: #78b5f4;
-  --rb-warning: #f0b45a;
-  --rb-raised: #202722;
-    --rb-focus: #7ab8ff;
-    --rb-focus-soft: rgb(77 142 255 / 34%);
     --shadow-control: 0 1px 0 rgb(0 0 0 / 40%);
     --shadow-button: 0 1px 0 rgb(0 0 0 / 40%);
     --shadow-button-hover: 0 1px 0 rgb(0 0 0 / 50%);
     --shadow-card: 0 1px 2px rgb(0 0 0 / 45%), 0 4px 14px rgb(0 0 0 / 32%);
     --shadow-float: 0 -1px 0 rgb(0 0 0 / 50%);
-  }
+  --rb-action: var(--rb-d-action);
+  --rb-action-hover: var(--rb-d-action-hover);
+  --rb-action-pressed: var(--rb-d-action-pressed);
+  --rb-border: var(--rb-d-border);
+  --rb-border-strong: var(--rb-d-border-strong);
+  --rb-brand: var(--rb-d-brand);
+  --rb-brand-active: var(--rb-d-brand-active);
+  --rb-brand-hover: var(--rb-d-brand-hover);
+  --rb-brand-soft: var(--rb-d-brand-soft);
+  --rb-brand-text: var(--rb-d-brand-text);
+  --rb-canvas: var(--rb-d-canvas);
+  --rb-danger: var(--rb-d-danger);
+  --rb-danger-soft: var(--rb-d-danger-soft);
+  --rb-focus: var(--rb-d-focus);
+  --rb-focus-soft: var(--rb-d-focus-soft);
+  --rb-info: var(--rb-d-info);
+  --rb-ink: var(--rb-d-ink);
+  --rb-muted: var(--rb-d-muted);
+  --rb-on-action: var(--rb-d-on-action);
+  --rb-on-brand: var(--rb-d-on-brand);
+  --rb-quiet: var(--rb-d-quiet);
+  --rb-raised: var(--rb-d-raised);
+  --rb-star: var(--rb-d-star);
+  --rb-star-soft: var(--rb-d-star-soft);
+  --rb-surface: var(--rb-d-surface);
+  --rb-warning: var(--rb-d-warning);
+}
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --rb-canvas: #f6f7f5;
-  --rb-surface: #ffffff;
-  --rb-quiet: #f0f2f0;
-  --rb-ink: #171a18;
-  --rb-muted: #66706a;
-  --rb-border: #dce2de;
-  --rb-border-strong: #b9c3bd;
-  --rb-brand: #00a86b;
-  --rb-brand-hover: #009a61;
-  --rb-brand-active: #008f5b;
-  --rb-brand-soft: #e3f5ec;
-  --rb-brand-text: #007a4d;
-  --rb-on-brand: #0d2118;
-  --rb-action: #007a4d;
-  --rb-action-hover: #006b43;
-  --rb-action-pressed: #005b39;
-  --rb-on-action: #ffffff;
-  --rb-star: #b97d0c;
-  --rb-star-soft: #fff7e5;
-  --rb-danger: #b33a3a;
-  --rb-danger-soft: #fce8e8;
-  --rb-info: #2663a0;
-  --rb-focus: #005fcc;
-  --rb-focus-soft: rgb(0 95 204 / 28%);
+  --rb-action: var(--rb-l-action);
+  --rb-action-hover: var(--rb-l-action-hover);
+  --rb-action-pressed: var(--rb-l-action-pressed);
+  --rb-border: var(--rb-l-border);
+  --rb-border-strong: var(--rb-l-border-strong);
+  --rb-brand: var(--rb-l-brand);
+  --rb-brand-active: var(--rb-l-brand-active);
+  --rb-brand-hover: var(--rb-l-brand-hover);
+  --rb-brand-soft: var(--rb-l-brand-soft);
+  --rb-brand-text: var(--rb-l-brand-text);
+  --rb-canvas: var(--rb-l-canvas);
+  --rb-danger: var(--rb-l-danger);
+  --rb-danger-soft: var(--rb-l-danger-soft);
+  --rb-focus: var(--rb-l-focus);
+  --rb-focus-soft: var(--rb-l-focus-soft);
+  --rb-info: var(--rb-l-info);
+  --rb-ink: var(--rb-l-ink);
+  --rb-muted: var(--rb-l-muted);
+  --rb-on-action: var(--rb-l-on-action);
+  --rb-on-brand: var(--rb-l-on-brand);
+  --rb-quiet: var(--rb-l-quiet);
+  --rb-raised: var(--rb-l-raised);
+  --rb-star: var(--rb-l-star);
+  --rb-star-soft: var(--rb-l-star-soft);
+  --rb-surface: var(--rb-l-surface);
+  --rb-warning: var(--rb-l-warning);
 }
 :root[data-theme="dark"],
 .dark {
   color-scheme: dark;
-  --rb-canvas: #0c100e;
-  --rb-surface: #131816;
-  --rb-quiet: #19201c;
-  --rb-ink: #f7f9f7;
-  --rb-muted: #abb5af;
-  --rb-border: #303a34;
-  --rb-border-strong: #465149;
-  --rb-brand: #00a86b;
-  --rb-brand-hover: #17c07f;
-  --rb-brand-active: #21cf8c;
-  --rb-brand-soft: #143729;
-  --rb-brand-text: #45cf99;
-  --rb-on-brand: #071b13;
-  --rb-action: #32cf94;
-  --rb-action-hover: #4ad8a3;
-  --rb-action-pressed: #2bb885;
-  --rb-on-action: #071b13;
-  --rb-star: #f2b94b;
-  --rb-star-soft: #3a2e14;
-  --rb-danger: #ff8f8f;
-  --rb-danger-soft: #452323;
-  --rb-info: #78b5f4;
-  --rb-warning: #f0b45a;
-  --rb-raised: #202722;
-  --rb-focus: #7ab8ff;
-  --rb-focus-soft: rgb(77 142 255 / 34%);
+  --rb-action: var(--rb-d-action);
+  --rb-action-hover: var(--rb-d-action-hover);
+  --rb-action-pressed: var(--rb-d-action-pressed);
+  --rb-border: var(--rb-d-border);
+  --rb-border-strong: var(--rb-d-border-strong);
+  --rb-brand: var(--rb-d-brand);
+  --rb-brand-active: var(--rb-d-brand-active);
+  --rb-brand-hover: var(--rb-d-brand-hover);
+  --rb-brand-soft: var(--rb-d-brand-soft);
+  --rb-brand-text: var(--rb-d-brand-text);
+  --rb-canvas: var(--rb-d-canvas);
+  --rb-danger: var(--rb-d-danger);
+  --rb-danger-soft: var(--rb-d-danger-soft);
+  --rb-focus: var(--rb-d-focus);
+  --rb-focus-soft: var(--rb-d-focus-soft);
+  --rb-info: var(--rb-d-info);
+  --rb-ink: var(--rb-d-ink);
+  --rb-muted: var(--rb-d-muted);
+  --rb-on-action: var(--rb-d-on-action);
+  --rb-on-brand: var(--rb-d-on-brand);
+  --rb-quiet: var(--rb-d-quiet);
+  --rb-raised: var(--rb-d-raised);
+  --rb-star: var(--rb-d-star);
+  --rb-star-soft: var(--rb-d-star-soft);
+  --rb-surface: var(--rb-d-surface);
+  --rb-warning: var(--rb-d-warning);
 }
 
 /* These are resets, so they belong in Tailwind's base layer.

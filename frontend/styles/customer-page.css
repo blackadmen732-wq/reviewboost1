@@ -133,30 +133,33 @@ html:has(.customer-live) {
  * The hero above is dark artwork in both modes for the same reason: this is a
  * printed-feeling page a customer sees once, not a themed surface. */
 .visit-card {
-  --rb-canvas: #f6f7f5;
-  --rb-surface: #ffffff;
-  --rb-quiet: #f0f2f0;
-  --rb-ink: #171a18;
-  --rb-muted: #66706a;
-  --rb-border: #dce2de;
-  --rb-border-strong: #b9c3bd;
-  --rb-brand-hover: #009a61;
-  --rb-brand-active: #008f5b;
-  --rb-brand-soft: #e3f5ec;
-  --rb-brand-text: #007a4d;
-  --rb-on-brand: #0d2118;
-  --rb-action: #007a4d;
-  --rb-action-hover: #006b43;
-  --rb-action-pressed: #005b39;
-  --rb-on-action: #ffffff;
-  --rb-star: #b97d0c;
-  --rb-star-soft: #fff7e5;
-  --rb-danger: #b33a3a;
-  --rb-danger-soft: #fce8e8;
-  --rb-info: #2663a0;
-  --rb-focus: #005fcc;
-  --rb-focus-soft: rgb(0 95 204 / 28%);
   color: #171a18;
+  --rb-action: var(--rb-l-action);
+  --rb-action-hover: var(--rb-l-action-hover);
+  --rb-action-pressed: var(--rb-l-action-pressed);
+  --rb-border: var(--rb-l-border);
+  --rb-border-strong: var(--rb-l-border-strong);
+  --rb-brand: var(--rb-l-brand);
+  --rb-brand-active: var(--rb-l-brand-active);
+  --rb-brand-hover: var(--rb-l-brand-hover);
+  --rb-brand-soft: var(--rb-l-brand-soft);
+  --rb-brand-text: var(--rb-l-brand-text);
+  --rb-canvas: var(--rb-l-canvas);
+  --rb-danger: var(--rb-l-danger);
+  --rb-danger-soft: var(--rb-l-danger-soft);
+  --rb-focus: var(--rb-l-focus);
+  --rb-focus-soft: var(--rb-l-focus-soft);
+  --rb-info: var(--rb-l-info);
+  --rb-ink: var(--rb-l-ink);
+  --rb-muted: var(--rb-l-muted);
+  --rb-on-action: var(--rb-l-on-action);
+  --rb-on-brand: var(--rb-l-on-brand);
+  --rb-quiet: var(--rb-l-quiet);
+  --rb-raised: var(--rb-l-raised);
+  --rb-star: var(--rb-l-star);
+  --rb-star-soft: var(--rb-l-star-soft);
+  --rb-surface: var(--rb-l-surface);
+  --rb-warning: var(--rb-l-warning);
 }
 
 /* The approved reference, measured from its pixels at a 390pt-wide screen

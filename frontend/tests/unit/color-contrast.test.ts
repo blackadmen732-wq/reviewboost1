@@ -18,16 +18,25 @@ import { describe, expect, it } from "vitest";
 
 const CSS = readFileSync(join(process.cwd(), "styles/globals.css"), "utf8");
 
-/** Read a custom property out of a specific theme block. */
+/**
+ * Read a custom property for one theme.
+ *
+ * Both themes are now declared once, as `--rb-l-*` and `--rb-d-*`, and every
+ * scope in the product — the app, the website, the Tag card, the customer
+ * card — maps to those. So this reads the palette directly and the numbers
+ * below cover all of them at once.
+ *
+ * It used to take the first `--rb-x: #hex` in the file for light and the last
+ * for dark, which only worked while the blocks happened to be declared in
+ * that order. Naming the entry is exact; it also fails loudly rather than
+ * silently grading the wrong colour if the file is ever reordered.
+ */
 function token(name: string, block: "light" | "dark"): string {
-  // `:root` carries light; the dark values live under the media query and the
-  // explicit `[data-theme="dark"]` selector. Taking the first match for light
-  // and the last for dark is enough because the file declares them in order.
-  const pattern = new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{3,8})`, "g");
-  const found = [...CSS.matchAll(pattern)].map((match) => match[1] as string);
+  const entry = name.replace(/^rb-/, block === "light" ? "rb-l-" : "rb-d-");
+  const match = new RegExp(`--${entry}:\\s*(#[0-9a-fA-F]{3,8})`).exec(CSS);
 
-  if (found.length === 0) throw new Error(`token --${name} not found`);
-  return block === "light" ? (found[0] as string) : (found[found.length - 1] as string);
+  if (!match) throw new Error(`token --${entry} not found`);
+  return match[1] as string;
 }
 
 function channel(value: number): number {
