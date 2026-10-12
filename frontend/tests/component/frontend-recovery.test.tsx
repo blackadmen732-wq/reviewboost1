@@ -60,12 +60,12 @@ it("keeps mobile Settings separate from the four daily destinations", () => {
 it("keeps the email and restores Continue when requesting a code loses the network", async () => {
   auth.signInWithOtp.mockRejectedValueOnce(new TypeError("Failed to fetch"));
   render(<SignInFlow next="/home" />);
-  fireEvent.change(screen.getByLabelText("Email"), {
+  fireEvent.change(screen.getByLabelText("Email address"), {
     target: { value: "owner@example.test" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   await screen.findByText(/could not reach reviewboost/i);
-  expect(screen.getByLabelText("Email")).toHaveValue("owner@example.test");
+  expect(screen.getByLabelText("Email address")).toHaveValue("owner@example.test");
   expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
 });
 

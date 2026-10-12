@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AuthFrame } from "@/features/auth/auth-frame";
+import { ProviderAccountNotice } from "@/features/auth/provider-account-notice";
 import { OnboardingFlow } from "@/features/onboarding/onboarding-flow";
 import { billingForPlan, parsePlanChoice } from "@/lib/owner/plan-choice";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -43,8 +44,14 @@ export default async function OnboardingPage({
   if (existing && existing.length > 0)
     redirect(selectedPlan ? billingForPlan(selectedPlan) : "/home");
 
+  // Arrived through Apple or Google with no business yet: make sure this is
+  // not an existing owner who reached a fresh account by another door.
+  const provider = user.app_metadata?.provider;
+  const viaProvider = provider === "apple" || provider === "google" ? provider : null;
+
   return (
     <AuthFrame align="start">
+      {viaProvider ? <ProviderAccountNotice provider={viaProvider} email={user.email ?? null} /> : null}
       <OnboardingFlow selectedPlan={selectedPlan} />
     </AuthFrame>
   );

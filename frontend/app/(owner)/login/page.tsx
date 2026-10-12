@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AuthFrame } from "@/features/auth/auth-frame";
 import { SignInFlow } from "@/features/auth/sign-in-flow";
 import { isGetStartedNext } from "@/features/public/public-copy";
+import { enabledOAuthProviders, oauthErrorCode } from "@/lib/auth/oauth-providers";
 import { safeInternalPath } from "@/lib/security/safe-redirect";
 import { publicFrontendUrl } from "@/lib/server/env";
 import { currentUser } from "@/lib/supabase/server";
@@ -26,10 +27,10 @@ export async function generateMetadata({
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
   const user = await currentUser();
-  const { next } = await searchParams;
+  const { next, error } = await searchParams;
 
   // The guarded accessor rather than a silent localhost fallback: in
   // production it throws if PUBLIC_FRONTEND_URL is unset instead of validating
@@ -43,6 +44,8 @@ export default async function LoginPage({
       <SignInFlow
         next={destination}
         intent={isGetStartedNext(destination) ? "start" : "signin"}
+        providers={enabledOAuthProviders()}
+        oauthError={oauthErrorCode(error)}
       />
     </AuthFrame>
   );

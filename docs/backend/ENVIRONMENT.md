@@ -95,6 +95,10 @@ truth; apply it with `supabase config push`, or set each value in the dashboard
 | Confirm signup template | same code-first wording | So first sign-in looks identical if confirmations are ever enabled. See `supabase/templates/confirmation.html`. |
 | Custom SMTP | Resend, sender `ReviewBoost <no-reply@reviewboost.fit>` | The verified `reviewboost.fit` domain (DKIM + SPF). |
 
+Apple and Google sign-in are off by default (`NEXT_PUBLIC_AUTH_APPLE_ENABLED`,
+`NEXT_PUBLIC_AUTH_GOOGLE_ENABLED`). Provider setup, redirect URLs and account
+linking rules: `docs/auth/SOCIAL_SIGN_IN.md`.
+
 ## Migration History Repair
 
 The Supabase MCP `apply_migration` names migrations with a server-generated

@@ -540,3 +540,49 @@ textarea {
      the viewport, not this wrapper, as their containing block. */
   animation: page-enter 180ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
 }
+
+/* --------------------------------------------------------------------------
+   Sign-in provider buttons
+   --------------------------------------------------------------------------
+   Apple and Google publish fixed colours for their buttons; these are theirs,
+   not ReviewBoost tokens. Apple: black on a light page, white on a dark one.
+   Google: white with a #747775 outline on light, #131314 with #8E918F on dark.
+   -------------------------------------------------------------------------- */
+:root {
+  --oauth-apple-bg: #000000;
+  --oauth-apple-fg: #ffffff;
+  --oauth-google-bg: #ffffff;
+  --oauth-google-fg: #1f1f1f;
+  --oauth-google-border: #747775;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --oauth-apple-bg: #ffffff;
+    --oauth-apple-fg: #000000;
+    --oauth-google-bg: #131314;
+    --oauth-google-fg: #e3e3e3;
+    --oauth-google-border: #8e918f;
+  }
+}
+:root[data-theme="dark"],
+.dark {
+  --oauth-apple-bg: #ffffff;
+  --oauth-apple-fg: #000000;
+  --oauth-google-bg: #131314;
+  --oauth-google-fg: #e3e3e3;
+  --oauth-google-border: #8e918f;
+}
+.oauth-apple {
+  border-color: var(--oauth-apple-bg);
+  background: var(--oauth-apple-bg);
+  color: var(--oauth-apple-fg);
+}
+.oauth-google {
+  border-color: var(--oauth-google-border);
+  background: var(--oauth-google-bg);
+  color: var(--oauth-google-fg);
+}
+.oauth-apple:not(:disabled):hover,
+.oauth-google:not(:disabled):hover {
+  opacity: 0.88;
+}

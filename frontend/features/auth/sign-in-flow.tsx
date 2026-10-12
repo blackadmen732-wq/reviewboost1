@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { CodeInput } from "@/components/ui/code-input";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
+import { OAuthButtons } from "@/features/auth/oauth-buttons";
+import {
+  OAUTH_ERROR_MESSAGES,
+  type OAuthErrorCode,
+  type OAuthProvider,
+  oauthRedirectTo,
+} from "@/lib/auth/oauth-providers";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -14,6 +21,11 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
  *
  * Login and Get started are the same door. Verify is the code on the next
  * screen. No Wordmark here — the page chrome already shows ReviewBoostLogo.
+ *
+ * Apple and Google sit under the email door as equal alternatives, only when
+ * they are switched on. They go through Supabase Auth (PKCE) and come back via
+ * /auth/callback to the same `next`, so the session, the business membership
+ * and every role check are the same whichever door was used.
  */
 
 type Step = "email" | "verify";
@@ -23,14 +35,28 @@ const RESEND_SECONDS = 30;
 export function SignInFlow({
   next,
   intent = "signin",
+  providers = [],
+  oauthError = null,
+  cancelHref = "/",
 }: {
   next: string;
   intent?: "signin" | "start";
+  /** Providers that are configured and switched on. Empty: email only. */
+  providers?: readonly OAuthProvider[];
+  /** Why the last Apple/Google attempt came back to this page, if it did. */
+  oauthError?: OAuthErrorCode | null;
+  /** Where Cancel goes. */
+  cancelHref?: string;
 }) {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A cancelled Apple/Google sheet is information, not an error.
+  const [providerNotice, setProviderNotice] = useState<{ text: string; calm: boolean } | null>(
+    oauthError ? { text: OAUTH_ERROR_MESSAGES[oauthError], calm: oauthError === "cancelled" } : null,
+  );
+  const [opening, setOpening] = useState<OAuthProvider | null>(null);
   const [resetToken, setResetToken] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const emailField = useRef<HTMLInputElement>(null);
@@ -69,6 +95,30 @@ export function SignInFlow({
       setBusy(false);
     }
   }, []);
+
+  async function continueWith(provider: OAuthProvider) {
+    setOpening(provider);
+    setError(null);
+    setProviderNotice(null);
+    try {
+      // On success the browser leaves for Apple or Google; nothing after this
+      // line runs. Only a refusal to start comes back here.
+      const { error: oauthStartError } = await supabaseBrowser().auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: oauthRedirectTo(window.location.origin, next) },
+      });
+      if (oauthStartError) {
+        setProviderNotice({ text: OAUTH_ERROR_MESSAGES.failed, calm: false });
+        setOpening(null);
+      }
+    } catch {
+      setProviderNotice({
+        text: "Could not reach ReviewBoost. Check your connection and try again.",
+        calm: false,
+      });
+      setOpening(null);
+    }
+  }
 
   async function handleEmailSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -173,27 +223,37 @@ export function SignInFlow({
     );
   }
 
+  const locked = busy || opening !== null;
+
   return (
     <form
       onSubmit={handleEmailSubmit}
-      className="flex flex-col gap-8"
+      className="flex flex-col gap-6"
       noValidate
       data-auth-step="login"
       data-auth-intent={intent}
     >
-      <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-4 border-b border-border pb-4">
         <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.02em] text-ink">
           {intent === "start" ? "Get started" : "Sign in"}
         </h1>
-        <p className="text-base leading-relaxed text-muted">
-          Use your business email. We will send you a code to sign in. No
-          password to remember.
-        </p>
+        <a
+          href={cancelHref}
+          className="-mr-2 inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-2 text-base font-medium text-brand-text focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
+          Cancel
+        </a>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <label htmlFor="email" className="text-base font-medium text-ink">
-          Email
+      {providerNotice ? (
+        <InlineNotice kind={providerNotice.calm ? "info" : "error"} blocking={!providerNotice.calm}>
+          {providerNotice.text}
+        </InlineNotice>
+      ) : null}
+
+      <div className="flex flex-col gap-2">
+        <label htmlFor="email" className="text-sm font-medium text-ink">
+          Email address
         </label>
         <Input
           ref={emailField}
@@ -205,27 +265,47 @@ export function SignInFlow({
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
-          autoFocus
+          autoFocus={providers.length === 0}
           placeholder="you@yourbusiness.com"
           value={email}
+          disabled={opening !== null}
+          aria-describedby="email-hint"
           onChange={(event) => {
             setEmail(event.target.value);
             setError(null);
           }}
-          className="h-16 text-lg"
         />
+        <p id="email-hint" className="text-sm text-muted">
+          We’ll email you a 6-digit code. No password.
+        </p>
         {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
       </div>
 
       <Button
         type="submit"
         variant="action"
-        size="lg"
         loading={busy}
         loadingLabel="Sending…"
+        disabled={opening !== null}
       >
         Continue
       </Button>
+
+      {providers.length > 0 ? (
+        <>
+          <div className="flex items-center gap-4" aria-hidden="true">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-sm text-muted">or</span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+          <OAuthButtons
+            providers={providers}
+            busy={opening}
+            disabled={locked}
+            onSelect={(provider) => void continueWith(provider)}
+          />
+        </>
+      ) : null}
 
       <p className="text-sm leading-relaxed text-muted">
         By continuing you agree to our{" "}
