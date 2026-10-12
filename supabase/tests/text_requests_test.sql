@@ -136,7 +136,7 @@ select is(
 -- Consent is owner/admin only.
 select tests.set_service();
 select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('1', 64),
-    'v1:enc', 1::smallint, '1111', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+    'v1:enc', 1::smallint, '1111', 'review_request', 'opted_in', 'owner_import', null, '{"method":"in_person","attested_by":"test","wording_version":"owner-attestation-v1"}'::jsonb, now());
 
 select tests.set_actor('7b000000-0000-0000-0000-000000000003'); -- member
 select is(
@@ -191,7 +191,7 @@ select is(
 
 -- Re-opt-in PH1 for gate tests.
 select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('1',64),
-    null, 1::smallint, null, 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+    null, 1::smallint, null, 'review_request', 'opted_in', 'owner_import', null, '{"method":"in_person","attested_by":"test","wording_version":"owner-attestation-v1"}'::jsonb, now());
 
 select is(
     (select allowed from app.sms_can_send('7c000000-0000-0000-0000-00000000000a', repeat('1',64), 'review_request')),
@@ -252,7 +252,7 @@ select is(
     false, 'a STOP before any consent row still blocks (phone-level opt-out)');
 
 select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('3',64),
-    'v1:enc', 1::smallint, '3333', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+    'v1:enc', 1::smallint, '3333', 'review_request', 'opted_in', 'owner_import', null, '{"method":"in_person","attested_by":"test","wording_version":"owner-attestation-v1"}'::jsonb, now());
 select is(
     (select allowed from app.sms_can_send('7c000000-0000-0000-0000-00000000000a', repeat('3',64), 'review_request')),
     false, 'a later owner opt-in does not override the customer''s earlier STOP');
@@ -340,7 +340,7 @@ select is(
 
 -- Recipient PH2 needs consent for the send to pass the gate.
 select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('2',64),
-    'v1:enc', 1::smallint, '2222', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+    'v1:enc', 1::smallint, '2222', 'review_request', 'opted_in', 'owner_import', null, '{"method":"in_person","attested_by":"test","wording_version":"owner-attestation-v1"}'::jsonb, now());
 
 select is(
     (select outcome from app.sms_begin_dispatch(
@@ -388,7 +388,7 @@ select is(
 -- Quiet-hours defer: a due job whose recipient is currently inside quiet hours
 -- is deferred to the next window rather than sent, and no attempt is opened.
 select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('5',64),
-    'v1:enc', 1::smallint, '5555', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+    'v1:enc', 1::smallint, '5555', 'review_request', 'opted_in', 'owner_import', null, '{"method":"in_person","attested_by":"test","wording_version":"owner-attestation-v1"}'::jsonb, now());
 select app.sms_schedule_request(
     '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
     repeat('5',64), 'v1:enc', 1::smallint, '5555', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
@@ -406,7 +406,7 @@ select is(
 -- stuck at sending, attempt never settled) is parked as provider_unknown on the
 -- next claim, never re-sent and never left stuck forever.
 select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('6',64),
-    'v1:enc', 1::smallint, '6666', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+    'v1:enc', 1::smallint, '6666', 'review_request', 'opted_in', 'owner_import', null, '{"method":"in_person","attested_by":"test","wording_version":"owner-attestation-v1"}'::jsonb, now());
 select app.sms_schedule_request(
     '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
     repeat('6',64), 'v1:enc', 1::smallint, '6666', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',
@@ -466,7 +466,7 @@ select is(
 -- duplicate-send guard. Uses a fresh recipient (PH4) that is opted in and has no
 -- recent_send suppression, so begin_dispatch actually opens an attempt.
 select app.sms_record_consent('7c000000-0000-0000-0000-00000000000a', repeat('4',64),
-    'v1:enc', 1::smallint, '4444', 'review_request', 'opted_in', 'owner_import', null, '{}'::jsonb, now());
+    'v1:enc', 1::smallint, '4444', 'review_request', 'opted_in', 'owner_import', null, '{"method":"in_person","attested_by":"test","wording_version":"owner-attestation-v1"}'::jsonb, now());
 select app.sms_schedule_request(
     '7c000000-0000-0000-0000-00000000000a', '7d000000-0000-0000-0000-00000000000a', '7e000000-0000-0000-0000-00000000000a',
     repeat('4',64), 'v1:enc', 1::smallint, '4444', 'v1:msg', 1::smallint, 'gsm7', 40, 1, 7500, 'USD',

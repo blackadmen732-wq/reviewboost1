@@ -23,6 +23,24 @@ one-to-one Text Requests with honest consent.
 These ship value without any integration: they make today's Text Requests
 honest. They are small and independent, so they go first.
 
+**Phase 0 code status (on this branch, not merged):** F-1, F-2 and approved
+templates are implemented. Differences from the target contracts above, all
+because no connected contacts exist yet:
+
+- Consent is recorded at `POST /api/v1/text-requests/consent`, keyed by phone
+  and Tag rather than `customerId`; the wording version is the string
+  `owner-attestation-v1` in `frontend/lib/sms/text-request-templates.ts`
+  rather than a row id. Doc 13's `/consent-attestations` replaces it in Phase 3.
+- The two approved messages are "Thanks for visiting today. How did we do?
+  {link}" and "How was your visit? Tell us here: {link}". No `{first_name}`
+  yet, because a typed number has no name.
+- A blocked send returns `409 not_eligible` with the owner-facing reason;
+  the full multi-reason list (doc 7) arrives with the eligibility function in
+  Phase 1.
+- Migration `20261012000100_consent_requires_evidence.sql` resets earlier
+  evidence-free owner opt-ins to `unknown` and adds a `NOT VALID` check that
+  new ones carry `method`, `attested_by` and `wording_version`.
+
 ## Phase 1 — Foundation (no provider)
 
 **Depends on:** Phase 0 decisions; #74 disposition.
