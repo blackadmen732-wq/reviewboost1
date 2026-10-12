@@ -1,0 +1,38 @@
+{
+  "checkedAt": "2026-10-12",
+  "purpose": "User-selected references, not product dependencies. No copied application code.",
+  "references": [
+    {
+      "name": "shadcn-ui",
+      "url": "https://github.com/shadcn-ui/ui.git",
+      "commit": "02cad61166c4c20edbc8a3f71bd720eed4c1f49b",
+      "destination": "design-kit",
+      "skill": null,
+      "license": "MIT"
+    },
+    {
+      "name": "impeccable",
+      "url": "https://github.com/pbakaus/impeccable.git",
+      "commit": "c63b8dd7dd5a5f3c32eaabe1af76d0694f863ed2",
+      "destination": ".local/design-references/impeccable",
+      "skill": "plugin/skills/impeccable",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "awesome-design-md",
+      "url": "https://github.com/taffy-owo/codex-skill-awesome-design-md.git",
+      "commit": "fdb65612913ac5ea951a5cda23f3093ccd15d42b",
+      "destination": ".local/design-references/awesome-design-md",
+      "skill": "awesome-design-md",
+      "license": "See upstream LICENSE and template source attribution"
+    },
+    {
+      "name": "ui-design-agent",
+      "url": "https://github.com/muzimu217/ui-design-agent-kit.git",
+      "commit": "31120ca32cb4479a49d555037a51e46a147092e5",
+      "destination": ".local/design-references/ui-design-agent-kit",
+      "skill": ".agents/skills/ui-design-agent",
+      "license": "Apache-2.0"
+    }
+  ]
+}
