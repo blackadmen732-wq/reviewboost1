@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Eye, LifeBuoy, Mail, Shield, Trash2 } from "lucide-react";
+import { Eye, LifeBuoy, Mail, Plug, Shield, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 import { AppShell } from "@/features/dashboard/app-shell";
@@ -84,6 +84,26 @@ export default async function SettingsPage() {
           </div>
         </div>
       </section>
+
+      {/* Owners and admins only: connecting an app reads customer data. Not a
+          new nav destination; it is set up once and then left alone. */}
+      {["owner", "admin"].includes(organization.role) ? (
+        <section className="mb-6 flex flex-col gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Apps</h2>
+          <Link
+            href="/settings/connections"
+            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+              <Plug className="size-5 text-muted" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-medium text-ink">Connections</p>
+              <p className="text-sm text-muted">Bring in customers from the apps you already use.</p>
+            </div>
+          </Link>
+        </section>
+      ) : null}
 
       {/* A real person to contact, and a plain answer about customer data. A
           barber deciding whether to put our code on their counter wants to know

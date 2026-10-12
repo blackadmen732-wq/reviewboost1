@@ -40,6 +40,16 @@ export const ERROR_CODE = {
   // Text Requests: this recipient may not be texted (no recorded consent, an
   // opt-out, a suppression). Client-actionable, and never billed.
   notEligible: "not_eligible",
+  // Connections. Each is something the owner can act on, so each has its own
+  // code and its own sentence in the UI.
+  connectionStateInvalid: "connection_state_invalid",
+  providerUnavailable: "provider_unavailable",
+  oauthStateInvalid: "oauth_state_invalid",
+  oauthDenied: "oauth_denied",
+  permissionsInsufficient: "permissions_insufficient",
+  accountAlreadyConnected: "account_already_connected",
+  accountMismatch: "account_mismatch",
+  testRequired: "test_required",
   requestTimeout: "request_timeout",
   internalError: "internal_error",
   serviceUnavailable: "service_unavailable",

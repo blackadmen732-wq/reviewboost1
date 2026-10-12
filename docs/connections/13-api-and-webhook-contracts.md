@@ -16,6 +16,24 @@
 - Contracts are added to `openapi/` as `reviewboost-owner-connections-v1.yaml`
   in Phase 1 so contract tests can run.
 
+> **Stage 1 as built (2026-10-12).** The routes below exist with the test
+> provider; differences from this proposal:
+>
+> - Provider-scoped routes are `/api/v1/connections/providers/{provider}/…`
+>   (Next.js cannot have `{provider}` and `{connectionId}` as sibling segments).
+> - Configuration is `GET` (the app's places, read live) and `POST`
+>   `{ "mappings": [ { "externalLocationId", "locationId" } ] }`. Place names
+>   and time zones are taken from the provider, not the request; time zone
+>   confirmation is deferred.
+> - The callback returns `{ connectionId, state }`; the setup screen reads
+>   places through `GET …/configuration`. Missing permissions return `200`
+>   with `state: "authorization_required"` rather than `409`.
+> - `account_mismatch` (409) and `test_required` (409) were added.
+> - Not built yet: `Idempotency-Key` on these routes (repeat taps are
+>   harmless: activation and "Update now" are idempotent in the database),
+>   cursor paging on runs and issues (latest 10 runs, 50 open issues),
+>   `mfa_required`, the OpenAPI file, and the Text Requests additions in 13.2.
+
 New error codes: `connection_state_invalid` (409), `provider_unavailable`
 (503 with `Retry-After`), `oauth_state_invalid` (400), `oauth_denied` (400),
 `permissions_insufficient` (409), `account_already_connected` (409),
@@ -71,7 +89,7 @@ Provider scope strings are not returned; owners see permission labels.
 
 No token, cursor, external account id, or scope string appears.
 
-### `POST /api/v1/connections/{provider}/authorize`
+### `POST /api/v1/connections/providers/{provider}/authorize`
 
 Roles: owner (admin if D-2.1). Requires MFA when built. Rate limit: 10 per org
 per hour.
@@ -82,7 +100,7 @@ Errors: `409 account_already_connected` (an org already has a live Square
 connection and this is not a reconnect), `403 mfa_required`, `503
 provider_unavailable` (provider not configured in this environment).
 
-### `POST /api/v1/connections/{provider}/callback`
+### `POST /api/v1/connections/providers/{provider}/callback`
 
 Request: `{ "code"?: string, "state": string, "error"?: string }` (copied
 from the provider's redirect query by the callback page; the page never
@@ -92,7 +110,7 @@ Errors: `400 oauth_state_invalid`, `400 oauth_denied`, `409
 account_already_connected`, `409 permissions_insufficient` (also sets
 `authorization_required`), `409` on reconnect with a different account.
 
-### `PUT /api/v1/connections/{connectionId}/configuration`
+### `GET` · `POST /api/v1/connections/{connectionId}/configuration`
 
 Allowed in `connecting`, `active`, `error`. Increments `config_version`.
 

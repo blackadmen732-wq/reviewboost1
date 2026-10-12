@@ -54,23 +54,25 @@ id appears only in API calls, not in page URLs that might be shared or logged.
 
 ### API routes
 
-Full contracts in doc 13. Summary:
+Full contracts in doc 13. Summary (paths as built in stage 1; Next.js does not allow
+`{provider}` and `{connectionId}` as sibling dynamic segments, so provider-scoped
+routes live under `providers/`):
 
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/v1/connections/providers` | Registry entries visible to this org, with availability and this org's connection state |
 | GET | `/api/v1/connections` | This org's connections |
 | GET | `/api/v1/connections/{connectionId}` | One connection, health, recent runs |
-| POST | `/api/v1/connections/{provider}/authorize` | Begin authorization; returns the provider URL |
-| POST | `/api/v1/connections/{provider}/callback` | Exchange code; validate state; create or update the connection |
-| PUT | `/api/v1/connections/{connectionId}/configuration` | Location mapping and workflow selection |
+| POST | `/api/v1/connections/providers/{provider}/authorize` | Begin authorization; returns the provider URL |
+| POST | `/api/v1/connections/providers/{provider}/callback` | Exchange code; validate state; create or update the connection |
+| GET, POST | `/api/v1/connections/{connectionId}/configuration` | The app's places (read live), and saving the place mapping |
 | POST | `/api/v1/connections/{connectionId}/test` | Safe test sync (no writes to canonical records) |
 | POST | `/api/v1/connections/{connectionId}/activate` | Activate after validation |
 | POST | `/api/v1/connections/{connectionId}/sync` | Manual sync (rate limited) |
 | POST | `/api/v1/connections/{connectionId}/disconnect` | Disconnect and revoke |
 | GET | `/api/v1/connections/{connectionId}/runs` | Sync history |
 | GET | `/api/v1/connections/{connectionId}/issues` | Records that could not be processed (redacted) |
-| POST | `/api/v1/webhooks/integrations/square` | Square webhook receiver |
+| POST | `/api/v1/webhooks/integrations/{provider}` | Provider webhook receiver (`square` from stage 2) |
 | POST | `/api/v1/internal/integrations/process` | Worker: drain inbox, run due syncs, refresh tokens |
 | GET | `/api/v1/text-requests/recipients` | Search eligible-or-not recipients for the composer |
 | POST | `/api/v1/text-requests/eligibility` | Explain eligibility for one recipient before sending |
