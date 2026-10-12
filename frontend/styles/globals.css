@@ -536,5 +536,7 @@ textarea {
 }
 
 .animate-page-enter {
-  animation: page-enter 180ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  /* Release the animated transform after entry so fixed page actions use
+     the viewport, not this wrapper, as their containing block. */
+  animation: page-enter 180ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
 }

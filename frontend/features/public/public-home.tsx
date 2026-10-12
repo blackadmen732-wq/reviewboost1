@@ -9,11 +9,11 @@ import {
   INTEGRITY,
   PRICING,
   PRIVACY,
-  PRODUCT,
   PUBLIC_HERO,
   SECURITY,
   START_HREF,
 } from "@/features/public/public-copy";
+import { ProductDemo } from "@/features/public/product-demo";
 import { PublicShell } from "@/features/public/public-shell";
 
 /**
@@ -22,27 +22,51 @@ import { PublicShell } from "@/features/public/public-shell";
 export function PublicHome() {
   return (
     <PublicShell>
-      <section className="mx-auto max-w-[40rem] px-5 pb-20 pt-16 sm:px-8 sm:pb-28 sm:pt-24">
-        <h1 className="text-[2.25rem] font-semibold leading-[1.15] tracking-[-0.035em] text-ink sm:text-[2.5rem]">
-          {PUBLIC_HERO.title}
-        </h1>
-        <p className="mt-5 max-w-[38ch] text-lg leading-relaxed text-muted">{PUBLIC_HERO.lede}</p>
-        <div className="mt-10 flex max-w-xs flex-col gap-3">
-          <Button asChild variant="action" size="lg">
-            <Link href={PUBLIC_HERO.primary.href}>{PUBLIC_HERO.primary.label}</Link>
-          </Button>
-          <Button asChild variant="ghost" size="lg">
-            <Link href={PUBLIC_HERO.secondary.href}>{PUBLIC_HERO.secondary.label}</Link>
-          </Button>
+      <section className="public-section public-hero">
+        <div>
+          <p className="mb-4 text-sm font-medium text-muted">
+            For local business owners
+          </p>
+          <h1 className="max-w-[17ch] text-[2.25rem] font-semibold leading-[1.12] tracking-[-0.035em] text-ink sm:text-[3.25rem]">
+            {PUBLIC_HERO.title}
+          </h1>
+          <p className="mt-5 max-w-[42ch] text-lg leading-relaxed text-muted">
+            {PUBLIC_HERO.lede}
+          </p>
+          <div className="mt-8 flex max-w-sm gap-2">
+            <Button asChild variant="action" size="lg">
+              <Link href={PUBLIC_HERO.primary.href}>
+                {PUBLIC_HERO.primary.label}
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="lg">
+              <Link href={PUBLIC_HERO.secondary.href}>
+                {PUBLIC_HERO.secondary.label}
+              </Link>
+            </Button>
+          </div>
+          <a
+            href="#customer-example"
+            className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline underline-offset-4"
+          >
+            Try the customer example
+          </a>
+          <p className="mt-2 text-sm text-muted">
+            Print a code or use a blank NFC tag. Your customer needs only their
+            phone.
+          </p>
         </div>
+        <ProductDemo />
       </section>
 
       <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
-          <p className="text-sm font-medium text-muted">How it works</p>
-          <ol className="mt-8 flex flex-col gap-10">
+        <div className="public-section" id="how-it-works">
+          <h2 className="text-2xl font-semibold tracking-tight text-ink">
+            From the counter to your Feedback.
+          </h2>
+          <ol className="public-steps mt-10">
             {HOW_IT_WORKS.map((step, index) => (
-              <li key={step.title} className="flex gap-5">
+              <li key={step.title} className="flex gap-4">
                 <span className="w-6 shrink-0 text-sm font-semibold text-muted">
                   {String(index + 1).padStart(2, "0")}
                 </span>
@@ -50,7 +74,9 @@ export function PublicHome() {
                   <h2 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
                     {step.title}
                   </h2>
-                  <p className="mt-2 max-w-[36ch] text-base leading-relaxed text-muted">{step.body}</p>
+                  <p className="mt-2 max-w-[36ch] text-base leading-relaxed text-muted">
+                    {step.body}
+                  </p>
                 </div>
               </li>
             ))}
@@ -67,39 +93,65 @@ export function PublicHome() {
       </section>
 
       <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
-          <p className="text-sm font-medium text-muted">Product</p>
-          <h2 className="mt-4 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {PRODUCT.headline}
-          </h2>
-          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{PRODUCT.lede}</p>
-          <ul className="mt-10 flex flex-col gap-8">
-            {PRODUCT.items.map((item) => (
-              <li key={item.title}>
-                <h3 className="text-base font-semibold text-ink">{item.title}</h3>
-                <p className="mt-2 max-w-[38ch] text-base leading-relaxed text-muted">{item.body}</p>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-10">
+        <div className="public-section public-owner-jobs">
+          <div>
+            <p className="text-sm font-medium text-muted">
+              Your side of the counter
+            </p>
+            <h2 className="mt-4 max-w-[20ch] text-3xl font-semibold leading-tight tracking-tight text-ink">
+              Know what needs you. Get back to your day.
+            </h2>
+            <p className="mt-4 max-w-[40ch] text-base leading-relaxed text-muted">
+              Open Home between customers. See new ratings, read Feedback, and
+              keep your Tags ready.
+            </p>
             <Link
               href="/product"
-              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
+              className="mt-5 inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline-offset-4 hover:underline"
             >
-              Tags in full
+              See the product
             </Link>
-          </p>
+          </div>
+          <ol className="divide-y divide-border border-y border-border">
+            <li className="py-5">
+              <h3 className="font-semibold text-ink">Make the page yours</h3>
+              <p className="mt-1 text-sm leading-relaxed text-muted">
+                Add your business photo. Preview the same page customers see,
+                then publish.
+              </p>
+            </li>
+            <li className="py-5">
+              <h3 className="font-semibold text-ink">
+                Keep every rating together
+              </h3>
+              <p className="mt-1 text-sm leading-relaxed text-muted">
+                Home shows what is new. Feedback keeps the full picture,
+                including the low ratings.
+              </p>
+            </li>
+            <li className="py-5">
+              <h3 className="font-semibold text-ink">Ask after a visit</h3>
+              <p className="mt-1 text-sm leading-relaxed text-muted">
+                Text Requests sends the same Tag link to customers who agreed to
+                receive it.
+              </p>
+            </li>
+          </ol>
         </div>
       </section>
 
       <section className="border-t border-border bg-quiet">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
+        <div className="mx-auto max-w-[40rem] px-5 py-12 sm:px-8 sm:py-16">
           <p className="text-sm font-medium text-muted">Integrity</p>
           <h2 className="mt-4 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
             {INTEGRITY.headline}
           </h2>
-          <p className="mt-4 max-w-[40ch] text-base leading-relaxed text-muted">{INTEGRITY.lede}</p>
-          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{INTEGRITY.body}</p>
+          <p className="mt-4 max-w-[40ch] text-base leading-relaxed text-muted">
+            {INTEGRITY.lede}
+          </p>
+          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">
+            {INTEGRITY.body}
+          </p>
           <p className="mt-10">
             <Link
               href="/integrity"
@@ -128,13 +180,17 @@ export function PublicHome() {
       </PricingSection>
 
       <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
+        <div className="mx-auto max-w-[40rem] px-5 py-12 sm:px-8 sm:py-16">
           <p className="text-sm font-medium text-muted">Security and privacy</p>
           <h2 className="mt-4 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
             {SECURITY.headline}
           </h2>
-          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{SECURITY.lede}</p>
-          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">{PRIVACY.lede}</p>
+          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">
+            {SECURITY.lede}
+          </p>
+          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">
+            {PRIVACY.lede}
+          </p>
           <p className="mt-10 flex flex-wrap gap-x-6 gap-y-2">
             <Link
               href="/security"
@@ -153,7 +209,7 @@ export function PublicHome() {
       </section>
 
       <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
+        <div className="mx-auto max-w-[40rem] px-5 py-12 sm:px-8 sm:py-16">
           <p className="text-sm font-medium text-muted">Questions</p>
           {/* Plain <details>. It is keyboard accessible and works before any
               JavaScript arrives, which matters on a phone with two bars. */}
@@ -179,11 +235,13 @@ export function PublicHome() {
       </section>
 
       <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-20 sm:px-8 sm:py-24">
+        <div className="mx-auto max-w-[40rem] px-5 py-12 sm:px-8 sm:py-16">
           <h2 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
             {CLOSE.headline}
           </h2>
-          <p className="mt-3 max-w-[36ch] text-base leading-relaxed text-muted">{CLOSE.lede}</p>
+          <p className="mt-3 max-w-[36ch] text-base leading-relaxed text-muted">
+            {CLOSE.lede}
+          </p>
           <div className="mt-8 max-w-xs">
             <Button asChild variant="action" size="lg">
               <Link href={START_HREF}>Get started</Link>

@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { CustomerPageEditor } from "@/features/customer-page/customer-page-editor";
-import { getOwnerCounts, requireOwner } from "@/lib/server/owner-data";
+import {
+  getOwnerCounts,
+  listStands,
+  requireOwner,
+} from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
   title: "Customer Page",
@@ -13,9 +17,14 @@ export const dynamic = "force-dynamic";
 
 export default async function CustomerPagePage() {
   const { organization } = await requireOwner("/customer-page");
-  const counts = await getOwnerCounts(organization.orgId, organization.timezone);
+  const [counts, stands] = await Promise.all([
+    getOwnerCounts(organization.orgId, organization.timezone),
+    listStands(organization.orgId),
+  ]);
+  const previewStand = stands.find((stand) => stand.status === "active");
 
-  const canEdit = organization.role === "owner" || organization.role === "admin";
+  const canEdit =
+    organization.role === "owner" || organization.role === "admin";
 
   return (
     <OwnerShell unreadCount={counts.unread} businessName={organization.name}>
@@ -31,10 +40,14 @@ export default async function CustomerPagePage() {
       </header>
 
       {canEdit ? (
-        <CustomerPageEditor businessName={organization.name} />
+        <CustomerPageEditor
+          businessName={organization.name}
+          previewStandId={previewStand?.standId ?? null}
+        />
       ) : (
         <p className="text-sm text-muted">
-          Only owners and admins can edit the customer page. Ask the account owner to make changes.
+          Only owners and admins can edit the customer page. Ask the account
+          owner to make changes.
         </p>
       )}
     </OwnerShell>

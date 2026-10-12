@@ -71,50 +71,55 @@ export function EditableRow({
     setBusy(true);
     setError(null);
 
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
+    try {
+      const {
+        data: { session },
+      } = await supabaseBrowser().auth.getSession();
 
-    if (!session) {
-      setBusy(false);
-      notify.error("Please sign in again", "Your session expired.");
-      return;
-    }
+      if (!session) {
+        notify.error("Please sign in again", "Your session expired.");
+        return;
+      }
 
-    const response = await fetch("/api/v1/settings", {
-      method: "PATCH",
-      headers: {
-        "content-type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ ...context, [field]: draft.trim() }),
-    });
+      const response = await fetch("/api/v1/settings", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ ...context, [field]: draft.trim() }),
+      });
 
-    setBusy(false);
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: { message?: string; details?: Array<{ message?: string }> };
+        } | null;
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as {
-        error?: { message?: string; details?: Array<{ message?: string }> };
-      } | null;
+        // The server's field message is more specific than anything generic we
+        // could invent here — "That does not look like a Google review link"
+        // tells someone what to do; "Could not save" does not.
+        setError(
+          payload?.error?.details?.[0]?.message ??
+            payload?.error?.message ??
+            "Could not save that. Please try again.",
+        );
+        return;
+      }
 
-      // The server's field message is more specific than anything generic we
-      // could invent here — "That does not look like a Google review link"
-      // tells someone what to do; "Could not save" does not.
+      setEditing(false);
+      setJustSaved(true);
+      // Long enough to be seen by someone who looked away, short enough not to
+      // become permanent furniture.
+      setTimeout(() => setJustSaved(false), 4000);
+      router.refresh();
+      notify.success("Saved", `${label} updated.`);
+    } catch {
       setError(
-        payload?.error?.details?.[0]?.message ??
-          payload?.error?.message ??
-          "Could not save that. Please try again.",
+        "Could not reach ReviewBoost. Your change has not been saved. Try again.",
       );
-      return;
+    } finally {
+      setBusy(false);
     }
-
-    setEditing(false);
-    setJustSaved(true);
-    // Long enough to be seen by someone who looked away, short enough not to
-    // become permanent furniture.
-    setTimeout(() => setJustSaved(false), 4000);
-    router.refresh();
-    notify.success("Saved", `${label} updated.`);
   }
 
   if (!editing) {
@@ -182,7 +187,11 @@ export function EditableRow({
       />
 
       {error ? (
-        <p id={`${inputId}-error`} role="alert" className="mt-2 text-sm text-danger">
+        <p
+          id={`${inputId}-error`}
+          role="alert"
+          className="mt-2 text-sm text-danger"
+        >
           {error}
         </p>
       ) : help ? (
@@ -190,7 +199,12 @@ export function EditableRow({
       ) : null}
 
       <div className="mt-3 flex gap-2">
-        <Button variant="action" loading={busy} loadingLabel="Saving…" onClick={() => void save()}>
+        <Button
+          variant="action"
+          loading={busy}
+          loadingLabel="Saving…"
+          onClick={() => void save()}
+        >
           Save
         </Button>
         <Button

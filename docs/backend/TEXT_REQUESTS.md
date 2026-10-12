@@ -233,9 +233,10 @@ errors, rate-limited where it matters:
 
 | Method | Path | Role | Purpose |
 | --- | --- | --- | --- |
-| POST | `/text-requests` | owner/admin | schedule (rate-limited, idempotent) |
+| POST | `/text-requests` | owner/admin | schedule (rate-limited, idempotent); refuses with `409 not_eligible` before reserving credit |
 | GET | `/text-requests` | any member | list recent |
-| POST | `/text-requests/preview` | owner/admin | segment + cost preview |
+| POST | `/text-requests/preview` | owner/admin | exact final text, segment + cost preview, eligibility |
+| POST | `/text-requests/consent` | owner/admin | record an owner's explicit confirmation that a customer agreed (rate-limited) |
 | POST | `/text-requests/{id}/cancel` | owner/admin | cancel if not yet dispatched |
 | POST | `/webhooks/sms/{provider}` | provider (signed) | delivery + inbound events |
 | POST | `/internal/sms/dispatch` | worker secret | run one dispatch batch |
@@ -297,8 +298,11 @@ them trigger on `supabase/**`, `frontend/lib/server/**`, and `frontend/app/api/*
 - A configured provider + credentials + verified sending number (above). **[needs-provider]**
 - An allocation of quota per org (`rpc_sms_quota_allocate`) tied to billing — the
   ledger exists; the purchase/plan integration does not. **[impl: ledger only]**
-- Recording real consent per recipient (an import path or a capture point);
-  without `opted_in` consent, every send is correctly suppressed. **[impl: mechanism]**
+- Recording real consent per recipient: the owner attestation path exists
+  (`/text-requests/consent`, with method, wording version and acting user as
+  evidence; see `docs/connections/07-consent-and-eligibility.md`). Whether an
+  owner attestation is a sufficient legal basis needs counsel before live
+  messaging. **[impl: owner attestation]**
 - Wiring rating-flow completion to `app.sms_mark_flow_completed` for full
   completed-flow dedupe attribution (the mechanism exists; the trigger from the
   public flow is a follow-up, as it needs a per-recipient link). **[impl: mechanism]**
@@ -307,3 +311,15 @@ them trigger on `supabase/**`, `frontend/lib/server/**`, and `frontend/app/api/*
 
 Nothing here should be read as "SMS compliance is done." The technical controls
 exist and are tested; legal review and live verification are separate steps.
+
+## 22. Message content and consent evidence
+
+Every Text Request is one of the approved messages in
+`frontend/lib/sms/text-request-templates.ts`; there is no free text. The server
+assembles the final body as `{Business}: {message with Tag link}` followed by
+`Reply STOP to opt out.`, and segments and cost are computed on that final
+body. Sending never records consent. An `owner_import` opt-in must carry
+evidence (`method`, `attested_by`, `wording_version`), enforced by
+`sms_consent_events_owner_import_evidence`; opt-ins recorded earlier without
+evidence are reset to `unknown` by `app.sms_reset_unevidenced_owner_consent()`
+(migration `20261012000100_consent_requires_evidence.sql`).

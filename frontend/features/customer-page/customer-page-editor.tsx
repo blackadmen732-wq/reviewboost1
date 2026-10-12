@@ -7,21 +7,34 @@ import { Button } from "@/components/ui/button";
 import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
 import { PhoneFrame } from "@/features/customer-page/phone-frame";
 import { VisitStars } from "@/features/customer-page/visit-stars";
-import { ownerFetch } from "@/lib/api/owner-fetch";
-import { NormalizePhotoError, normalizePhoto } from "@/lib/images/normalize-photo";
+import Link from "next/link";
+
+import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page";
+import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
+import {
+  NormalizePhotoError,
+  normalizePhoto,
+} from "@/lib/images/normalize-photo";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 import { DEFAULT_HERO_TRANSFORM } from "@/lib/owner/hero-transform";
 import type { CustomerPageContent } from "@/lib/server/customer-page-service";
-import { cn } from "@/lib/utils/cn";
 
 const previewMessages = customerMessages.en;
 
 interface CustomerPageEditorProps {
   businessName: string;
   onSaved?: () => void;
+  previewStandId?: string | null;
 }
 
-type UploadState = "idle" | "preparing" | "signing" | "uploading" | "confirming" | "done" | "error";
+type UploadState =
+  | "idle"
+  | "preparing"
+  | "signing"
+  | "uploading"
+  | "confirming"
+  | "done"
+  | "error";
 
 /**
  * The preview is the customer page itself — the same CustomerVisitView tree
@@ -41,6 +54,7 @@ type UploadState = "idle" | "preparing" | "signing" | "uploading" | "confirming"
 export function CustomerPageEditor({
   businessName,
   onSaved,
+  previewStandId = null,
 }: CustomerPageEditorProps) {
   // The full draft as returned by GET /api/v1/customer-page.
   // Editing is done by merging changes into this rather than tracking fields
@@ -50,40 +64,57 @@ export function CustomerPageEditor({
   const [heroUrl, setHeroUrl] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   // The photo customers see today, to tell the owner when the preview differs.
-  const [liveHeroAssetId, setLiveHeroAssetId] = useState<string | null>(null);
+  const [publishedDraft, setPublishedDraft] =
+    useState<CustomerPageContent | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [publishState, setPublishState] = useState<
+    "idle" | "publishing" | "published" | "error"
+  >("idle");
 
   useEffect(() => {
+    let current = true;
     void (async () => {
       try {
         const res = await ownerFetch("/api/v1/customer-page");
-        if (!res.ok) return;
+        if (!res.ok) throw new Error("load_failed");
         const { data } = (await res.json()) as {
           data: {
             draft: CustomerPageContent;
             published:
-              | { heroUrl?: string | null; heroAssetId?: string | null; tagline?: string | null }
-              | null;
+              (CustomerPageContent & { heroUrl?: string | null }) | null;
             draftHeroUrl?: string | null;
           };
         };
+        if (!current) return;
         setDraft(data.draft ?? {});
-        setLiveHeroAssetId(data.published?.heroAssetId ?? null);
-        // The preview shows what Publish will put live: the draft's photo.
-        // It used to show the published photo, so an owner who uploaded and
-        // came back later saw the old picture and thought the upload was lost.
-        const previewUrl = data.draftHeroUrl ?? data.published?.heroUrl ?? null;
-        if (previewUrl) setHeroUrl(previewUrl);
-      } catch {
-        // ignore — defaults are fine
+        setPublishedDraft(data.published ?? null);
+        setHeroUrl(data.draftHeroUrl ?? data.published?.heroUrl ?? null);
+      } catch (caught) {
+        if (current)
+          setLoadError(
+            caught instanceof SessionExpiredError
+              ? caught.message
+              : "Could not load your customer page. Your published page has not changed.",
+          );
       } finally {
-        setLoaded(true);
+        if (current) setLoaded(true);
       }
     })();
-  }, []);
+    return () => {
+      current = false;
+    };
+  }, [loadAttempt]);
+
+  useEffect(
+    () => () => {
+      if (heroUrl?.startsWith("blob:")) URL.revokeObjectURL(heroUrl);
+    },
+    [heroUrl],
+  );
 
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [publishing, setPublishing] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -100,6 +131,8 @@ export function CustomerPageEditor({
   const uploadHero = useCallback(
     async (file: File) => {
       setUploadError(null);
+      setStatusMsg(null);
+      setPublishState("idle");
       setUploadState("preparing");
       const previous = heroUrl;
 
@@ -130,7 +163,9 @@ export function CustomerPageEditor({
         setUploadError(message);
       };
       const messageOf = async (res: Response, fallback: string) => {
-        const err = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+        const err = (await res.json().catch(() => ({}))) as {
+          error?: { message?: string };
+        };
         return err.error?.message ?? fallback;
       };
 
@@ -141,7 +176,8 @@ export function CustomerPageEditor({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ kind: "hero", contentType: photo.type }),
         });
-        if (!beginRes.ok) return fail(await messageOf(beginRes, "Upload failed."));
+        if (!beginRes.ok)
+          return fail(await messageOf(beginRes, "Upload failed."));
         const { data: ticket } = (await beginRes.json()) as {
           data: { assetId: string; path: string; token: string };
         };
@@ -155,7 +191,8 @@ export function CustomerPageEditor({
           headers: { "Content-Type": photo.type, "x-upsert": "true" },
           body: photo.blob,
         });
-        if (!putRes.ok) return fail("The photo did not upload. Please try again.");
+        if (!putRes.ok)
+          return fail("The photo did not upload. Please try again.");
 
         // Step 3: confirm the upload server-side
         setUploadState("confirming");
@@ -164,8 +201,18 @@ export function CustomerPageEditor({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ assetId: ticket.assetId, path: ticket.path }),
         });
-        if (!confirmRes.ok) return fail(await messageOf(confirmRes, "The photo could not be checked. Please try again."));
+        if (!confirmRes.ok)
+          return fail(
+            await messageOf(
+              confirmRes,
+              "The photo could not be checked. Please try again.",
+            ),
+          );
 
+        const confirmed = (await confirmRes.json()) as {
+          data?: { publicUrl?: string };
+        };
+        if (confirmed.data?.publicUrl) setHeroUrl(confirmed.data.publicUrl);
         setDraft((prev) => ({ ...prev, heroAssetId: ticket.assetId }));
         setUploadState("done");
       } catch (caught) {
@@ -200,7 +247,7 @@ export function CustomerPageEditor({
    * step failed.
    */
   const publish = useCallback(async () => {
-    setPublishing(true);
+    setPublishState("publishing");
     setStatusMsg(null);
 
     try {
@@ -228,18 +275,21 @@ export function CustomerPageEditor({
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setStatusMsg(
-          (err as { error?: { message?: string } }).error?.message ?? "Publish failed. Try again.",
+          (err as { error?: { message?: string } }).error?.message ??
+            "Publish failed. Try again.",
         );
         return;
       }
 
-      setStatusMsg("Page is live!");
-      setLiveHeroAssetId(draft.heroAssetId ?? null);
+      setPublishState("published");
+      setPublishedDraft({ ...draft });
       onSaved?.();
     } catch {
-      setStatusMsg("Could not reach ReviewBoost. Check your connection and try again.");
+      setStatusMsg(
+        "Could not reach ReviewBoost. Check your connection and try again.",
+      );
     } finally {
-      setPublishing(false);
+      setPublishState((state) => (state === "publishing" ? "error" : state));
     }
   }, [draft, onSaved]);
 
@@ -250,47 +300,76 @@ export function CustomerPageEditor({
     uploadState === "confirming";
   const uploadLabel =
     uploadState === "preparing" || uploadState === "signing"
-      ? "Preparing…"
+      ? "Preparing photo…"
       : uploadState === "uploading"
         ? "Uploading…"
         : uploadState === "confirming"
-          ? "Verifying…"
+          ? "Almost done…"
           : heroUrl
             ? "Replace photo"
             : "Add photo";
 
+  const publishing = publishState === "publishing";
+  const unchanged =
+    publishedDraft !== null &&
+    editableContent(draft) === editableContent(publishedDraft);
+  const published = unchanged && !uploading;
+
   if (!loaded) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted">
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-        Loading…
+      <p role="status" className="py-8 text-sm text-muted">
+        Loading your customer page…
+      </p>
+    );
+  }
+  if (loadError) {
+    return (
+      <div className="max-w-md rounded-[var(--radius-card)] border border-border bg-surface p-5">
+        <p role="alert" className="text-sm text-danger">
+          {loadError}
+        </p>
+        <Button
+          className="mt-4"
+          variant="secondary"
+          onClick={() => {
+            setLoaded(false);
+            setLoadError(null);
+            setLoadAttempt((attempt) => attempt + 1);
+          }}
+        >
+          Try again
+        </Button>
+        {loadError.includes("session expired") ? (
+          <Link
+            href="/login?next=/customer-page"
+            className="mt-3 block text-sm text-brand-text underline"
+          >
+            Sign in again
+          </Link>
+        ) : null}
       </div>
     );
   }
 
-  const unpublished = Boolean(draft.heroAssetId) && draft.heroAssetId !== liveHeroAssetId;
-  const published = statusMsg === "Page is live!";
-
-  // Upload → preview → Publish, in that order, in one column. The phone is
-  // the owner's preview only; /q/{token} never draws it.
-  //
-  // The phone is drawn at a preview size (PhoneFrame size="editor") so the
-  // three steps read as one short workflow rather than one giant device, and
-  // the column ends with room for the fixed bottom bar and the home-indicator
-  // safe area, so Publish and its status always scroll fully clear of the bar.
   return (
     <div
-      className="mx-auto flex w-full max-w-sm flex-col pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:pb-0"
+      className="grid gap-6 pb-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)] lg:gap-8 lg:pb-0"
       data-customer-page-editor
     >
-      <div>
-        {/* Secondary: quieter and shorter than Publish, still a 44px target. */}
+      <div className="lg:pt-8">
+        <h2 className="hidden text-lg font-semibold text-ink lg:block">
+          Make it yours
+        </h2>
+        <p className="mb-4 hidden max-w-[28ch] text-sm leading-relaxed text-muted lg:block">
+          Add your business photo. Check the preview, then publish it to your
+          Tags.
+        </p>
         <Button
           type="button"
           variant="secondary"
           size="sm"
           className="font-medium shadow-none"
-          disabled={uploading}
+          disabled={uploading || publishing}
           loading={uploading}
           loadingLabel={uploadLabel}
           onClick={() => fileInputRef.current?.click()}
@@ -303,66 +382,104 @@ export function CustomerPageEditor({
           type="file"
           accept="image/png,image/jpeg,image/webp"
           className="hidden"
+          disabled={uploading || publishing}
           onChange={handleFileChange}
         />
         {uploadError ? (
-          <p role="alert" className="mt-2 text-sm text-danger">
+          <p role="alert" className="mt-3 text-sm text-danger">
             {uploadError}
           </p>
         ) : null}
-      </div>
 
-      <div className="mt-5">
-        {unpublished ? (
-          <p className="mb-2 flex items-center justify-center gap-1.5 text-sm font-medium text-ink">
-            <span aria-hidden="true" className="size-2 rounded-full bg-star" />
-            Not published yet
-          </p>
-        ) : null}
-        {/* The real customer page — the same CustomerVisitView /q renders —
-            with the draft image, inside the preview phone. */}
-        <PhoneFrame label={`${businessName} customer page preview`} size="editor">
-          <CustomerVisitView
-            heroUrl={heroUrl ?? null}
-            transform={DEFAULT_HERO_TRANSFORM}
-            heading={previewMessages.ratingHeading}
-            // The live page always says this line; a leftover draft tagline
-            // would show here and never reach a customer.
-            support={previewMessages.ratingSupport}
-            footerLine={previewMessages.footerPromise}
-          >
-            {/* Inert: this is a picture of the page, not a place to rate. */}
-            <VisitStars value={null} messages={previewMessages} preview />
-          </CustomerVisitView>
-        </PhoneFrame>
-      </div>
-
-      {/* One action. publish() saves the draft first, so there is no separate
-          Save step to hold in mind. */}
-      <div className="mt-6">
-        <Button
-          type="button"
-          variant="action"
-          disabled={publishing || uploading}
-          loading={publishing}
-          loadingLabel="Publishing…"
-          onClick={() => void publish()}
+        <div
+          className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-canvas px-5 py-3 lg:static lg:mt-6 lg:border-0 lg:p-0"
+          data-editor-publish
         >
-          Publish
-        </Button>
-        {statusMsg ? (
-          <p
-            role={published ? "status" : "alert"}
-            className={cn(
-              "mt-3 inline-flex items-center gap-1.5 text-sm font-medium",
-              published ? "text-brand-text" : "text-danger",
-            )}
+          <Button
+            type="button"
+            variant="action"
+            disabled={publishing || uploading || published}
+            loading={publishing}
+            loadingLabel="Publishing…"
+            onClick={() => void publish()}
           >
-            {published ? <Check className="size-4" strokeWidth={3} aria-hidden="true" /> : null}
+            {published ? (
+              <>
+                <Check className="size-4" aria-hidden="true" />
+                Published
+              </>
+            ) : (
+              "Publish"
+            )}
+          </Button>
+          <p className="mt-2 text-center text-xs text-muted lg:text-left">
+            {uploading
+              ? "Your photo is uploading."
+              : published
+                ? "Your Tags use this page."
+                : "Changes reach your Tags when you publish."}
+          </p>
+        </div>
+
+        {published ? (
+          <div
+            role="status"
+            className="mt-5 border-l-2 border-action pl-4"
+            data-publish-confirmation
+          >
+            <p className="text-sm font-semibold text-ink">
+              Customer page published
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-muted">
+              This is the page your Tags will show.
+            </p>
+            {previewStandId ? (
+              <PreviewCustomerPage standId={previewStandId} />
+            ) : (
+              <Link
+                href="/stands"
+                className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline-offset-4 hover:underline"
+              >
+                Go to your Tags
+              </Link>
+            )}
+          </div>
+        ) : statusMsg ? (
+          <p role="alert" className="mt-4 text-sm text-danger">
             {statusMsg}
           </p>
         ) : null}
       </div>
+
+      <figure className="min-w-0">
+        <figcaption className="mb-3 text-center text-xs font-medium text-muted">
+          {published ? "Published page" : "Preview · not published yet"}
+        </figcaption>
+        <PhoneFrame
+          label={`${businessName} customer page preview`}
+          size="editor"
+        >
+          <CustomerVisitView
+            heroUrl={heroUrl}
+            transform={DEFAULT_HERO_TRANSFORM}
+            heading={previewMessages.ratingHeading}
+            support={previewMessages.ratingSupport}
+            footerLine={previewMessages.footerPromise}
+          >
+            <VisitStars value={null} messages={previewMessages} preview />
+          </CustomerVisitView>
+        </PhoneFrame>
+      </figure>
     </div>
   );
+}
+
+/** Compare saved content, excluding public URLs and publication metadata. */
+function editableContent(content: CustomerPageContent): string {
+  return JSON.stringify([
+    content.templateId ?? null,
+    content.logoAssetId ?? null,
+    content.heroAssetId ?? null,
+    content.tagline ?? null,
+  ]);
 }

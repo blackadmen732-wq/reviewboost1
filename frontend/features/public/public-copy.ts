@@ -35,7 +35,7 @@ export function isGetStartedNext(path: string): boolean {
 
 export const PUBLIC_HERO = {
   title: "A code on the counter. The same Google chance for every customer.",
-  lede: "They scan, they rate, they can leave a Google review — whether they chose one star or five.",
+  lede: "Customers tap or scan your Tag, leave a private rating, and get your Google link. You see every rating in Feedback.",
   primary: { href: START_HREF, label: "Get started" },
   secondary: { href: SIGN_IN_HREF, label: "Sign in" },
 } as const;
@@ -47,11 +47,11 @@ export const HOW_IT_WORKS = [
   },
   {
     title: "They scan and rate",
-    body: "Thirty seconds on their phone. Nothing to install.",
+    body: "One star tap on their phone. Nothing to install.",
   },
   {
-    title: "Everyone is offered Google",
-    body: "The rating never decides who gets the public review link. One star and five stars are offered the same page.",
+    title: "Feedback for you. Google for everyone.",
+    body: "Their rating lands in Feedback. Every customer gets the same Google link, whatever they rated.",
   },
 ] as const;
 
@@ -61,7 +61,7 @@ export const PRODUCT = {
   items: [
     {
       title: "Print a code",
-      body: "A QR that survives a scuffed counter. Put it by the till, the receipt, or the door.",
+      body: "Print your QR code. Put it by the till, on a receipt, or where customers can see it.",
     },
     {
       title: "Program a Tag",
@@ -78,15 +78,16 @@ export const INTEGRITY = {
 
 export const PRICING = {
   headline: "Simple plans for local businesses.",
-  lede: "Start with what you need. Upgrade when your business needs more.",
+  lede: "Choose by how many places and Tags you need.",
   // Stripe billing is live. This used to read "Billing is not live yet",
   // which was true when it was written and is now the kind of stale sentence
   // that makes a visitor doubt everything else on the page.
-  caveat: "Starter has a seven-day free trial, card required. Growth and Pro are charged when you subscribe.",
+  caveat:
+    "Starter has a seven-day free trial, card required. Growth and Pro are charged when you subscribe.",
 } as const;
 
 export const SECURITY = {
-  headline: "Held the way a till should be held.",
+  headline: "Private ratings. Your business account.",
   lede: "Owner pages need a signed-in session. Customer pages collect a rating and nothing else — no name, phone, or email.",
 } as const;
 
@@ -99,6 +100,6 @@ export const PRIVACY = {
 } as const;
 
 export const CLOSE = {
-  headline: "Ready when you are.",
+  headline: "Put your first Tag on the counter.",
   lede: "Create a Tag, preview the customer page, print or program it, put it where people pay.",
 } as const;

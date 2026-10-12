@@ -39,6 +39,16 @@ async function openFlow(
 }
 
 test.describe("ReviewBoost customer flow", () => {
+  test("the empty hero and reference footer are consistent in both themes", async ({ page }) => {
+    for (const colorScheme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+      await openFlow(page);
+      await expect(page.locator("[data-hero-empty]")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+      await expect(page.locator("[data-powered-bolt]")).toHaveCSS("fill", "rgb(98, 98, 98)");
+      await expect(page.locator("[data-powered-by] strong")).toHaveText("ReviewBoost");
+    }
+  });
+
   test("every rating 1–5 lands on the same destination with no step in between", async ({
     page,
   }) => {

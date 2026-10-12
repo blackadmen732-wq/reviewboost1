@@ -8,9 +8,10 @@ import { previewSchema, previewTextRequest } from "@/lib/server/sms/text-request
 /**
  * Segment and cost preview for a Text Request, before anything is scheduled.
  *
- * Read-only: it computes the message body, its encoding and segment count, and
- * the estimated cost at the configured provider rate, without touching consent,
- * quota, or the outbox.
+ * Read-only: it returns the exact message (business name and "Reply STOP" line
+ * included), its encoding and segment count, the estimated cost at the
+ * configured provider rate, and whether this number may be texted. It records
+ * nothing and reserves nothing.
  */
 
 export const runtime = "nodejs";
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     requireRole(context.role, ["owner", "admin"]);
 
     const body = parseOrThrow(previewSchema, await readJsonBody(request));
-    const preview = await previewTextRequest(context, body);
+    const preview = await previewTextRequest(context, body, requestId);
 
     return json(request, requestId, 200, { data: preview, requestId });
   });

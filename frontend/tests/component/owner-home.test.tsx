@@ -17,8 +17,25 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+vi.mock("@/lib/api/owner-fetch", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api/owner-fetch")>()),
+  ownerFetch: vi.fn(
+    async () =>
+      new Response(
+        JSON.stringify({
+          data: { standUrl: "https://reviewboost.fit/q/sample" },
+        }),
+        { status: 200 },
+      ),
+  ),
+}));
+
 import { OwnerHome } from "@/features/dashboard/owner-home";
-import { deriveHomeModel, type HomeCounts, type HomeStand } from "@/features/dashboard/home-model";
+import {
+  deriveHomeModel,
+  type HomeCounts,
+  type HomeStand,
+} from "@/features/dashboard/home-model";
 
 const emptyCounts: HomeCounts = {
   ratingsToday: 0,
@@ -49,12 +66,19 @@ describe("OwnerHome", () => {
       hasLocation: true,
     });
 
-    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+    render(
+      <OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />,
+    );
 
     expect(screen.getByRole("heading", { name: "Oak & Vine" })).toBeVisible();
     expect(screen.getByText("No tag yet")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Create a Tag" })).toHaveAttribute("href", "/stands");
-    expect(screen.queryByRole("link", { name: "Print your code" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Create a Tag" })).toHaveAttribute(
+      "href",
+      "/stands",
+    );
+    expect(
+      screen.queryByRole("link", { name: "Print your code" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("Preview customer page")).not.toBeInTheDocument();
     expect(screen.queryByText("Praise")).not.toBeInTheDocument();
     expect(screen.queryByText("Customers")).not.toBeInTheDocument();
@@ -67,45 +91,63 @@ describe("OwnerHome", () => {
       hasLocation: true,
     });
 
-    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+    render(
+      <OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />,
+    );
 
     expect(screen.getByText("No tag yet")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Create a Tag" })).toHaveAttribute("href", "/stands");
-    expect(screen.queryByRole("link", { name: "Add Google link" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Print your code" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Create a Tag" })).toHaveAttribute(
+      "href",
+      "/stands",
+    );
+    expect(
+      screen.queryByRole("link", { name: "Add Google link" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Print your code" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("empty missing Google link blocks the loop before print", () => {
+  it("empty missing Google link blocks the loop before print", async () => {
     const model = deriveHomeModel({
       counts: { ...emptyCounts, hasGoogleLink: false },
       stands: [stand],
       hasLocation: true,
     });
 
-    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+    render(
+      <OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />,
+    );
 
     expect(screen.getByText("Google link is missing")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Add Google link" })).toHaveAttribute(
-      "href",
-      "/settings",
-    );
-    expect(screen.queryByRole("link", { name: "Print your code" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Preview customer page" })).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "Add Google link" }),
+    ).toHaveAttribute("href", "/settings");
+    expect(
+      screen.queryByRole("link", { name: "Print your code" }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("link", { name: /Preview customer page/ }),
+    ).toBeVisible();
   });
 
-  it("empty with an unprogrammed tag offers print and preview, not a second green CTA", () => {
+  it("empty with an unprogrammed tag offers print and preview, not a second green CTA", async () => {
     const model = deriveHomeModel({
       counts: emptyCounts,
       stands: [stand],
       hasLocation: true,
     });
 
-    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+    render(
+      <OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />,
+    );
 
     expect(screen.getByText("Tag is not programmed yet")).toBeVisible();
     expect(screen.getByRole("link", { name: "Print your code" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Preview customer page" })).toBeVisible();
-    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(
+      await screen.findByRole("link", { name: /Preview customer page/ }),
+    ).toBeVisible();
+    expect(screen.getAllByRole("link")).toHaveLength(2);
   });
 
   it("ready empty waits honestly", () => {
@@ -115,12 +157,20 @@ describe("OwnerHome", () => {
       hasLocation: true,
     });
 
-    render(<OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />);
+    render(
+      <OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />,
+    );
 
     expect(screen.getByText("No ratings yet.")).toBeVisible();
-    expect(screen.getByText("Your tag is ready. Put it where people pay.")).toBeVisible();
-    expect(screen.queryByRole("link", { name: "Print your code" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Create a Tag" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Your tag is ready. Put it where people pay."),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("link", { name: "Print your code" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Create a Tag" }),
+    ).not.toBeInTheDocument();
   });
 
   it("returning home shows real unread rows and one green CTA", () => {
@@ -150,7 +200,10 @@ describe("OwnerHome", () => {
 
     expect(screen.getByText("1 new rating")).toBeVisible();
     expect(screen.getByText("Waited twenty minutes.")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Read feedback" })).toHaveAttribute("href", "/feedback");
+    expect(screen.getByRole("link", { name: "Read feedback" })).toHaveAttribute(
+      "href",
+      "/feedback",
+    );
     expect(screen.getByText("1 tag · not programmed yet")).toBeVisible();
     expect(screen.queryByText("No ratings yet.")).not.toBeInTheDocument();
   });
@@ -167,27 +220,53 @@ describe("setup steps finished since the last visit", () => {
     });
 
   it("draw nothing on a first visit, where everything would be new", () => {
-    const { container } = render(<OwnerHome businessName="Oak & Vine" model={model()} unreadItems={[]} seenDone={null} />);
+    const { container } = render(
+      <OwnerHome
+        businessName="Oak & Vine"
+        model={model()}
+        unreadItems={[]}
+        seenDone={null}
+      />,
+    );
     expect(container.querySelector("[data-fresh]")).toBeNull();
     expect(container.querySelector(".animate-check-draw")).toBeNull();
   });
 
   it("draw the tick once for a step done since then, and only that one", () => {
     const m = model();
-    const done = (m.setup ?? []).filter((step) => step.done).map((step) => step.key);
+    const done = (m.setup ?? [])
+      .filter((step) => step.done)
+      .map((step) => step.key);
     expect(done.length).toBeGreaterThan(0);
     const { container } = render(
-      <OwnerHome businessName="Oak & Vine" model={m} unreadItems={[]} seenDone={done.slice(1)} />,
+      <OwnerHome
+        businessName="Oak & Vine"
+        model={m}
+        unreadItems={[]}
+        seenDone={done.slice(1)}
+      />,
     );
     const fresh = container.querySelectorAll("[data-fresh]");
     expect(fresh).toHaveLength(1);
-    expect(fresh[0]?.closest("[data-setup-step]")).toHaveAttribute("data-setup-step", done[0]);
+    expect(fresh[0]?.closest("[data-setup-step]")).toHaveAttribute(
+      "data-setup-step",
+      done[0],
+    );
   });
 
   it("draw nothing when every done step was already seen", () => {
     const m = model();
-    const done = (m.setup ?? []).filter((step) => step.done).map((step) => step.key);
-    const { container } = render(<OwnerHome businessName="Oak & Vine" model={m} unreadItems={[]} seenDone={done} />);
+    const done = (m.setup ?? [])
+      .filter((step) => step.done)
+      .map((step) => step.key);
+    const { container } = render(
+      <OwnerHome
+        businessName="Oak & Vine"
+        model={m}
+        unreadItems={[]}
+        seenDone={done}
+      />,
+    );
     expect(container.querySelector("[data-fresh]")).toBeNull();
     expect(container.querySelector(".animate-step-current")).toBeNull();
   });
@@ -195,7 +274,8 @@ describe("setup steps finished since the last visit", () => {
 
 describe("parseSetupSeen", () => {
   it("reads step keys and treats anything mangled as a first visit", async () => {
-    const { parseSetupSeen } = await import("@/features/dashboard/setup-seen-cookie");
+    const { parseSetupSeen } =
+      await import("@/features/dashboard/setup-seen-cookie");
     expect(parseSetupSeen(undefined)).toBeNull();
     expect(parseSetupSeen("tag%2Cgoogle")).toEqual(["tag", "google"]);
     expect(parseSetupSeen("%E0%A4%A")).toBeNull();

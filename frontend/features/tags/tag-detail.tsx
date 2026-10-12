@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, ExternalLink, MoreHorizontal, Printer, Smartphone } from "lucide-react";
+import { Download, MoreHorizontal, Printer, Smartphone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -8,7 +8,10 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog } from "@/components/ui/dialog";
 import { notify } from "@/components/ui/toast";
 import { ProgramTagSheet } from "@/features/tags/program-tag-sheet";
-import { useAuthenticatedQr, type AuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
+import {
+  useAuthenticatedQr,
+  type AuthenticatedQr,
+} from "@/lib/hooks/use-authenticated-qr";
 import {
   lastUsedLabel,
   tagReadiness,
@@ -16,9 +19,9 @@ import {
 } from "@/lib/owner/tag-readiness";
 import { ownerOrAdmin } from "@/lib/owner/permissions";
 import type { Stand } from "@/lib/server/owner-data";
+import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils/cn";
-
 
 /** The only action that invalidates a printed QR code or a programmed NFC chip. */
 export const ROTATE_WARNING =
@@ -34,8 +37,18 @@ export const ROTATE_NOT_NEEDED =
  * or admin may call, so a member or viewer gets the read-only view instead of
  * a spinner that fails and buttons that 403.
  */
-export function TagDetail({ stand, canManage }: { stand: Stand; canManage: boolean }) {
-  return canManage ? <ManagedTagDetail stand={stand} /> : <ReadOnlyTagDetail stand={stand} />;
+export function TagDetail({
+  stand,
+  canManage,
+}: {
+  stand: Stand;
+  canManage: boolean;
+}) {
+  return canManage ? (
+    <ManagedTagDetail stand={stand} />
+  ) : (
+    <ReadOnlyTagDetail stand={stand} />
+  );
 }
 
 function ReadOnlyTagDetail({ stand }: { stand: Stand }) {
@@ -47,7 +60,8 @@ function ReadOnlyTagDetail({ stand }: { stand: Stand }) {
           {stand.label}
         </h1>
         <p className="mt-2 text-base text-muted">
-          {stand.locationName ?? "Place"} · {tagReadinessLabel(status)} · {lastUsedLabel(stand.lastOpenedAt)}
+          {stand.locationName ?? "Place"} · {tagReadinessLabel(status)} ·{" "}
+          {lastUsedLabel(stand.lastOpenedAt)}
         </p>
       </header>
       <p className="text-base text-muted" data-tag-access="read-only">
@@ -72,52 +86,45 @@ function ManagedTagDetail({ stand }: { stand: Stand }) {
     justProgrammedAt ? { ...stand, nfcProvisionedAt: justProgrammedAt } : stand,
   );
 
-  async function openLive() {
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
-    if (!session) {
-      notify.error("Please sign in again", "Your session expired.");
-      return;
-    }
-    const res = await fetch(`/api/v1/review-stands/${stand.standId}/qr?format=json`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-      credentials: "omit",
-    });
-    if (!res.ok) {
-      notify.error("Could not open the customer page", "Please try again.");
-      return;
-    }
-    const json = (await res.json()) as { data?: { standUrl?: string } };
-    if (!json.data?.standUrl) {
-      notify.error("Could not open the customer page", "Please try again.");
-      return;
-    }
-    window.open(json.data.standUrl, "_blank", "noopener,noreferrer");
-  }
-
   async function rotate() {
     setBusy(true);
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
-    if (!session) {
+    try {
+      const {
+        data: { session },
+      } = await supabaseBrowser().auth.getSession();
+      if (!session) {
+        notify.error("Please sign in again", "Your session expired.");
+        return;
+      }
+      const response = await fetch(
+        `/api/v1/review-stands/${stand.standId}/rotate-token`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        },
+      );
+      if (!response.ok) {
+        notify.error("Could not make a new code", "Please try again.");
+        return;
+      }
+      setJustProgrammedAt(null);
+      setConfirming(false);
+      router.refresh();
+      qr.reload();
+      notify.success(
+        "New code ready",
+        "The old code no longer works. Print this one and program NFC again.",
+      );
+    } catch {
+      qr.reload();
+      router.refresh();
+      notify.error(
+        "Could not confirm the new code",
+        "Check this Tag before trying again.",
+      );
+    } finally {
       setBusy(false);
-      notify.error("Please sign in again", "Your session expired.");
-      return;
     }
-    const response = await fetch(`/api/v1/review-stands/${stand.standId}/rotate-token`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-    setBusy(false);
-    setConfirming(false);
-    if (!response.ok) {
-      notify.error("Could not make a new code", "Please try again.");
-      return;
-    }
-    qr.reload();
-    notify.success("New code ready", "The old code no longer works. Print this one and program NFC again.");
   }
 
   return (
@@ -129,7 +136,8 @@ function ManagedTagDetail({ stand }: { stand: Stand }) {
               {stand.label}
             </h1>
             <p className="mt-2 text-base text-muted">
-              {stand.locationName ?? "Place"} · {tagReadinessLabel(status)} · {lastUsedLabel(stand.lastOpenedAt)}
+              {stand.locationName ?? "Place"} · {tagReadinessLabel(status)} ·{" "}
+              {lastUsedLabel(stand.lastOpenedAt)}
             </p>
           </div>
           <button
@@ -144,11 +152,21 @@ function ManagedTagDetail({ stand }: { stand: Stand }) {
         </div>
         {more ? (
           <div className="mt-3 flex flex-col gap-2 rounded-[var(--radius-card)] border border-border bg-surface p-3">
-            <Button variant="secondary" onClick={() => window.print()}>
+            <Button
+              variant="secondary"
+              disabled={qr.status !== "ready"}
+              onClick={() => window.print()}
+            >
               <Printer className="size-5" aria-hidden="true" />
               Print
             </Button>
-            <Button variant="secondary" onClick={() => qr.download(`reviewboost-${stand.tokenPrefix}.svg`)}>
+            <Button
+              variant="secondary"
+              disabled={qr.status !== "ready" || qr.downloading}
+              onClick={() =>
+                qr.download(`reviewboost-${stand.tokenPrefix}.svg`)
+              }
+            >
               <Download className="size-5" aria-hidden="true" />
               Save code
             </Button>
@@ -172,14 +190,16 @@ function ManagedTagDetail({ stand }: { stand: Stand }) {
           onReload={qr.reload}
         />
         <div className="mt-5 flex flex-col gap-3">
-          <Button variant="action" size="lg" onClick={() => window.print()}>
+          <Button
+            variant="action"
+            size="lg"
+            disabled={qr.status !== "ready"}
+            onClick={() => window.print()}
+          >
             <Printer className="size-5" aria-hidden="true" />
             Print this code
           </Button>
-          <Button variant="secondary" size="lg" onClick={() => void openLive()}>
-            <ExternalLink className="size-5" aria-hidden="true" />
-            Preview customer page
-          </Button>
+          <PreviewCustomerPage standId={stand.standId} variant="button" />
         </div>
       </section>
 
@@ -250,11 +270,14 @@ function QrPanel({
   needsReprint: boolean;
   onReload: () => void;
 }) {
-  const frame = "mx-auto flex aspect-square w-full max-w-[280px] items-center justify-center";
+  const frame =
+    "mx-auto flex aspect-square w-full max-w-[280px] items-center justify-center";
 
   // The code fades only when it is actually replaced — a new token after
   // "Make a new code" — never when it first appears or on a re-render.
-  const [shown, setShown] = useState<{ url: string | null; replaced: boolean }>({ url: objectUrl, replaced: false });
+  const [shown, setShown] = useState<{ url: string | null; replaced: boolean }>(
+    { url: objectUrl, replaced: false },
+  );
   if (status === "ready" && objectUrl !== shown.url) {
     setShown({ url: objectUrl, replaced: shown.url !== null });
   }
@@ -285,12 +308,18 @@ function QrPanel({
           key={objectUrl}
           src={objectUrl}
           alt={`Code for ${label}`}
-          className={cn("mx-auto aspect-square w-full max-w-[280px]", shown.replaced && "animate-qr-in")}
+          className={cn(
+            "mx-auto aspect-square w-full max-w-[280px]",
+            shown.replaced && "animate-qr-in",
+          )}
         />
         {needsReprint ? (
-          <p className="mt-3 text-center text-sm text-muted" data-qr-state="rotation-required">
-            This is the new code. The one already printed no longer works — print
-            this and replace it.
+          <p
+            className="mt-3 text-center text-sm text-muted"
+            data-qr-state="rotation-required"
+          >
+            This is the new code. The one already printed no longer works —
+            print this and replace it.
           </p>
         ) : null}
       </div>
@@ -299,8 +328,13 @@ function QrPanel({
 
   if (status === "expired") {
     return (
-      <div className={`${frame} flex-col gap-3 text-center`} data-qr-state="expired">
-        <p className="text-sm text-muted">Your session expired, so the code could not load.</p>
+      <div
+        className={`${frame} flex-col gap-3 text-center`}
+        data-qr-state="expired"
+      >
+        <p className="text-sm text-muted">
+          Your session expired, so the code could not load.
+        </p>
         <Button variant="secondary" onClick={onReload}>
           Sign in again and retry
         </Button>
@@ -310,7 +344,10 @@ function QrPanel({
 
   if (status === "error") {
     return (
-      <div className={`${frame} flex-col gap-3 text-center`} data-qr-state="error">
+      <div
+        className={`${frame} flex-col gap-3 text-center`}
+        data-qr-state="error"
+      >
         <p className="text-sm text-muted">The code could not be loaded.</p>
         <Button variant="secondary" onClick={onReload}>
           Try again
@@ -321,7 +358,11 @@ function QrPanel({
 
   return (
     <div className={frame} data-qr-state="loading">
-      <div className="size-8 animate-spin rounded-full border-4 border-border border-t-brand-text" aria-label="Loading code" role="status" />
+      <div
+        className="size-8 animate-spin rounded-full border-4 border-border border-t-brand-text"
+        aria-label="Loading code"
+        role="status"
+      />
     </div>
   );
 }

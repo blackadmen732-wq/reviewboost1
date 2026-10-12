@@ -9,7 +9,7 @@ import {
   TRIAL,
   type PublicPlan,
 } from "@/features/public/pricing-plans";
-import { START_HREF } from "@/features/public/public-copy";
+import { startForPlan } from "@/lib/owner/plan-choice";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -42,7 +42,10 @@ function startLine(plan: PublicPlan): [string, string] {
 
 function PlanCard({ plan }: { plan: PublicPlan }) {
   const [first, second] = startLine(plan);
-  const cta = plan.trialDays > 0 ? `Start ${plan.trialDays}-day trial` : `Choose ${plan.name}`;
+  const cta =
+    plan.trialDays > 0
+      ? `Start ${plan.trialDays}-day trial`
+      : `Choose ${plan.name}`;
 
   return (
     <li
@@ -57,8 +60,12 @@ function PlanCard({ plan }: { plan: PublicPlan }) {
       )}
       data-plan={plan.id}
     >
-      <h3 className="text-xl font-semibold tracking-[-0.015em] text-ink">{plan.name}</h3>
-      <p className="mt-1.5 text-[0.95rem] leading-relaxed text-muted">{plan.fit}</p>
+      <h3 className="text-xl font-semibold tracking-[-0.015em] text-ink">
+        {plan.name}
+      </h3>
+      <p className="mt-1.5 text-[0.95rem] leading-relaxed text-muted">
+        {plan.fit}
+      </p>
 
       <p className="mt-7 flex items-baseline gap-2">
         <span className="text-[4rem] font-semibold leading-none tracking-[-0.05em] text-ink tabular-nums sm:text-[4.5rem]">
@@ -77,7 +84,7 @@ function PlanCard({ plan }: { plan: PublicPlan }) {
           "group-focus-within:border-action group-focus-within:bg-action group-focus-within:text-on-action",
         )}
       >
-        <Link href={START_HREF}>{cta}</Link>
+        <Link href={startForPlan(plan.id)}>{cta}</Link>
       </Button>
 
       <div className="mt-3.5 text-center text-sm leading-relaxed text-muted">
@@ -91,7 +98,9 @@ function PlanCard({ plan }: { plan: PublicPlan }) {
       <dl className="flex flex-col gap-3.5 text-base">
         <div className="flex items-baseline justify-between gap-4">
           <dt className="text-muted">Locations</dt>
-          <dd className="font-semibold text-ink tabular-nums">{plan.locations}</dd>
+          <dd className="font-semibold text-ink tabular-nums">
+            {plan.locations}
+          </dd>
         </div>
         <div className="flex items-baseline justify-between gap-4">
           <dt className="text-muted">Tags</dt>
@@ -121,13 +130,16 @@ export function PricingTable() {
           that a card is needed. The Starter card only has room for the gist. */}
       <p className="mx-auto mt-10 max-w-[60ch] text-center text-sm leading-relaxed text-muted">
         <span className="font-medium text-ink">
-          Try {TRIAL.plan} free for {TRIAL.days} days — {TRIAL.tags} Tag, {TRIAL.locations}{" "}
-          location.
+          Try {TRIAL.plan} free for {TRIAL.days} days — {TRIAL.tags} Tag,{" "}
+          {TRIAL.locations} location.
         </span>{" "}
         {TRIAL.note}
       </p>
 
-      <section aria-labelledby="every-plan-heading" className="mx-auto mt-14 max-w-3xl">
+      <section
+        aria-labelledby="every-plan-heading"
+        className="mx-auto mt-14 max-w-3xl"
+      >
         <h3
           id="every-plan-heading"
           className="text-center text-lg font-semibold tracking-[-0.015em] text-ink"

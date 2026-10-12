@@ -103,7 +103,7 @@ export default function TermsPage() {
       <p>
         You can delete your account and everything in it yourself, from Settings —
         see{" "}
-        <Link href="/delete-account" className="text-brand underline underline-offset-4">
+        <Link href="/delete-account" className="text-brand-text underline underline-offset-4">
           Delete your account
         </Link>
         . There is no self-service export today. If you need your ratings in a
@@ -136,7 +136,7 @@ export default function TermsPage() {
       <h2>Contact</h2>
       <p>
         Questions about these terms:{" "}
-        <a href={`mailto:${SUPPORT_EMAIL}`} className="text-brand underline underline-offset-4">
+        <a href={`mailto:${SUPPORT_EMAIL}`} className="text-brand-text underline underline-offset-4">
           {SUPPORT_EMAIL}
         </a>
       </p>

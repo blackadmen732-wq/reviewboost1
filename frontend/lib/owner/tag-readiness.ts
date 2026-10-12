@@ -16,8 +16,13 @@ export interface TagReadinessInput {
 }
 
 export function tagNeedsRewrite(input: TagReadinessInput): boolean {
-  if (input.nfcProvisionedAt === null || input.tokenRotatedAt === null) return false;
-  return new Date(input.tokenRotatedAt) > new Date(input.nfcProvisionedAt);
+  if (input.tokenRotatedAt === null) return false;
+  // Rotation clears the programmed date. Null after a rotation still means
+  // the chip and printed code on the counter carry the old link.
+  return (
+    input.nfcProvisionedAt === null ||
+    new Date(input.tokenRotatedAt) > new Date(input.nfcProvisionedAt)
+  );
 }
 
 export function tagReadiness(input: TagReadinessInput): TagReadiness {
@@ -37,7 +42,10 @@ export function tagReadinessLabel(status: TagReadiness): string {
   return "Both";
 }
 
-export function lastUsedLabel(iso: string | null, now: number = Date.now()): string {
+export function lastUsedLabel(
+  iso: string | null,
+  now: number = Date.now(),
+): string {
   if (!iso) return "Not used yet";
   const then = new Date(iso);
   const days = Math.floor((now - then.getTime()) / 86_400_000);

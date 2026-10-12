@@ -37,7 +37,10 @@ export function SignInFlow({
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
-    const timer = window.setTimeout(() => setSecondsLeft((value) => value - 1), 1000);
+    const timer = window.setTimeout(
+      () => setSecondsLeft((value) => value - 1),
+      1000,
+    );
     return () => window.clearTimeout(timer);
   }, [secondsLeft]);
 
@@ -45,20 +48,26 @@ export function SignInFlow({
     setBusy(true);
     setError(null);
 
-    const { error: sendError } = await supabaseBrowser().auth.signInWithOtp({
-      email: address,
-      options: { shouldCreateUser: true },
-    });
-
-    setBusy(false);
-
-    if (sendError) {
-      setError("We could not send the code. Check the address and try again.");
-      return;
+    try {
+      const { error: sendError } = await supabaseBrowser().auth.signInWithOtp({
+        email: address,
+        options: { shouldCreateUser: true },
+      });
+      if (sendError) {
+        setError(
+          "We could not send the code. Check the address and try again.",
+        );
+        return;
+      }
+      setStep("verify");
+      setSecondsLeft(RESEND_SECONDS);
+    } catch {
+      setError(
+        "Could not reach ReviewBoost. Check your connection and try again.",
+      );
+    } finally {
+      setBusy(false);
     }
-
-    setStep("verify");
-    setSecondsLeft(RESEND_SECONDS);
   }, []);
 
   async function handleEmailSubmit(event: React.FormEvent) {
@@ -80,20 +89,26 @@ export function SignInFlow({
       setBusy(true);
       setError(null);
 
-      const { error: verifyError } = await supabaseBrowser().auth.verifyOtp({
-        email,
-        token: code,
-        type: "email",
-      });
-
-      if (verifyError) {
-        setBusy(false);
-        setError("That code is not right. Check it and type it again.");
+      try {
+        const { error: verifyError } = await supabaseBrowser().auth.verifyOtp({
+          email,
+          token: code,
+          type: "email",
+        });
+        if (verifyError) {
+          setError("That code is not right. Check it and type it again.");
+          setResetToken((value) => value + 1);
+          return;
+        }
+        window.location.assign(next);
+      } catch {
+        setError(
+          "Could not reach ReviewBoost. Check your connection and try again.",
+        );
         setResetToken((value) => value + 1);
-        return;
+      } finally {
+        setBusy(false);
       }
-
-      window.location.assign(next);
     },
     [email, next],
   );
@@ -171,8 +186,8 @@ export function SignInFlow({
           {intent === "start" ? "Get started" : "Sign in"}
         </h1>
         <p className="text-base leading-relaxed text-muted">
-          Customers scan a code on your counter. You get more reviews — from
-          everyone who rates you.
+          Use your business email. We will send you a code to sign in. No
+          password to remember.
         </p>
       </div>
 
@@ -202,7 +217,13 @@ export function SignInFlow({
         {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
       </div>
 
-      <Button type="submit" variant="action" size="lg" loading={busy} loadingLabel="Sending…">
+      <Button
+        type="submit"
+        variant="action"
+        size="lg"
+        loading={busy}
+        loadingLabel="Sending…"
+      >
         Continue
       </Button>
 

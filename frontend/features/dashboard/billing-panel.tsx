@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { PUBLIC_PLANS, TRIAL } from "@/features/public/pricing-plans";
 import { ownerOnly } from "@/lib/owner/permissions";
+import { cn } from "@/lib/utils/cn";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 type PlanId = "starter" | "growth" | "pro";
@@ -238,7 +239,7 @@ function count(used: number, limit: number, one: string, many: string): string {
  * badge, what it means, one action), then what the business is using, then —
  * only when there is no subscription behind it — the plans to choose from.
  */
-export function BillingPanel({ billing, canManage }: { billing: Billing; canManage: boolean }) {
+export function BillingPanel({ billing, canManage, selectedPlan = null }: { billing: Billing; canManage: boolean; selectedPlan?: PlanId | null }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -459,9 +460,13 @@ export function BillingPanel({ billing, canManage }: { billing: Billing; canMana
               <li
                 key={plan.id}
                 data-plan={plan.id}
-                className="group flex flex-col rounded-[var(--radius-card)] border border-border bg-surface p-6 shadow-[var(--shadow-card)] transition-[border-color,box-shadow,transform] duration-200 ease-out hover:border-action focus-within:border-action motion-safe:hover:-translate-y-0.5 motion-safe:focus-within:-translate-y-0.5"
+                data-selected={selectedPlan === plan.id || undefined}
+                className={cn("group flex flex-col rounded-[var(--radius-card)] border bg-surface p-6", selectedPlan === plan.id ? "border-action" : "border-border")}
               >
-                <p className="text-lg font-semibold text-ink">{plan.name}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-lg font-semibold text-ink">{plan.name}</p>
+                  {selectedPlan === plan.id ? <span className="text-xs font-medium text-brand-text">Your choice</span> : null}
+                </div>
                 <p className="mt-0.5 text-sm text-muted">{plan.fit}</p>
                 <p className="mt-5 flex items-baseline gap-1.5">
                   <span className="text-[2.75rem] font-semibold leading-none tracking-[-0.04em] text-ink tabular-nums">

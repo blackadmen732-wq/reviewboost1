@@ -1,6 +1,14 @@
 "use client";
 
-import { ArrowLeft, Check, Download, ExternalLink, Printer, RefreshCw, Store } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Download,
+  ExternalLink,
+  Printer,
+  RefreshCw,
+  Store,
+} from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +21,8 @@ import {
 } from "@/features/dashboard/google-link-copy";
 import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
 import { isGoogleReviewWritingUrl } from "@/lib/security/google-review-url";
+import { billingForPlan } from "@/lib/owner/plan-choice";
+import { PLAN_CATALOG, type PlanId } from "@/lib/owner/plan-catalog";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -41,7 +51,11 @@ interface Created {
   standId: string;
 }
 
-export function OnboardingFlow() {
+export function OnboardingFlow({
+  selectedPlan = null,
+}: {
+  selectedPlan?: PlanId | null;
+}) {
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState("");
   const [googleUrl, setGoogleUrl] = useState("");
@@ -52,7 +66,8 @@ export function OnboardingFlow() {
   const qr = useAuthenticatedQr(created?.standId ?? null);
 
   const trimmedUrl = googleUrl.trim();
-  const urlLooksRight = trimmedUrl !== "" && isGoogleReviewWritingUrl(trimmedUrl);
+  const urlLooksRight =
+    trimmedUrl !== "" && isGoogleReviewWritingUrl(trimmedUrl);
 
   function slugify(value: string): string {
     // Generated rather than asked for. "Choose a web address" is a question
@@ -121,7 +136,9 @@ export function OnboardingFlow() {
       setCreated(body.data);
       setStep("done");
     } catch {
-      setError("Could not reach ReviewBoost. Check your connection and try again.");
+      setError(
+        "Could not reach ReviewBoost. Check your connection and try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -141,7 +158,9 @@ export function OnboardingFlow() {
           <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
             What is your business called?
           </h1>
-          <p className="text-base text-muted">This is what customers will see.</p>
+          <p className="text-base text-muted">
+            Use the name on your shop or business.
+          </p>
         </div>
 
         <div className="flex flex-col gap-3">
@@ -164,6 +183,7 @@ export function OnboardingFlow() {
         </div>
 
         <Button
+          variant="action"
           size="lg"
           disabled={name.trim().length < 2}
           onClick={() => {
@@ -252,8 +272,8 @@ export function OnboardingFlow() {
 
           {trimmedUrl !== "" && !urlLooksRight ? (
             <InlineNotice kind="error">
-              That does not look like a Google link. It should start with
-              g.page or google.com.
+              That does not look like a Google link. It should start with g.page
+              or google.com.
             </InlineNotice>
           ) : null}
 
@@ -262,6 +282,7 @@ export function OnboardingFlow() {
 
         <div className="flex flex-col gap-3">
           <Button
+            variant="action"
             size="lg"
             loading={busy}
             loadingLabel="Setting up…"
@@ -273,7 +294,11 @@ export function OnboardingFlow() {
 
           {/* Always available. The person who cannot find this link today is
               exactly the person who must not be locked out today. */}
-          <Button variant="ghost" loading={busy} onClick={() => void finish(undefined)}>
+          <Button
+            variant="ghost"
+            loading={busy}
+            onClick={() => void finish(undefined)}
+          >
             I will do this later
           </Button>
           <p className="text-sm text-muted" data-google-unset="true">
@@ -289,7 +314,11 @@ export function OnboardingFlow() {
   return (
     <div className="flex flex-col items-center gap-8 text-center">
       <div className="grid size-20 place-items-center rounded-full bg-brand-soft">
-        <Check className="size-10 text-brand-text" strokeWidth={3} aria-hidden="true" />
+        <Check
+          className="size-10 text-brand-text"
+          strokeWidth={3}
+          aria-hidden="true"
+        />
       </div>
 
       <div className="flex flex-col gap-2">
@@ -300,8 +329,9 @@ export function OnboardingFlow() {
             business puts this on the counter and finds out from a customer.
             The door opens when a plan does. */}
         <p className="text-base text-muted">
-          Choose a plan to switch it on. Starter is free for seven days,
-          and nothing is charged until the trial ends.
+          {selectedPlan
+            ? `Your ${PLAN_CATALOG[selectedPlan].name} choice is saved. Review the price and payment details next to switch on your Tag.`
+            : "Choose a plan to switch it on. Starter is free for seven days, and nothing is charged until the trial ends."}
         </p>
       </div>
 
@@ -311,7 +341,9 @@ export function OnboardingFlow() {
             <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center">
               <div className="flex flex-col items-center gap-3">
                 <p className="text-sm text-muted">
-                  {qr.status === "expired" ? "Please sign in again" : "Could not load QR code"}
+                  {qr.status === "expired"
+                    ? "Please sign in again"
+                    : "Could not load QR code"}
                 </p>
                 <button
                   type="button"
@@ -339,8 +371,10 @@ export function OnboardingFlow() {
       ) : null}
 
       <div className="flex w-full flex-col gap-3">
-        <Button size="lg" asChild>
-          <a href="/settings/billing">Choose a plan</a>
+        <Button variant="action" size="lg" asChild>
+          <a href={billingForPlan(selectedPlan)}>
+            {selectedPlan ? "Continue to your plan" : "Choose a plan"}
+          </a>
         </Button>
         <Button variant="secondary" onClick={() => window.print()}>
           <Printer className="size-5" aria-hidden="true" />
@@ -364,7 +398,11 @@ export function OnboardingFlow() {
 
 function Progress({ current }: { current: number }) {
   return (
-    <div className="flex items-center gap-2" role="img" aria-label={`Step ${current} of 3`}>
+    <div
+      className="flex items-center gap-2"
+      role="img"
+      aria-label={`Step ${current} of 3`}
+    >
       {[1, 2, 3].map((step) => (
         <span
           key={step}

@@ -72,4 +72,7 @@ export const EXPECTED_MIGRATIONS: readonly string[] = [
   "worker_heartbeats",
   "billing_customer_lookup",
   "applied_migrations_read",
+  "account_deletion_fixes",
+  "consent_requires_evidence",
+  "local_customer_page_assets",
 ];

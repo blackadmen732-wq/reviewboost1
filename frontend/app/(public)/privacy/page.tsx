@@ -113,7 +113,7 @@ export default function PrivacyPage() {
       <p>
         You can request a copy of your data, correction of inaccuracies, or deletion of
         your account at any time by emailing{" "}
-        <a href={`mailto:${CONTACT_EMAIL}`} className="text-brand underline underline-offset-4">
+        <a href={`mailto:${CONTACT_EMAIL}`} className="text-brand-text underline underline-offset-4">
           {CONTACT_EMAIL}
         </a>
         . We respond within 30 days.
@@ -156,13 +156,13 @@ export default function PrivacyPage() {
       <h2>Contact</h2>
       <p>
         Questions about privacy:{" "}
-        <a href={`mailto:${CONTACT_EMAIL}`} className="text-brand underline underline-offset-4">
+        <a href={`mailto:${CONTACT_EMAIL}`} className="text-brand-text underline underline-offset-4">
           {CONTACT_EMAIL}
         </a>
       </p>
       <p>
         General support:{" "}
-        <a href={`mailto:${SUPPORT_EMAIL}`} className="text-brand underline underline-offset-4">
+        <a href={`mailto:${SUPPORT_EMAIL}`} className="text-brand-text underline underline-offset-4">
           {SUPPORT_EMAIL}
         </a>
       </p>

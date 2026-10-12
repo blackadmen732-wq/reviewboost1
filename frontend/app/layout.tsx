@@ -8,6 +8,7 @@ import { PwaRegister } from "@/components/pwa-register";
 import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
 import "@/styles/customer-page.css";
+import "@/styles/public-product.css";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
 const DESCRIPTION =

@@ -20,6 +20,10 @@ vi.mock("@/lib/hooks/use-authenticated-qr", () => ({
   }),
 }));
 vi.mock("@/features/tags/program-tag-sheet", () => ({ ProgramTagSheet: () => null }));
+vi.mock("@/lib/api/owner-fetch", () => ({
+  ownerFetch: async () => new Response(JSON.stringify({ data: { standUrl: "https://reviewboost.fit/q/test" } })),
+  SessionExpiredError: class extends Error {},
+}));
 
 import { ROTATE_NOT_NEEDED, ROTATE_WARNING, TagDetail } from "@/features/tags/tag-detail";
 import type { Stand } from "@/lib/server/owner-data";
@@ -93,7 +97,7 @@ describe("Make a new code", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { user, dialog } = await openWarning();
     await user.click(within(dialog).getByRole("button", { name: "Keep my code" }));
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.filter(([path]) => String(path).includes("rotate-token"))).toHaveLength(0);
     expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 

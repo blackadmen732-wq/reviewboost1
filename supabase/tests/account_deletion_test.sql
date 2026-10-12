@@ -17,7 +17,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(18);
+select plan(25);
 
 create or replace function tests.set_actor(p_user_id uuid) returns void
 language plpgsql as $$
@@ -173,6 +173,63 @@ select ok(
     exists (select 1 from public.organizations
              where id = '00000000-1701-0000-0000-000000000001'),
     'four refused attempts later the business is still there');
+
+-- ------------------------------------- the check that runs before Stripe ---
+-- rpc_delete_organization_check gives the route the same refusals before it
+-- cancels a subscription, and deletes nothing.
+
+select throws_ok(
+    $$ select public.rpc_delete_organization_check(
+           '00000000-1701-0000-0000-000000000001', 'Bystander Cafe') $$,
+    'P0001',
+    'confirmation_mismatch',
+    'the pre-check refuses the wrong name, so the route never reaches Stripe');
+
+select lives_ok(
+    $$ select public.rpc_delete_organization_check(
+           '00000000-1701-0000-0000-000000000001', '  doomed DINER ') $$,
+    'the pre-check accepts what the deletion accepts');
+
+select ok(
+    exists (select 1 from public.organizations
+             where id = '00000000-1701-0000-0000-000000000001'),
+    'a passing pre-check deletes nothing');
+
+select tests.set_actor('00000000-1701-0000-0000-0000000000a2');
+
+select throws_ok(
+    $$ select public.rpc_delete_organization_check(
+           '00000000-1701-0000-0000-000000000001', 'Doomed Diner') $$,
+    'P0001',
+    'not_found_or_forbidden',
+    'the pre-check refuses an admin, like the deletion');
+
+select tests.set_actor('00000000-1701-0000-0000-0000000000a3');
+
+select throws_ok(
+    $$ select public.rpc_delete_organization_check(
+           '00000000-1701-0000-0000-000000000001', 'Doomed Diner') $$,
+    'P0001',
+    'not_found_or_forbidden',
+    'the pre-check refuses another business''s owner, like the deletion');
+
+-- The Stripe ids are for the service role only, through `public` so the Data
+-- API can reach them.
+select throws_ok(
+    $$ select * from public.rpc_billing_refs_for_org('00000000-1701-0000-0000-000000000001') $$,
+    '42501',
+    'permission denied for function rpc_billing_refs_for_org',
+    'a signed-in user cannot read anyone''s Stripe ids');
+
+select tests.reset_role();
+set local role service_role;
+
+select lives_ok(
+    $$ select * from public.rpc_billing_refs_for_org('00000000-1701-0000-0000-000000000001') $$,
+    'the service role reads the Stripe ids through public');
+
+select tests.reset_role();
+select tests.set_actor('00000000-1701-0000-0000-0000000000a1');
 
 select lives_ok(
     $$ select public.rpc_delete_organization(

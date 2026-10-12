@@ -334,9 +334,9 @@ describe("live checks", () => {
     expect(problemsOf(report)).toMatch(/missing 1 migration\(s\).*tag_routing_invariants/);
   });
 
-  it("fails when the hosted ledger has only the first 36 migrations (production today)", async () => {
+  it("fails when the hosted ledger has only the first 36 migrations", async () => {
     const report = await live({ appliedMigrations: async () => EXPECTED_MIGRATIONS.slice(0, 36) });
-    expect(problemsOf(report)).toMatch(/missing 30 migration\(s\)/);
+    expect(problemsOf(report)).toContain(`missing ${EXPECTED_MIGRATIONS.length - 36} migration(s)`);
   });
 
   it("fails closed when the ledger cannot be read", async () => {

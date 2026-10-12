@@ -117,6 +117,14 @@ describe("POST /api/v1/public/review-sign-in", () => {
     for (const call of rpcCalls) expect(call.key).not.toContain("198.51.100.4");
   });
 
+  it("does not spend the shared daily budget on other people's wrong codes", async () => {
+    // Every rejected emailed code in the mobile app also lands here. Spending
+    // the overall budget on those let ordinary typos lock App Review out.
+    const res = await POST(request({ email: "owner@example.com", code: "123456" }));
+    expect(res.status).toBe(401);
+    expect(rpcCalls.map((call) => call.bucket)).toEqual(["review-sign-in-client"]);
+  });
+
   it("rejects a code that is not six digits before touching anything", async () => {
     const res = await POST(request({ email: "app-review@reviewboost.fit", code: "48291" }));
     expect(res.status).toBe(400);

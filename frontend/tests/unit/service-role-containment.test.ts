@@ -23,6 +23,7 @@ import { describe, expect, it } from "vitest";
 const ROOT = join(__dirname, "..", "..");
 
 const IMPORTERS: Record<string, string> = {
+  "app/api/v1/text-requests/consent/route.ts": "owner/admin authenticated first; organization rate-limit RPC only; evidence is recorded by the reviewed SMS service",
   "lib/server/supabase.ts": "defines the client",
   "lib/server/billing-service.ts": "Stripe webhook inbox and billing RPCs (no user session exists)",
   "lib/server/customer-flow-service.ts": "anonymous public review flow: capability-scoped rpc_* only",
@@ -128,5 +129,15 @@ describe("service-role containment", () => {
       new RegExp(`${receiver}\\s*(?:\\.\\s*schema\\([^)]*\\)\\s*)?\\.\\s*from\\s*\\(`).test(planted),
     );
     expect(hit).toBe(true);
+  });
+
+  // supabase/config.toml exposes only `public` to the Data API. A call through
+  // `.schema("...")` reaches nothing in production and every request fails —
+  // which account deletion did, behind a unit test that mocked `.schema()`.
+  it("never asks the Data API for a schema it does not serve", () => {
+    const offenders = files
+      .filter((file) => /\.schema\(\s*["'`]/.test(file.text))
+      .map((file) => file.path);
+    expect(offenders).toEqual([]);
   });
 });

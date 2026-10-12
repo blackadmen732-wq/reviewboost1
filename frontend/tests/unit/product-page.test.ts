@@ -52,10 +52,11 @@ describe("the Product page tells the truth about Tags", () => {
     expect(page.toLowerCase()).toContain("stops working");
   });
 
-  it("tells somebody to print the replacement before retiring the original", () => {
-    // Rotating first and printing second means a dead code on the counter for
-    // however long the printer takes.
-    expect(page.toLowerCase()).toContain("print the replacement before");
+  it("tells somebody to replace both physical carriers after rotation", () => {
+    // Rotation immediately retires the old token. The replacement address
+    // only exists after that operation, so it cannot be printed beforehand.
+    expect(page.toLowerCase()).toContain("once you rotate, print the new code");
+    expect(page.toLowerCase()).toContain("rewrite the nfc tag before putting it back in use");
   });
 });
 

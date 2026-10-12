@@ -211,3 +211,8 @@ describe("customer page discoverability", () => {
     expect(source("features/dashboard/nav-items.ts")).not.toContain("/customer-page");
   });
 });
+
+
+it("asks for a reprint when rotation has cleared the NFC programmed date", () => {
+  expect(tagReadiness({ nfcProvisionedAt: null, tokenRotatedAt: "2026-09-28T12:00:00Z" })).toBe("both");
+});

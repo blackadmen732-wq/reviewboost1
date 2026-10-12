@@ -5,6 +5,8 @@
  * Fake counts never enter this model.
  */
 
+import { tagNeedsRewrite } from "@/lib/owner/tag-readiness";
+
 import { GOOGLE_LINK_INVALID } from "@/features/dashboard/google-link-copy";
 
 export interface HomeCounts {
@@ -93,14 +95,11 @@ export function isHomeEmpty(counts: Pick<HomeCounts, "recentCount" | "ratingsTod
   return counts.recentCount === 0 && counts.ratingsToday === 0;
 }
 
-export function tagNeedsRewrite(stand: HomeStand): boolean {
-  if (stand.nfcProvisionedAt === null || stand.tokenRotatedAt === null) return false;
-  return new Date(stand.tokenRotatedAt) > new Date(stand.nfcProvisionedAt);
-}
+export { tagNeedsRewrite };
 
 export function tagProgramPhase(stand: HomeStand): TagProgramPhase {
-  if (stand.nfcProvisionedAt === null) return "not-programmed";
   if (tagNeedsRewrite(stand)) return "needs-reprogramming";
+  if (stand.nfcProvisionedAt === null) return "not-programmed";
   return "programmed";
 }
 
