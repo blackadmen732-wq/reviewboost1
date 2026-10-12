@@ -6,6 +6,16 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { notify } from "@/components/ui/toast";
+import {
+  CONSENT_ATTESTATION_VERSION,
+  CONSENT_METHODS,
+  CONSENT_METHOD_IDS,
+  DEFAULT_TEXT_REQUEST_TEMPLATE_ID,
+  TEXT_REQUEST_TEMPLATES,
+  TEXT_REQUEST_TEMPLATE_IDS,
+  type ConsentMethod,
+  type TextRequestTemplateId,
+} from "@/lib/sms/text-request-templates";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 interface Balance {
@@ -34,10 +44,20 @@ interface TextRequestComposerProps {
   recent: readonly RecentRequest[];
 }
 
+interface Eligibility {
+  allowed: boolean;
+  reason: string | null;
+  message: string | null;
+}
+
 interface Preview {
+  body: string;
   segments: number;
   encoding: string;
   unitCount: number;
+  recipientLastFour: string;
+  eligibility: Eligibility;
+  consentStatement: string;
 }
 
 /**
@@ -51,13 +71,23 @@ interface Preview {
  * browser and dividing by 160 is wrong for any message containing an emoji,
  * a curly quote, or an accented name — and the number it produces is what the
  * business is billed against.
+ *
+ * The owner picks one of the approved messages; the server adds the business
+ * name in front and "Reply STOP to opt out." at the end, and the preview shows
+ * that exact text. Sending never records consent. A number with no recorded
+ * agreement is shown as such, and the owner can confirm, separately and
+ * explicitly, how that customer agreed.
  */
 export function TextRequestComposer({ balance, tags, recent }: TextRequestComposerProps) {
   const router = useRouter();
   const [phone, setPhone] = useState("");
   const [standId, setStandId] = useState(tags[0]?.standId ?? "");
-  const [message, setMessage] = useState("");
+  const [templateId, setTemplateId] = useState<TextRequestTemplateId>(
+    DEFAULT_TEXT_REQUEST_TEMPLATE_ID,
+  );
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [consentMethod, setConsentMethod] = useState<ConsentMethod | "">("");
+  const [consentConfirmed, setConsentConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,7 +126,7 @@ export function TextRequestComposer({ balance, tags, recent }: TextRequestCompos
       const response = await authorizedFetch("/api/v1/text-requests/preview", {
         phone: phone.trim(),
         standId,
-        ...(message.trim() ? { messageTemplate: message.trim() } : {}),
+        templateId,
       });
 
       if (!response.ok) {
@@ -105,10 +135,10 @@ export function TextRequestComposer({ balance, tags, recent }: TextRequestCompos
         return;
       }
 
-      const payload = (await response.json()) as {
-        data: { segments: number; encoding: string; unitCount: number };
-      };
+      const payload = (await response.json()) as { data: Preview };
       setPreview(payload.data);
+      setConsentMethod("");
+      setConsentConfirmed(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Something went wrong.");
     } finally {
@@ -123,8 +153,7 @@ export function TextRequestComposer({ balance, tags, recent }: TextRequestCompos
       const response = await authorizedFetch("/api/v1/text-requests", {
         phone: phone.trim(),
         standId,
-        ...(message.trim() ? { messageTemplate: message.trim() } : {}),
-        consent: { source: "owner_import" },
+        templateId,
       });
 
       if (!response.ok) {
@@ -143,7 +172,48 @@ export function TextRequestComposer({ balance, tags, recent }: TextRequestCompos
     }
   }
 
-  const canSend = phone.trim().length > 2 && standId !== "" && balance.total > 0;
+  async function recordConsent() {
+    if (!consentMethod || !consentConfirmed) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await authorizedFetch("/api/v1/text-requests/consent", {
+        phone: phone.trim(),
+        standId,
+        method: consentMethod,
+        wordingVersion: CONSENT_ATTESTATION_VERSION,
+        confirmed: true,
+      });
+
+      if (!response.ok) {
+        setError(await readError(response));
+        return;
+      }
+
+      const payload = (await response.json()) as { data: { eligibility: Eligibility } };
+      setPreview((current) =>
+        current ? { ...current, eligibility: payload.data.eligibility } : current,
+      );
+      notify.success("Saved", "Their agreement is recorded.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Something went wrong.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Anything that changes who gets the text, or what it says, needs a fresh
+  // preview before it can be sent.
+  function clearPreview() {
+    setPreview(null);
+    setConsentMethod("");
+    setConsentConfirmed(false);
+  }
+
+  const canSend =
+    preview !== null && preview.eligibility.allowed && standId !== "" && balance.total > 0;
+  const needsConsent =
+    preview !== null && !preview.eligibility.allowed && preview.eligibility.reason === "no_consent";
 
   return (
     <div className="flex flex-col gap-6">
@@ -197,7 +267,10 @@ export function TextRequestComposer({ balance, tags, recent }: TextRequestCompos
                 inputMode="tel"
                 autoComplete="off"
                 value={phone}
-                onChange={(event) => setPhone(event.target.value)}
+                onChange={(event) => {
+                  setPhone(event.target.value);
+                  clearPreview();
+                }}
                 placeholder="+1 555 123 4567"
               />
             </label>
@@ -207,7 +280,10 @@ export function TextRequestComposer({ balance, tags, recent }: TextRequestCompos
               <select
                 className="min-h-14 rounded-[var(--radius-control)] border border-border bg-canvas px-4 text-base text-ink"
                 value={standId}
-                onChange={(event) => setStandId(event.target.value)}
+                onChange={(event) => {
+                  setStandId(event.target.value);
+                  clearPreview();
+                }}
               >
                 {tags.map((tag) => (
                   <option key={tag.standId} value={tag.standId}>
@@ -217,30 +293,105 @@ export function TextRequestComposer({ balance, tags, recent }: TextRequestCompos
               </select>
             </label>
 
-            <label className="flex flex-col gap-1 text-sm font-medium text-muted">
-              Message (optional)
-              <textarea
-                className="min-h-24 rounded-[var(--radius-control)] border border-border bg-canvas p-4 text-base text-ink"
-                value={message}
-                onChange={(event) => {
-                  setMessage(event.target.value);
-                  setPreview(null);
-                }}
-                placeholder="How was your visit? Tap here to leave a review: {{link}}"
-              />
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-1 text-sm font-medium text-muted">Message</legend>
+              {TEXT_REQUEST_TEMPLATE_IDS.map((id) => (
+                <label
+                  key={id}
+                  className="flex min-h-14 cursor-pointer items-start gap-3 rounded-[var(--radius-control)] border border-border bg-canvas p-4 text-base text-ink"
+                >
+                  <input
+                    type="radio"
+                    name="text-request-template"
+                    className="mt-1"
+                    value={id}
+                    checked={templateId === id}
+                    onChange={() => {
+                      setTemplateId(id);
+                      clearPreview();
+                    }}
+                  />
+                  <span>{TEXT_REQUEST_TEMPLATES[id].replace("{{link}}", "[your Tag link]")}</span>
+                </label>
+              ))}
               <span className="text-xs text-muted">
-                Leave it empty to use the default. Include {"{{link}}"} where the Tag link
-                should go.
+                Your business name goes in front, and every text ends with &ldquo;Reply STOP to
+                opt out.&rdquo;
               </span>
-            </label>
+            </fieldset>
 
             {preview ? (
-              <InlineNotice kind="info">
-                <p>
+              <section
+                className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-border bg-canvas p-4"
+                aria-labelledby="preview-heading"
+              >
+                <h3 id="preview-heading" className="text-sm font-medium text-muted">
+                  What ••• {preview.recipientLastFour} will get
+                </h3>
+                <p className="whitespace-pre-wrap break-words text-base text-ink">
+                  {preview.body}
+                </p>
+                <p className="text-sm text-muted">
                   {preview.segments} {preview.segments === 1 ? "message" : "messages"} will be
                   billed ({preview.unitCount} characters, {preview.encoding.toUpperCase()}).
                 </p>
+              </section>
+            ) : null}
+
+            {preview && !preview.eligibility.allowed && !needsConsent ? (
+              <InlineNotice kind="error" title="You can't text this number">
+                <p>{preview.eligibility.message}</p>
               </InlineNotice>
+            ) : null}
+
+            {needsConsent && preview ? (
+              <section
+                className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-border bg-surface p-4"
+                aria-labelledby="consent-heading"
+              >
+                <h3 id="consent-heading" className="text-base font-semibold text-ink">
+                  Did this customer agree to a text?
+                </h3>
+                <p className="text-sm text-muted">
+                  {preview.eligibility.message} Only continue if they said yes.
+                </p>
+                <fieldset className="flex flex-col gap-2">
+                  <legend className="mb-1 text-sm font-medium text-muted">How they agreed</legend>
+                  {CONSENT_METHOD_IDS.map((id) => (
+                    <label key={id} className="flex min-h-11 items-center gap-3 text-base text-ink">
+                      <input
+                        type="radio"
+                        name="consent-method"
+                        value={id}
+                        checked={consentMethod === id}
+                        onChange={() => setConsentMethod(id)}
+                      />
+                      {CONSENT_METHODS[id]}
+                    </label>
+                  ))}
+                </fieldset>
+                <label className="flex items-start gap-3 text-base text-ink">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={consentConfirmed}
+                    onChange={(event) => setConsentConfirmed(event.target.checked)}
+                  />
+                  <span>{preview.consentStatement}</span>
+                </label>
+                <div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void recordConsent()}
+                    loading={busy}
+                    loadingLabel="Saving…"
+                    disabled={!consentMethod || !consentConfirmed}
+                  >
+                    Save their agreement
+                  </Button>
+                </div>
+              </section>
             ) : null}
 
             {error ? (
