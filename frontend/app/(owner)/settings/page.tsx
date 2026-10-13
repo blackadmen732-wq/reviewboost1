@@ -160,18 +160,22 @@ export default async function SettingsPage() {
             <p className="text-sm text-muted">Your plan, messages left, and payment.</p>
           </div>
         </Link>
-        <Link
-          href="/settings/connections"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <Plug className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Connections</p>
-            <p className="text-sm text-muted">Google link, billing, texting and sign-in, and whether each works.</p>
-          </div>
-        </Link>
+        {/* Owners and admins only: connecting an app reads customer data. Not a
+            new nav destination; it is set up once and then left alone. */}
+        {["owner", "admin"].includes(organization.role) ? (
+          <Link
+            href="/settings/connections"
+            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+              <Plug className="size-5 text-muted" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-medium text-ink">Connections</p>
+              <p className="text-sm text-muted">Bring in customers from the apps you already use.</p>
+            </div>
+          </Link>
+        ) : null}
       </section>
 
       <section className="mb-6 flex flex-col gap-3" aria-labelledby="appearance-heading">

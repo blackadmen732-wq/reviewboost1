@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveConnections, PLANNED_SERVICES, type ConnectionsInput } from "@/lib/owner/connections";
+import { deriveConnections, type ConnectionsInput } from "@/lib/owner/connections";
 import {
   compareCustomers,
   customerConsentState,
@@ -94,10 +94,5 @@ describe("Connections, from real state only", () => {
     const signIn = card(base, "sign_in");
     expect(signIn.facts[0]!.value).toBe("Email code · Google");
     expect(signIn.purpose).toMatch(/doesn't connect your Google Business Profile/);
-  });
-
-  it("lists services that cannot be connected without any action", () => {
-    expect(PLANNED_SERVICES.length).toBeGreaterThan(0);
-    for (const service of PLANNED_SERVICES) expect(Object.keys(service).sort()).toEqual(["kind", "name"]);
   });
 });

@@ -3,9 +3,9 @@
  *
  * Every card here is derived from something the backend actually holds — the
  * places' Google links, the Stripe-backed plan, whether texting is set up on
- * this deployment, and how the owner signs in. Nothing is a switch. A service
- * ReviewBoost cannot connect to yet is listed as not available, with no
- * button, because a Connect control that does nothing is worse than none.
+ * this deployment, and how the owner signs in. Nothing is a switch. Apps an
+ * owner connects (Square and others) are the registry's job, in
+ * lib/server/integrations; these cards sit under that directory.
  */
 
 export type ConnectionState = "connected" | "attention" | "not_connected" | "test_mode" | "not_available";
@@ -23,11 +23,6 @@ export interface ConnectionCard {
   stateLabel: string;
   facts: ConnectionFact[];
   action: { label: string; href: string } | null;
-}
-
-export interface PlannedService {
-  name: string;
-  kind: string;
 }
 
 export interface ConnectionsInput {
@@ -172,13 +167,3 @@ function signInCard(methods: readonly string[]): ConnectionCard {
 export function deriveConnections(input: ConnectionsInput): ConnectionCard[] {
   return [googleCard(input.places), billingCard(input.billing), textingCard(input.texting), signInCard(input.signInMethods)];
 }
-
-/**
- * Point-of-sale and booking systems a connection could bring visits in from.
- * Not built: listed so an owner knows where it stands, with no button.
- */
-export const PLANNED_SERVICES: readonly PlannedService[] = [
-  { name: "Square", kind: "Point of sale" },
-  { name: "Toast", kind: "Point of sale" },
-  { name: "Clover", kind: "Point of sale" },
-];

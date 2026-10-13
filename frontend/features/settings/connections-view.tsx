@@ -1,17 +1,18 @@
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
-import { PLANNED_SERVICES, type ConnectionCard, type ConnectionState } from "@/lib/owner/connections";
+import type { ConnectionCard, ConnectionState } from "@/lib/owner/connections";
 import { cn } from "@/lib/utils/cn";
 
 /**
- * The Connections cards and the not-yet-available list. Presentational: every
- * value comes from `deriveConnections`, which reads only real state.
+ * The account cards under the app directory: the Google review link, billing,
+ * texting and sign-in. Presentational: every value comes from
+ * `deriveConnections`, which reads only real state.
  */
 export function ConnectionsView({ cards }: { cards: readonly ConnectionCard[] }) {
   return (
     <>
-      <ul className="grid grid-cols-1 gap-4 md:grid-cols-2" aria-label="Connections">
+      <ul className="grid grid-cols-1 gap-4 md:grid-cols-2" aria-label="Your account">
         {cards.map((card) => (
           <li key={card.id}>
             <Connection card={card} />
@@ -19,23 +20,6 @@ export function ConnectionsView({ cards }: { cards: readonly ConnectionCard[] })
         ))}
       </ul>
 
-      <section className="mt-12" aria-labelledby="planned-heading">
-        <h2 id="planned-heading" className="text-sm font-semibold uppercase tracking-wide text-muted">
-          Not available yet
-        </h2>
-        <p className="mt-2 max-w-[56ch] text-base text-muted">
-          Bringing in finished visits from your point-of-sale, so you can send Text Requests without typing
-          numbers. None of these can be connected today.
-        </p>
-        <ul className="mt-4 divide-y divide-border border-y border-border">
-          {PLANNED_SERVICES.map((service) => (
-            <li key={service.name} className="flex min-h-14 items-center justify-between gap-3 py-3">
-              <span className="text-base text-ink">{service.name}</span>
-              <span className="text-sm text-muted">{service.kind} · Not available</span>
-            </li>
-          ))}
-        </ul>
-      </section>
     </>
   );
 }
