@@ -1,5 +1,4 @@
 import Link from "next/link";
-import localFont from "next/font/local";
 import { ArrowDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -18,32 +17,13 @@ import {
 import { ProductDemo } from "@/features/public/product-demo";
 import { PublicShell } from "@/features/public/public-shell";
 
-const editorialFont = localFont({
-  src: [
-    {
-      path: "../../lib/fonts/instrument-serif/InstrumentSerif-Regular.ttf",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "../../lib/fonts/instrument-serif/InstrumentSerif-Italic.ttf",
-      weight: "400",
-      style: "italic",
-    },
-  ],
-  variable: "--font-public-editorial",
-  display: "swap",
-});
-
 /**
  * Signed-out homepage. One idea per band. No testimonials, no invented counts.
  */
 export function PublicHome() {
   return (
-    <PublicShell homepage>
-      <section
-        className={`public-section public-hero ${editorialFont.variable}`}
-      >
+    <PublicShell homepage currentPath="/">
+      <section className="public-section public-hero">
         <div className="public-hero__copy">
           <h1 className="public-hero__title">
             <span>{PUBLIC_HERO.titleLines[0]}</span>{" "}
