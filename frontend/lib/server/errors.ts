@@ -38,6 +38,16 @@ export const ERROR_CODE = {
   // (buy more / wait), so distinct from a generic failure.
   quotaExhausted: "quota_exhausted",
   notEligible: "not_eligible",
+  // Connections. Each is something the owner can act on, so each has its own
+  // code and its own sentence in the UI.
+  connectionStateInvalid: "connection_state_invalid",
+  providerUnavailable: "provider_unavailable",
+  oauthStateInvalid: "oauth_state_invalid",
+  oauthDenied: "oauth_denied",
+  permissionsInsufficient: "permissions_insufficient",
+  accountAlreadyConnected: "account_already_connected",
+  accountMismatch: "account_mismatch",
+  testRequired: "test_required",
   limitReached: "limit_reached",
   requestTimeout: "request_timeout",
   internalError: "internal_error",
