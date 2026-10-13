@@ -357,6 +357,11 @@ Owner actions: migration `20261014000200_manual_customers.sql`; service
 - **Access:** owner/admin only (PR #76's RLS). Writes are definer RPCs that
   read the caller from `auth.uid()` via `app.customer_manual_authorize` and
   audit with ids only. pgTAP: `manual_customers_test.sql`.
+- **Recent visitors:** the composer's customer picker lists people with a
+  visit from a connected app in the last 14 days first ("Visited recently",
+  newest first) and says where the visit came from. That is ordering only: a
+  visit is not agreement, the consent prompt is unchanged, and nothing is sent
+  until the owner previews and presses Send.
 - **Not built:** file imports, groups, sending to several people at once, or
   sending automatically when a visit arrives.
 

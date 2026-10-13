@@ -4,6 +4,7 @@ import { AppShell } from "@/features/dashboard/app-shell";
 import { TextRequestComposer } from "@/features/dashboard/text-request-composer";
 import { TextRequestTabs } from "@/features/text-requests/text-request-tabs";
 import { permissionsFor } from "@/lib/owner/permissions";
+import { providerDirectory } from "@/lib/server/integrations/connection-service";
 import {
   listOwnerCustomers,
   listRecentTextRequests,
@@ -54,6 +55,7 @@ export default async function TextRequestsPage({
   ]);
 
   const sendable = stands.filter((stand) => stand.status === "active");
+  const sourceNames = new Map(providerDirectory().map((provider) => [provider.id, provider.displayName]));
 
   return (
     <AppShell businessName={organization.name}>
@@ -79,7 +81,14 @@ export default async function TextRequestsPage({
         customers={
           customers === null
             ? null
-            : customers.map(({ id, name, lastFour, consent }) => ({ id, name, lastFour, agreement: consent }))
+            : customers.map(({ id, name, lastFour, consent, lastVisitAt, sources, addedByHand }) => ({
+                id,
+                name,
+                lastFour,
+                agreement: consent,
+                lastVisitAt,
+                source: addedByHand ? null : (sourceNames.get(sources.find((source) => source !== "manual") ?? "") ?? null),
+              }))
         }
         initialCustomerId={customer ?? null}
       />

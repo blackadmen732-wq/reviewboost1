@@ -9,7 +9,7 @@ import { InlineNotice } from "@/components/ui/inline-notice";
 import { notify } from "@/components/ui/toast";
 import { MessagePhone } from "@/features/text-requests/message-phone";
 import {
-  compareCustomers,
+  groupForPicker,
   textRequestStatus,
   type CustomerConsentState,
 } from "@/lib/owner/customers";
@@ -26,7 +26,7 @@ import {
 } from "@/lib/sms/text-request-templates";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils/cn";
-import { relativeDay } from "@/lib/utils/relative-day";
+import { relativeDay, relativeDayInSentence } from "@/lib/utils/relative-day";
 
 interface Balance {
   monthly: number;
@@ -55,6 +55,10 @@ export interface SavedCustomer {
   lastFour: string;
   /** What the consent ledger says about texting them. */
   agreement: CustomerConsentState;
+  /** Their latest visit from a connected app, if any. Ordering only, never permission. */
+  lastVisitAt?: string | null;
+  /** The connected app that knows them ("Square"), when the owner did not add them. */
+  source?: string | null;
 }
 
 interface TextRequestComposerProps {
@@ -124,7 +128,7 @@ export function TextRequestComposer({
 }: TextRequestComposerProps) {
   const router = useRouter();
   const customers = customersOrNull ?? [];
-  const sorted = [...customers].sort(compareCustomers);
+  const { recent: recentVisitors, others } = groupForPicker(customers);
   const startsSaved =
     initialCustomerId !== null && customers.some((customer) => customer.id === initialCustomerId);
 
@@ -369,13 +373,39 @@ export function TextRequestComposer({
               }}
             >
               <option value="">Choose a customer</option>
-              {sorted.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name ?? "No name"} · ••• {customer.lastFour}
-                </option>
-              ))}
+              {recentVisitors.length > 0 ? (
+                <>
+                  <optgroup label="Visited recently">
+                    {recentVisitors.map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.name ?? "No name"} · ••• {customer.lastFour} ·{" "}
+                        {relativeDayInSentence(customer.lastVisitAt!)}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Everyone else">
+                    {others.map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.name ?? "No name"} · ••• {customer.lastFour}
+                      </option>
+                    ))}
+                  </optgroup>
+                </>
+              ) : (
+                others.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name ?? "No name"} · ••• {customer.lastFour}
+                  </option>
+                ))
+              )}
             </select>
           </label>
+          {chosen?.lastVisitAt ? (
+            <p className="text-sm text-muted">
+              Visited {relativeDayInSentence(chosen.lastVisitAt)}
+              {chosen.source ? ` · from ${chosen.source}` : ""}
+            </p>
+          ) : null}
           {chosen ? <AgreementHint state={chosen.agreement} /> : null}
         </div>
       ) : (

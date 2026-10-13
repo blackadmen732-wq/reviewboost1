@@ -19,3 +19,13 @@ export function relativeDay(iso: string, now: number = Date.now()): string {
 
   return then.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
+
+/**
+ * The same, mid-sentence: "Visited today", "Visited 3 days ago",
+ * "Visited on 12 Jul". A date keeps its capital.
+ */
+export function relativeDayInSentence(iso: string, now: number = Date.now()): string {
+  const said = relativeDay(iso, now);
+  if (said === "Today" || said === "Yesterday" || said.endsWith(" days ago")) return said.toLowerCase();
+  return `on ${said}`;
+}

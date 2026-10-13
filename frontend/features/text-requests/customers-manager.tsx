@@ -20,7 +20,7 @@ import {
 } from "@/lib/owner/customers";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils/cn";
-import { relativeDay } from "@/lib/utils/relative-day";
+import { relativeDay, relativeDayInSentence } from "@/lib/utils/relative-day";
 
 export interface CustomerRowData {
   id: string;
@@ -311,7 +311,7 @@ function CustomerRow({
       <td className="flex flex-col gap-0.5 text-sm text-muted md:table-cell md:px-4 md:py-4">
         {customer.lastVisitAt ? (
           <span className="block text-ink">
-            Visited <span className="whitespace-nowrap">{relativeDay(customer.lastVisitAt).toLowerCase()}</span>
+            Visited <span className="whitespace-nowrap">{relativeDayInSentence(customer.lastVisitAt)}</span>
             {placeName ? ` · ${placeName}` : ""}
           </span>
         ) : null}

@@ -70,3 +70,28 @@ export function matchesCustomer(
     value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase();
   return fold(customer.name).includes(fold(q));
 }
+
+/** How far back a visit puts someone at the top of the Text Request picker. */
+export const RECENT_VISIT_DAYS = 14;
+
+/**
+ * Split customers for choosing whom to text: people who visited recently
+ * (from a connected app's sales or appointments) first, most recent first,
+ * then everyone else by name. Only an ordering: a recent visit is not
+ * permission to text anyone, and nothing is sent until the owner sends it.
+ */
+export function groupForPicker<T extends { name: string | null; lastFour: string; lastVisitAt?: string | null }>(
+  customers: readonly T[],
+  now: number = Date.now(),
+): { recent: T[]; others: T[] } {
+  const since = now - RECENT_VISIT_DAYS * 86_400_000;
+  const visitedAt = (customer: T) => {
+    const at = customer.lastVisitAt ? Date.parse(customer.lastVisitAt) : NaN;
+    return Number.isFinite(at) && at >= since && at <= now ? at : null;
+  };
+  const recent = customers
+    .filter((customer) => visitedAt(customer) !== null)
+    .sort((a, b) => (visitedAt(b) ?? 0) - (visitedAt(a) ?? 0) || compareCustomers(a, b));
+  const others = customers.filter((customer) => visitedAt(customer) === null).sort(compareCustomers);
+  return { recent, others };
+}

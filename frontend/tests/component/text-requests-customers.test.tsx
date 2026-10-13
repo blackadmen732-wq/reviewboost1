@@ -172,6 +172,44 @@ const customer = (over: Partial<CustomerRowData>): CustomerRowData => ({
   ...over,
 });
 
+describe("Text Requests: people who visited recently", () => {
+  it("lists recent visitors first, says where they came from, and sends nothing on its own", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const today = new Date().toISOString();
+    const lastMonth = new Date(Date.now() - 40 * 86_400_000).toISOString();
+    render(
+      <TextRequestComposer
+        balance={balance}
+        tags={tags}
+        recent={[]}
+        canSendRequests
+        customers={[
+          { id: "c-zed", name: "Zed", lastFour: "0101", agreement: customerConsentState(null), lastVisitAt: today, source: "Square" },
+          { id: "c-amy", name: "Amy", lastFour: "0102", agreement: customerConsentState(null), lastVisitAt: lastMonth, source: "Square" },
+          { id: "c-bo", name: "Bo", lastFour: "0103", agreement: customerConsentState(null) },
+        ]}
+        initialCustomerId="c-zed"
+      />,
+    );
+
+    const groups = document.querySelectorAll("optgroup");
+    expect([...groups].map((group) => group.label)).toEqual(["Visited recently", "Everyone else"]);
+    expect(within(groups[0] as HTMLElement).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Zed · ••• 0101 · today",
+    ]);
+    expect(within(groups[1] as HTMLElement).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Amy · ••• 0102",
+      "Bo · ••• 0103",
+    ]);
+
+    expect(screen.getByText("Visited today · from Square")).toBeInTheDocument();
+    // A visit is not agreement: the owner is still asked how they agreed.
+    expect(screen.getByText(/No agreement recorded/)).toBeInTheDocument();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
 describe("Customers", () => {
   const list = [
     customer({}),
