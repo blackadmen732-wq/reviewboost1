@@ -16,6 +16,7 @@ import {
   type InsightRange,
   type InsightRow,
 } from "@/lib/owner/insights";
+import { listCustomers, type CustomerListItem } from "@/lib/server/customers/customer-service";
 import { logger } from "@/lib/server/logger";
 import { supabaseServer } from "@/lib/supabase/server";
 import { localDay, startOfLocalDay, startOfLocalMonth, startOfLocalWeek } from "@/lib/utils/local-day";
@@ -1211,3 +1212,18 @@ export const hasPublishedCustomerPhoto = cache(async (orgId: string): Promise<bo
     (row) => typeof (row.published as { heroUrl?: unknown } | null)?.heroUrl === "string",
   );
 });
+
+// ------------------------------------------------------------ customers ----
+
+/**
+ * Saved customers for an owner or admin, through the same service the API
+ * uses, so the page and `GET /api/v1/customers` cannot disagree. Names and
+ * last four digits only; whole numbers stay on the server.
+ */
+export const listOwnerCustomers = cache(
+  async (orgId: string, userId: string, role: string): Promise<CustomerListItem[]> => {
+    const supabase = await supabaseServer();
+    return listCustomers({ db: supabase, orgId, userId, role }, "owner-page");
+  },
+);
+

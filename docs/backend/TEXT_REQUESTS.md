@@ -323,3 +323,38 @@ evidence (`method`, `attested_by`, `wording_version`), enforced by
 `sms_consent_events_owner_import_evidence`; opt-ins recorded earlier without
 evidence are reset to `unknown` by `app.sms_reset_unevidenced_owner_consent()`
 (migration `20261012000100_consent_requires_evidence.sql`).
+
+## 23. Saved customers **[impl][test-ci]**
+
+Migration `20261013000100_customer_contacts.sql`; service
+`frontend/lib/server/customers/customer-service.ts`; routes under
+`/api/v1/customers`; screen at Text Requests → Customers.
+
+- **What it is:** a short list of people a business texts, so an owner picks a
+  name instead of retyping a number. Name is optional. One entry per number per
+  business (`unique (org_id, phone_hash)`); a duplicate is refused, never merged.
+- **What it is not:** consent. Saving a customer writes nothing to the consent
+  ledger. The list *reads* `sms_consent_state` to show "Agreed to texts",
+  "No agreement recorded" or "Asked not to be texted". The first text still goes
+  through the same eligibility gate and, if needed, the separate owner
+  attestation in §22.
+- **Privacy:** name and number are AES-GCM encrypted by the server; the database
+  holds ciphertext, the keyed digest and the last four. The browser receives
+  names and last four only. A Text Request to a saved customer is sent by
+  `customerId`; the server decrypts the number (`customerPhone`). Whole numbers
+  leave the server only in an owner/admin export, which is audited
+  (`customer_contact.exported`, count only) before the file is returned, and in
+  which a name cannot start a spreadsheet formula.
+- **Access:** owner/admin only, matching the consent ledger. Reads through RLS
+  (`rpc_customer_contacts_list` is SECURITY INVOKER); writes through
+  `rpc_customer_contact_save` / `_delete` / `rpc_customer_contacts_record_export`,
+  which read the caller from `auth.uid()`, check the role, and write an audit
+  event with ids only.
+- **Removal** deletes the entry and keeps consent history and past Text Requests.
+- **Not built:** imports from a file, groups, or sending to more than one person
+  at a time. Each needs its own consent story first.
+
+Settings → Connections shows the Google review link, billing, whether texting
+is live, in test mode or not set up on this deployment, and sign-in methods —
+each from real state, each with a link to the screen that changes it. Point-of-
+sale services are listed as not available, with no Connect control.

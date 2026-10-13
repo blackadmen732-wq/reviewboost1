@@ -27,14 +27,14 @@ service-role client in application code.
 | Class | Functions | Why not INVOKER + RLS | Caller identity | Tenant |
 |---|---|---|---|---|
 | RLS helpers | `app.is_org_member`, `app.has_org_role`, `app.shares_organization` | Policies call them; as INVOKER they would recurse through the membership table's own RLS | `auth.uid()` | derived from membership rows |
-| Owner writes (32 `rpc_*`) | locations, Tags, staff, members, responses, praise, destinations, Customer Page, Text Requests cancel, NFC record, org update/delete, balance | `authenticated` has **no** write grant on any table by design, so every write is a function that validates input, checks role, writes the row and the audit event in one transaction | `auth.uid()`; fails `42501` when null | `p_org_id` is accepted but every function checks `organization_members` for (org, caller, active[, role]) before touching it, and each row is re-scoped by `org_id` |
+| Owner writes (35 `rpc_*`) | locations, Tags, staff, members, responses, praise, destinations, Customer Page, Customers (save, delete, record export; owner/admin only), Text Requests cancel, NFC record, org update/delete, balance | `authenticated` has **no** write grant on any table by design, so every write is a function that validates input, checks role, writes the row and the audit event in one transaction | `auth.uid()`; fails `42501` when null | `p_org_id` is accepted but every function checks `organization_members` for (org, caller, active[, role]) before touching it, and each row is re-scoped by `org_id` |
 | Organization creation | `rpc_create_organization` → `app.create_organization_with_first_stand` | creates the org the caller is not yet a member of | `auth.uid()` | the new org; per-user org limit |
 | Service-only (91) | billing, Stripe inbox, SMS pipeline, public review flow, rate limits, heartbeats, maintenance | called only by the server with the service role; `revoke … from public, anon, authenticated` | server | derived from capability tokens (public flow) or from Stripe/Twilio identifiers (webhooks) — never from a client-supplied org id |
 
 Cross-tenant attacks on these are performed, not asserted, in
 `cross_org_isolation_test.sql`, `praise_isolation_test.sql`,
 `column_security_test.sql`, `security_hardening_test.sql`,
-`customer_page_test.sql`, `account_deletion_test.sql`.
+`customer_page_test.sql`, `account_deletion_test.sql`, `customer_contacts_test.sql`.
 
 ## Advisor findings on head
 

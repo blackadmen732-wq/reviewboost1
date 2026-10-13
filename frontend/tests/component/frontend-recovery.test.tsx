@@ -160,24 +160,28 @@ it("records consent separately and never includes it in the send request", async
   );
   const phone = screen.getByLabelText("Customer's mobile number");
   fireEvent.change(phone, { target: { value: "+15555550123" } });
-  const send = screen.getByRole("button", { name: "Send text request" });
-  expect(send).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "Preview text request" }));
+  // One button at a time: Preview first, never Send before a preview.
+  expect(screen.queryByRole("button", { name: /^Send to/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Preview text" }));
   await screen.findByRole("heading", {
     name: "Did this customer agree to a text?",
   });
-  expect(send).toBeDisabled();
+  // With no agreement on record, the only action is recording it.
+  expect(screen.queryByRole("button", { name: /^Send to/ })).toBeNull();
+  const saveAgreement = screen.getByRole("button", { name: "Save their agreement" });
+  expect(saveAgreement).toBeDisabled();
   fireEvent.click(screen.getByRole("radio", { name: /in person/i }));
+  expect(saveAgreement).toBeDisabled();
   fireEvent.click(
     screen.getByRole("checkbox", { name: /this customer agreed/i }),
   );
-  expect(send).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "Save their agreement" }));
-  await waitFor(() => expect(send).toBeEnabled());
+  fireEvent.click(saveAgreement);
+  const send = await screen.findByRole("button", { name: "Send to ••• 0123" });
   const consentCall = fetcher.mock.calls.find(([url]) =>
     url.endsWith("/consent"),
   );
   expect(JSON.parse(consentCall![1].body)).toMatchObject({
+    phone: "+15555550123",
     method: "in_person",
     confirmed: true,
     wordingVersion: "owner-attestation-v1",
@@ -190,5 +194,6 @@ it("records consent separately and never includes it in the send request", async
     templateId: "thanks_v1",
   });
   await waitFor(() => expect(phone).toHaveValue(""));
-  expect(send).toBeDisabled();
+  expect(screen.queryByRole("button", { name: /^Send to/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Preview text" })).toBeDisabled();
 });

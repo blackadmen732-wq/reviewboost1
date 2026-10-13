@@ -2,9 +2,15 @@ import type { Metadata } from "next";
 
 import { AppShell } from "@/features/dashboard/app-shell";
 import { TextRequestComposer } from "@/features/dashboard/text-request-composer";
+import { TextRequestTabs } from "@/features/text-requests/text-request-tabs";
 import { permissionsFor } from "@/lib/owner/permissions";
-import { listStands, requireOwner } from "@/lib/server/owner-data";
-import { readSmsBalance, listRecentTextRequests } from "@/lib/server/owner-data";
+import {
+  listOwnerCustomers,
+  listRecentTextRequests,
+  listStands,
+  readSmsBalance,
+  requireOwner,
+} from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
   title: "Text Requests",
@@ -16,21 +22,35 @@ export const dynamic = "force-dynamic";
 /**
  * Text Requests.
  *
- * Not "campaigns", and not a marketing tool. V1 sends one kind of message: a
- * review request carrying the business's own Tag link. Anything else would be
- * a different product with a different compliance story.
+ * Not a marketing tool. V1 sends one kind of message: a review request
+ * carrying the business's own Tag link, to one person at a time. Anything else
+ * would be a different product with a different compliance story.
  *
  * Every number on this page comes from the ledger. There is no "150" written
  * anywhere in the UI — a business on Growth sees 500, a business mid-month
  * sees what is left, and a trial sees zero, because that is what it has.
+ *
+ * Saved customers are read only for someone who can send; a member or viewer
+ * sees the page without them, the same way the API refuses them the list.
  */
-export default async function TextRequestsPage() {
-  const { organization } = await requireOwner("/text-requests");
+export default async function TextRequestsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ customer?: string }>;
+}) {
+  const { user, organization } = await requireOwner("/text-requests");
+  const can = permissionsFor(organization.role);
+  const { customer } = await searchParams;
 
-  const [balance, stands, recent] = await Promise.all([
+  const [balance, stands, recent, customers] = await Promise.all([
     readSmsBalance(organization.orgId),
     listStands(organization.orgId),
     listRecentTextRequests(organization.orgId),
+    // A list that cannot be read must not take sending down with it, and must
+    // not look like an empty list either: null is said out loud on the page.
+    can.sendTextRequests
+      ? listOwnerCustomers(organization.orgId, user.id, organization.role).catch(() => null)
+      : Promise.resolve([]),
   ]);
 
   const sendable = stands.filter((stand) => stand.status === "active");
@@ -44,15 +64,24 @@ export default async function TextRequestsPage() {
         </p>
       </div>
 
+      {can.sendTextRequests ? <TextRequestTabs active="send" /> : null}
+
       <TextRequestComposer
         balance={balance}
         tags={sendable.map((stand) => ({
           standId: stand.standId,
           label: stand.label,
           locationName: stand.locationName,
+          locationId: stand.locationId,
         }))}
         recent={recent}
-        canSendRequests={permissionsFor(organization.role).sendTextRequests}
+        canSendRequests={can.sendTextRequests}
+        customers={
+          customers === null
+            ? null
+            : customers.map(({ id, name, lastFour, consent }) => ({ id, name, lastFour, agreement: consent }))
+        }
+        initialCustomerId={customer ?? null}
       />
     </AppShell>
   );

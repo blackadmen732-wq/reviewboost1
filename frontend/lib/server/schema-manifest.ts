@@ -75,4 +75,5 @@ export const EXPECTED_MIGRATIONS: readonly string[] = [
   "account_deletion_fixes",
   "consent_requires_evidence",
   "local_customer_page_assets",
+  "customer_contacts",
 ];

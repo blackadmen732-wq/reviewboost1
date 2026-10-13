@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CreditCard, Eye, ImageUp, LifeBuoy, Mail, Shield, Trash2 } from "lucide-react";
+import { CreditCard, Eye, ImageUp, LifeBuoy, Mail, Plug, Shield, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 import { AppShell } from "@/features/dashboard/app-shell";
@@ -158,6 +158,18 @@ export default async function SettingsPage() {
           <div className="min-w-0 flex-1">
             <p className="text-base font-medium text-ink">Billing</p>
             <p className="text-sm text-muted">Your plan, messages left, and payment.</p>
+          </div>
+        </Link>
+        <Link
+          href="/settings/connections"
+          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+            <Plug className="size-5 text-muted" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-medium text-ink">Connections</p>
+            <p className="text-sm text-muted">Google link, billing, texting and sign-in, and whether each works.</p>
           </div>
         </Link>
       </section>

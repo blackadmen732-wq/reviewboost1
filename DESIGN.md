@@ -59,7 +59,7 @@ Feedback Insights already contains a real rating trend and distribution. Preserv
 
 ## Navigation and motion
 
-Home / Feedback / Texts / Tags are the four mobile tabs. Settings stays secondary; Insights stays under Feedback. Connections and retention are outside this frontend delivery. Legacy Reviews/Customers/Praise URLs redirect to maintained surfaces.
+Home / Feedback / Texts / Tags are the four mobile tabs. Settings stays secondary; Insights stays under Feedback; saved Customers stay under Texts (owner/admin). Settings → Connections shows real state only (Google link, billing, texting, sign-in) and lists unbuilt point-of-sale services with no Connect control; PR76's Connections platform and retention remain outside this delivery. Legacy Reviews/Customers/Praise URLs redirect to maintained surfaces.
 
 Retain 150ms control and 180ms page tokens, subtle row/status transitions, and visible focus. Prefer a specific transitioned property list. Respect `prefers-reduced-motion`; no delayed splash, mandatory animation, scroll-jacking or motion needed to understand state. Animation fill must not leave a transformed ancestor that breaks fixed mobile controls.
 

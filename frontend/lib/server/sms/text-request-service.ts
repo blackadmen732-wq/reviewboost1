@@ -11,7 +11,9 @@ import { serviceRoleClient } from "@/lib/server/supabase";
 import { getProviderRate } from "@/lib/server/sms/provider";
 import { estimateMessageCost } from "@/lib/server/sms/cost";
 import { reviewRequestDedupeKey } from "@/lib/server/sms/dedupe";
-import { normalizePhone, phoneHash, toStoredPhone } from "@/lib/server/sms/phone";
+import { phoneHash, toStoredPhone, type NormalizedPhone } from "@/lib/server/sms/phone";
+import { parseOwnerPhone } from "@/lib/server/sms/phone-input";
+import { customerPhone } from "@/lib/server/customers/customer-service";
 import { nextAllowedSendTime } from "@/lib/server/sms/quiet-hours";
 import { uuidSchema } from "@/lib/server/validation";
 import {
@@ -46,20 +48,6 @@ import {
 
 const DEDUPE_WINDOW_SECONDS = 24 * 60 * 60;
 
-// A national number needs a country to become E.164; the org can carry a
-// default. Kept configurable rather than hardcoded to one market.
-function defaultCountryCallingCode(): string | undefined {
-  const raw = process.env.SMS_DEFAULT_COUNTRY_CALLING_CODE;
-  return raw && /^\d{1,3}$/.test(raw) ? raw : undefined;
-}
-
-// Only pass the option when a code is configured — exactOptionalPropertyTypes
-// forbids an explicit `undefined`.
-function phoneOptions(): { defaultCountryCallingCode: string } | undefined {
-  const cc = defaultCountryCallingCode();
-  return cc ? { defaultCountryCallingCode: cc } : undefined;
-}
-
 const standTokenSchema = z
   .string()
   .min(8)
@@ -84,6 +72,29 @@ const standRefSchema = {
   standToken: standTokenSchema.optional(),
 };
 
+/**
+ * Who gets the text: a number typed now, or a saved customer named by id. A
+ * saved customer's number is read and decrypted on the server; the browser
+ * never had it.
+ */
+const recipientSchema = {
+  phone: z.string().min(3).max(40).optional(),
+  customerId: uuidSchema("Choose a customer.").optional(),
+};
+
+function requireOneRecipient(
+  value: { phone?: string | undefined; customerId?: string | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  if (Boolean(value.phone) === Boolean(value.customerId)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["phone"],
+      message: "Enter a mobile number or choose a saved customer.",
+    });
+  }
+}
+
 function requireOneStandRef(
   value: { standId?: string | undefined; standToken?: string | undefined },
   ctx: z.RefinementCtx,
@@ -99,11 +110,12 @@ function requireOneStandRef(
 
 export const previewSchema = z
   .strictObject({
-    phone: z.string().min(3).max(40),
+    ...recipientSchema,
     ...standRefSchema,
     templateId: templateIdSchema.optional(),
   })
-  .superRefine(requireOneStandRef);
+  .superRefine(requireOneStandRef)
+  .superRefine(requireOneRecipient);
 
 /*
  * There is deliberately no `consent` field here any more. Sending used to
@@ -113,24 +125,27 @@ export const previewSchema = z
  */
 export const scheduleSchema = z
   .strictObject({
-    phone: z.string().min(3).max(40),
+    ...recipientSchema,
     ...standRefSchema,
     templateId: templateIdSchema.optional(),
     // An explicit client idempotency key makes a deliberate retry exact.
     idempotencyKey: z.string().min(8).max(200).optional(),
   })
-  .superRefine(requireOneStandRef);
+  .superRefine(requireOneStandRef)
+  .superRefine(requireOneRecipient);
 
-export const consentAttestationSchema = z.strictObject({
-  phone: z.string().min(3).max(40),
-  standId: uuidSchema("Choose which Tag the link should point at."),
-  method: z.enum(CONSENT_METHOD_IDS, { message: "Say how the customer agreed." }),
-  wordingVersion: z.literal(CONSENT_ATTESTATION_VERSION, {
-    message: "Please reload the page and confirm again.",
-  }),
-  // Literally true: the owner ticked the confirmation, not merely sent the form.
-  confirmed: z.literal(true, { message: "Please confirm the customer agreed." }),
-});
+export const consentAttestationSchema = z
+  .strictObject({
+    ...recipientSchema,
+    standId: uuidSchema("Choose which Tag the link should point at."),
+    method: z.enum(CONSENT_METHOD_IDS, { message: "Say how the customer agreed." }),
+    wordingVersion: z.literal(CONSENT_ATTESTATION_VERSION, {
+      message: "Please reload the page and confirm again.",
+    }),
+    // Literally true: the owner ticked the confirmation, not merely sent the form.
+    confirmed: z.literal(true, { message: "Please confirm the customer agreed." }),
+  })
+  .superRefine(requireOneRecipient);
 
 export type ScheduleInput = z.infer<typeof scheduleSchema>;
 export type PreviewInput = z.infer<typeof previewSchema>;
@@ -159,6 +174,15 @@ async function loadBusinessName(context: OrganizationContext): Promise<string> {
     );
   }
   return name;
+}
+
+/** The recipient as E.164, from the typed number or the saved customer. */
+async function resolveRecipient(
+  context: OrganizationContext,
+  input: { phone?: string | undefined; customerId?: string | undefined },
+): Promise<NormalizedPhone> {
+  if (input.customerId) return parseOwnerPhone(await customerPhone(context, input.customerId));
+  return parseOwnerPhone(input.phone ?? "");
 }
 
 function renderMessage(
@@ -358,7 +382,7 @@ export async function previewTextRequest(
   input: PreviewInput,
   requestId: string,
 ): Promise<PreviewResult> {
-  const normalized = normalizePhone(input.phone, phoneOptions());
+  const normalized = await resolveRecipient(context, input);
   const stored = toStoredPhone(normalized);
   const stand = await resolveStand(context, input);
   const businessName = await loadBusinessName(context);
@@ -398,7 +422,7 @@ export async function recordConsentAttestation(
   input: ConsentAttestationInput,
   requestId: string,
 ): Promise<ConsentAttestationResult> {
-  const normalized = normalizePhone(input.phone, phoneOptions());
+  const normalized = await resolveRecipient(context, input);
   const stored = toStoredPhone(normalized);
   const stand = await resolveStand(context, { standId: input.standId });
 
@@ -446,7 +470,7 @@ export async function scheduleTextRequest(
   input: ScheduleInput,
   requestId: string,
 ): Promise<ScheduleResult> {
-  const normalized = normalizePhone(input.phone, phoneOptions());
+  const normalized = await resolveRecipient(context, input);
   const stored = toStoredPhone(normalized);
   const stand = await resolveStand(context, input);
   // Refuse before anything is reserved: no consent, an opt-out or a suppression
