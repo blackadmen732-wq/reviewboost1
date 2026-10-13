@@ -1,5 +1,6 @@
 import "server-only";
 
+import { squareConfig } from "@/lib/server/integrations/providers/square/config";
 import type { ProviderId, VisitKind, WorkflowId } from "@/lib/server/integrations/types";
 
 /**
@@ -12,7 +13,10 @@ import type { ProviderId, VisitKind, WorkflowId } from "@/lib/server/integration
  *   in_setup    — being built, or not configured in this environment: "Coming soon".
  *   planned     — on the list, nothing built: "Planned".
  *
- * Square is `in_setup` until its adapter lands (stage 2). The `fake` provider
+ * Square is `available` only where its application is configured, and
+ * `in_setup` ("Coming soon") everywhere else. Configured against Square's
+ * sandbox, it says so on the card: a sandbox account holds test data, never a
+ * real business's customers. The `fake` provider
  * is a test double for local development and preview environments; it is
  * never listed in production.
  */
@@ -167,8 +171,20 @@ export function fakeProviderEnabled(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
+/** Square as this environment can offer it. */
+function square(): ProviderDefinition {
+  const config = squareConfig();
+  if (!config) return SQUARE;
+  if (config.environment === "production") return { ...SQUARE, availability: "available" };
+  return {
+    ...SQUARE,
+    availability: "available",
+    summary: "Test mode: connects a Square sandbox account, not a real business.",
+  };
+}
+
 export function listProviders(): ProviderDefinition[] {
-  return [...(fakeProviderEnabled() ? [FAKE] : []), SQUARE, ...PLANNED];
+  return [...(fakeProviderEnabled() ? [FAKE] : []), square(), ...PLANNED];
 }
 
 export function getProvider(id: string): ProviderDefinition | null {

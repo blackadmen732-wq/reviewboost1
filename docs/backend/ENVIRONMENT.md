@@ -38,6 +38,12 @@ That file is gitignored; never commit real values.
 | `INTEGRATION_CREDENTIAL_KEY_PREVIOUS` | no | The key being rotated away from, during a rotation only. |
 | `INTEGRATIONS_FAKE_PROVIDER` | no | `enabled` lists the pretend "Test provider" for trying Connections. Ignored in production (`VERCEL_ENV=production`, or `NODE_ENV=production` off Vercel). |
 | `FAKE_PROVIDER_WEBHOOK_KEY` | no | Signs and verifies the test provider's webhooks. Unset, every test webhook is rejected. |
+| `SQUARE_ENVIRONMENT` | no | `sandbox` (default) or `production`. Production must be named explicitly, and only with a production application id. |
+| `SQUARE_APPLICATION_ID` | to offer Square | From the Square Developer Console, OAuth page, for the environment above (`sandbox-sq0idb-…` in the sandbox). Without it and the secret, Square stays "Coming soon". |
+| `SQUARE_APPLICATION_SECRET` | to offer Square | The same page. Server only; used for the token exchange, refresh and revoke. |
+| `SQUARE_WEBHOOK_SIGNATURE_KEY` | for Square webhooks | The signature key of the webhook subscription whose notification URL is `{PUBLIC_FRONTEND_URL}/api/v1/webhooks/integrations/square`. Unset, every Square webhook is rejected; syncs still run. |
+
+Square setup, step by step: `docs/connections/square-sandbox-setup.md`.
 
 The Connections worker (`/api/v1/internal/integrations/process`) uses the same
 `SMS_WORKER_SECRET` / `CRON_SECRET` guard as the SMS dispatcher. It is not on a

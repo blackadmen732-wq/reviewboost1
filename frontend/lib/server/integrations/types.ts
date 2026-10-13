@@ -83,6 +83,11 @@ export interface SyncWindow {
 export interface SyncContext {
   tokens: TokenSet;
   externalAccountId: string;
+  /**
+   * The provider's places the owner chose. A provider that answers one place
+   * per call (Square's payments) reads only these; others may ignore it.
+   */
+  locationIds?: readonly string[];
 }
 
 export interface ParsedEvent {

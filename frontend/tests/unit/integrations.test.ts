@@ -32,6 +32,9 @@ beforeEach(() => {
   delete process.env.VERCEL_ENV;
   delete process.env.INTEGRATION_CREDENTIAL_KEY_VERSION;
   delete process.env.INTEGRATION_CREDENTIAL_KEY_PREVIOUS;
+  delete process.env.SQUARE_ENVIRONMENT;
+  delete process.env.SQUARE_APPLICATION_ID;
+  delete process.env.SQUARE_APPLICATION_SECRET;
 });
 
 afterEach(() => {
@@ -95,7 +98,7 @@ describe("registry", () => {
     expect(fakeProviderEnabled()).toBe(true);
   });
 
-  it("keeps Square as coming soon until its adapter lands", async () => {
+  it("keeps Square as coming soon until its application is configured", async () => {
     const { getConnectableProvider, getProvider } = await load();
     expect(getProvider("square")?.availability).toBe("in_setup");
     expect(getConnectableProvider("square")).toBeNull();

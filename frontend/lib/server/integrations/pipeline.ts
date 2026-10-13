@@ -112,13 +112,14 @@ export async function loadConnection(
     tokens = await refreshTokens(svc, row, adapter, tokens, binding);
   }
 
+  const mappedLocationIds = loadedRow.mapped_location_ids ?? [];
   return {
     connection: row,
     adapter,
     workflow,
-    ctx: { tokens, externalAccountId: row.external_account_id },
+    ctx: { tokens, externalAccountId: row.external_account_id, locationIds: mappedLocationIds },
     binding,
-    mappedLocations: new Set(loadedRow.mapped_location_ids ?? []),
+    mappedLocations: new Set(mappedLocationIds),
   };
 }
 
