@@ -74,6 +74,7 @@ export const EXPECTED_MIGRATIONS: readonly string[] = [
   "applied_migrations_read",
   "account_deletion_fixes",
   "consent_requires_evidence",
+  "integrations_foundation",
   "local_customer_page_assets",
   "customer_contacts",
 ];
