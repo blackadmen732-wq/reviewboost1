@@ -93,13 +93,12 @@ export async function reconcileStart(
   stream: string,
   now: Date,
 ): Promise<Date> {
-  const { data } = await svc
-    .from("integration_sync_checkpoints")
-    .select("high_water")
-    .eq("connection_id", connectionId)
-    .eq("stream", stream)
-    .maybeSingle();
-  const highWater = (data as { high_water?: string | null } | null)?.high_water;
+  const { data, error } = await svc.rpc("rpc_integration_checkpoint_high_water", {
+    p_connection_id: connectionId,
+    p_stream: stream,
+  });
+  if (error) throw error;
+  const highWater = typeof data === "string" ? data : null;
   if (highWater) return new Date(new Date(highWater).getTime() - RECONCILE_OVERLAP_MS);
   return new Date(now.getTime() - BACKFILL_DAYS * 86_400_000);
 }
@@ -209,13 +208,16 @@ async function processInboxRow(svc: SupabaseClient, row: InboxRow, worker: strin
   // a connection never pulls in the provider's whole directory.
   let heldIds = new Set<string>();
   if (resolved.customers.length) {
-    const { data: held, error } = await svc
-      .from("customer_source_profiles")
-      .select("external_id")
-      .eq("connection_id", loaded.connection.id)
-      .in("external_id", resolved.customers.map((c) => c.externalId));
+    const { data: held, error } = await svc.rpc("rpc_integration_held_profiles", {
+      p_connection_id: loaded.connection.id,
+      p_external_ids: resolved.customers.map((c) => c.externalId),
+    });
     if (error) throw error;
-    heldIds = new Set(((held ?? []) as Array<{ external_id: string }>).map((h) => h.external_id));
+    heldIds = new Set(
+      ((held ?? []) as unknown[]).map((h) =>
+        typeof h === "string" ? h : String((h as Record<string, unknown>)["rpc_integration_held_profiles"] ?? ""),
+      ),
+    );
   }
 
   await applyResolved(svc, loaded, resolved.customers, resolved.visits, heldIds, ref, counts);

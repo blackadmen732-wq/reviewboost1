@@ -77,4 +77,5 @@ export const EXPECTED_MIGRATIONS: readonly string[] = [
   "integrations_foundation",
   "local_customer_page_assets",
   "customer_contacts",
+  "integration_worker_reads",
 ];

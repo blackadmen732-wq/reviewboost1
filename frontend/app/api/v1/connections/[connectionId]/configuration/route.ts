@@ -27,7 +27,7 @@ export async function GET(
     const context = await requireConnectionsAdmin(request);
     const connectionId = connectionIdOrThrow((await params).connectionId);
     await consumeRateLimit("integration_read_provider", context.orgId, 60, 3600);
-    const locations = await listProviderLocations(context.orgId, connectionId, requestId);
+    const locations = await listProviderLocations(context, connectionId, requestId);
     return json(request, requestId, 200, { data: { providerLocations: locations }, requestId });
   });
 }

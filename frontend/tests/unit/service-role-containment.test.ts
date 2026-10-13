@@ -41,7 +41,23 @@ const IMPORTERS: Record<string, string> = {
   "app/api/v1/internal/maintenance/route.ts": "scheduled maintenance RPCs",
   "app/api/v1/internal/readiness/route.ts": "readiness: catalog RPC and Storage bucket check",
   "app/api/v1/text-requests/route.ts": "per-organization rate-limit RPC (the bucket table is service-only)",
+  // Connections. Every integration_* write is a service_role-only definer
+  // function; the organization always comes from the verified session or, for
+  // the worker and webhooks, from the connection row the database returns.
+  "lib/server/integrations/connection-service.ts":
+    "owner connect/configure/test/activate/sync/disconnect RPCs, after an RLS read proves the connection is this business's",
+  "lib/server/integrations/route-helpers.ts": "per-organization rate-limit RPC for Connections routes",
+  "lib/server/integrations/sync-runner.ts": "Connections worker: run/inbox/apply RPCs only (see WORKER_MODULES)",
+  "app/api/v1/webhooks/integrations/[provider]/route.ts": "provider webhook inbox RPC (no user session exists)",
 };
+
+/**
+ * The Connections worker receives its service-role client as a parameter, so
+ * the local-Postgres end-to-end test can stand in for it. That hides uses from
+ * the checks above, so these modules carry a stricter rule of their own: they
+ * never call `.from(` on anything. Every read and write is a narrow rpc_*.
+ */
+const WORKER_MODULES = ["lib/server/integrations/pipeline.ts", "lib/server/integrations/sync-runner.ts"];
 
 const STORAGE_ALLOWED = new Set([
   "lib/server/customer-page-service.ts",
@@ -120,6 +136,15 @@ describe("service-role containment", () => {
           .filter((before) => !/(?:const|let|var)\s+\w+\s*=\s*$/.test(before))
           .map(() => file.path),
       );
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps the Connections worker to rpc_* calls only", () => {
+    const offenders = WORKER_MODULES.filter((path) => {
+      const file = files.find((candidate) => candidate.path === path);
+      expect(file, path).toBeDefined();
+      return /\.\s*from\s*\(/.test(file!.text);
+    });
     expect(offenders).toEqual([]);
   });
 

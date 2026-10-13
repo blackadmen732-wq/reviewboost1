@@ -430,14 +430,18 @@ export async function completeAuthorization(
 
 // ------------------------------------------------------------ setup steps ---
 
-/** Verify the connection is this business's before acting on it with the service role. */
-async function ownedConnection(orgId: string, connectionId: string, requestId: string) {
+/**
+ * Verify the connection is this business's before acting on it with the
+ * service role. Read through the caller's own client, so row level security
+ * (owner/admin of this organization) decides, not a WHERE clause.
+ */
+async function ownedConnection(context: OrganizationContext, connectionId: string, requestId: string) {
   if (!UUID_RE.test(connectionId)) throw new ApiError(404, ERROR_CODE.notFound, "That connection was not found.");
-  const { data, error } = await serviceRoleClient()
+  const { data, error } = await context.db
     .from("integration_connections")
     .select("id, org_id, provider_id, workflow_id, state, config_version")
     .eq("id", connectionId)
-    .eq("org_id", orgId)
+    .eq("org_id", context.orgId)
     .maybeSingle();
   if (error) readFailure("owned_connection", error, requestId);
   if (!data) throw new ApiError(404, ERROR_CODE.notFound, "That connection was not found.");
@@ -448,7 +452,7 @@ async function withProvider<T>(
   orgId: string,
   connectionId: string,
   requestId: string,
-  run: (loaded: Awaited<ReturnType<typeof loadConnection>>) => Promise<T>,
+  run: (loaded: Awaited<ReturnType<typeof loadConnection>>, svc: SupabaseClient) => Promise<T>,
 ): Promise<T> {
   const svc = serviceRoleClient();
   let loaded;
@@ -466,7 +470,7 @@ async function withProvider<T>(
   if (loaded.connection.org_id !== orgId) throw new ApiError(404, ERROR_CODE.notFound, "That connection was not found.");
 
   try {
-    return await run(loaded);
+    return await run(loaded, svc);
   } catch (caught) {
     if (caught instanceof ApiError) throw caught;
     const classification = caught instanceof ProviderError ? caught.classification : loaded.adapter.classifyError(caught);
@@ -482,14 +486,14 @@ async function withProvider<T>(
 
 /** The provider's places, read live, for the "match your places" step. */
 export async function listProviderLocations(
-  orgId: string,
+  context: OrganizationContext,
   connectionId: string,
   requestId: string,
 ): Promise<ProviderLocation[]> {
-  await ownedConnection(orgId, connectionId, requestId);
-  return withProvider(orgId, connectionId, requestId, async (loaded) => {
+  await ownedConnection(context, connectionId, requestId);
+  return withProvider(context.orgId, connectionId, requestId, async (loaded, svc) => {
     const account = await loaded.adapter.discoverAccount(loaded.ctx.tokens);
-    await reportOutcome(serviceRoleClient(), loaded.connection, "ok");
+    await reportOutcome(svc, loaded.connection, "ok");
     return account.locations;
   });
 }
@@ -517,7 +521,7 @@ export async function saveConfiguration(
   input: z.infer<typeof configurationSchema>,
   requestId: string,
 ): Promise<{ configVersion: number }> {
-  const locations = await listProviderLocations(context.orgId, connectionId, requestId);
+  const locations = await listProviderLocations(context, connectionId, requestId);
   const known = new Map(locations.map((location) => [location.externalLocationId, location]));
 
   const mappings = input.mappings.map((mapping) => {
@@ -553,14 +557,14 @@ export async function runTest(
   requestId: string,
   now: Date = new Date(),
 ): Promise<{ passed: boolean; summary: TestSummary }> {
-  const owned = await ownedConnection(context.orgId, connectionId, requestId);
-  const mappings = await listMappings(serviceRoleClient(), connectionId, requestId);
+  const owned = await ownedConnection(context, connectionId, requestId);
+  const mappings = await listMappings(context.db, connectionId, requestId);
   if (mappings.length === 0) {
     throw new ApiError(400, ERROR_CODE.validationFailed, "Choose at least one place first.");
   }
   const mapped = new Set(mappings.map((mapping) => mapping.externalLocationId));
 
-  const summary = await withProvider(context.orgId, connectionId, requestId, async (loaded) => {
+  const summary = await withProvider(context.orgId, connectionId, requestId, async (loaded, svc) => {
     const window = { start: new Date(now.getTime() - TEST_DAYS * 86_400_000), end: now };
     const visits: CanonicalVisitInput[] = [];
     let cursor: string | null = null;
@@ -578,7 +582,7 @@ export async function runTest(
       customers.filter((customer) => normalizeProviderPhone(customer.phone).kind === "ok").map((customer) => customer.externalId),
     );
 
-    await reportOutcome(serviceRoleClient(), loaded.connection, "ok");
+    await reportOutcome(svc, loaded.connection, "ok");
     return {
       visitsFound: inPlaces.length,
       withCustomer: inPlaces.filter((visit) => visit.customerExternalId).length,
@@ -612,7 +616,7 @@ export async function activate(
   connectionId: string,
   requestId: string,
 ): Promise<{ queuedRuns: number }> {
-  const owned = await ownedConnection(context.orgId, connectionId, requestId);
+  const owned = await ownedConnection(context, connectionId, requestId);
   const workflow = workflowFor(owned.provider_id, owned.workflow_id);
   const { data, error } = await serviceRoleClient().rpc("rpc_integration_activate", {
     p_connection_id: connectionId,
@@ -635,19 +639,18 @@ export async function syncNow(
   requestId: string,
   now: Date = new Date(),
 ): Promise<{ runId: string; created: boolean }> {
-  const owned = await ownedConnection(context.orgId, connectionId, requestId);
+  const owned = await ownedConnection(context, connectionId, requestId);
   if (owned.state !== "active") {
     throw new ApiError(409, ERROR_CODE.connectionStateInvalid, "Turn this connection on first.");
   }
   const workflow = workflowFor(owned.provider_id, owned.workflow_id);
   const svc = serviceRoleClient();
-  const { data: checkpoint } = await svc
-    .from("integration_sync_checkpoints")
-    .select("high_water")
-    .eq("connection_id", connectionId)
-    .eq("stream", workflow.stream)
-    .maybeSingle();
-  const highWater = (checkpoint as { high_water?: string | null } | null)?.high_water;
+  const { data: highWaterData, error: highWaterError } = await svc.rpc("rpc_integration_checkpoint_high_water", {
+    p_connection_id: connectionId,
+    p_stream: workflow.stream,
+  });
+  if (highWaterError) throw mapIntegrationRpcError(highWaterError, requestId);
+  const highWater = typeof highWaterData === "string" ? highWaterData : null;
   const start = highWater
     ? new Date(new Date(highWater).getTime() - 15 * 60_000)
     : new Date(now.getTime() - BACKFILL_DAYS * 86_400_000);
@@ -678,7 +681,7 @@ export async function disconnect(
   connectionId: string,
   requestId: string,
 ): Promise<{ state: string; revoked: boolean }> {
-  await ownedConnection(context.orgId, connectionId, requestId);
+  await ownedConnection(context, connectionId, requestId);
   const svc = serviceRoleClient();
 
   // Load the tokens before they are deleted, so access can be revoked.

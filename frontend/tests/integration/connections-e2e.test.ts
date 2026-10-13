@@ -123,7 +123,7 @@ describe.skipIf(!enabled)("Connections end to end (local Postgres)", () => {
 
   it("maps places, runs the check, and turns on", async () => {
     const service = await import("@/lib/server/integrations/connection-service");
-    const places = await service.listProviderLocations(ORG, connectionId, "e2e");
+    const places = await service.listProviderLocations(ctx, connectionId, "e2e");
     expect(places.map((p) => p.externalLocationId)).toEqual(["L1", "L2"]);
 
     await expect(

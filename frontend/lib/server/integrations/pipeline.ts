@@ -56,8 +56,6 @@ export class ConnectionUnavailableError extends Error {
   }
 }
 
-const CONNECTION_COLUMNS = "id, org_id, provider_id, workflow_id, external_account_id, state, granted_scopes";
-
 /**
  * Load a connection and its tokens, refreshing them first when the adapter
  * says they are due. Refresh is single-flight across workers; a worker that
@@ -68,27 +66,38 @@ export async function loadConnection(
   connectionId: string,
   now: Date = new Date(),
 ): Promise<LoadedConnection> {
-  const { data: connection, error } = await svc
-    .from("integration_connections")
-    .select(CONNECTION_COLUMNS)
-    .eq("id", connectionId)
-    .maybeSingle();
+  // One narrow, service-role-only function: this connection, its sealed
+  // credentials and its chosen places. The worker never reads the tables.
+  const { data, error } = await svc.rpc("rpc_integration_load_connection", { p_connection_id: connectionId });
   if (error) throw error;
-  if (!connection) throw new ConnectionUnavailableError("connection_not_found");
+  const loadedRow = (Array.isArray(data) ? data[0] : data) as
+    | (ConnectionRow & CredentialRow & { has_credentials: boolean; mapped_location_ids: string[] | null })
+    | null
+    | undefined;
+  if (!loadedRow) throw new ConnectionUnavailableError("connection_not_found");
 
-  const row = connection as ConnectionRow;
+  const row: ConnectionRow = {
+    id: loadedRow.id,
+    org_id: loadedRow.org_id,
+    provider_id: loadedRow.provider_id,
+    workflow_id: loadedRow.workflow_id,
+    external_account_id: loadedRow.external_account_id,
+    state: loadedRow.state,
+    granted_scopes: loadedRow.granted_scopes,
+  };
   const adapter = getAdapter(row.provider_id);
   const provider = getProvider(row.provider_id);
   const workflow = provider ? getWorkflow(provider, row.workflow_id) : null;
   if (!adapter || !workflow) throw new ConnectionUnavailableError("provider_not_available");
 
-  const { data: credentials, error: credError } = await svc
-    .from("integration_credentials")
-    .select("access_token_enc, refresh_token_enc, access_expires_at, refresh_expires_at, last_refreshed_at")
-    .eq("connection_id", connectionId)
-    .maybeSingle();
-  if (credError) throw credError;
-  if (!credentials) throw new ConnectionUnavailableError("credentials_missing");
+  if (!loadedRow.has_credentials) throw new ConnectionUnavailableError("credentials_missing");
+  const credentials: CredentialRow = {
+    access_token_enc: loadedRow.access_token_enc,
+    refresh_token_enc: loadedRow.refresh_token_enc,
+    access_expires_at: loadedRow.access_expires_at,
+    refresh_expires_at: loadedRow.refresh_expires_at,
+    last_refreshed_at: loadedRow.last_refreshed_at,
+  };
 
   const binding: CredentialBinding = {
     orgId: row.org_id,
@@ -103,19 +112,13 @@ export async function loadConnection(
     tokens = await refreshTokens(svc, row, adapter, tokens, binding);
   }
 
-  const { data: mappings, error: mappingError } = await svc
-    .from("integration_location_mappings")
-    .select("external_location_id")
-    .eq("connection_id", connectionId);
-  if (mappingError) throw mappingError;
-
   return {
     connection: row,
     adapter,
     workflow,
     ctx: { tokens, externalAccountId: row.external_account_id },
     binding,
-    mappedLocations: new Set(((mappings ?? []) as Array<{ external_location_id: string }>).map((m) => m.external_location_id)),
+    mappedLocations: new Set(loadedRow.mapped_location_ids ?? []),
   };
 }
 
