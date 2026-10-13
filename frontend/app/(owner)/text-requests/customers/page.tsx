@@ -5,6 +5,7 @@ import { AppShell } from "@/features/dashboard/app-shell";
 import { CustomersManager } from "@/features/text-requests/customers-manager";
 import { TextRequestTabs } from "@/features/text-requests/text-request-tabs";
 import { permissionsFor } from "@/lib/owner/permissions";
+import { providerDirectory } from "@/lib/server/integrations/connection-service";
 import { listLocations, listOwnerCustomers, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
@@ -35,7 +36,7 @@ export default async function CustomersPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Text Requests</h1>
         <p className="mt-1 text-base text-muted">
-          The people you text. Pick one and send them your Tag link.
+          Everyone you can text: people you added, and customers from apps you connected.
         </p>
       </div>
 
@@ -44,6 +45,7 @@ export default async function CustomersPage() {
       <CustomersManager
         customers={customers}
         places={locations.map(({ locationId, name }) => ({ locationId, name }))}
+        sourceNames={Object.fromEntries(providerDirectory().map((provider) => [provider.id, provider.displayName]))}
       />
     </AppShell>
   );

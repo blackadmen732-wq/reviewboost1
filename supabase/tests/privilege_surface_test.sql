@@ -50,13 +50,13 @@ select set_eq(
         'rpc_create_organization(text,text,text,text,text,text,text,text,text,smallint,text,text,smallint)',
         'rpc_create_staff(uuid,text,text)',
         'rpc_create_stand(uuid,uuid,text,text,text,smallint,text,text,smallint)',
-        'rpc_customer_contact_delete(uuid,uuid,text)',
-        'rpc_customer_contact_save(uuid,uuid,uuid,text,smallint,text,text,smallint,text,text)',
-        'rpc_customer_contacts_record_export(uuid,integer,text)',
+        'rpc_customer_manual_delete(uuid,uuid,text)',
+        'rpc_customer_manual_save(uuid,uuid,text,text,text,text,smallint,text,text)',
         'rpc_customer_page_asset_begin(uuid,customer_page_asset_kind,text,text)',
         'rpc_customer_page_publish(uuid,uuid)',
         'rpc_customer_page_save_draft(uuid,uuid,jsonb)',
         'rpc_customer_page_unpublish(uuid,uuid)',
+        'rpc_customers_record_export(uuid,integer,text)',
         'rpc_delete_organization(uuid,text)',
         'rpc_delete_organization_check(uuid,text)',
         'rpc_mark_praise_shared(uuid)',
@@ -95,7 +95,7 @@ select is(
        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where p.prosecdef and n.nspname = 'public'
         and has_function_privilege('authenticated', p.oid, 'execute')
-        and pg_get_functiondef(p.oid) !~ '(auth\.uid\(\)|app\.customer_page_authorize|app\.create_organization_with_first_stand)'),
+        and pg_get_functiondef(p.oid) !~ '(auth\.uid\(\)|app\.customer_page_authorize|app\.customer_manual_authorize|app\.create_organization_with_first_stand)'),
     null,
     'every privileged function a signed-in user can call establishes the caller itself');
 

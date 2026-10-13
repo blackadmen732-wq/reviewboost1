@@ -61,17 +61,18 @@ describe("saving a customer", () => {
   it("encrypts the name and number, and sends only a digest and the last four in the clear", async () => {
     const { createCustomer } = await load();
     const { context, rpc } = makeContext({
-      rpc_customer_contact_save: { data: [{ contact_id: CUSTOMER, created: true }], error: null },
+      rpc_customer_manual_save: { data: [{ customer_id: CUSTOMER, outcome: "created" }], error: null },
     });
 
     await expect(
       createCustomer(context, { name: "  Ana   Lopez ", phone: "+1 (555) 201-0142" }, "req-1"),
-    ).resolves.toEqual({ id: CUSTOMER, lastFour: "0142" });
+    ).resolves.toEqual({ id: CUSTOMER, lastFour: "0142", linked: false });
 
     const [name, args] = rpc.mock.calls[0]! as unknown as [string, Record<string, unknown>];
-    expect(name).toBe("rpc_customer_contact_save");
+    expect(name).toBe("rpc_customer_manual_save");
     expect(args.p_org_id).toBe(ORG);
-    expect(args.p_contact_id).toBeNull();
+    expect(args.p_customer_id).toBeNull();
+    expect(String(args.p_name_digest)).toMatch(/^[A-Za-z0-9_-]{16,}/);
     expect(args.p_phone_last_four).toBe("0142");
     expect(String(args.p_phone_hash)).toMatch(/^[A-Za-z0-9_-]{16,}/);
     expect(JSON.stringify(args)).not.toContain("5552010142");
@@ -95,7 +96,7 @@ describe("saving a customer", () => {
   it("says a duplicate number is already saved, rather than merging", async () => {
     const { createCustomer } = await load();
     const { context } = makeContext({
-      rpc_customer_contact_save: { data: null, error: { message: "contact_exists" } },
+      rpc_customer_manual_save: { data: null, error: { message: "contact_exists" } },
     });
     await expect(createCustomer(context, { phone: "+15552010142" }, "req-3")).rejects.toMatchObject({
       status: 409,
@@ -103,27 +104,43 @@ describe("saving a customer", () => {
     });
   });
 
-  it("keeps the stored number when an edit sends none", async () => {
+  it("sends no number when an edit leaves it alone, and refuses changing an app's number", async () => {
     const { updateCustomer } = await load();
-    const { context, rpc } = makeContext(
-      { rpc_customer_contact_save: { data: [{ contact_id: CUSTOMER, created: false }], error: null } },
-      {
-        customer_contacts: {
-          data: { phone_hash: "h".repeat(64), phone_encrypted: "v1:a:b:c", phone_key_version: 1, phone_last_four: "0142" },
-          error: null,
-        },
-      },
-    );
+    const { context, rpc } = makeContext({
+      rpc_customer_manual_save: { data: [{ customer_id: CUSTOMER, outcome: "updated" }], error: null },
+    });
     await updateCustomer(context, CUSTOMER, { name: "Ana" }, "req-4");
     const args = (rpc.mock.calls[0] as unknown as [string, Record<string, unknown>])[1];
-    expect(args.p_contact_id).toBe(CUSTOMER);
-    expect(args.p_phone_hash).toBe("h".repeat(64));
-    expect(args.p_phone_encrypted).toBe("v1:a:b:c");
+    expect(args.p_customer_id).toBe(CUSTOMER);
+    expect(args.p_phone_hash).toBeNull();
+    expect(args.p_phone_encrypted).toBeNull();
+
+    const refused = makeContext({
+      rpc_customer_manual_save: { data: null, error: { message: "phone_from_source" } },
+    });
+    await expect(updateCustomer(refused.context, CUSTOMER, { phone: "+15559990000" }, "req-4b")).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringMatching(/connected app/),
+    });
+  });
+
+  it("links a number a connected app already knows instead of duplicating it", async () => {
+    const { createCustomer } = await load();
+    const { context } = makeContext({
+      rpc_customer_manual_save: { data: [{ customer_id: CUSTOMER, outcome: "linked" }], error: null },
+    });
+    await expect(createCustomer(context, { phone: "+15552010142" }, "req-4c")).resolves.toMatchObject({ linked: true });
+  });
+
+  it("keeps a customer a connected app still knows when the owner removes theirs", async () => {
+    const { deleteCustomer } = await load();
+    const { context } = makeContext({ rpc_customer_manual_delete: { data: "kept_from_source", error: null } });
+    await expect(deleteCustomer(context, CUSTOMER, "req-4d")).resolves.toEqual({ outcome: "kept_from_source" });
   });
 
   it("reports a removal that found nothing as not found", async () => {
     const { deleteCustomer } = await load();
-    const { context } = makeContext({ rpc_customer_contact_delete: { data: false, error: null } });
+    const { context } = makeContext({ rpc_customer_manual_delete: { data: "not_found", error: null } });
     await expect(deleteCustomer(context, CUSTOMER, "req-5")).rejects.toMatchObject({ status: 404 });
   });
 });
@@ -133,26 +150,36 @@ describe("the list the browser receives", () => {
     const { listCustomers } = await load();
     const { encrypt } = await crypto();
     const { context } = makeContext({
-      rpc_customer_contacts_list: {
+      rpc_customers_list: {
         data: [
           {
             id: CUSTOMER,
-            location_id: null,
             name_encrypted: encrypt("Ana"),
+            names_differ: false,
             phone_encrypted: encrypt("+15552010142"),
             phone_last_four: "0142",
+            has_manual: true,
+            sources: ["manual", "square"],
             consent_status: "opted_in",
+            last_visit_at: "2026-10-12T14:00:00Z",
+            last_visit_kind: "payment",
+            last_visit_location: null,
             last_request_status: "delivered",
             last_request_at: "2026-10-12T15:00:00Z",
             created_at: "2026-10-01T15:00:00Z",
           },
           {
             id: "9a000000-0000-4000-8000-00000000000b",
-            location_id: null,
             name_encrypted: null,
+            names_differ: false,
             phone_encrypted: encrypt("+15557781000"),
             phone_last_four: "1000",
+            has_manual: false,
+            sources: ["square"],
             consent_status: null,
+            last_visit_at: null,
+            last_visit_kind: null,
+            last_visit_location: null,
             last_request_status: null,
             last_request_at: null,
             created_at: "2026-10-02T15:00:00Z",
@@ -163,14 +190,21 @@ describe("the list the browser receives", () => {
     });
 
     const list = await listCustomers(context, "req-6");
-    expect(list[0]).toMatchObject({ name: "Ana", lastFour: "0142", consent: { kind: "agreed" } });
-    expect(list[1]).toMatchObject({ name: null, consent: { kind: "no_record" } });
+    expect(list[0]).toMatchObject({
+      name: "Ana",
+      lastFour: "0142",
+      consent: { kind: "agreed" },
+      sources: ["manual", "square"],
+      addedByHand: true,
+      lastVisitKind: "payment",
+    });
+    expect(list[1]).toMatchObject({ name: null, consent: { kind: "no_record" }, addedByHand: false });
     expect(JSON.stringify(list)).not.toMatch(/5552010142|5557781000|v1:/);
   });
 
   it("fails the read rather than showing an empty list", async () => {
     const { listCustomers } = await load();
-    const { context } = makeContext({ rpc_customer_contacts_list: { data: null, error: { message: "boom" } } });
+    const { context } = makeContext({ rpc_customers_list: { data: null, error: { message: "boom" } } });
     await expect(listCustomers(context, "req-7")).rejects.toMatchObject({ status: 503 });
   });
 });
@@ -180,15 +214,20 @@ describe("export", () => {
     const { exportCustomers } = await load();
     const { encrypt } = await crypto();
     const { context, rpc } = makeContext({
-      rpc_customer_contacts_list: {
+      rpc_customers_list: {
         data: [
           {
             id: CUSTOMER,
-            location_id: null,
             name_encrypted: encrypt('=HYPERLINK("http://x","y")'),
+            names_differ: false,
             phone_encrypted: encrypt("+15552010142"),
             phone_last_four: "0142",
+            has_manual: true,
+            sources: ["manual"],
             consent_status: "opted_out",
+            last_visit_at: null,
+            last_visit_kind: null,
+            last_visit_location: null,
             last_request_status: null,
             last_request_at: null,
             created_at: "2026-10-01T15:00:00Z",
@@ -196,7 +235,7 @@ describe("export", () => {
         ],
         error: null,
       },
-      rpc_customer_contacts_record_export: { data: null, error: null },
+      rpc_customers_record_export: { data: null, error: null },
     });
 
     const { csv, count } = await exportCustomers(context, "req-8");
@@ -204,7 +243,7 @@ describe("export", () => {
     expect(csv).toContain('"+15552010142"');
     expect(csv).toContain(`"'=HYPERLINK(""http://x"",""y"")"`);
     expect(csv).toContain('"Asked not to be texted"');
-    expect(rpc).toHaveBeenCalledWith("rpc_customer_contacts_record_export", {
+    expect(rpc).toHaveBeenCalledWith("rpc_customers_record_export", {
       p_org_id: ORG,
       p_count: 1,
       p_request_id: "req-8",
@@ -214,8 +253,8 @@ describe("export", () => {
   it("returns no file when the export cannot be recorded", async () => {
     const { exportCustomers } = await load();
     const { context } = makeContext({
-      rpc_customer_contacts_list: { data: [], error: null },
-      rpc_customer_contacts_record_export: { data: null, error: { message: "down" } },
+      rpc_customers_list: { data: [], error: null },
+      rpc_customers_record_export: { data: null, error: { message: "down" } },
     });
     await expect(exportCustomers(context, "req-9")).rejects.toMatchObject({ status: 503 });
   });
@@ -252,15 +291,7 @@ describe("texting a saved customer", () => {
     const { context } = makeContext(
       {},
       {
-        customer_contacts: {
-          data: {
-            phone_hash: phoneHash("+15552010142"),
-            phone_encrypted: encrypt("+15552010142"),
-            phone_key_version: 1,
-            phone_last_four: "0142",
-          },
-          error: null,
-        },
+        customers: { data: { phone_encrypted: encrypt("+15552010142") }, error: null },
         review_stands: {
           data: { id: STAND, location_id: "10000000-0000-4000-8000-000000000001", public_token_encrypted: encrypt("tok_abcdefgh123") },
           error: null,
@@ -282,7 +313,7 @@ describe("texting a saved customer", () => {
 
   it("does not text a customer the business does not have", async () => {
     const { previewTextRequest } = await import("@/lib/server/sms/text-request-service");
-    const { context } = makeContext({}, { customer_contacts: { data: null, error: null } });
+    const { context } = makeContext({}, { customers: { data: null, error: null } });
     await expect(
       previewTextRequest(context, { customerId: CUSTOMER, standId: STAND }, "req-11"),
     ).rejects.toMatchObject({ status: 404 });

@@ -324,35 +324,41 @@ evidence (`method`, `attested_by`, `wording_version`), enforced by
 evidence are reset to `unknown` by `app.sms_reset_unevidenced_owner_consent()`
 (migration `20261012000100_consent_requires_evidence.sql`).
 
-## 23. Saved customers **[impl][test-ci]**
+## 23. Customers **[impl][test-ci]**
 
-Migration `20261013000100_customer_contacts.sql`; service
+One customer model, from the Connections foundation (PR #76,
+`docs/connections/05-customer-and-visit-model.md`): `customers` (one reachable
+contact per business, keyed by phone hash, because consent and opt-out are),
+`customer_source_profiles` (how each source knows them: `manual` for the owner,
+`integration` for a connected app) and `customer_visits` (from connected apps).
+Owner actions: migration `20261014000200_manual_customers.sql`; service
 `frontend/lib/server/customers/customer-service.ts`; routes under
 `/api/v1/customers`; screen at Text Requests → Customers.
 
-- **What it is:** a short list of people a business texts, so an owner picks a
-  name instead of retyping a number. Name is optional. One entry per number per
-  business (`unique (org_id, phone_hash)`); a duplicate is refused, never merged.
-- **What it is not:** consent. Saving a customer writes nothing to the consent
-  ledger. The list *reads* `sms_consent_state` to show "Agreed to texts",
-  "No agreement recorded" or "Asked not to be texted". The first text still goes
-  through the same eligibility gate and, if needed, the separate owner
-  attestation in §22.
-- **Privacy:** name and number are AES-GCM encrypted by the server; the database
-  holds ciphertext, the keyed digest and the last four. The browser receives
-  names and last four only. A Text Request to a saved customer is sent by
-  `customerId`; the server decrypts the number (`customerPhone`). Whole numbers
-  leave the server only in an owner/admin export, which is audited
-  (`customer_contact.exported`, count only) before the file is returned, and in
-  which a name cannot start a spreadsheet formula.
-- **Access:** owner/admin only, matching the consent ledger. Reads through RLS
-  (`rpc_customer_contacts_list` is SECURITY INVOKER); writes through
-  `rpc_customer_contact_save` / `_delete` / `rpc_customer_contacts_record_export`,
-  which read the caller from `auth.uid()`, check the role, and write an audit
-  event with ids only.
-- **Removal** deletes the entry and keeps consent history and past Text Requests.
-- **Not built:** imports from a file, groups, or sending to more than one person
-  at a time. Each needs its own consent story first.
+- **Adding by hand** creates a customer with a manual profile. A number a
+  connected app already knows becomes the *same* customer with the owner's name
+  added (`linked`); a number already added by hand is refused, never merged.
+  A name that differs between sources is flagged (`names_differ`), never
+  resolved automatically.
+- **Not consent.** Nothing here writes the consent ledger. The list reads
+  `sms_consent_state`; the first text still goes through the eligibility gate
+  and, if needed, the separate owner attestation in §22.
+- **A number from a connected app** cannot be changed by hand
+  (`phone_from_source`); it changes at the source.
+- **Removing** deletes the owner's manual profile. A customer a connected app
+  still knows stays (`kept_from_source`); consent history and past Text
+  Requests always stay.
+- **Privacy:** names and numbers are encrypted by the server; the browser gets
+  names and last four only. A Text Request to a customer is sent by
+  `customerId`; the server decrypts the number through the caller's RLS. Whole
+  numbers leave only in an owner/admin export, audited (`customer.exported`,
+  count only) before the file is returned; names cannot start a spreadsheet
+  formula.
+- **Access:** owner/admin only (PR #76's RLS). Writes are definer RPCs that
+  read the caller from `auth.uid()` via `app.customer_manual_authorize` and
+  audit with ids only. pgTAP: `manual_customers_test.sql`.
+- **Not built:** file imports, groups, sending to several people at once, or
+  sending automatically when a visit arrives.
 
 Settings → Connections shows the Google review link, billing, whether texting
 is live, in test mode or not set up on this deployment, and sign-in methods —

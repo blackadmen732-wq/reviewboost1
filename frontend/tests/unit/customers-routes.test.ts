@@ -7,7 +7,7 @@ vi.mock("server-only", () => ({}));
  * Customers routes: who may call them, what they accept, and what the export
  * returns. The service is stubbed; its own behaviour is in
  * customer-service.test.ts, and the database's role checks in
- * supabase/tests/customer_contacts_test.sql.
+ * supabase/tests/manual_customers_test.sql.
  */
 
 let role = "owner";

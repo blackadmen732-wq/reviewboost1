@@ -159,8 +159,12 @@ describe("Text Requests: sending to a saved customer", () => {
 const customer = (over: Partial<CustomerRowData>): CustomerRowData => ({
   id: "cust-1",
   name: "Ana López",
+  namesDiffer: false,
   lastFour: "0142",
-  locationId: null,
+  sources: ["manual"],
+  addedByHand: true,
+  lastVisitAt: null,
+  lastVisitLocationId: null,
   consent: customerConsentState("opted_in"),
   lastRequestStatus: "delivered",
   lastRequestAt: "2026-10-12T12:00:00Z",
@@ -176,7 +180,7 @@ describe("Customers", () => {
   ];
 
   it("searches by name or digits and filters by texting permission", () => {
-    render(<CustomersManager customers={list} places={[]} />);
+    render(<CustomersManager customers={list} places={[]} sourceNames={{ square: "Square" }} />);
     expect(document.querySelectorAll("[data-customer-row]")).toHaveLength(3);
 
     fireEvent.change(screen.getByRole("searchbox", { name: "Search customers" }), { target: { value: "lop" } });
@@ -191,7 +195,7 @@ describe("Customers", () => {
   });
 
   it("does not offer a text to someone who asked not to be texted", () => {
-    render(<CustomersManager customers={list} places={[]} />);
+    render(<CustomersManager customers={list} places={[]} sourceNames={{ square: "Square" }} />);
     const rows = [...document.querySelectorAll<HTMLElement>("[data-customer-row]")];
     const cy = rows.find((row) => row.textContent?.includes("Cy"))!;
     expect(within(cy).queryByRole("link", { name: /send a text/i })).toBeNull();
@@ -205,7 +209,7 @@ describe("Customers", () => {
   it("adds a customer through the API, then reloads from the server", async () => {
     const fetcher = vi.fn(async () => ok({ id: "new", lastFour: "4455" }, 201));
     vi.stubGlobal("fetch", fetcher);
-    render(<CustomersManager customers={[]} places={[]} />);
+    render(<CustomersManager customers={[]} places={[]} sourceNames={{ square: "Square" }} />);
     expect(screen.getByText("No saved customers yet")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Add customer" }));
@@ -217,7 +221,7 @@ describe("Customers", () => {
     const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/v1/customers");
     expect(init.method).toBe("POST");
-    expect(JSON.parse(String(init.body))).toEqual({ name: "Dee", phone: "+15550004455", locationId: null });
+    expect(JSON.parse(String(init.body))).toEqual({ name: "Dee", phone: "+15550004455" });
   });
 
   it("shows the server's reason when a save is refused, and keeps the form", async () => {
@@ -228,7 +232,7 @@ describe("Customers", () => {
           new Response(JSON.stringify({ error: { message: "That number is already saved." } }), { status: 409 }),
       ),
     );
-    render(<CustomersManager customers={[]} places={[]} />);
+    render(<CustomersManager customers={[]} places={[]} sourceNames={{ square: "Square" }} />);
     fireEvent.click(screen.getByRole("button", { name: "Add customer" }));
     fireEvent.change(await screen.findByLabelText("Mobile number"), { target: { value: "+15550004455" } });
     fireEvent.click(screen.getByRole("button", { name: "Save customer" }));
@@ -237,10 +241,51 @@ describe("Customers", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
+  it("shows where a customer came from and their last visit", () => {
+    render(
+      <CustomersManager
+        customers={[
+          customer({
+            id: "sq-1",
+            name: "Bo Chen",
+            sources: ["square"],
+            addedByHand: false,
+            lastVisitAt: new Date().toISOString(),
+            lastVisitLocationId: "loc-2",
+            namesDiffer: true,
+          }),
+        ]}
+        places={[
+          { locationId: "loc-1", name: "Main St" },
+          { locationId: "loc-2", name: "Harbor" },
+        ]}
+        sourceNames={{ square: "Square" }}
+      />,
+    );
+    const row = document.querySelector<HTMLElement>("[data-customer-row]")!;
+    expect(row).toHaveTextContent("From Square");
+    expect(row).toHaveTextContent("Visited today · Harbor");
+    expect(row.querySelector("[data-names-differ]")).not.toBeNull();
+  });
+
+  it("does not offer to change a number or remove a customer a connected app supplies", async () => {
+    render(
+      <CustomersManager
+        customers={[customer({ id: "sq-1", sources: ["square"], addedByHand: false })]}
+        places={[]}
+        sourceNames={{ square: "Square" }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit Ana López" }));
+    await screen.findByText(/Square keeps their number up to date/);
+    expect(screen.queryByLabelText(/mobile number/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove customer" })).toBeNull();
+  });
+
   it("asks before removing, and removes through the API", async () => {
     const fetcher = vi.fn(async () => ok({ id: "cust-1", deleted: true }));
     vi.stubGlobal("fetch", fetcher);
-    render(<CustomersManager customers={[customer({})]} places={[]} />);
+    render(<CustomersManager customers={[customer({})]} places={[]} sourceNames={{ square: "Square" }} />);
     fireEvent.click(screen.getByRole("button", { name: "Edit Ana López" }));
     fireEvent.click(await screen.findByRole("button", { name: "Remove customer" }));
     expect(fetcher).not.toHaveBeenCalled();

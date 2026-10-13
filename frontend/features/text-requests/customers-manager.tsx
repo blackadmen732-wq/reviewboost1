@@ -25,9 +25,14 @@ import { relativeDay } from "@/lib/utils/relative-day";
 export interface CustomerRowData {
   id: string;
   name: string | null;
+  namesDiffer: boolean;
   lastFour: string;
-  locationId: string | null;
+  /** "manual", or a connected app's id such as "square". */
+  sources: string[];
+  addedByHand: boolean;
   consent: CustomerConsentState;
+  lastVisitAt: string | null;
+  lastVisitLocationId: string | null;
   lastRequestStatus: string | null;
   lastRequestAt: string | null;
   createdAt: string;
@@ -82,9 +87,12 @@ async function errorMessage(response: Response, fallback: string): Promise<strin
 export function CustomersManager({
   customers,
   places,
+  sourceNames,
 }: {
   customers: readonly CustomerRowData[];
   places: readonly Place[];
+  /** Display names for connected apps, from the provider registry. */
+  sourceNames: Readonly<Record<string, string>>;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -123,6 +131,11 @@ export function CustomersManager({
 
   const placeName = (locationId: string | null) =>
     places.length > 1 ? (places.find((place) => place.locationId === locationId)?.name ?? null) : null;
+  const sourceLabel = (sources: readonly string[]) => {
+    const names = sources.map((source) => (source === "manual" ? "you" : (sourceNames[source] ?? source)));
+    if (names.length === 0) return null;
+    return names.length === 1 && names[0] === "you" ? "Added by you" : `From ${names.join(" and ")}`;
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -204,7 +217,7 @@ export function CustomersManager({
                   <tr className="text-sm text-muted">
                     <th scope="col" className="px-4 py-3 font-medium">Name</th>
                     <th scope="col" className="px-4 py-3 font-medium">Texting</th>
-                    <th scope="col" className="px-4 py-3 font-medium">Last text</th>
+                    <th scope="col" className="px-4 py-3 font-medium">Activity</th>
                     <th scope="col" className="px-4 py-3 font-medium">
                       <span className="sr-only">Actions</span>
                     </th>
@@ -215,7 +228,8 @@ export function CustomersManager({
                     <CustomerRow
                       key={customer.id}
                       customer={customer}
-                      placeName={placeName(customer.locationId)}
+                      placeName={placeName(customer.lastVisitLocationId)}
+                      source={sourceLabel(customer.sources)}
                       onEdit={() => setEditing(customer)}
                     />
                   ))}
@@ -229,7 +243,7 @@ export function CustomersManager({
       <CustomerDialog
         key={editing === null ? "closed" : editing === "new" ? "new" : editing.id}
         editing={editing}
-        places={places}
+        sourceLabel={editing && editing !== "new" ? sourceLabel(editing.sources.filter((s) => s !== "manual")) : null}
         onClose={() => setEditing(null)}
         onSaved={() => {
           setEditing(null);
@@ -267,10 +281,12 @@ function ConsentBadge({ consent }: { consent: CustomerConsentState }) {
 function CustomerRow({
   customer,
   placeName,
+  source,
   onEdit,
 }: {
   customer: CustomerRowData;
   placeName: string | null;
+  source: string | null;
   onEdit: () => void;
 }) {
   const last = customer.lastRequestStatus ? textRequestStatus(customer.lastRequestStatus) : null;
@@ -281,19 +297,30 @@ function CustomerRow({
         <p className="break-words text-base font-medium text-ink">{customer.name ?? "No name"}</p>
         <p className="text-sm tabular-nums text-muted">
           ••• {customer.lastFour}
-          {placeName ? ` · ${placeName}` : ""}
+          {source ? ` · ${source}` : ""}
         </p>
+        {customer.namesDiffer ? (
+          <p className="text-xs text-muted" data-names-differ>
+            Known by a different name in another source
+          </p>
+        ) : null}
       </td>
       <td className="md:px-4 md:py-4">
         <ConsentBadge consent={customer.consent} />
       </td>
-      <td className="text-sm text-muted md:px-4 md:py-4">
+      <td className="flex flex-col gap-0.5 text-sm text-muted md:table-cell md:px-4 md:py-4">
+        {customer.lastVisitAt ? (
+          <span className="block text-ink">
+            Visited <span className="whitespace-nowrap">{relativeDay(customer.lastVisitAt).toLowerCase()}</span>
+            {placeName ? ` · ${placeName}` : ""}
+          </span>
+        ) : null}
         {last && customer.lastRequestAt ? (
-          <span>
-            {last.label} · <span className="whitespace-nowrap">{relativeDay(customer.lastRequestAt)}</span>
+          <span className="block">
+            Text {last.label.toLowerCase()} · <span className="whitespace-nowrap">{relativeDay(customer.lastRequestAt)}</span>
           </span>
         ) : (
-          <span>Never texted</span>
+          <span className="block">Never texted</span>
         )}
       </td>
       <td className="md:px-4 md:py-4 md:text-right">
@@ -324,19 +351,21 @@ function CustomerRow({
 
 function CustomerDialog({
   editing,
-  places,
+  sourceLabel,
   onClose,
   onSaved,
 }: {
   editing: CustomerRowData | "new" | null;
-  places: readonly Place[];
+  /** "From Square" when a connected app also knows this customer. */
+  sourceLabel: string | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const existing = editing !== null && editing !== "new" ? editing : null;
+  // A number a connected app supplies is that app's to change.
+  const numberFromApp = existing !== null && existing.sources.some((source) => source !== "manual");
   const [name, setName] = useState(existing?.name ?? "");
   const [phone, setPhone] = useState("");
-  const [locationId, setLocationId] = useState(existing?.locationId ?? places[0]?.locationId ?? "");
   const [busy, setBusy] = useState(false);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -351,7 +380,6 @@ function CustomerDialog({
     try {
       const body = {
         name: name.trim() || null,
-        locationId: locationId || null,
         ...(phone.trim() ? { phone: phone.trim() } : {}),
       };
       const response = existing
@@ -380,7 +408,13 @@ function CustomerDialog({
         setError(await errorMessage(response, "That didn't remove them. Please try again."));
         return;
       }
-      notify.success("Customer removed", "Their past texts and agreement history are kept.");
+      const payload = (await response.json().catch(() => null)) as { data?: { outcome?: string } } | null;
+      notify.success(
+        payload?.data?.outcome === "kept_from_source" ? "Your name for them was removed" : "Customer removed",
+        payload?.data?.outcome === "kept_from_source"
+          ? "A connected app still knows them, so they stay. Past texts and agreement history are kept."
+          : "Their past texts and agreement history are kept.",
+      );
       onSaved();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not reach ReviewBoost. Try again.");
@@ -395,7 +429,9 @@ function CustomerDialog({
         title={existing ? "Edit customer" : "Add customer"}
         description={
           existing
-            ? `Ending ••• ${existing.lastFour}. Leave the number empty to keep it.`
+            ? numberFromApp
+              ? `Ending ••• ${existing.lastFour}. ${sourceLabel ?? "A connected app"} keeps their number up to date.`
+              : `Ending ••• ${existing.lastFour}. Leave the number empty to keep it.`
             : "Saving someone isn't their agreement to texts. You'll confirm that before the first text."
         }
       >
@@ -412,44 +448,26 @@ function CustomerDialog({
               onChange={(event) => setName(event.target.value)}
             />
           </div>
-          <div>
-            <label htmlFor="customer-phone" className="mb-1 block text-sm font-medium text-ink">
-              {existing ? "New mobile number" : "Mobile number"}
-            </label>
-            <Input
-              id="customer-phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="off"
-              value={phone}
-              placeholder={existing ? `Keep ••• ${existing.lastFour}` : "+1 555 123 4567"}
-              invalid={error !== null && /number/i.test(error)}
-              onChange={(event) => {
-                setPhone(event.target.value);
-                setError(null);
-              }}
-            />
-          </div>
-          {places.length > 1 ? (
+          {numberFromApp ? null : (
             <div>
-              <label htmlFor="customer-place" className="mb-1 block text-sm font-medium text-ink">
-                Usual place
+              <label htmlFor="customer-phone" className="mb-1 block text-sm font-medium text-ink">
+                {existing ? "New mobile number" : "Mobile number"}
               </label>
-              <select
-                id="customer-place"
-                className="min-h-14 w-full rounded-[var(--radius-control)] border border-border bg-surface px-4 text-base text-ink"
-                value={locationId}
-                onChange={(event) => setLocationId(event.target.value)}
-              >
-                <option value="">Not set</option>
-                {places.map((place) => (
-                  <option key={place.locationId} value={place.locationId}>
-                    {place.name}
-                  </option>
-                ))}
-              </select>
+              <Input
+                id="customer-phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="off"
+                value={phone}
+                placeholder={existing ? `Keep ••• ${existing.lastFour}` : "+1 555 123 4567"}
+                invalid={error !== null && /number/i.test(error)}
+                onChange={(event) => {
+                  setPhone(event.target.value);
+                  setError(null);
+                }}
+              />
             </div>
-          ) : null}
+          )}
           {error ? (
             <p role="alert" className="text-sm text-danger">
               {error}
@@ -460,8 +478,9 @@ function CustomerDialog({
         {confirmingRemove && existing ? (
           <div className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-danger/40 p-4">
             <p className="text-base text-ink">
-              Remove {existing.name ?? `••• ${existing.lastFour}`} from Customers? Their past texts and
-              agreement history stay.
+              {numberFromApp
+                ? `Remove your name for ${existing.name ?? `••• ${existing.lastFour}`}? ${sourceLabel ?? "A connected app"} still knows them, so they stay in Customers.`
+                : `Remove ${existing.name ?? `••• ${existing.lastFour}`} from Customers? Their past texts and agreement history stay.`}
             </p>
             <div className="flex flex-col gap-2 sm:flex-row-reverse">
               <Button
@@ -495,7 +514,7 @@ function CustomerDialog({
           </div>
         )}
 
-        {existing && !confirmingRemove ? (
+        {existing?.addedByHand && !confirmingRemove ? (
           <button
             type="button"
             onClick={() => setConfirmingRemove(true)}
