@@ -33,11 +33,13 @@ export function isGetStartedNext(path: string): boolean {
   return path === "/onboarding" || path.startsWith("/onboarding?");
 }
 
+const HERO_TITLE_LINES = ["Hear how", "the visit went."] as const;
+
 export const PUBLIC_HERO = {
-  title: "A code on the counter. The same Google chance for every customer.",
+  title: HERO_TITLE_LINES.join(" "),
+  titleLines: HERO_TITLE_LINES,
   lede: "Customers tap or scan your Tag, leave a private rating, and get your Google link. You see every rating in Feedback.",
   primary: { href: START_HREF, label: "Get started" },
-  secondary: { href: SIGN_IN_HREF, label: "Sign in" },
 } as const;
 
 export const HOW_IT_WORKS = [

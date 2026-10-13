@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Star } from "lucide-react";
 
 import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
 import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
@@ -20,7 +21,7 @@ const EXAMPLES = [
 ] as const;
 
 /** Real customer presentation, clearly labelled as an example. No fake activity. */
-export function ProductDemo() {
+export function ProductDemo({ hero = false }: { hero?: boolean }) {
   const [selected, setSelected] = useState(0);
   const [rating, setRating] = useState<RatingValue | null>(null);
   const example = EXAMPLES[selected]!;
@@ -28,7 +29,10 @@ export function ProductDemo() {
   // Next's local image optimiser serves the existing artwork at preview size.
   const photo = `/_next/image?url=${encodeURIComponent(example.photo)}&w=640&q=75`;
   return (
-    <figure className="product-demo" id="customer-example">
+    <figure
+      className={cn("product-demo", hero && "product-demo--hero")}
+      id="customer-example"
+    >
       <div className="product-demo__objects" aria-hidden="true">
         <div className="product-demo__tag">
           <ReviewBoostLogo pose="full" size="poweredBy" />
@@ -106,7 +110,17 @@ export function ProductDemo() {
                   : "border-border bg-surface text-ink hover:bg-quiet",
               )}
             >
-              {value}
+              {hero ? (
+                <Star
+                  className="size-5"
+                  aria-hidden="true"
+                  fill={
+                    rating !== null && value <= rating ? "currentColor" : "none"
+                  }
+                />
+              ) : (
+                value
+              )}
             </button>
           ))}
         </div>

@@ -26,12 +26,12 @@ shadcn's inspected Button, CSS-variable mapping and theme registry validate patt
 | Danger `--rb-danger` | `#B33A3A` | `#FF8F8F` |
 | Focus `--rb-focus` | `#005FCC` | `#7AB8FF` |
 
-Existing public pricing uses a dark green field. Deep forest `#064E3B` is a proposed next-pass action color, not the current global or native token. Brand green is an identity accent, not the background for small white labels. Use `action` for owner primary buttons and `brand-text` for small green text. Status includes words/icons, never color alone. Keep actual token definitions in CSS/native theme; do not create a competing token layer in a component.
+Existing public pricing uses a dark green field. Deep forest `#064E3B` now appears in the scoped homepage direction; it is not the global or native action token. Brand green is an identity accent, not the background for small white labels. Use `action` for owner primary buttons and `brand-text` for small green text. Status includes words/icons, never color alone. Keep actual token definitions in CSS/native theme; do not create a competing token layer in a component.
 
 ## Typography and spacing
 
-- App/public: bundled Geist Sans. Customer heading/footer: bundled Inter Tight; tracked instruction/promise: DM Sans. Font licenses stay with their files. Use tabular numerals for counts, prices and time comparisons.
-- Base body 16px; secondary 14px; captions 12px; page title 24px; compact display 28px. Public hero scales 36–52px. Keep body readable rather than shrinking text to fit a fixed card.
+- App/public body: bundled Geist Sans. Homepage display: self-hosted Instrument Serif, regular/italic, selected from the user's Veyra/Midday references. Customer heading/footer: bundled Inter Tight; tracked instruction/promise: DM Sans. Font licenses stay with their files. Use tabular numerals for counts, prices and time comparisons.
+- Base body 16px; secondary 14px; captions 12px; page title 24px; compact display 28px. Default public display scales 36–52px; the scoped homepage display uses 52–96px. Keep body readable rather than shrinking text to fit a fixed card.
 - Existing spacing scale: 4, 8, 12, 16, 24, 32, 40, 48, 64, 80, 96, 120, 144px. Group labels/fields tightly; separate tasks with space. Public bands use 48px mobile and 72px desktop vertical padding.
 - Controls: 12px radius; ordinary cards: 16px; 56px standard input/button height, minimum 44px interactive target. Customer stars keep their existing responsive sizing and 48px minimum on the live canvas.
 - Owner content is constrained around 800px; public content around 1080px. The desktop editor places controls beside the phone; mobile places Publish above the persistent tabs. A single column must remain usable at 320px.
@@ -78,8 +78,8 @@ Retain 150ms control and 180ms page tokens, subtle row/status transitions, and v
 
 For affected routes: mobile 390px, tablet 768px, desktop 1280px, plus 320px reflow where controls are dense. Check light/dark, reduced motion, focus, error/retry, pending/success, empty/populated and photo/no-photo. Save browser evidence with route, viewport and state; label local fixture data. Run relevant tests and production build. Real Stripe/Twilio, physical NFC and App Store evidence remain separate from local browser checks.
 
-## Proposed next pass — awaiting the user's requested review
+## Homepage direction — implemented for review, 13 October 2026
 
-The latest Pinterest/PDF references are inspiration, not implemented specifications. Recommend warm cream `#F8F5F0`, white surfaces, forest actions `#064E3B` / hover `#04382C`, existing charcoal `#171A18`, secondary `#52625A`, border `#D8DED9`, and restrained bright-green identity accents. Retain bundled Geist for this first pass; the supplied references disagree between Manrope/Inter, Geist and Inter Tight/DM Sans. Do not replace all fonts by implication. Keep the Customer Page's own typography and flow isolated.
+The homepage header/hero now uses scoped warm cream `#F8F5F0`, white product surfaces, forest actions `#064E3B` / hover `#04382C`, charcoal `#171A18`, secondary `#52625A`, border `#D8DED9`, and the recognizable bright-green mark. The latest user-provided Veyra/Midday examples resolved the display direction: centered Instrument Serif, with an italic second line and real product proof below. Geist remains for body/controls; Customer Page typography and flow remain isolated. Dark homepage treatment uses `#0E1712` canvas and `#9ED5B9` actions with dark foreground, preserving contrast.
 
-The first proposed visual pass is the public header and hero only. Exact files, scope, alternatives and acceptance checks are in `docs/design/PR67_VISUAL_SYSTEM_AUDIT.md`. No global palette/font migration has been applied. Reliability gaps take priority; see `docs/design/PR67_LAUNCH_GAPS.md`.
+This first direction is limited to the header/hero and its existing sample component. It leads with the owner benefit, keeps setup as the primary action, and brings the full Tag/phone proof into the first mobile viewport. Native disclosure navigation retains every mobile destination. The opt-in `hero` presentation leaves the Product route's default sample appearance intact. Global tokens and owner surfaces have not migrated. See `docs/design/HOMEPAGE_DIRECTION.md` for scope and validation. Review this screen before wider rollout; the remaining recovery work in `docs/design/PR67_LAUNCH_GAPS.md` remains a separate task.

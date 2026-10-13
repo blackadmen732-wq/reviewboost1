@@ -1,5 +1,7 @@
 # PR #67 frontend repair: results and review evidence
 
+Later pass, 13 October: [the homepage header/hero direction](HOMEPAGE_DIRECTION.md) now implements the scoped cream/forest treatment. This report retains the 12 October repair evidence and test totals; the new pass has its own screenshots and validation.
+
 Reviewed 12 October 2026 against PR67 `1036e2e1d4500629d604527673e5636cca7eff51`, on its existing branch `cursor/sprint-forge-owner-systems-v15-7042`. This report covers local implementation and tests, not deployed behavior. The user's latest visual direction is documented separately and has not been applied globally.
 
 ## Audience, architecture and page count
