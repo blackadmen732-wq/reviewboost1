@@ -1,4 +1,6 @@
 import Link from "next/link";
+import localFont from "next/font/local";
+import { ArrowDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { FAQ } from "@/features/public/faq";
@@ -16,47 +18,54 @@ import {
 import { ProductDemo } from "@/features/public/product-demo";
 import { PublicShell } from "@/features/public/public-shell";
 
+const editorialFont = localFont({
+  src: [
+    {
+      path: "../../lib/fonts/instrument-serif/InstrumentSerif-Regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../lib/fonts/instrument-serif/InstrumentSerif-Italic.ttf",
+      weight: "400",
+      style: "italic",
+    },
+  ],
+  variable: "--font-public-editorial",
+  display: "swap",
+});
+
 /**
  * Signed-out homepage. One idea per band. No testimonials, no invented counts.
  */
 export function PublicHome() {
   return (
-    <PublicShell>
-      <section className="public-section public-hero">
-        <div>
-          <p className="mb-4 text-sm font-medium text-muted">
-            For local business owners
-          </p>
-          <h1 className="max-w-[17ch] text-[2.25rem] font-semibold leading-[1.12] tracking-[-0.035em] text-ink sm:text-[3.25rem]">
-            {PUBLIC_HERO.title}
+    <PublicShell homepage>
+      <section
+        className={`public-section public-hero ${editorialFont.variable}`}
+      >
+        <div className="public-hero__copy">
+          <h1 className="public-hero__title">
+            <span>{PUBLIC_HERO.titleLines[0]}</span>{" "}
+            <span>{PUBLIC_HERO.titleLines[1]}</span>
           </h1>
-          <p className="mt-5 max-w-[42ch] text-lg leading-relaxed text-muted">
-            {PUBLIC_HERO.lede}
-          </p>
-          <div className="mt-8 flex max-w-sm gap-2">
-            <Button asChild variant="action" size="lg">
+          <p className="public-hero__lede">{PUBLIC_HERO.lede}</p>
+          <div className="public-hero__actions">
+            <Button asChild variant="action" className="w-auto">
               <Link href={PUBLIC_HERO.primary.href}>
                 {PUBLIC_HERO.primary.label}
               </Link>
             </Button>
-            <Button asChild variant="ghost" size="lg">
-              <Link href={PUBLIC_HERO.secondary.href}>
-                {PUBLIC_HERO.secondary.label}
-              </Link>
-            </Button>
+            <a href="#customer-example" className="public-hero__sample-link">
+              Try the example{" "}
+              <ArrowDown className="size-4" aria-hidden="true" />
+            </a>
           </div>
-          <a
-            href="#customer-example"
-            className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline underline-offset-4"
-          >
-            Try the customer example
-          </a>
-          <p className="mt-2 text-sm text-muted">
-            Print a code or use a blank NFC tag. Your customer needs only their
-            phone.
+          <p className="public-hero__note">
+            QR or NFC. No app for your customers.
           </p>
         </div>
-        <ProductDemo />
+        <ProductDemo hero />
       </section>
 
       <section className="border-t border-border">

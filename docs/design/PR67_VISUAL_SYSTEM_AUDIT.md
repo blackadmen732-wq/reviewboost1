@@ -1,5 +1,7 @@
 # PR #67 visual-system audit and next-pass proposal
 
+Update, 13 October: the focused homepage direction is now implemented for review following the user's request to improve the visual result. See [direction and validation](HOMEPAGE_DIRECTION.md). The original audit below records the decisions before that pass; wider owner/native rollout remains unimplemented.
+
 12 October 2026. This audits the existing branch plus the already-authorized repair pass. **The new Pinterest palette/typography direction is proposed, not applied.** The user's latest instruction asks to see exact files and changes before visual editing and to review the first header/hero pass before a wider rollout.
 
 ## Audience and visual purpose
