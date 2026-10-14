@@ -210,6 +210,14 @@ export default function LoginScreen() {
           needed.
         </Text>
 
+        {sessionError && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText} accessibilityLiveRegion="polite">
+              {sessionError}
+            </Text>
+          </View>
+        )}
+
         {error && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>

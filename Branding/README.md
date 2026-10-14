@@ -1,7 +1,16 @@
 # ReviewBoost brand
 
-One mark, one green, one source. Everything in this folder except `Mark.svg`
-and `Wordmark.svg` is generated.
+One canonical mark, one logo green, one source. The canonical SVG lockups and
+app icons are generated from `Mark.svg` and `Wordmark.svg`.
+
+The user-selected **owner-app launch treatment** is a separate, scoped asset:
+`references/owner-app-launch-reference.jpg` preserves the supplied phone mockup;
+`apps/mobile/assets/launch-wordmark.png` is its recreated white handwritten
+wordmark, prepared with Image Gen and inspected on green at phone size.
+It is a raster recreation, not an exact original vector master. The app draws
+the flat `#005B3E` field; device chrome is supplied by the OS. The existing
+R/Geist lockups and app icons remain canonical for the everyday interface.
+See `docs/mobile/LAUNCH_SCREEN.md` for configuration, evidence and build limits.
 
 ## Files
 
@@ -38,7 +47,8 @@ the mark on its own.
 | Ink | `#171A18` | "Review" in the wordmark on light backgrounds. Web `--rb-ink`. |
 | Ink on dark | `#F7F9F7` | "Review" on dark backgrounds. |
 | White | `#FFFFFF` | The mark on the app icon. |
-| Action green | `#007A4D` | UI only: buttons, links and running text that needs 4.5:1 on white. **Never a logo colour.** |
+| Action green | `#064E3B` | Light UI primary actions. **Never the canonical logo colour.** |
+| Owner launch field | `#005B3E` | User-selected startup screen only, behind the white script wordmark. |
 
 `#035B3B`, the dark green of the old rotated icon tile, is retired.
 

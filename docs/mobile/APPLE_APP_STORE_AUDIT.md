@@ -319,7 +319,7 @@ Verification still needed on the archive: Xcode → Organizer → *Generate Priv
 | Area | Change | Files |
 |---|---|---|
 | Device family | iPhone only | `app.json` `supportsTablet: false` |
-| Launch | Calm `#F6F7F5` canvas, no image flash, root view the same colour | `app.json` (`expo-splash-screen`, `expo-system-ui`), `assets/launch-transparent.png` |
+| Launch | Updated 14 October to user-selected `#005B3E` field and white script wordmark; native/JS startup share the artwork; real-device handoff unverified | `app.json` (`expo-splash-screen`, `expo-system-ui`), `assets/launch-wordmark.png`, `components/launch-screen.tsx`; see `LAUNCH_SCREEN.md` |
 | Tab bar | SF Symbols instead of text glyphs | `app/(tabs)/_layout.tsx`, `expo-symbols` |
 | Legal links | Privacy, Terms and Support rows, opening in Safari | `app/(tabs)/account.tsx`, `data/public-links.ts` |
 | Payments copy | Past-due and cancelled copy states facts only; a test forbids purchase words in any status | `data/billing-view.ts`, `data/__tests__/billing-view.test.ts` |

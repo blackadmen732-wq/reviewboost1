@@ -6,14 +6,15 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#F6F7F5",
+    "backgroundColor": "#005B3E",
     "scheme": "reviewboost",
     "ios": {
       "bundleIdentifier": "fit.reviewboost.app",
       "supportsTablet": false,
       "infoPlist": {
         "NFCReaderUsageDescription": "ReviewBoost uses NFC to write your business's review link to your ReviewBoost Tags and to check what a Tag already holds before changing it.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
@@ -92,9 +93,13 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F6F7F5",
-          "image": "./assets/launch-transparent.png",
-          "imageWidth": 1
+          "backgroundColor": "#005B3E",
+          "image": "./assets/launch-wordmark.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "ios": {
+            "imageWidth": 320
+          }
         }
       ],
       "expo-system-ui",
