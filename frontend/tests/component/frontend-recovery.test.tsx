@@ -81,7 +81,7 @@ it("keeps an unsaved setting editable after a dropped request", async () => {
       value="Mario’s Pizza"
     />,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Change" }));
+  fireEvent.click(screen.getByRole("button", { name: "Change Business" }));
   fireEvent.change(screen.getByLabelText("Business"), {
     target: { value: "Mario’s Pizza House" },
   });
@@ -90,7 +90,7 @@ it("keeps an unsaved setting editable after a dropped request", async () => {
   expect(screen.getByLabelText("Business")).toHaveValue("Mario’s Pizza House");
   expect(screen.getByLabelText("Business")).toBeEnabled();
   expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
-  expect(refresh).not.toHaveBeenCalled();
+  expect(refresh).toHaveBeenCalled();
 });
 
 it("opens a prepared preview through a native link rather than an async popup", async () => {

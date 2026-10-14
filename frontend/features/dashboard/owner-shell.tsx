@@ -25,6 +25,7 @@ export function OwnerShell({
 }) {
   return (
     <div className="min-h-dvh bg-canvas">
+      <a href="#owner-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[var(--radius-control)] focus:bg-surface focus:px-4 focus:py-3 focus:text-ink focus:outline focus:outline-2 focus:outline-focus">Skip to content</a>
       <DesktopSidebar unreadCount={unreadCount} businessName={businessName} />
 
       <div className="lg:pl-[220px]">
@@ -47,7 +48,7 @@ export function OwnerShell({
             Settings
           </Link>
         </header>
-        <main className="mx-auto w-full max-w-[var(--rb-content)] px-5 pb-28 pt-6 lg:px-8 lg:pb-16 lg:pt-12">
+        <main id="owner-content" tabIndex={-1} className="mx-auto w-full max-w-[var(--rb-content)] px-5 pb-28 pt-6 lg:px-8 lg:pb-16 lg:pt-12">
           <PageTransition>{children}</PageTransition>
         </main>
       </div>

@@ -1,3 +1,4 @@
+import * as Dialog from "@radix-ui/react-dialog";
 import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
 import { Button } from "@/components/ui/button";
 import { NfcFigure } from "@/features/tags/nfc-visuals";
@@ -31,36 +32,63 @@ export function NfcSheetView({
   const controls = scene !== "success";
 
   return (
-    <div className="nfc-sheet" role="dialog" aria-modal="true" aria-labelledby="nfc-title">
-      <div className="nfc-sheet__panel" data-nfc-phase={phase} data-nfc-scene={scene}>
-        <div className="nfc-sheet__brand">
-          <ReviewBoostLogo />
-        </div>
+    <Dialog.Root
+      open
+      onOpenChange={(open) => {
+        if (!open) onDismiss();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Content className="nfc-sheet">
+          <div
+            className="nfc-sheet__panel"
+            data-nfc-phase={phase}
+            data-nfc-scene={scene}
+          >
+            <div className="nfc-sheet__brand">
+              <ReviewBoostLogo />
+            </div>
 
-        <div className="nfc-sheet__stage">
-          <NfcFigure scene={scene} />
+            <div className="nfc-sheet__stage">
+              <NfcFigure scene={scene} />
 
-          <div className="nfc-sheet__words" aria-live="polite">
-            <p className="nfc-sheet__title" id="nfc-title">
-              {copy.title}
-            </p>
-            {copy.body ? <p className="nfc-sheet__body">{copy.body}</p> : null}
+              <div className="nfc-sheet__words" aria-live="polite">
+                <Dialog.Title asChild>
+                  <p className="nfc-sheet__title">{copy.title}</p>
+                </Dialog.Title>
+                <Dialog.Description asChild>
+                  <p className={copy.body ? "nfc-sheet__body" : "sr-only"}>
+                    {copy.body ?? "NFC setup for your ReviewBoost Tag."}
+                  </p>
+                </Dialog.Description>
+              </div>
+            </div>
+
+            <div className="nfc-sheet__actions">
+              {controls && copy.action ? (
+                <Button
+                  variant="action"
+                  size="lg"
+                  className="nfc-sheet__button"
+                  onClick={onPrimary}
+                >
+                  {copy.action}
+                </Button>
+              ) : null}
+              {controls && copy.dismiss ? (
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="nfc-sheet__button"
+                  onClick={onDismiss}
+                >
+                  {copy.dismiss}
+                </Button>
+              ) : null}
+            </div>
           </div>
-        </div>
-
-        <div className="nfc-sheet__actions">
-          {controls && copy.action ? (
-            <Button variant="action" size="lg" className="nfc-sheet__button" onClick={onPrimary}>
-              {copy.action}
-            </Button>
-          ) : null}
-          {controls && copy.dismiss ? (
-            <Button variant="secondary" size="lg" className="nfc-sheet__button" onClick={onDismiss}>
-              {copy.dismiss}
-            </Button>
-          ) : null}
-        </div>
-      </div>
-    </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

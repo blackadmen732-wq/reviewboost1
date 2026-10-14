@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
+import { boundedRead, boundedWrite } from "./read-deadline";
 import { signInForReview } from "./review-sign-in";
 import { sendCodeResult, type SendCodeResult } from "./send-code";
 import { parseMemberRole, type Organization } from "./types";
@@ -18,6 +19,8 @@ interface AuthState {
   isLoading: boolean;
   orgLoading: boolean;
   orgError: string | null;
+  sessionError: string | null;
+  refreshOrganizations: () => Promise<void>;
   email: string | null;
   name: string | null;
   organizations: Organization[];
@@ -38,19 +41,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [orgLoading, setOrgLoading] = useState(false);
   const [orgError, setOrgError] = useState<string | null>(null);
   const authGeneration = useRef(0);
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setIsLoading(false);
-    });
+    let current = true;
+    const generation = authGeneration.current;
+    boundedRead(async () => await supabase.auth.getSession())
+      .then(({ data: { session: s }, error }) => {
+        if (!current || generation !== authGeneration.current) return;
+        if (error) throw error;
+        setSession(s);
+      })
+      .catch(() => {
+        if (current && generation === authGeneration.current)
+          setSessionError(
+            "Could not restore your session. Check your connection, then sign in again.",
+          );
+      })
+      .finally(() => {
+        if (current) setIsLoading(false);
+      });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, s) => {
+      authGeneration.current += 1;
       setSession(s);
+      setSessionError(null);
+      setIsLoading(false);
       if (!s) {
-        authGeneration.current += 1;
         setOrganizations([]);
         setActiveOrg(null);
         setOrgLoading(false);
@@ -58,7 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      current = false;
+      authGeneration.current += 1;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -72,52 +95,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOrgLoading(true);
     setOrgError(null);
 
-    const { data, error } = await supabase
-      .from("organization_members")
-      .select("id, org_id, role, organizations(name, timezone)")
-      .eq("user_id", userId)
-      .eq("status", "active")
-      .order("created_at", { ascending: true });
+    try {
+      const { data, error } = await boundedRead(
+        async (signal) =>
+          await supabase
+            .from("organization_members")
+            .select("id, org_id, role, organizations(name, timezone)")
+            .eq("user_id", userId)
+            .eq("status", "active")
+            .order("created_at", { ascending: true })
+            .abortSignal(signal),
+      );
 
-    if (gen !== authGeneration.current) return;
+      if (gen !== authGeneration.current) return;
 
-    if (error || !data) {
-      setOrganizations([]);
-      setOrgError(error?.message ?? "Failed to load organizations");
+      if (error || !data) {
+        setOrganizations([]);
+        setOrgError(error?.message ?? "Failed to load organizations");
+        setOrgLoading(false);
+        return;
+      }
+
+      const orgs: Organization[] = data.map((row: Record<string, unknown>) => {
+        const orgData = row.organizations as
+          | { name: string; timezone: string }
+          | { name: string; timezone: string }[]
+          | null;
+        const org = Array.isArray(orgData) ? orgData[0] : orgData;
+        return {
+          orgId: row.org_id as string,
+          name: org?.name ?? "",
+          timezone: org?.timezone ?? "UTC",
+          role: parseMemberRole(row.role),
+        };
+      });
+
+      setOrganizations(orgs);
+      setActiveOrg((current) =>
+        current ? (orgs.find((o) => o.orgId === current.orgId) ?? null) : null,
+      );
       setOrgLoading(false);
-      return;
+    } catch {
+      if (gen === authGeneration.current) {
+        setOrganizations([]);
+        setActiveOrg(null);
+        setOrgError(
+          "Could not load your businesses. Check your connection and try again.",
+        );
+      }
+    } finally {
+      if (gen === authGeneration.current) setOrgLoading(false);
     }
-
-    const orgs: Organization[] = data.map((row: Record<string, unknown>) => {
-      const orgData = row.organizations as
-        | { name: string; timezone: string }
-        | { name: string; timezone: string }[]
-        | null;
-      const org = Array.isArray(orgData) ? orgData[0] : orgData;
-      return {
-        orgId: row.org_id as string,
-        name: org?.name ?? "",
-        timezone: org?.timezone ?? "UTC",
-        role: parseMemberRole(row.role),
-      };
-    });
-
-    setOrganizations(orgs);
-    setActiveOrg((current) =>
-      current ? orgs.find((o) => o.orgId === current.orgId) ?? null : null,
-    );
-    setOrgLoading(false);
   }
+
+  const refreshOrganizations = async () => {
+    if (session?.user.id) await fetchOrganizations(session.user.id);
+  };
 
   // ReviewBoost accounts have no passwords — sign-in is a six-digit code
   // sent by email, identical to the web app.
-  const sendCode = useCallback(async (email: string): Promise<SendCodeResult> => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true },
-    });
-    return sendCodeResult(error);
-  }, []);
+  const sendCode = useCallback(
+    async (email: string): Promise<SendCodeResult> => {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: true },
+      });
+      return sendCodeResult(error);
+    },
+    [],
+  );
 
   const verifyCode = useCallback(
     async (email: string, code: string): Promise<string | null> => {
@@ -136,12 +182,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async (): Promise<string | null> => {
-    const { error } = await supabase.auth.signOut();
-    if (error) return error.message;
-    setSession(null);
-    setOrganizations([]);
-    setActiveOrg(null);
-    return null;
+    try {
+      const { error } = await boundedWrite(
+        async () => await supabase.auth.signOut(),
+      );
+      if (error) return error.message;
+      authGeneration.current += 1;
+      setSession(null);
+      setOrganizations([]);
+      setActiveOrg(null);
+      return null;
+    } catch {
+      return "Could not sign out. Check your connection and try again.";
+    }
   }, []);
 
   const selectOrg = useCallback(
@@ -161,6 +214,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         orgLoading,
         orgError,
+        sessionError,
+        refreshOrganizations,
         email: user?.email ?? null,
         name: user?.user_metadata?.full_name ?? user?.email ?? null,
         organizations,

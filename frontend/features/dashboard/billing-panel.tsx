@@ -8,6 +8,7 @@ import { InlineNotice } from "@/components/ui/inline-notice";
 import { PUBLIC_PLANS, TRIAL } from "@/features/public/pricing-plans";
 import { ownerOnly } from "@/lib/owner/permissions";
 import { cn } from "@/lib/utils/cn";
+import { withWriteDeadline } from "@/lib/api/read-deadline";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 type PlanId = "starter" | "growth" | "pro";
@@ -39,13 +40,20 @@ const PLANS = PUBLIC_PLANS;
  * Only Starter has a trial, and only for a business that has never had a
  * plan: checkout gives no second trial after a cancellation.
  */
-function checkoutLabel(plan: (typeof PLANS)[number], firstSubscription: boolean): string {
-  if (firstSubscription && plan.trialDays > 0) return `Start ${plan.trialDays}-day trial`;
+function checkoutLabel(
+  plan: (typeof PLANS)[number],
+  firstSubscription: boolean,
+): string {
+  if (firstSubscription && plan.trialDays > 0)
+    return `Start ${plan.trialDays}-day trial`;
   return `Choose ${plan.name}`;
 }
 
 /** The line under each plan's button: what pressing it costs, today. */
-function checkoutTerms(plan: (typeof PLANS)[number], firstSubscription: boolean): string {
+function checkoutTerms(
+  plan: (typeof PLANS)[number],
+  firstSubscription: boolean,
+): string {
   if (firstSubscription && plan.trialDays > 0) {
     return `Card required. $${plan.price} a month after ${plan.trialDays} days.`;
   }
@@ -70,7 +78,11 @@ function formatDate(value: string | null): string | null {
  * close a business's door, and telling an owner their Tags are dead when they
  * are not would send them to replace hardware that is fine.
  */
-function describe(billing: Billing): { title: string; body: string; tone: "info" | "error" } {
+function describe(billing: Billing): {
+  title: string;
+  body: string;
+  tone: "info" | "error";
+} {
   const periodEnd = formatDate(billing.currentPeriodEnd);
   const trialEnd = formatDate(billing.trialEndsAt);
 
@@ -107,7 +119,9 @@ function describe(billing: Billing): { title: string; body: string; tone: "info"
           }
         : {
             title: "Your plan is active",
-            body: periodEnd ? `Your next payment is on ${periodEnd}.` : "Your plan is running.",
+            body: periodEnd
+              ? `Your next payment is on ${periodEnd}.`
+              : "Your plan is running.",
             tone: "info",
           };
     case "past_due":
@@ -160,7 +174,10 @@ const BADGE: Record<Tone, string> = {
 function badgeFor(billing: Billing): { label: string; tone: Tone } {
   switch (billing.status) {
     case "trialing":
-      return { label: billing.planId ? `${TRIAL.days}-day trial` : "Trial", tone: "success" };
+      return {
+        label: billing.planId ? `${TRIAL.days}-day trial` : "Trial",
+        tone: "success",
+      };
     case "active":
       return billing.cancelAtPeriodEnd
         ? { label: "Ending", tone: "warning" }
@@ -213,7 +230,10 @@ function Meter({
         <p className="text-sm text-muted">{label}</p>
         <p className="text-sm font-semibold text-ink tabular-nums">{value}</p>
       </div>
-      <div aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-quiet">
+      <div
+        aria-hidden="true"
+        className="h-1.5 overflow-hidden rounded-full bg-quiet"
+      >
         <div
           className={`h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none ${
             tone === "danger" ? "bg-danger" : "bg-action"
@@ -239,7 +259,15 @@ function count(used: number, limit: number, one: string, many: string): string {
  * badge, what it means, one action), then what the business is using, then —
  * only when there is no subscription behind it — the plans to choose from.
  */
-export function BillingPanel({ billing, canManage, selectedPlan = null }: { billing: Billing; canManage: boolean; selectedPlan?: PlanId | null }) {
+export function BillingPanel({
+  billing,
+  canManage,
+  selectedPlan = null,
+}: {
+  billing: Billing;
+  canManage: boolean;
+  selectedPlan?: PlanId | null;
+}) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -260,16 +288,21 @@ export function BillingPanel({ billing, canManage, selectedPlan = null }: { bill
       const {
         data: { session },
       } = await supabaseBrowser().auth.getSession();
-      if (!session) throw new Error("Your session expired. Please sign in again.");
+      if (!session)
+        throw new Error("Your session expired. Please sign in again.");
 
-      const response = await fetch("/api/v1/billing", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(body),
-      });
+      const response = await withWriteDeadline(
+        async (signal) =>
+          await fetch("/api/v1/billing", {
+            signal,
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(body),
+          }),
+      );
 
       const payload = (await response.json().catch(() => null)) as {
         data?: { url?: string };
@@ -277,13 +310,18 @@ export function BillingPanel({ billing, canManage, selectedPlan = null }: { bill
       } | null;
 
       if (!response.ok || !payload?.data?.url) {
-        setError(payload?.error?.message ?? "That did not go through. Please try again.");
+        setError(
+          payload?.error?.message ??
+            "That did not go through. Please try again.",
+        );
         return;
       }
 
       window.location.assign(payload.data.url);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Something went wrong.");
+      setError(
+        caught instanceof Error ? caught.message : "Something went wrong.",
+      );
     } finally {
       setBusy(null);
     }
@@ -302,13 +340,19 @@ export function BillingPanel({ billing, canManage, selectedPlan = null }: { bill
   // allows no *new* Tags or locations (its limit is 0) but the plan is still
   // the plan, so the meters measure against the plan and say so.
   const running =
-    billing.status === "trialing" || billing.status === "active" || billing.status === "past_due";
+    billing.status === "trialing" ||
+    billing.status === "active" ||
+    billing.status === "past_due";
   const showUsage = running && billing.usage != null;
   const onTrial = billing.status === "trialing";
   const locationLimitShown =
-    billing.status === "past_due" ? (currentPlan?.locations ?? 0) : (billing.usage?.locations.limit ?? 0);
+    billing.status === "past_due"
+      ? (currentPlan?.locations ?? 0)
+      : (billing.usage?.locations.limit ?? 0);
   const tagLimitShown =
-    billing.status === "past_due" ? (currentPlan?.tags ?? 0) : (billing.usage?.tags.limit ?? 0);
+    billing.status === "past_due"
+      ? (currentPlan?.tags ?? 0)
+      : (billing.usage?.tags.limit ?? 0);
   const monthlyAllowance = onTrial ? 0 : (currentPlan?.monthlyTexts ?? 0);
 
   // Active is the quietest state: the badge already says it is running, so
@@ -345,12 +389,17 @@ export function BillingPanel({ billing, canManage, selectedPlan = null }: { bill
       <section
         aria-labelledby="plan-heading"
         className={`flex flex-col gap-6 rounded-[var(--radius-card)] border bg-surface p-5 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:justify-between sm:p-7 ${
-          badge.tone === "warning" ? "border-[color:var(--rb-warning)]/50" : "border-border"
+          badge.tone === "warning"
+            ? "border-[color:var(--rb-warning)]/50"
+            : "border-border"
         }`}
       >
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 id="plan-heading" className="text-xl font-semibold tracking-[-0.015em] text-ink">
+            <h2
+              id="plan-heading"
+              className="text-xl font-semibold tracking-[-0.015em] text-ink"
+            >
               {currentPlan ? (
                 <>
                   <span>{currentPlan.name}</span> plan
@@ -365,8 +414,12 @@ export function BillingPanel({ billing, canManage, selectedPlan = null }: { bill
 
           {alarming || quiet ? null : (
             <>
-              <p className="mt-3 text-base font-medium text-ink">{state.title}</p>
-              <p className="mt-1 max-w-[56ch] text-sm leading-relaxed text-muted">{state.body}</p>
+              <p className="mt-3 text-base font-medium text-ink">
+                {state.title}
+              </p>
+              <p className="mt-1 max-w-[56ch] text-sm leading-relaxed text-muted">
+                {state.body}
+              </p>
             </>
           )}
 
@@ -374,7 +427,10 @@ export function BillingPanel({ billing, canManage, selectedPlan = null }: { bill
               cancelled or suspended plan it would read as a live charge. */}
           {currentPlan && running ? (
             <p className="mt-3 text-sm text-muted">
-              <span className="font-semibold text-ink">${currentPlan.price}</span> a month
+              <span className="font-semibold text-ink">
+                ${currentPlan.price}
+              </span>{" "}
+              a month
               {factLine ? (
                 <>
                   {" · "}
@@ -395,31 +451,52 @@ export function BillingPanel({ billing, canManage, selectedPlan = null }: { bill
             loadingLabel="Opening…"
             disabled={busy !== null}
           >
-            {billing.status === "past_due" ? "Update payment method" : "Manage plan and payment"}
+            {billing.status === "past_due"
+              ? "Update payment method"
+              : "Manage plan and payment"}
           </Button>
         ) : null}
       </section>
 
       {showUsage && billing.usage ? (
-        <section aria-labelledby="usage-heading" className="flex flex-col gap-3">
+        <section
+          aria-labelledby="usage-heading"
+          className="flex flex-col gap-3"
+        >
           <h2 id="usage-heading" className="text-base font-semibold text-ink">
             {onTrial ? "During your trial" : "This billing period"}
           </h2>
           <div className="grid items-start gap-3 md:grid-cols-3">
             <Meter
               label="Locations"
-              value={count(billing.usage.locations.used, locationLimitShown, "location", "locations")}
-              ratio={locationLimitShown ? billing.usage.locations.used / locationLimitShown : 0}
+              value={count(
+                billing.usage.locations.used,
+                locationLimitShown,
+                "location",
+                "locations",
+              )}
+              ratio={
+                locationLimitShown
+                  ? billing.usage.locations.used / locationLimitShown
+                  : 0
+              }
             />
             <Meter
               label="Tags"
-              value={count(billing.usage.tags.used, tagLimitShown, "Tag", "Tags")}
+              value={count(
+                billing.usage.tags.used,
+                tagLimitShown,
+                "Tag",
+                "Tags",
+              )}
               detail={
                 billing.status === "past_due"
                   ? "New Tags can be added once the payment goes through."
                   : undefined
               }
-              ratio={tagLimitShown ? billing.usage.tags.used / tagLimitShown : 0}
+              ratio={
+                tagLimitShown ? billing.usage.tags.used / tagLimitShown : 0
+              }
             />
             <Meter
               label="Texts left"
@@ -437,16 +514,26 @@ export function BillingPanel({ billing, canManage, selectedPlan = null }: { bill
                     ? "Your plan's monthly texts arrive with the first payment."
                     : undefined
               }
-              ratio={monthlyAllowance ? billing.smsBalance.monthly / monthlyAllowance : 0}
+              ratio={
+                monthlyAllowance
+                  ? billing.smsBalance.monthly / monthlyAllowance
+                  : 0
+              }
             />
           </div>
         </section>
       ) : null}
 
       {canManage && needsCheckout ? (
-        <section aria-labelledby="plans-heading" className="flex flex-col gap-4">
+        <section
+          aria-labelledby="plans-heading"
+          className="flex flex-col gap-4"
+        >
           <div>
-            <h2 id="plans-heading" className="text-xl font-semibold tracking-[-0.015em] text-ink">
+            <h2
+              id="plans-heading"
+              className="text-xl font-semibold tracking-[-0.015em] text-ink"
+            >
               Choose a plan
             </h2>
             <p className="mt-1 max-w-[62ch] text-sm leading-relaxed text-muted">
@@ -461,11 +548,18 @@ export function BillingPanel({ billing, canManage, selectedPlan = null }: { bill
                 key={plan.id}
                 data-plan={plan.id}
                 data-selected={selectedPlan === plan.id || undefined}
-                className={cn("group flex flex-col rounded-[var(--radius-card)] border bg-surface p-6", selectedPlan === plan.id ? "border-action" : "border-border")}
+                className={cn(
+                  "group flex flex-col rounded-[var(--radius-card)] border bg-surface p-6",
+                  selectedPlan === plan.id ? "border-action" : "border-border",
+                )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-lg font-semibold text-ink">{plan.name}</p>
-                  {selectedPlan === plan.id ? <span className="text-xs font-medium text-brand-text">Your choice</span> : null}
+                  {selectedPlan === plan.id ? (
+                    <span className="text-xs font-medium text-brand-text">
+                      Your choice
+                    </span>
+                  ) : null}
                 </div>
                 <p className="mt-0.5 text-sm text-muted">{plan.fit}</p>
                 <p className="mt-5 flex items-baseline gap-1.5">
@@ -478,7 +572,9 @@ export function BillingPanel({ billing, canManage, selectedPlan = null }: { bill
                   type="button"
                   variant="secondary"
                   className="mt-5 group-hover:border-action group-hover:bg-action group-hover:text-on-action group-focus-within:border-action group-focus-within:bg-action group-focus-within:text-on-action"
-                  onClick={() => void act({ action: "checkout", planId: plan.id }, plan.id)}
+                  onClick={() =>
+                    void act({ action: "checkout", planId: plan.id }, plan.id)
+                  }
                   loading={busy === plan.id}
                   loadingLabel="Opening…"
                   disabled={busy !== null}
@@ -492,11 +588,15 @@ export function BillingPanel({ billing, canManage, selectedPlan = null }: { bill
                 <dl className="flex flex-col gap-2.5 text-sm">
                   <div className="flex justify-between gap-3">
                     <dt className="text-muted">Locations</dt>
-                    <dd className="font-semibold text-ink tabular-nums">{plan.locations}</dd>
+                    <dd className="font-semibold text-ink tabular-nums">
+                      {plan.locations}
+                    </dd>
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-muted">Tags</dt>
-                    <dd className="font-semibold text-ink tabular-nums">{plan.tags}</dd>
+                    <dd className="font-semibold text-ink tabular-nums">
+                      {plan.tags}
+                    </dd>
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-muted">Texts a month</dt>

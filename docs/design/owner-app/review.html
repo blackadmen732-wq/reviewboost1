@@ -1,0 +1,171 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ReviewBoost — app walkthrough</title><style>body{margin:0;background:#f8f5f0;color:#17221d;font:16px/1.6 system-ui}main{max-width:1400px;margin:auto;padding:32px}h1{font-size:40px;line-height:1.15}h2{margin-top:48px}a{color:#064e3b}nav{display:flex;gap:20px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px}figure{margin:0;background:white;padding:16px;border:1px solid #d8ded9;border-radius:16px}img{width:100%;height:auto;display:block}figcaption{font-weight:600;margin-bottom:12px}details{margin-bottom:24px}summary{cursor:pointer;font-weight:600}p{max-width:900px}.note{padding:20px;border-left:3px solid #064e3b}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #005fcc;outline-offset:4px}</style><main><h1>ReviewBoost, step by step.</h1><p>PR #67 • 14 October 2026. Actual Chromium screenshots from an isolated local API/database. Local ratings, memberships and subscription records exercise real contracts; they do not establish live Stripe, SMS or App Store readiness.</p><nav><a href="#compare">Before / after</a><a href="#journey">Activation and actions</a><a href="#routes">Every route</a><a href="reviewboost-figma-board.svg">Figma import board</a><a href="../OWNER_APP_WALKTHROUGH.md">Findings and checks</a></nav><p class="note">30 page patterns: 27 maintained pages and 3 redirects. Profile controls live in Settings. Owner pages were checked at 320, 390, 768 and 1280px, plus dark mode at 390px. Public/customer pages were checked at 390px in this pass; earlier public evidence includes wider widths. Full-page images show fixed navigation at its original viewport position; scroll in the real app to assess that interaction.</p><h2 id="compare">Focused improvements</h2><p>Before had one business and no ratings; after has two local memberships, ten real local rating responses and a second Tag. Do not interpret those fixture differences as a product feature or fabricated dashboard data.</p>
+<h3>Home</h3><p>Forest primary actions and readable completed setup.</p><div class="grid">
+<figure><figcaption>Before · mobile</figcaption><a href="before-04-home-390.png"><img loading="lazy" src="before-04-home-390.png" alt="Before · mobile screenshot"></a></figure>
+<figure><figcaption>After · mobile</figcaption><a href="after-04-home-light-390.png"><img loading="lazy" src="after-04-home-light-390.png" alt="After · mobile screenshot"></a></figure>
+<figure><figcaption>After · desktop</figcaption><a href="after-04-home-light-1280.png"><img loading="lazy" src="after-04-home-light-1280.png" alt="After · desktop screenshot"></a></figure>
+</div>
+<h3>Texts</h3><p>Explain zero balance and link to the existing billing page.</p><div class="grid">
+<figure><figcaption>Before · mobile</figcaption><a href="before-07-texts-390.png"><img loading="lazy" src="before-07-texts-390.png" alt="Before · mobile screenshot"></a></figure>
+<figure><figcaption>After · mobile</figcaption><a href="after-07-texts-light-390.png"><img loading="lazy" src="after-07-texts-light-390.png" alt="After · mobile screenshot"></a></figure>
+<figure><figcaption>After · desktop</figcaption><a href="after-07-texts-light-1280.png"><img loading="lazy" src="after-07-texts-light-1280.png" alt="After · desktop screenshot"></a></figure>
+</div>
+<h3>Tag Detail</h3><p>Constrain QR actions on desktop; scoped authenticated QR works with multiple businesses.</p><div class="grid">
+<figure><figcaption>Before · mobile</figcaption><a href="before-09-tag-detail-390.png"><img loading="lazy" src="before-09-tag-detail-390.png" alt="Before · mobile screenshot"></a></figure>
+<figure><figcaption>After · mobile</figcaption><a href="after-09-tag-detail-light-390.png"><img loading="lazy" src="after-09-tag-detail-light-390.png" alt="After · mobile screenshot"></a></figure>
+<figure><figcaption>After · desktop</figcaption><a href="after-09-tag-detail-light-1280.png"><img loading="lazy" src="after-09-tag-detail-light-1280.png" alt="After · desktop screenshot"></a></figure>
+</div>
+<h3>Customer Editor</h3><p>Save a photo draft, remove it, publish deliberately. The customer renderer remains shared.</p><div class="grid">
+<figure><figcaption>Before · mobile</figcaption><a href="before-10-customer-editor-390.png"><img loading="lazy" src="before-10-customer-editor-390.png" alt="Before · mobile screenshot"></a></figure>
+<figure><figcaption>After · mobile</figcaption><a href="after-10-customer-editor-light-390.png"><img loading="lazy" src="after-10-customer-editor-light-390.png" alt="After · mobile screenshot"></a></figure>
+<figure><figcaption>After · desktop</figcaption><a href="after-10-customer-editor-light-1280.png"><img loading="lazy" src="after-10-customer-editor-light-1280.png" alt="After · desktop screenshot"></a></figure>
+</div>
+<h3>Settings</h3><p>Clearer groups, named edit controls, and an existing business switch destination.</p><div class="grid">
+<figure><figcaption>Before · mobile</figcaption><a href="before-11-settings-390.png"><img loading="lazy" src="before-11-settings-390.png" alt="Before · mobile screenshot"></a></figure>
+<figure><figcaption>After · mobile</figcaption><a href="after-11-settings-light-390.png"><img loading="lazy" src="after-11-settings-light-390.png" alt="After · mobile screenshot"></a></figure>
+<figure><figcaption>After · desktop</figcaption><a href="after-11-settings-light-1280.png"><img loading="lazy" src="after-11-settings-light-1280.png" alt="After · desktop screenshot"></a></figure>
+</div>
+<h2 id="journey">Activation and meaningful actions</h2><p>Activation captures precede the forest-token change. Actual local emailed-code setup, Tag creation and retained Growth selection; checkout was not submitted.</p><div class="grid">
+<figure><figcaption>24 verification</figcaption><a href="24-verification.png"><img loading="lazy" src="24-verification.png" alt="24 verification screenshot"></a></figure>
+<figure><figcaption>25 onboarding name</figcaption><a href="25-onboarding-name.png"><img loading="lazy" src="25-onboarding-name.png" alt="25 onboarding name screenshot"></a></figure>
+<figure><figcaption>26 onboarding google</figcaption><a href="26-onboarding-google.png"><img loading="lazy" src="26-onboarding-google.png" alt="26 onboarding google screenshot"></a></figure>
+<figure><figcaption>27 onboarding created</figcaption><a href="27-onboarding-created.png"><img loading="lazy" src="27-onboarding-created.png" alt="27 onboarding created screenshot"></a></figure>
+<figure><figcaption>28 selected plan</figcaption><a href="28-selected-plan.png"><img loading="lazy" src="28-selected-plan.png" alt="28 selected plan screenshot"></a></figure>
+</div><p>Uploaded draft survived refresh; removing a photo survived refresh and published an entirely white top. A committed publish and note with lost responses were reconciled by reading server state, with one POST each in the recorded test. QR download returned SVG; print invocation was stubbed. Business selection changed the real scoped account. No physical NFC write, live SMS or live Stripe request was activated.</p><div class="grid">
+<figure><figcaption>NFC keyboard focus and Escape</figcaption><a href="after-17-nfc-ready.png"><img loading="lazy" src="after-17-nfc-ready.png" alt="NFC keyboard focus and Escape screenshot"></a></figure>
+<figure><figcaption>Uncertain publish confirmed by server read</figcaption><a href="after-30-publish-reconciled.png"><img loading="lazy" src="after-30-publish-reconciled.png" alt="Uncertain publish confirmed by server read screenshot"></a></figure>
+<figure><figcaption>Live customer page without photo</figcaption><a href="after-31-customer-white.png"><img loading="lazy" src="after-31-customer-white.png" alt="Live customer page without photo screenshot"></a></figure>
+<figure><figcaption>Destructive QR rotation warning</figcaption><a href="after-38-rotate-warning.png"><img loading="lazy" src="after-38-rotate-warning.png" alt="Destructive QR rotation warning screenshot"></a></figure>
+<figure><figcaption>NFC error recovery in Chromium</figcaption><a href="after-40-nfc-unsupported.png"><img loading="lazy" src="after-40-nfc-unsupported.png" alt="NFC error recovery in Chromium screenshot"></a></figure>
+<figure><figcaption>Business picker</figcaption><a href="after-41-business-picker.png"><img loading="lazy" src="after-41-business-picker.png" alt="Business picker screenshot"></a></figure>
+<figure><figcaption>Actual business switch</figcaption><a href="after-42-other-business-home.png"><img loading="lazy" src="after-42-other-business-home.png" alt="Actual business switch screenshot"></a></figure>
+</div><h2 id="routes">Route evidence</h2><p>75 capture checks, no detected horizontal overflow or browser exceptions. 39 axe scans: no WCAG A/AA rule violations detected. Two additional QR scans passed after the tenant-scoping correction. Automated checks do not replace keyboard, screen-reader or device review.</p>
+<details><summary>Home</summary><div class="grid">
+<figure><figcaption>/home · light · 320px</figcaption><a href="after-04-home-light-320.png"><img loading="lazy" src="after-04-home-light-320.png" alt="/home · light · 320px screenshot"></a></figure>
+<figure><figcaption>/home · light · 390px</figcaption><a href="after-04-home-light-390.png"><img loading="lazy" src="after-04-home-light-390.png" alt="/home · light · 390px screenshot"></a></figure>
+<figure><figcaption>/home · light · 768px</figcaption><a href="after-04-home-light-768.png"><img loading="lazy" src="after-04-home-light-768.png" alt="/home · light · 768px screenshot"></a></figure>
+<figure><figcaption>/home · light · 1280px</figcaption><a href="after-04-home-light-1280.png"><img loading="lazy" src="after-04-home-light-1280.png" alt="/home · light · 1280px screenshot"></a></figure>
+<figure><figcaption>/home · dark · 390px</figcaption><a href="after-04-home-dark-390.png"><img loading="lazy" src="after-04-home-dark-390.png" alt="/home · dark · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Feedback</summary><div class="grid">
+<figure><figcaption>/feedback · light · 320px</figcaption><a href="after-05-feedback-light-320.png"><img loading="lazy" src="after-05-feedback-light-320.png" alt="/feedback · light · 320px screenshot"></a></figure>
+<figure><figcaption>/feedback · light · 390px</figcaption><a href="after-05-feedback-light-390.png"><img loading="lazy" src="after-05-feedback-light-390.png" alt="/feedback · light · 390px screenshot"></a></figure>
+<figure><figcaption>/feedback · light · 768px</figcaption><a href="after-05-feedback-light-768.png"><img loading="lazy" src="after-05-feedback-light-768.png" alt="/feedback · light · 768px screenshot"></a></figure>
+<figure><figcaption>/feedback · light · 1280px</figcaption><a href="after-05-feedback-light-1280.png"><img loading="lazy" src="after-05-feedback-light-1280.png" alt="/feedback · light · 1280px screenshot"></a></figure>
+<figure><figcaption>/feedback · dark · 390px</figcaption><a href="after-05-feedback-dark-390.png"><img loading="lazy" src="after-05-feedback-dark-390.png" alt="/feedback · dark · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Insights</summary><div class="grid">
+<figure><figcaption>/feedback/insights · light · 320px</figcaption><a href="after-06-insights-light-320.png"><img loading="lazy" src="after-06-insights-light-320.png" alt="/feedback/insights · light · 320px screenshot"></a></figure>
+<figure><figcaption>/feedback/insights · light · 390px</figcaption><a href="after-06-insights-light-390.png"><img loading="lazy" src="after-06-insights-light-390.png" alt="/feedback/insights · light · 390px screenshot"></a></figure>
+<figure><figcaption>/feedback/insights · light · 768px</figcaption><a href="after-06-insights-light-768.png"><img loading="lazy" src="after-06-insights-light-768.png" alt="/feedback/insights · light · 768px screenshot"></a></figure>
+<figure><figcaption>/feedback/insights · light · 1280px</figcaption><a href="after-06-insights-light-1280.png"><img loading="lazy" src="after-06-insights-light-1280.png" alt="/feedback/insights · light · 1280px screenshot"></a></figure>
+<figure><figcaption>/feedback/insights · dark · 390px</figcaption><a href="after-06-insights-dark-390.png"><img loading="lazy" src="after-06-insights-dark-390.png" alt="/feedback/insights · dark · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Texts</summary><div class="grid">
+<figure><figcaption>/text-requests · light · 320px</figcaption><a href="after-07-texts-light-320.png"><img loading="lazy" src="after-07-texts-light-320.png" alt="/text-requests · light · 320px screenshot"></a></figure>
+<figure><figcaption>/text-requests · light · 390px</figcaption><a href="after-07-texts-light-390.png"><img loading="lazy" src="after-07-texts-light-390.png" alt="/text-requests · light · 390px screenshot"></a></figure>
+<figure><figcaption>/text-requests · light · 768px</figcaption><a href="after-07-texts-light-768.png"><img loading="lazy" src="after-07-texts-light-768.png" alt="/text-requests · light · 768px screenshot"></a></figure>
+<figure><figcaption>/text-requests · light · 1280px</figcaption><a href="after-07-texts-light-1280.png"><img loading="lazy" src="after-07-texts-light-1280.png" alt="/text-requests · light · 1280px screenshot"></a></figure>
+<figure><figcaption>/text-requests · dark · 390px</figcaption><a href="after-07-texts-dark-390.png"><img loading="lazy" src="after-07-texts-dark-390.png" alt="/text-requests · dark · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Tags</summary><div class="grid">
+<figure><figcaption>/stands · light · 320px</figcaption><a href="after-08-tags-light-320.png"><img loading="lazy" src="after-08-tags-light-320.png" alt="/stands · light · 320px screenshot"></a></figure>
+<figure><figcaption>/stands · light · 390px</figcaption><a href="after-08-tags-light-390.png"><img loading="lazy" src="after-08-tags-light-390.png" alt="/stands · light · 390px screenshot"></a></figure>
+<figure><figcaption>/stands · light · 768px</figcaption><a href="after-08-tags-light-768.png"><img loading="lazy" src="after-08-tags-light-768.png" alt="/stands · light · 768px screenshot"></a></figure>
+<figure><figcaption>/stands · light · 1280px</figcaption><a href="after-08-tags-light-1280.png"><img loading="lazy" src="after-08-tags-light-1280.png" alt="/stands · light · 1280px screenshot"></a></figure>
+<figure><figcaption>/stands · dark · 390px</figcaption><a href="after-08-tags-dark-390.png"><img loading="lazy" src="after-08-tags-dark-390.png" alt="/stands · dark · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Tag Detail</summary><div class="grid">
+<figure><figcaption>/stands/[standId] · light · 320px</figcaption><a href="after-09-tag-detail-light-320.png"><img loading="lazy" src="after-09-tag-detail-light-320.png" alt="/stands/[standId] · light · 320px screenshot"></a></figure>
+<figure><figcaption>/stands/[standId] · light · 390px</figcaption><a href="after-09-tag-detail-light-390.png"><img loading="lazy" src="after-09-tag-detail-light-390.png" alt="/stands/[standId] · light · 390px screenshot"></a></figure>
+<figure><figcaption>/stands/[standId] · light · 768px</figcaption><a href="after-09-tag-detail-light-768.png"><img loading="lazy" src="after-09-tag-detail-light-768.png" alt="/stands/[standId] · light · 768px screenshot"></a></figure>
+<figure><figcaption>/stands/[standId] · light · 1280px</figcaption><a href="after-09-tag-detail-light-1280.png"><img loading="lazy" src="after-09-tag-detail-light-1280.png" alt="/stands/[standId] · light · 1280px screenshot"></a></figure>
+<figure><figcaption>/stands/[standId] · dark · 390px</figcaption><a href="after-09-tag-detail-dark-390.png"><img loading="lazy" src="after-09-tag-detail-dark-390.png" alt="/stands/[standId] · dark · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Customer Editor</summary><div class="grid">
+<figure><figcaption>/customer-page · light · 320px</figcaption><a href="after-10-customer-editor-light-320.png"><img loading="lazy" src="after-10-customer-editor-light-320.png" alt="/customer-page · light · 320px screenshot"></a></figure>
+<figure><figcaption>/customer-page · light · 390px</figcaption><a href="after-10-customer-editor-light-390.png"><img loading="lazy" src="after-10-customer-editor-light-390.png" alt="/customer-page · light · 390px screenshot"></a></figure>
+<figure><figcaption>/customer-page · light · 768px</figcaption><a href="after-10-customer-editor-light-768.png"><img loading="lazy" src="after-10-customer-editor-light-768.png" alt="/customer-page · light · 768px screenshot"></a></figure>
+<figure><figcaption>/customer-page · light · 1280px</figcaption><a href="after-10-customer-editor-light-1280.png"><img loading="lazy" src="after-10-customer-editor-light-1280.png" alt="/customer-page · light · 1280px screenshot"></a></figure>
+<figure><figcaption>/customer-page · dark · 390px</figcaption><a href="after-10-customer-editor-dark-390.png"><img loading="lazy" src="after-10-customer-editor-dark-390.png" alt="/customer-page · dark · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Settings</summary><div class="grid">
+<figure><figcaption>/settings · light · 320px</figcaption><a href="after-11-settings-light-320.png"><img loading="lazy" src="after-11-settings-light-320.png" alt="/settings · light · 320px screenshot"></a></figure>
+<figure><figcaption>/settings · light · 390px</figcaption><a href="after-11-settings-light-390.png"><img loading="lazy" src="after-11-settings-light-390.png" alt="/settings · light · 390px screenshot"></a></figure>
+<figure><figcaption>/settings · light · 768px</figcaption><a href="after-11-settings-light-768.png"><img loading="lazy" src="after-11-settings-light-768.png" alt="/settings · light · 768px screenshot"></a></figure>
+<figure><figcaption>/settings · light · 1280px</figcaption><a href="after-11-settings-light-1280.png"><img loading="lazy" src="after-11-settings-light-1280.png" alt="/settings · light · 1280px screenshot"></a></figure>
+<figure><figcaption>/settings · dark · 390px</figcaption><a href="after-11-settings-dark-390.png"><img loading="lazy" src="after-11-settings-dark-390.png" alt="/settings · dark · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Billing</summary><div class="grid">
+<figure><figcaption>/settings/billing · light · 320px</figcaption><a href="after-12-billing-light-320.png"><img loading="lazy" src="after-12-billing-light-320.png" alt="/settings/billing · light · 320px screenshot"></a></figure>
+<figure><figcaption>/settings/billing · light · 390px</figcaption><a href="after-12-billing-light-390.png"><img loading="lazy" src="after-12-billing-light-390.png" alt="/settings/billing · light · 390px screenshot"></a></figure>
+<figure><figcaption>/settings/billing · light · 768px</figcaption><a href="after-12-billing-light-768.png"><img loading="lazy" src="after-12-billing-light-768.png" alt="/settings/billing · light · 768px screenshot"></a></figure>
+<figure><figcaption>/settings/billing · light · 1280px</figcaption><a href="after-12-billing-light-1280.png"><img loading="lazy" src="after-12-billing-light-1280.png" alt="/settings/billing · light · 1280px screenshot"></a></figure>
+<figure><figcaption>/settings/billing · dark · 390px</figcaption><a href="after-12-billing-dark-390.png"><img loading="lazy" src="after-12-billing-dark-390.png" alt="/settings/billing · dark · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Delete Business</summary><div class="grid">
+<figure><figcaption>/settings/delete · light · 320px</figcaption><a href="after-13-delete-business-light-320.png"><img loading="lazy" src="after-13-delete-business-light-320.png" alt="/settings/delete · light · 320px screenshot"></a></figure>
+<figure><figcaption>/settings/delete · light · 390px</figcaption><a href="after-13-delete-business-light-390.png"><img loading="lazy" src="after-13-delete-business-light-390.png" alt="/settings/delete · light · 390px screenshot"></a></figure>
+<figure><figcaption>/settings/delete · light · 768px</figcaption><a href="after-13-delete-business-light-768.png"><img loading="lazy" src="after-13-delete-business-light-768.png" alt="/settings/delete · light · 768px screenshot"></a></figure>
+<figure><figcaption>/settings/delete · light · 1280px</figcaption><a href="after-13-delete-business-light-1280.png"><img loading="lazy" src="after-13-delete-business-light-1280.png" alt="/settings/delete · light · 1280px screenshot"></a></figure>
+<figure><figcaption>/settings/delete · dark · 390px</figcaption><a href="after-13-delete-business-dark-390.png"><img loading="lazy" src="after-13-delete-business-dark-390.png" alt="/settings/delete · dark · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Feedback Detail</summary><div class="grid">
+<figure><figcaption>/feedback/[responseId] · light · 320px</figcaption><a href="after-16-feedback-detail-light-320.png"><img loading="lazy" src="after-16-feedback-detail-light-320.png" alt="/feedback/[responseId] · light · 320px screenshot"></a></figure>
+<figure><figcaption>/feedback/[responseId] · light · 390px</figcaption><a href="after-16-feedback-detail-light-390.png"><img loading="lazy" src="after-16-feedback-detail-light-390.png" alt="/feedback/[responseId] · light · 390px screenshot"></a></figure>
+<figure><figcaption>/feedback/[responseId] · light · 768px</figcaption><a href="after-16-feedback-detail-light-768.png"><img loading="lazy" src="after-16-feedback-detail-light-768.png" alt="/feedback/[responseId] · light · 768px screenshot"></a></figure>
+<figure><figcaption>/feedback/[responseId] · light · 1280px</figcaption><a href="after-16-feedback-detail-light-1280.png"><img loading="lazy" src="after-16-feedback-detail-light-1280.png" alt="/feedback/[responseId] · light · 1280px screenshot"></a></figure>
+<figure><figcaption>/feedback/[responseId] · dark · 390px</figcaption><a href="after-16-feedback-detail-dark-390.png"><img loading="lazy" src="after-16-feedback-detail-dark-390.png" alt="/feedback/[responseId] · dark · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Business Picker</summary><div class="grid">
+<figure><figcaption>/select-org · light · 320px</figcaption><a href="after-03-business-picker-light-320.png"><img loading="lazy" src="after-03-business-picker-light-320.png" alt="/select-org · light · 320px screenshot"></a></figure>
+<figure><figcaption>/select-org · light · 390px</figcaption><a href="after-03-business-picker-light-390.png"><img loading="lazy" src="after-03-business-picker-light-390.png" alt="/select-org · light · 390px screenshot"></a></figure>
+<figure><figcaption>/select-org · light · 768px</figcaption><a href="after-03-business-picker-light-768.png"><img loading="lazy" src="after-03-business-picker-light-768.png" alt="/select-org · light · 768px screenshot"></a></figure>
+<figure><figcaption>/select-org · light · 1280px</figcaption><a href="after-03-business-picker-light-1280.png"><img loading="lazy" src="after-03-business-picker-light-1280.png" alt="/select-org · light · 1280px screenshot"></a></figure>
+<figure><figcaption>/select-org · dark · 390px</figcaption><a href="after-03-business-picker-dark-390.png"><img loading="lazy" src="after-03-business-picker-dark-390.png" alt="/select-org · dark · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Login</summary><div class="grid">
+<figure><figcaption>/login · light · 390px</figcaption><a href="after-01-login-light-390.png"><img loading="lazy" src="after-01-login-light-390.png" alt="/login · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Customer</summary><div class="grid">
+<figure><figcaption>/q/[token] · light · 390px</figcaption><a href="after-14-customer-light-390.png"><img loading="lazy" src="after-14-customer-light-390.png" alt="/q/[token] · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Offline</summary><div class="grid">
+<figure><figcaption>/offline · light · 390px</figcaption><a href="after-15-offline-light-390.png"><img loading="lazy" src="after-15-offline-light-390.png" alt="/offline · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Public Home</summary><div class="grid">
+<figure><figcaption>/ · light · 390px</figcaption><a href="after-43-public-home-light-390.png"><img loading="lazy" src="after-43-public-home-light-390.png" alt="/ · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Product</summary><div class="grid">
+<figure><figcaption>/product · light · 390px</figcaption><a href="after-44-product-light-390.png"><img loading="lazy" src="after-44-product-light-390.png" alt="/product · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>How It Works</summary><div class="grid">
+<figure><figcaption>/how-it-works · light · 390px</figcaption><a href="after-45-how-it-works-light-390.png"><img loading="lazy" src="after-45-how-it-works-light-390.png" alt="/how-it-works · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Pricing</summary><div class="grid">
+<figure><figcaption>/pricing · light · 390px</figcaption><a href="after-46-pricing-light-390.png"><img loading="lazy" src="after-46-pricing-light-390.png" alt="/pricing · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Integrity</summary><div class="grid">
+<figure><figcaption>/integrity · light · 390px</figcaption><a href="after-47-integrity-light-390.png"><img loading="lazy" src="after-47-integrity-light-390.png" alt="/integrity · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Privacy</summary><div class="grid">
+<figure><figcaption>/privacy · light · 390px</figcaption><a href="after-48-privacy-light-390.png"><img loading="lazy" src="after-48-privacy-light-390.png" alt="/privacy · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Terms</summary><div class="grid">
+<figure><figcaption>/terms · light · 390px</figcaption><a href="after-49-terms-light-390.png"><img loading="lazy" src="after-49-terms-light-390.png" alt="/terms · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Security</summary><div class="grid">
+<figure><figcaption>/security · light · 390px</figcaption><a href="after-50-security-light-390.png"><img loading="lazy" src="after-50-security-light-390.png" alt="/security · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Support</summary><div class="grid">
+<figure><figcaption>/support · light · 390px</figcaption><a href="after-51-support-light-390.png"><img loading="lazy" src="after-51-support-light-390.png" alt="/support · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Public Delete</summary><div class="grid">
+<figure><figcaption>/delete-account · light · 390px</figcaption><a href="after-52-public-delete-light-390.png"><img loading="lazy" src="after-52-public-delete-light-390.png" alt="/delete-account · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Goodbye</summary><div class="grid">
+<figure><figcaption>/goodbye · light · 390px</figcaption><a href="after-53-goodbye-light-390.png"><img loading="lazy" src="after-53-goodbye-light-390.png" alt="/goodbye · light · 390px screenshot"></a></figure>
+</div></details>
+<details><summary>Not Found</summary><div class="grid">
+<figure><figcaption>/not-a-reviewboost-page · light · 390px</figcaption><a href="after-54-not-found-light-390.png"><img loading="lazy" src="after-54-not-found-light-390.png" alt="/not-a-reviewboost-page · light · 390px screenshot"></a></figure>
+</div></details>
+<p>Remaining external checks: hosted configuration, real Stripe entitlements/webhooks, real consenting SMS delivery, native iPhone lifecycle/NFC and TestFlight. Personal account deletion for users without a business remains a backend contract gap.</p></main></html>

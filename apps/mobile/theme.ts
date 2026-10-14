@@ -4,9 +4,9 @@ export const colors = {
   onBrand: "#0d2118",
   brandHover: "#009a61",
   brandActive: "#008f5b",
-  action: "#007a4d",
-  actionHover: "#006b43",
-  actionPressed: "#005b39",
+  action: "#064e3b",
+  actionHover: "#04382c",
+  actionPressed: "#032b22",
   onAction: "#ffffff",
 
   canvas: "#F6F7F5",

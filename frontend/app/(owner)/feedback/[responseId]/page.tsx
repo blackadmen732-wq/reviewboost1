@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { Stars } from "@/components/ui/stars";
 import { ActionThread } from "@/features/dashboard/action-thread";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
+import { MarkReadButton } from "@/features/dashboard/mark-read-button";
 import { ResolveButton } from "@/features/dashboard/resolve-button";
 import { getReview, requireOwner } from "@/lib/server/owner-data";
 import { relativeDay } from "@/lib/utils/relative-day";
@@ -41,26 +42,51 @@ export default async function FeedbackDetailPage({
         All feedback
       </Link>
 
+      <h1 className="mb-6 text-2xl font-semibold tracking-[-0.02em] text-ink">
+        Feedback
+      </h1>
       <article className="max-w-[36rem]">
         <div className="mb-4 flex items-center justify-between gap-3">
           <Stars rating={review.rating} size="md" />
-          <time dateTime={review.submittedAt} className="shrink-0 text-sm text-muted">
+          <time
+            dateTime={review.submittedAt}
+            className="shrink-0 text-sm text-muted"
+          >
             {relativeDay(review.submittedAt)}
           </time>
         </div>
 
         {review.note ? (
-          <p className="whitespace-pre-wrap text-lg leading-relaxed text-ink">{review.note}</p>
+          <p className="whitespace-pre-wrap text-lg leading-relaxed text-ink">
+            {review.note}
+          </p>
         ) : (
-          <p className="text-base italic text-muted">They gave a rating without writing anything.</p>
+          <p className="text-base italic text-muted">
+            This customer left a rating.
+          </p>
         )}
       </article>
 
-      <div className="mt-8 flex items-center justify-between gap-3">
-        <p key={String(review.isResolved)} className="animate-fade-in text-sm text-muted">
+      <div className="mt-6">
+        {review.isRead ? (
+          <p className="inline-flex min-h-11 items-center text-sm text-muted">
+            Read
+          </p>
+        ) : (
+          <MarkReadButton responseId={review.responseId} />
+        )}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p
+          key={String(review.isResolved)}
+          className="animate-fade-in text-sm text-muted"
+        >
           {review.isResolved ? "Sorted" : "Not sorted yet"}
         </p>
-        <ResolveButton responseId={review.responseId} isResolved={review.isResolved} />
+        <ResolveButton
+          responseId={review.responseId}
+          isResolved={review.isResolved}
+        />
       </div>
 
       <ActionThread responseId={review.responseId} actions={actions} />

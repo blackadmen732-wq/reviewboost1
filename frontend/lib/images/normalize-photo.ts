@@ -57,7 +57,7 @@ export const MIN_LONG_EDGE = 1200;
  * What a transparent PNG's clear areas become in a JPEG: the page's own empty
  * photo-area colour, so a cut-out logo sits on the same ground it would anyway.
  */
-export const TRANSPARENT_FILL = "#1a1a1a";
+export const TRANSPARENT_FILL = "#ffffff";
 
 export const UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export type UploadType = (typeof UPLOAD_TYPES)[number];

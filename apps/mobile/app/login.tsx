@@ -26,7 +26,7 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const codeField = useRef<TextInput>(null);
-  const { sendCode, verifyCode } = useAuth();
+  const { sendCode, verifyCode, sessionError } = useAuth();
   const router = useRouter();
   // The back link sits under the status bar / Dynamic Island on every
   // iPhone, rather than at a fixed 64pt that only fits some of them.
@@ -38,7 +38,8 @@ export default function LoginScreen() {
     return () => clearTimeout(timer);
   }, [secondsLeft]);
 
-  const canSubmitEmail = email.trim().length >= 5 && email.includes("@") && !submitting;
+  const canSubmitEmail =
+    email.trim().length >= 5 && email.includes("@") && !submitting;
   const canSubmitCode = code.length === CODE_LENGTH && !submitting;
 
   const handleSendCode = async () => {
@@ -133,6 +134,11 @@ export default function LoginScreen() {
             We sent a {CODE_LENGTH}-digit code to {email}
           </Text>
 
+          {sessionError && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{sessionError}</Text>
+            </View>
+          )}
           {error && (
             <View style={styles.errorBox}>
               <Text style={styles.errorText}>{error}</Text>
@@ -145,7 +151,9 @@ export default function LoginScreen() {
             placeholder="000000"
             placeholderTextColor={colors.inkFaint}
             value={code}
-            onChangeText={(value) => setCode(value.replace(/\D/g, "").slice(0, CODE_LENGTH))}
+            onChangeText={(value) =>
+              setCode(value.replace(/\D/g, "").slice(0, CODE_LENGTH))
+            }
             keyboardType="number-pad"
             autoComplete="one-time-code"
             textContentType="oneTimeCode"
@@ -172,8 +180,15 @@ export default function LoginScreen() {
             disabled={secondsLeft > 0 || submitting}
             accessibilityRole="button"
           >
-            <Text style={[styles.resendText, secondsLeft > 0 && styles.resendDisabled]}>
-              {secondsLeft > 0 ? `Send a new code in ${secondsLeft}s` : "Send a new code"}
+            <Text
+              style={[
+                styles.resendText,
+                secondsLeft > 0 && styles.resendDisabled,
+              ]}
+            >
+              {secondsLeft > 0
+                ? `Send a new code in ${secondsLeft}s`
+                : "Send a new code"}
             </Text>
           </Tappable>
         </View>
@@ -191,7 +206,8 @@ export default function LoginScreen() {
           <BrandLockup height={40} />
         </View>
         <Text style={styles.subtitle}>
-          Enter your email and we&apos;ll send you a sign-in code. No password needed.
+          Enter your email and we&apos;ll send you a sign-in code. No password
+          needed.
         </Text>
 
         {error && (
@@ -242,7 +258,13 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     lineHeight: 22,
   },
-  backButton: { position: "absolute", left: 16, minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
+  backButton: {
+    position: "absolute",
+    left: 16,
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
   backText: { fontSize: 15, color: colors.inkMuted },
   errorBox: {
     backgroundColor: colors.dangerBg,

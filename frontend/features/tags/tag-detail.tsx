@@ -40,12 +40,14 @@ export const ROTATE_NOT_NEEDED =
 export function TagDetail({
   stand,
   canManage,
+  organizationId,
 }: {
   stand: Stand;
   canManage: boolean;
+  organizationId?: string;
 }) {
   return canManage ? (
-    <ManagedTagDetail stand={stand} />
+    <ManagedTagDetail stand={stand} organizationId={organizationId} />
   ) : (
     <ReadOnlyTagDetail stand={stand} />
   );
@@ -71,9 +73,15 @@ function ReadOnlyTagDetail({ stand }: { stand: Stand }) {
   );
 }
 
-function ManagedTagDetail({ stand }: { stand: Stand }) {
+function ManagedTagDetail({
+  stand,
+  organizationId,
+}: {
+  stand: Stand;
+  organizationId: string | undefined;
+}) {
   const router = useRouter();
-  const qr = useAuthenticatedQr(stand.standId);
+  const qr = useAuthenticatedQr(stand.standId, organizationId);
   // Set the moment a Tag is programmed so the header stops saying "Needs NFC"
   // while router.refresh() fetches the server's version. Without it the owner
   // programmed a Tag, watched it succeed, and was still told it needed doing.
@@ -177,7 +185,7 @@ function ManagedTagDetail({ stand }: { stand: Stand }) {
         ) : null}
       </header>
 
-      <section className="rounded-[var(--radius-card)] border border-border bg-surface p-5">
+      <section className="max-w-[28rem] rounded-[var(--radius-card)] border border-border bg-surface p-5">
         {/* The hook already distinguishes loading from expired from failed. The
             view used to collapse all of them into "no objectUrl" and spin
             forever, so an owner whose session had expired watched an
@@ -203,7 +211,7 @@ function ManagedTagDetail({ stand }: { stand: Stand }) {
         </div>
       </section>
 
-      <section>
+      <section className="max-w-[28rem]">
         <Button variant="action" size="lg" onClick={() => setProgram(true)}>
           <Smartphone className="size-5" aria-hidden="true" />
           Program NFC

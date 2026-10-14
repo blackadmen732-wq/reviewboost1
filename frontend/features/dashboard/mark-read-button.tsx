@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { supabaseBrowser } from "@/lib/supabase/browser";
+import { ownerFetch } from "@/lib/api/owner-fetch";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -25,28 +25,25 @@ export function MarkReadButton({ responseId }: { responseId: string }) {
   async function markRead() {
     setDone(true);
 
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
-
-    if (!session) {
+    try {
+      const response = await ownerFetch(
+        `/api/v1/customer-responses/${responseId}/read`,
+        { method: "POST" },
+      );
+      if (!response.ok) {
+        setDone(false);
+        return;
+      }
+      const body = (await response.json()) as {
+        data?: { isRead?: boolean; changed?: boolean };
+      };
+      if (body.data?.isRead !== true || body.data.changed === false)
+        setDone(false);
+      router.refresh();
+    } catch {
       setDone(false);
-      return;
+      router.refresh();
     }
-
-    const response = await fetch(`/api/v1/customer-responses/${responseId}/read`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-
-    if (!response.ok) {
-      setDone(false);
-      return;
-    }
-
-    // Refreshes the Server Component so the unread badge in the nav agrees with
-    // what is on screen. Two counters disagreeing is worse than either.
-    router.refresh();
   }
 
   if (done) {

@@ -6,6 +6,7 @@ import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
+import { withReadDeadline, withWriteDeadline } from "@/lib/api/read-deadline";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -38,8 +39,10 @@ export function DeleteAccountFlow({
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uncertain, setUncertain] = useState(false);
 
-  const matches = typed.trim().toLowerCase() === businessName.trim().toLowerCase();
+  const matches =
+    typed.trim().toLowerCase() === businessName.trim().toLowerCase();
 
   if (!isOwner) {
     return (
@@ -51,65 +54,72 @@ export function DeleteAccountFlow({
   }
 
   async function remove() {
-    if (!matches || busy) return;
+    if (!matches || busy || uncertain) return;
     setBusy(true);
     setError(null);
 
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
-
-    if (!session) {
-      setBusy(false);
-      setError("Your session expired. Sign in again, then delete.");
-      return;
-    }
-
-    let response: Response;
+    let attempted = false;
     try {
-      response = await fetch("/api/v1/account/deletion", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ confirmation: typed.trim() }),
-      });
-    } catch {
-      setBusy(false);
-      setError("We could not reach ReviewBoost. Nothing has been deleted.");
-      return;
-    }
-
-    if (!response.ok) {
-      setBusy(false);
-      // The server distinguishes "we could not cancel your subscription" from
-      // "that is not the business name", and both are things a person can act
-      // on, so its sentence is shown rather than a generic one.
-      const body = (await response.json().catch(() => null)) as {
-        error?: { message?: string };
-      } | null;
-      setError(
-        body?.error?.message ??
-          "Something went wrong and nothing has been deleted. Try again shortly.",
+      const {
+        data: { session },
+      } = await withReadDeadline(
+        async () => await supabaseBrowser().auth.getSession(),
       );
-      return;
-    }
-
-    // The session is worthless now — on the usual path the login it belonged to
-    // no longer exists. Clearing it locally first keeps the goodbye page from
-    // being rendered by a layout still trying to load a deleted business.
-    try {
-      await supabaseBrowser().auth.signOut();
+      if (!session) {
+        setError("Your session expired. Sign in again, then delete.");
+        return;
+      }
+      attempted = true;
+      const response = await withWriteDeadline(
+        async (signal) =>
+          await fetch("/api/v1/account/deletion", {
+            signal,
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ confirmation: typed.trim() }),
+          }),
+      );
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        if (response.status >= 500) setUncertain(true);
+        setError(
+          body?.error?.message ??
+            "Could not confirm deletion. Check your businesses before trying again.",
+        );
+        return;
+      }
+      const result = (await response.json()) as {
+        data?: { signInRemoved?: boolean };
+      };
+      if (result.data?.signInRemoved === false) {
+        // Another membership survives. Keep its valid session and discard only
+        // the deleted business's cached document through a full navigation.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.assign("/select-org");
+        return;
+      }
+      try {
+        await supabaseBrowser().auth.signOut();
+      } catch {
+        /* The deleted login is unusable server-side. */
+      }
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign("/goodbye");
     } catch {
-      // Already unusable server-side; nothing here changes the outcome.
+      setUncertain(attempted);
+      setError(
+        attempted
+          ? "Could not confirm whether deletion finished. Check your businesses before trying again."
+          : "Could not verify your session. Sign in again, then try.",
+      );
+    } finally {
+      setBusy(false);
     }
-
-    // A full document navigation, like signing out: the client Router Cache
-    // holds rendered Server Component payloads containing this business's
-    // feedback, and a soft navigation can serve them from memory afterwards.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- see above
-    window.location.assign("/goodbye");
   }
 
   return (
@@ -119,7 +129,9 @@ export function DeleteAccountFlow({
           `bg-danger/5` would have kept a light tint behind light text. */}
       <InlineNotice kind="error" title="This cannot be undone.">
         <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>The Tags on your counter stop working. Take them down, or expect to.</li>
+          <li>
+            The Tags on your counter stop working. Take them down, or expect to.
+          </li>
           <li>Every rating your customers left is deleted.</li>
           <li>Your subscription is cancelled as part of this.</li>
         </ul>
@@ -133,11 +145,15 @@ export function DeleteAccountFlow({
         >
           cancel your plan
         </Link>{" "}
-        instead. That keeps your account and your ratings, and you can come back.
+        instead. That keeps your account and your ratings, and you can come
+        back.
       </p>
 
       <div>
-        <label htmlFor={fieldId} className="mb-2 block text-base font-medium text-ink">
+        <label
+          htmlFor={fieldId}
+          className="mb-2 block text-base font-medium text-ink"
+        >
           Type <span className="font-semibold">{businessName}</span> to confirm
         </label>
         <Input
@@ -148,7 +164,9 @@ export function DeleteAccountFlow({
           autoCapitalize="off"
           spellCheck={false}
           disabled={busy}
-          {...(error ? { "aria-invalid": true, "aria-describedby": errorId } : {})}
+          {...(error
+            ? { "aria-invalid": true, "aria-describedby": errorId }
+            : {})}
         />
       </div>
 
@@ -158,10 +176,15 @@ export function DeleteAccountFlow({
         </InlineNotice>
       ) : null}
 
+      {uncertain ? (
+        <Button variant="secondary" asChild>
+          <Link href="/select-org">Check my businesses</Link>
+        </Button>
+      ) : null}
       <div className="flex flex-col gap-3">
         <Button
           variant="destructive"
-          disabled={!matches}
+          disabled={!matches || uncertain}
           loading={busy}
           loadingLabel="Deleting…"
           onClick={remove}

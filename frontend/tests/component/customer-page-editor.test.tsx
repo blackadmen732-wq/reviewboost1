@@ -493,3 +493,210 @@ describe("Customer page recovery and publication state", () => {
     expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
   });
 });
+
+// A draft is not published, and a lost write response is not proof of failure.
+describe("Customer Page saved-photo recovery", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const state = (draft: object, published: object | null, version = 1) =>
+    new Response(
+      JSON.stringify({
+        data: {
+          draft,
+          published,
+          draftHeroUrl: null,
+          publishedVersion: version,
+        },
+      }),
+      { status: 200 },
+    );
+
+  it("never masks an intentionally empty draft with the published photo", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        state(
+          { heroAssetId: null },
+          { heroAssetId: "old", heroUrl: "https://example.test/old.jpg" },
+        ),
+      ),
+    );
+    render(<CustomerPageEditor businessName="Test business" />);
+    await screen.findByRole("button", { name: "Add photo" });
+    expect(document.querySelector("[data-hero-layer] img")).toBeNull();
+    expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
+  });
+
+  it("saves removal as null, preserves other fields, and keeps it removed after reopening", async () => {
+    let draft = {
+      heroAssetId: "old" as string | null,
+      tagline: "Retained line",
+      logoAssetId: "logo",
+      templateId: "classic",
+    };
+    const published = { ...draft, heroUrl: "https://example.test/old.jpg" };
+    const writes: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input, init?: RequestInit) => {
+        if (init?.method === "PUT") {
+          draft = JSON.parse(String(init.body));
+          writes.push("PUT");
+          return new Response("{}", { status: 200 });
+        }
+        return new Response(
+          JSON.stringify({
+            data: {
+              draft,
+              published,
+              publishedVersion: 1,
+              draftHeroUrl: draft.heroAssetId ? published.heroUrl : null,
+            },
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+    const first = render(<CustomerPageEditor businessName="Test business" />);
+    await screen.findByRole("button", { name: "Remove photo" });
+    fireEvent.click(screen.getByRole("button", { name: "Remove photo" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled(),
+    );
+    expect(draft).toEqual({
+      heroAssetId: null,
+      tagline: "Retained line",
+      logoAssetId: "logo",
+      templateId: "classic",
+    });
+    expect(writes).toEqual(["PUT"]);
+    first.unmount();
+    render(<CustomerPageEditor businessName="Test business" />);
+    await screen.findByRole("button", { name: "Add photo" });
+    expect(document.querySelector("[data-hero-layer] img")).toBeNull();
+  });
+
+  it("saves a confirmed upload before declaring the photo saved and restores it on mount", async () => {
+    let draft: { heroAssetId?: string } = {};
+    let photoSaved = false;
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: () => "blob:local-photo",
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init?: RequestInit) => {
+        const path = String(input);
+        const method = init?.method ?? "GET";
+        if (method === "GET")
+          return new Response(
+            JSON.stringify({
+              data: {
+                draft,
+                published: null,
+                draftHeroUrl: draft.heroAssetId
+                  ? "https://example.test/new.jpg"
+                  : null,
+                publishedVersion: 0,
+              },
+            }),
+            { status: 200 },
+          );
+        if (path.endsWith("/assets") && method === "POST")
+          return new Response(
+            JSON.stringify({
+              data: { assetId: "new", path: "new.jpg", token: "local" },
+            }),
+            { status: 200 },
+          );
+        if (path.endsWith("/assets"))
+          return new Response(
+            JSON.stringify({
+              data: { publicUrl: "https://example.test/new.jpg" },
+            }),
+            { status: 200 },
+          );
+        if (path === "/api/v1/customer-page") {
+          draft = JSON.parse(String(init?.body));
+          photoSaved = true;
+        }
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    const first = render(<CustomerPageEditor businessName="Test business" />);
+    await screen.findByRole("button", { name: "Add photo" });
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File(["x"], "new.jpg", { type: "image/jpeg" })] },
+    });
+    await screen.findByText(/Photo saved/);
+    expect(photoSaved).toBe(true);
+    expect(draft.heroAssetId).toBe("new");
+    first.unmount();
+    render(<CustomerPageEditor businessName="Test business" />);
+    await screen.findByRole("button", { name: "Replace photo" });
+    expect(document.querySelector("[data-hero-layer] img")).toHaveAttribute(
+      "src",
+      "https://example.test/new.jpg",
+    );
+  });
+
+  it("confirms a publish that committed before its response was lost, with exactly one POST", async () => {
+    const draft = { heroAssetId: null };
+    let committed = false;
+    let posts = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          posts++;
+          committed = true;
+          throw new TypeError("Connection lost after commit");
+        }
+        if (init?.method === "PUT") return new Response("{}", { status: 200 });
+        return state(
+          draft,
+          committed ? draft : { heroAssetId: "old" },
+          committed ? 2 : 1,
+        );
+      }),
+    );
+    render(<CustomerPageEditor businessName="Test business" />);
+    await screen.findByRole("button", { name: "Publish" });
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await screen.findByText("Customer page published");
+    expect(posts).toBe(1);
+    expect(screen.getByRole("button", { name: "Published" })).toBeDisabled();
+  });
+
+  it("blocks republishing while the lost response cannot be reconciled, then checks without replay", async () => {
+    let reads = 0,
+      posts = 0,
+      readable = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input, init?: RequestInit) => {
+        if (init?.method === "PUT") return new Response("{}", { status: 200 });
+        if (init?.method === "POST") {
+          posts++;
+          throw new TypeError("Lost response");
+        }
+        reads++;
+        if (reads > 1 && !readable) throw new TypeError("Offline");
+        return state({}, readable ? {} : null, readable ? 2 : 1);
+      }),
+    );
+    render(<CustomerPageEditor businessName="Test business" />);
+    await screen.findByRole("button", { name: "Publish" });
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await screen.findByRole("button", { name: "Check published page" });
+    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+    readable = true;
+    fireEvent.click(
+      screen.getByRole("button", { name: "Check published page" }),
+    );
+    await screen.findByText("Customer page published");
+    expect(posts).toBe(1);
+  });
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ImageUp } from "lucide-react";
+import { Check, ImageUp, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { VisitStars } from "@/features/customer-page/visit-stars";
 import Link from "next/link";
 
 import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page";
+import { withWriteDeadline } from "@/lib/api/read-deadline";
 import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
 import {
   NormalizePhotoError,
@@ -17,7 +18,10 @@ import {
 } from "@/lib/images/normalize-photo";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 import { DEFAULT_HERO_TRANSFORM } from "@/lib/owner/hero-transform";
-import type { CustomerPageContent } from "@/lib/server/customer-page-service";
+import type {
+  CustomerPageContent,
+  CustomerPageState,
+} from "@/lib/server/customer-page-service";
 
 const previewMessages = customerMessages.en;
 
@@ -56,54 +60,60 @@ export function CustomerPageEditor({
   onSaved,
   previewStandId = null,
 }: CustomerPageEditorProps) {
-  // The full draft as returned by GET /api/v1/customer-page.
-  // Editing is done by merging changes into this rather than tracking fields
-  // separately, so a save never drops a field the owner set in a prior session.
   const [draft, setDraft] = useState<CustomerPageContent>({});
-  // heroUrl is display-only: the confirmed public URL for the preview.
   const [heroUrl, setHeroUrl] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
-  // The photo customers see today, to tell the owner when the preview differs.
   const [publishedDraft, setPublishedDraft] =
     useState<CustomerPageContent | null>(null);
+  const [publishedVersion, setPublishedVersion] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [publishState, setPublishState] = useState<
     "idle" | "publishing" | "published" | "error"
   >("idle");
+  const [uploadState, setUploadState] = useState<UploadState>("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(true);
+  const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
+  const [pendingPublication, setPendingPublication] = useState(false);
+  const publishIntent = useRef<{
+    content: CustomerPageContent;
+    version: number;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const operation = useRef(false);
+  const mounted = useRef(true);
 
   useEffect(() => {
-    let current = true;
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
     void (async () => {
       try {
-        const res = await ownerFetch("/api/v1/customer-page");
-        if (!res.ok) throw new Error("load_failed");
-        const { data } = (await res.json()) as {
-          data: {
-            draft: CustomerPageContent;
-            published:
-              (CustomerPageContent & { heroUrl?: string | null }) | null;
-            draftHeroUrl?: string | null;
-          };
-        };
-        if (!current) return;
+        const data = await readPage(controller.signal);
+        if (controller.signal.aborted) return;
         setDraft(data.draft ?? {});
         setPublishedDraft(data.published ?? null);
-        setHeroUrl(data.draftHeroUrl ?? data.published?.heroUrl ?? null);
+        setPublishedVersion(data.publishedVersion ?? 0);
+        setHeroUrl(draftPhotoUrl(data));
       } catch (caught) {
-        if (current)
+        if (!controller.signal.aborted)
           setLoadError(
             caught instanceof SessionExpiredError
               ? caught.message
               : "Could not load your customer page. Your published page has not changed.",
           );
       } finally {
-        if (current) setLoaded(true);
+        if (!controller.signal.aborted) setLoaded(true);
       }
     })();
-    return () => {
-      current = false;
-    };
+    return () => controller.abort();
   }, [loadAttempt]);
 
   useEffect(
@@ -113,191 +123,304 @@ export function CustomerPageEditor({
     [heroUrl],
   );
 
-  const [uploadState, setUploadState] = useState<UploadState>("idle");
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  /** PUT is idempotent content replacement. Check an uncertain response before retry. */
+  const saveDraft = useCallback(
+    async (content: CustomerPageContent): Promise<boolean> => {
+      setDraftSaving(true);
+      setDraftSaved(false);
+      setDraftSaveError(null);
+      try {
+        const response = await ownerFetch("/api/v1/customer-page", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(content),
+        });
+        if (!response.ok)
+          throw new Error(
+            await responseMessage(response, "Could not save your photo."),
+          );
+        if (mounted.current) setDraftSaved(true);
+        return true;
+      } catch (caught) {
+        try {
+          const state = await readPage();
+          if (editableContent(state.draft) === editableContent(content)) {
+            if (mounted.current) setDraftSaved(true);
+            return true;
+          }
+        } catch {
+          /* Preserve the local intent. The live page is unchanged. */
+        }
+        if (mounted.current)
+          setDraftSaveError(
+            caught instanceof SessionExpiredError
+              ? caught.message
+              : "Could not confirm your saved photo. Keep this page open and try saving again. Your published page has not changed.",
+          );
+        return false;
+      } finally {
+        if (mounted.current) setDraftSaving(false);
+      }
+    },
+    [],
+  );
 
-  /**
-   * Upload → preview → Publish, with the preview first.
-   *
-   * The chosen photo appears in the phone the moment it is picked, from a
-   * local object URL, while the three-step upload (sign, send to storage,
-   * confirm) runs behind it. It used to appear only after all three finished,
-   * so the owner stared at the old photo wondering whether anything happened.
-   * If any step fails the previous photo comes back and the error says so —
-   * the preview never shows something that is not actually saved.
-   */
+  /** A confirmed asset must become a saved draft before upload reports completion. */
   const uploadHero = useCallback(
     async (file: File) => {
+      if (operation.current) return;
+      operation.current = true;
       setUploadError(null);
+      setDraftSaveError(null);
       setStatusMsg(null);
       setPublishState("idle");
       setUploadState("preparing");
       const previous = heroUrl;
-
-      // Upright, JPEG/PNG/WebP and under 5 MB before anything is sent — a
-      // camera photo straight off a phone is usually none of those. The
-      // preview shows the prepared photo, which is exactly what is uploaded.
-      let photo: Awaited<ReturnType<typeof normalizePhoto>>;
       try {
-        photo = await normalizePhoto(file);
-      } catch (caught) {
-        setUploadState("error");
-        setUploadError(
-          caught instanceof NormalizePhotoError
-            ? caught.message
-            : "That photo could not be prepared. Try a different one.",
-        );
-        return;
-      }
-
-      setUploadState("signing");
-      const local = URL.createObjectURL(photo.blob);
-      setHeroUrl(local);
-
-      const fail = (message: string) => {
-        URL.revokeObjectURL(local);
-        setHeroUrl(previous);
-        setUploadState("error");
-        setUploadError(message);
-      };
-      const messageOf = async (res: Response, fallback: string) => {
-        const err = (await res.json().catch(() => ({}))) as {
-          error?: { message?: string };
+        let photo: Awaited<ReturnType<typeof normalizePhoto>>;
+        try {
+          photo = await normalizePhoto(file);
+        } catch (caught) {
+          if (mounted.current) {
+            setUploadState("error");
+            setUploadError(
+              caught instanceof NormalizePhotoError
+                ? caught.message
+                : "That photo could not be prepared. Try a different one.",
+            );
+          }
+          return;
+        }
+        if (!mounted.current) return;
+        setUploadState("signing");
+        setHeroUrl(URL.createObjectURL(photo.blob));
+        const fail = (message: string) => {
+          if (!mounted.current) return;
+          setHeroUrl(previous);
+          setUploadState("error");
+          setUploadError(message);
         };
-        return err.error?.message ?? fallback;
-      };
-
-      try {
-        // Step 1: get a signed upload ticket
-        const beginRes = await ownerFetch("/api/v1/customer-page/assets", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind: "hero", contentType: photo.type }),
-        });
-        if (!beginRes.ok)
-          return fail(await messageOf(beginRes, "Upload failed."));
-        const { data: ticket } = (await beginRes.json()) as {
-          data: { assetId: string; path: string; token: string };
-        };
-
-        // Step 2: upload directly to Supabase Storage (the ticket authorises it)
-        setUploadState("uploading");
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const storageUrl = `${supabaseUrl}/storage/v1/object/upload/sign/customer-page/${ticket.path}?token=${ticket.token}`;
-        const putRes = await fetch(storageUrl, {
-          method: "PUT",
-          headers: { "Content-Type": photo.type, "x-upsert": "true" },
-          body: photo.blob,
-        });
-        if (!putRes.ok)
-          return fail("The photo did not upload. Please try again.");
-
-        // Step 3: confirm the upload server-side
-        setUploadState("confirming");
-        const confirmRes = await ownerFetch("/api/v1/customer-page/assets", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assetId: ticket.assetId, path: ticket.path }),
-        });
-        if (!confirmRes.ok)
-          return fail(
-            await messageOf(
-              confirmRes,
-              "The photo could not be checked. Please try again.",
-            ),
+        try {
+          const begin = await ownerFetch("/api/v1/customer-page/assets", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ kind: "hero", contentType: photo.type }),
+          });
+          if (!begin.ok)
+            return fail(await responseMessage(begin, "Upload failed."));
+          const { data: ticket } = (await begin.json()) as {
+            data: { assetId: string; path: string; token: string };
+          };
+          if (!mounted.current) return;
+          setUploadState("uploading");
+          const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/customer-page/${ticket.path}?token=${ticket.token}`;
+          const sent = await withWriteDeadline(
+            async (signal) =>
+              await fetch(url, {
+                signal,
+                method: "PUT",
+                headers: { "Content-Type": photo.type, "x-upsert": "true" },
+                body: photo.blob,
+              }),
           );
-
-        const confirmed = (await confirmRes.json()) as {
-          data?: { publicUrl?: string };
-        };
-        if (confirmed.data?.publicUrl) setHeroUrl(confirmed.data.publicUrl);
-        setDraft((prev) => ({ ...prev, heroAssetId: ticket.assetId }));
-        setUploadState("done");
-      } catch (caught) {
-        fail(
-          caught instanceof Error && caught.name === "SessionExpiredError"
-            ? caught.message
-            : "Could not reach ReviewBoost. Check your connection and try again.",
-        );
+          if (!sent.ok)
+            return fail("The photo did not upload. Please try again.");
+          if (!mounted.current) return;
+          setUploadState("confirming");
+          const confirmed = await ownerFetch("/api/v1/customer-page/assets", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              assetId: ticket.assetId,
+              path: ticket.path,
+            }),
+          });
+          if (!confirmed.ok)
+            return fail(
+              await responseMessage(
+                confirmed,
+                "The photo could not be checked. Please try again.",
+              ),
+            );
+          const { data } = (await confirmed.json()) as {
+            data?: { publicUrl?: string };
+          };
+          if (!data?.publicUrl)
+            return fail("The photo could not be checked. Try again.");
+          if (!mounted.current) return;
+          setHeroUrl(data.publicUrl);
+          const next = { ...draft, heroAssetId: ticket.assetId };
+          setDraft(next);
+          await saveDraft(next);
+          if (mounted.current) setUploadState("done");
+        } catch (caught) {
+          fail(
+            caught instanceof SessionExpiredError
+              ? caught.message
+              : "Could not reach ReviewBoost. Check your connection and try again.",
+          );
+        }
+      } finally {
+        operation.current = false;
       }
     },
-    [heroUrl],
+    [draft, heroUrl, saveDraft],
   );
 
   const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      void uploadHero(file);
-      e.target.value = "";
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) void uploadHero(file);
+      event.target.value = "";
     },
     [uploadHero],
   );
 
-  /**
-   * Publish is save-then-publish, and the save has to succeed.
-   *
-   * The save result used to be discarded. Publish snapshots whatever draft the
-   * server currently holds, so a failed save — expired session, validation,
-   * dropped connection — meant publishing the *previous* draft and then telling
-   * the owner "Page is live!". They would walk away believing the photo they
-   * just picked was on the counter. Stop at the first failure and say which
-   * step failed.
-   */
+  const removePhoto = useCallback(async () => {
+    if (operation.current) return;
+    operation.current = true;
+    setUploadError(null);
+    setStatusMsg(null);
+    setPublishState("idle");
+    const next = { ...draft, heroAssetId: null };
+    setDraft(next);
+    setHeroUrl(null);
+    try {
+      await saveDraft(next);
+    } finally {
+      operation.current = false;
+    }
+  }, [draft, saveDraft]);
+
+  const confirmPublished = useCallback(
+    (content: CustomerPageContent, version: number) => {
+      if (!mounted.current) return;
+      setPublishedDraft({ ...content });
+      setPublishedVersion(version);
+      setPublishState("published");
+      setPendingPublication(false);
+      setStatusMsg(null);
+      publishIntent.current = null;
+      onSaved?.();
+    },
+    [onSaved],
+  );
+
+  /** A lost publish response is reconciled with a read, never automatically replayed. */
+  const checkPublication = useCallback(
+    async (failure?: string) => {
+      const intent = publishIntent.current;
+      if (!intent) return;
+      setPublishState("publishing");
+      try {
+        const state = await readPage();
+        if (
+          state.published &&
+          state.publishedVersion > intent.version &&
+          editableContent(state.published) === editableContent(intent.content)
+        ) {
+          confirmPublished(intent.content, state.publishedVersion);
+          return;
+        }
+        if (!mounted.current) return;
+        setPublishedDraft(state.published);
+        setPublishedVersion(state.publishedVersion);
+        setPendingPublication(false);
+        publishIntent.current = null;
+        setStatusMsg(
+          `${failure ? `${failure} ` : ""}Your published page still shows the earlier version. Your draft is saved; you can try Publish again.`,
+        );
+      } catch (caught) {
+        if (mounted.current)
+          setStatusMsg(
+            caught instanceof SessionExpiredError
+              ? caught.message
+              : "We could not confirm whether publishing finished. Check the published page before trying again.",
+          );
+      } finally {
+        if (mounted.current)
+          setPublishState((state) =>
+            state === "publishing" ? "error" : state,
+          );
+      }
+    },
+    [confirmPublished],
+  );
+
   const publish = useCallback(async () => {
+    if (operation.current || pendingPublication || !draftSaved) return;
+    operation.current = true;
     setPublishState("publishing");
     setStatusMsg(null);
-
     try {
       const saved = await ownerFetch("/api/v1/customer-page", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...draft, tagline: draft.tagline ?? null }),
       });
-
       if (!saved.ok) {
-        const err = await saved.json().catch(() => ({}));
         setStatusMsg(
-          (err as { error?: { message?: string } }).error?.message ??
+          await responseMessage(
+            saved,
             "Could not save your changes, so nothing was published. Try again.",
+          ),
         );
         return;
       }
-
-      const res = await ownerFetch("/api/v1/customer-page", {
+      publishIntent.current = { content: draft, version: publishedVersion };
+      const response = await ownerFetch("/api/v1/customer-page", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setStatusMsg(
-          (err as { error?: { message?: string } }).error?.message ??
-            "Publish failed. Try again.",
+      if (!response.ok) {
+        const message = await responseMessage(
+          response,
+          "Could not confirm publishing.",
         );
+        if (response.status < 500) {
+          publishIntent.current = null;
+          setStatusMsg(message);
+          return;
+        }
+        setPendingPublication(true);
+        await checkPublication(message);
         return;
       }
-
-      setPublishState("published");
-      setPublishedDraft({ ...draft });
-      onSaved?.();
-    } catch {
-      setStatusMsg(
-        "Could not reach ReviewBoost. Check your connection and try again.",
-      );
+      const { data } = (await response.json()) as {
+        data?: { publishedVersion?: number };
+      };
+      confirmPublished(draft, data?.publishedVersion ?? publishedVersion);
+    } catch (caught) {
+      if (publishIntent.current) {
+        setPendingPublication(true);
+        await checkPublication("Could not reach ReviewBoost.");
+      } else if (mounted.current)
+        setStatusMsg(
+          caught instanceof SessionExpiredError
+            ? caught.message
+            : "Could not reach ReviewBoost. Check your connection and try again.",
+        );
     } finally {
-      setPublishState((state) => (state === "publishing" ? "error" : state));
+      operation.current = false;
+      if (mounted.current)
+        setPublishState((state) => (state === "publishing" ? "error" : state));
     }
-  }, [draft, onSaved]);
+  }, [
+    draft,
+    draftSaved,
+    pendingPublication,
+    publishedVersion,
+    checkPublication,
+    confirmPublished,
+  ]);
 
-  const uploading =
-    uploadState === "preparing" ||
-    uploadState === "signing" ||
-    uploadState === "uploading" ||
-    uploadState === "confirming";
+  const uploading = [
+    "preparing",
+    "signing",
+    "uploading",
+    "confirming",
+  ].includes(uploadState);
   const uploadLabel =
     uploadState === "preparing" || uploadState === "signing"
       ? "Preparing photo…"
@@ -308,12 +431,16 @@ export function CustomerPageEditor({
           : heroUrl
             ? "Replace photo"
             : "Add photo";
-
   const publishing = publishState === "publishing";
   const unchanged =
     publishedDraft !== null &&
     editableContent(draft) === editableContent(publishedDraft);
-  const published = unchanged && !uploading;
+  const published =
+    unchanged &&
+    !uploading &&
+    draftSaved &&
+    !draftSaving &&
+    !pendingPublication;
 
   if (!loaded) {
     return (
@@ -364,25 +491,72 @@ export function CustomerPageEditor({
           Add your business photo. Check the preview, then publish it to your
           Tags.
         </p>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="font-medium shadow-none"
-          disabled={uploading || publishing}
-          loading={uploading}
-          loadingLabel={uploadLabel}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <ImageUp className="size-4" aria-hidden="true" />
-          {uploadLabel}
-        </Button>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="w-auto flex-1 px-3 font-medium shadow-none"
+            disabled={
+              uploading || publishing || draftSaving || pendingPublication
+            }
+            loading={uploading}
+            loadingLabel={uploadLabel}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <ImageUp className="size-4" aria-hidden="true" />
+            {uploadLabel}
+          </Button>
+          {heroUrl ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-auto flex-1 px-3"
+              disabled={
+                uploading || publishing || draftSaving || pendingPublication
+              }
+              onClick={() => void removePhoto()}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              Remove photo
+            </Button>
+          ) : null}
+        </div>
+        <p className="mt-3 text-sm leading-relaxed text-muted">
+          Without a photo, the top stays white.
+        </p>
+        {draftSaving ? (
+          <p role="status" className="mt-3 text-sm text-muted">
+            Saving your photo…
+          </p>
+        ) : draftSaveError ? (
+          <div className="mt-3">
+            <p role="alert" className="text-sm text-danger">
+              {draftSaveError}
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={() => void saveDraft(draft)}
+            >
+              Save photo again
+            </Button>
+          </div>
+        ) : !unchanged && draftSaved && uploadState === "done" ? (
+          <p role="status" className="mt-3 text-sm text-muted">
+            Photo saved. Publish when you’re ready.
+          </p>
+        ) : null}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/png,image/jpeg,image/webp"
           className="hidden"
-          disabled={uploading || publishing}
+          disabled={
+            uploading || publishing || draftSaving || pendingPublication
+          }
           onChange={handleFileChange}
         />
         {uploadError ? (
@@ -398,7 +572,14 @@ export function CustomerPageEditor({
           <Button
             type="button"
             variant="action"
-            disabled={publishing || uploading || published}
+            disabled={
+              publishing ||
+              uploading ||
+              draftSaving ||
+              !draftSaved ||
+              pendingPublication ||
+              published
+            }
             loading={publishing}
             loadingLabel="Publishing…"
             onClick={() => void publish()}
@@ -413,8 +594,8 @@ export function CustomerPageEditor({
             )}
           </Button>
           <p className="mt-2 text-center text-xs text-muted lg:text-left">
-            {uploading
-              ? "Your photo is uploading."
+            {uploading || draftSaving
+              ? "Your photo is being saved."
               : published
                 ? "Your Tags use this page."
                 : "Changes reach your Tags when you publish."}
@@ -445,9 +626,22 @@ export function CustomerPageEditor({
             )}
           </div>
         ) : statusMsg ? (
-          <p role="alert" className="mt-4 text-sm text-danger">
-            {statusMsg}
-          </p>
+          <div className="mt-4">
+            <p role="alert" className="text-sm text-danger">
+              {statusMsg}
+            </p>
+            {pendingPublication ? (
+              <Button
+                variant="secondary"
+                className="mt-3"
+                loading={publishing}
+                loadingLabel="Checking…"
+                onClick={() => void checkPublication()}
+              >
+                Check published page
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
@@ -482,4 +676,36 @@ function editableContent(content: CustomerPageContent): string {
     content.heroAssetId ?? null,
     content.tagline ?? null,
   ]);
+}
+
+async function responseMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  const body = (await response.json().catch(() => null)) as {
+    error?: { message?: string };
+  } | null;
+  return body?.error?.message ?? fallback;
+}
+async function readPage(signal?: AbortSignal): Promise<CustomerPageState> {
+  const response = await ownerFetch(
+    "/api/v1/customer-page",
+    signal ? { signal } : {},
+  );
+  if (!response.ok) throw new Error("Could not read your customer page.");
+  const { data } = (await response.json()) as { data: CustomerPageState };
+  return { ...data, publishedVersion: data.publishedVersion ?? 0 };
+}
+/** Current null is intentional. Fallback is only for a legacy omitted URL. */
+function draftPhotoUrl(state: {
+  draft: CustomerPageContent;
+  draftHeroUrl?: string | null;
+  published: (CustomerPageContent & { heroUrl?: string | null }) | null;
+}): string | null {
+  if (state.draftHeroUrl !== undefined) return state.draftHeroUrl;
+  if (state.draft?.heroAssetId === null) return null;
+  return state.published &&
+    state.draft?.heroAssetId === state.published.heroAssetId
+    ? (state.published.heroUrl ?? null)
+    : null;
 }

@@ -200,7 +200,7 @@ function SetupSteps({ steps, seenDone }: { steps: SetupStep[]; seenDone: readonl
                 <span
                   className={cn(
                     "text-base",
-                    step.done && "text-muted line-through decoration-border",
+                    step.done && "text-muted decoration-border",
                     !step.done && isCurrent && "font-semibold text-ink",
                     !step.done && !isCurrent && "text-muted",
                   )}

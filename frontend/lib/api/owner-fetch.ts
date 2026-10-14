@@ -1,5 +1,6 @@
 "use client";
 
+import { withReadDeadline, withWriteDeadline } from "@/lib/api/read-deadline";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -17,13 +18,23 @@ export class SessionExpiredError extends Error {
   }
 }
 
-export async function ownerFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const {
-    data: { session },
-  } = await supabaseBrowser().auth.getSession();
-  if (!session) throw new SessionExpiredError();
-
-  const headers = new Headers(init.headers);
-  headers.set("Authorization", `Bearer ${session.access_token}`);
-  return fetch(path, { ...init, headers });
+export async function ownerFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const request = async (signal?: AbortSignal): Promise<Response> => {
+    const {
+      data: { session },
+    } = await supabaseBrowser().auth.getSession();
+    if (!session) throw new SessionExpiredError();
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${session.access_token}`);
+    return fetch(path, { ...init, ...(signal ? { signal } : {}), headers });
+  };
+  // A write timeout is an uncertain outcome. Writes retain their workflow's
+  // reconciliation policy and are never automatically retried here.
+  const method = (init.method ?? "GET").toUpperCase();
+  return method === "GET" || method === "HEAD"
+    ? withReadDeadline(request, init.signal)
+    : withWriteDeadline(request, init.signal);
 }

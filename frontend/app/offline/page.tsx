@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+
 import type { Metadata } from "next";
 import { WifiOff } from "lucide-react";
 
@@ -28,9 +31,13 @@ export default function OfflinePage() {
           You are offline
         </h1>
         <p className="text-base text-muted">
-          Check your connection. Everything is still saved.
+          Check your connection. Your saved business data is safe; check pending
+          changes after reconnecting.
         </p>
       </div>
+      <Button asChild variant="secondary" className="w-auto">
+        <Link href="/home">Try Home again</Link>
+      </Button>
     </main>
   );
 }

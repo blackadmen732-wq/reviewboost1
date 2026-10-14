@@ -1,0 +1,56 @@
+[
+  {
+    "step": "NFC",
+    "focusAndTrap": true,
+    "escapeCloses": true,
+    "axeViolations": 0
+  },
+  {
+    "step": "Customer Page",
+    "draftSurvivesRefresh": true,
+    "removalSurvivesRefresh": true,
+    "liveNoPhotoWhite": true,
+    "publishLostResponseReconciled": true,
+    "publishPOSTs": 1
+  },
+  {
+    "step": "Feedback",
+    "lostNoteResponseReconciled": true,
+    "notePOSTs": 1,
+    "markReadConnected": true,
+    "sortAndReopen": true
+  },
+  {
+    "step": "Settings",
+    "cancelPreservesOriginal": true,
+    "themeChanges": true
+  },
+  {
+    "step": "Text Requests",
+    "serverPreview": true,
+    "consentRequired": true,
+    "zeroCreditSendDisabled": true,
+    "noSMS": true
+  },
+  {
+    "step": "Billing",
+    "providerFailureRecoverable": true,
+    "noCheckoutSubmitted": true
+  },
+  {
+    "step": "Tags",
+    "realLocalCreation": true,
+    "downloadedSVG": true,
+    "printDialogTriggered": true,
+    "customerPopupLoaded": true,
+    "rotationWarningAndCancel": true,
+    "unsupportedNFCShown": true,
+    "physicalNFCUnverified": true
+  },
+  {
+    "step": "Business switch",
+    "twoRealLocalMemberships": true,
+    "pickerChangesBusiness": true,
+    "returnedToOriginal": true
+  }
+]

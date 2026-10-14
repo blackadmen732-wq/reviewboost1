@@ -47,6 +47,7 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
 type Step = "name" | "google" | "done";
 
 interface Created {
+  organizationId?: string;
   standUrl: string;
   standId: string;
 }
@@ -63,7 +64,10 @@ export function OnboardingFlow({
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Created | null>(null);
 
-  const qr = useAuthenticatedQr(created?.standId ?? null);
+  const qr = useAuthenticatedQr(
+    created?.standId ?? null,
+    created?.organizationId,
+  );
 
   const trimmedUrl = googleUrl.trim();
   const urlLooksRight =

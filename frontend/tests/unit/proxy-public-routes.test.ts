@@ -203,3 +203,13 @@ describe("the protected list matches the real app", () => {
     expect(isOwnerPath("/settings-export")).toBe(false);
   });
 });
+
+it("keeps a chosen plan and feedback filters when an expired session returns to sign-in", async () => {
+  withEnv(true); clientReturning(null);
+  for (const path of ["/settings/billing?plan=growth", "/feedback?show=all&rating=2"]) {
+    const response = await proxy(request(path));
+    const destination = new URL(response.headers.get("location")!);
+    expect(destination.pathname).toBe("/login");
+    expect(destination.searchParams.get("next")).toBe(path);
+  }
+});

@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { notify } from "@/components/ui/toast";
+import { withWriteDeadline } from "@/lib/api/read-deadline";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils/cn";
 
@@ -81,14 +82,18 @@ export function EditableRow({
         return;
       }
 
-      const response = await fetch("/api/v1/settings", {
-        method: "PATCH",
-        headers: {
-          "content-type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ ...context, [field]: draft.trim() }),
-      });
+      const response = await withWriteDeadline(
+        async (signal) =>
+          await fetch("/api/v1/settings", {
+            signal,
+            method: "PATCH",
+            headers: {
+              "content-type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ ...context, [field]: draft.trim() }),
+          }),
+      );
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as {
@@ -115,8 +120,9 @@ export function EditableRow({
       notify.success("Saved", `${label} updated.`);
     } catch {
       setError(
-        "Could not reach ReviewBoost. Your change has not been saved. Try again.",
+        "Could not confirm saving. Your change is still here; check the current value before trying again.",
       );
+      router.refresh();
     } finally {
       setBusy(false);
     }
@@ -159,7 +165,7 @@ export function EditableRow({
             className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-brand-text transition-colors hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
           >
             <Pencil className="size-4" aria-hidden="true" />
-            Change
+            Change<span className="sr-only"> {label}</span>
           </button>
         )}
       </div>

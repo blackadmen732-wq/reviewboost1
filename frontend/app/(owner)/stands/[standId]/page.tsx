@@ -37,7 +37,11 @@ export default async function TagDetailPage({
           Tags
         </Link>
       </p>
-      <TagDetail stand={stand} canManage={permissionsFor(organization.role).manageTags} />
+      <TagDetail
+        organizationId={organization.orgId}
+        stand={stand}
+        canManage={permissionsFor(organization.role).manageTags}
+      />
     </OwnerShell>
   );
 }

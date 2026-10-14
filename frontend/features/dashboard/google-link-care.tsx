@@ -21,6 +21,7 @@ import {
 } from "@/features/dashboard/google-link-copy";
 import { GoogleLinkHelp } from "@/features/dashboard/settings-form";
 import { isGoogleReviewWritingUrl } from "@/lib/security/google-review-url";
+import { withWriteDeadline } from "@/lib/api/read-deadline";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -31,7 +32,10 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
  * A refused open always says why.
  */
 
-function refuseOrOpen(url: string, onRefuse: (message: string) => void): boolean {
+function refuseOrOpen(
+  url: string,
+  onRefuse: (message: string) => void,
+): boolean {
   const state = openGoogleReviewUrl(url);
   const refusal = googleLinkRefusal(state);
   if (refusal) {
@@ -67,7 +71,10 @@ export function GoogleLinkCare({
   const draftLooksRight = trimmed !== "" && isGoogleReviewWritingUrl(trimmed);
   // A listing or short link still works where it is already saved, but cannot
   // be saved as a new link; say which, rather than calling it "not Google".
-  const draftRefusal = googleLinkState(trimmed) === "legacy" ? GOOGLE_LINK_NOT_REVIEW_LINK : GOOGLE_LINK_INVALID;
+  const draftRefusal =
+    googleLinkState(trimmed) === "legacy"
+      ? GOOGLE_LINK_NOT_REVIEW_LINK
+      : GOOGLE_LINK_INVALID;
   const savedState = googleLinkState(value);
 
   function speakRefusal(message: string) {
@@ -100,14 +107,22 @@ export function GoogleLinkCare({
         return;
       }
 
-      const response = await fetch("/api/v1/settings", {
-        method: "PATCH",
-        headers: {
-          "content-type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ locationId, destinationProvider: "google", destinationUrl: trimmed }),
-      });
+      const response = await withWriteDeadline(
+        async (signal) =>
+          await fetch("/api/v1/settings", {
+            signal,
+            method: "PATCH",
+            headers: {
+              "content-type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              locationId,
+              destinationProvider: "google",
+              destinationUrl: trimmed,
+            }),
+          }),
+      );
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as {
@@ -129,7 +144,9 @@ export function GoogleLinkCare({
     } catch {
       // Transport or auth failure: say so, and leave the draft in the field so
       // pressing Save again is the whole retry.
-      setError("Could not reach ReviewBoost. Check your connection and try again.");
+      setError(
+        "Could not reach ReviewBoost. Check your connection and try again.",
+      );
       notify.error("Could not save", "Check your connection and try again.");
     } finally {
       setBusy(false);
@@ -140,7 +157,10 @@ export function GoogleLinkCare({
     <div className="flex flex-col gap-4" data-google-link-state={savedState}>
       {editing ? (
         <div className="rounded-[var(--radius-card)] border border-brand bg-surface p-4">
-          <label className="block text-sm font-medium text-muted" htmlFor={inputId}>
+          <label
+            className="block text-sm font-medium text-muted"
+            htmlFor={inputId}
+          >
             Google link
           </label>
           <Input
@@ -175,7 +195,9 @@ export function GoogleLinkCare({
               {error}
             </p>
           ) : (
-            <p className="mt-2 text-sm leading-relaxed text-muted">{GOOGLE_LINK_BLAST}</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              {GOOGLE_LINK_BLAST}
+            </p>
           )}
 
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
@@ -187,7 +209,12 @@ export function GoogleLinkCare({
               <ExternalLink className="size-4" aria-hidden="true" />
               Test
             </Button>
-            <Button variant="action" loading={busy} loadingLabel="Saving…" onClick={() => void save()}>
+            <Button
+              variant="action"
+              loading={busy}
+              loadingLabel="Saving…"
+              onClick={() => void save()}
+            >
               Save
             </Button>
             <Button
@@ -219,10 +246,20 @@ export function GoogleLinkCare({
             ) : null}
             {savedState === "legacy" ? (
               // Working, so not an error: a status note with the one fix.
-              <div role="status" className="mt-2 flex items-start gap-2 text-sm" data-google-link-upgrade>
-                <span aria-hidden="true" className="mt-1.5 size-2 shrink-0 rounded-full bg-star" />
+              <div
+                role="status"
+                className="mt-2 flex items-start gap-2 text-sm"
+                data-google-link-upgrade
+              >
+                <span
+                  aria-hidden="true"
+                  className="mt-1.5 size-2 shrink-0 rounded-full bg-star"
+                />
                 <p className="leading-relaxed text-ink">
-                  <span className="font-semibold">{GOOGLE_LINK_LEGACY_TITLE}.</span> {GOOGLE_LINK_LEGACY}
+                  <span className="font-semibold">
+                    {GOOGLE_LINK_LEGACY_TITLE}.
+                  </span>{" "}
+                  {GOOGLE_LINK_LEGACY}
                 </p>
               </div>
             ) : null}
@@ -255,7 +292,11 @@ export function GoogleLinkCare({
         </div>
       )}
 
-      {!editing ? <p className="max-w-[42ch] text-sm leading-relaxed text-muted">{GOOGLE_LINK_BLAST}</p> : null}
+      {!editing ? (
+        <p className="max-w-[42ch] text-sm leading-relaxed text-muted">
+          {GOOGLE_LINK_BLAST}
+        </p>
+      ) : null}
 
       {!editing && savedState !== "missing" ? (
         <Button

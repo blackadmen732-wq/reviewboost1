@@ -28,10 +28,11 @@ import { colors, fonts, radii } from "@/theme";
  * exactly like the ones that did not. The database checks the name too.
  */
 export default function DeleteAccountScreen() {
-  const { activeOrg, logout } = useAuth();
+  const { activeOrg, logout, refreshOrganizations } = useAuth();
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uncertain, setUncertain] = useState(false);
 
   const businessName = activeOrg?.name ?? "";
   const matches =
@@ -40,16 +41,34 @@ export default function DeleteAccountScreen() {
   const isOwner = activeOrg?.role === "owner";
 
   async function remove() {
-    if (!matches || busy || !activeOrg) return;
+    if (!matches || busy || uncertain || !activeOrg) return;
     setBusy(true);
     setError(null);
 
     try {
-      await apiFetch("/api/v1/account/deletion", activeOrg.orgId, {
-        method: "POST",
-        body: JSON.stringify({ confirmation: typed.trim() }),
-      });
+      const result = await apiFetch<{ data: { signInRemoved: boolean } }>(
+        "/api/v1/account/deletion",
+        activeOrg.orgId,
+        {
+          method: "POST",
+          body: JSON.stringify({ confirmation: typed.trim() }),
+        },
+      );
+      if (!result.data.signInRemoved) {
+        await refreshOrganizations();
+        router.replace("/select-org");
+        return;
+      }
+      const signOutError = await logout();
+      if (signOutError) {
+        setError(
+          "Business deleted. Could not clear your local sign-in. Try signing out from Account.",
+        );
+        return;
+      }
+      router.replace("/login");
     } catch (caught) {
+      setUncertain(!(caught instanceof ApiError) || caught.status >= 500);
       setBusy(false);
       // The server distinguishes "we could not cancel your subscription" from
       // "that is not the business name", and both are actionable, so its
@@ -57,16 +76,12 @@ export default function DeleteAccountScreen() {
       setError(
         caught instanceof ApiError
           ? caught.message
-          : "Something went wrong and nothing has been deleted.",
+          : "Could not confirm whether deletion finished. Check your businesses before trying again.",
       );
       return;
+    } finally {
+      setBusy(false);
     }
-
-    // The login this session belonged to is gone on the usual path, so the
-    // stored session is worthless. Signing out clears it and sends the app
-    // back to the login screen through the normal auth flow.
-    await logout();
-    router.replace("/login");
   }
 
   return (
@@ -120,12 +135,29 @@ export default function DeleteAccountScreen() {
               </View>
             ) : null}
 
+            {uncertain ? (
+              <Tappable
+                style={styles.cancel}
+                onPress={() => {
+                  void refreshOrganizations().then(() =>
+                    router.replace("/select-org"),
+                  );
+                }}
+                accessibilityRole="button"
+              >
+                <Text style={styles.cancelText}>Check my businesses</Text>
+              </Tappable>
+            ) : null}
+
             <Tappable
-              style={[styles.destructive, !matches || busy ? styles.disabled : null]}
-              disabled={!matches || busy}
+              style={[
+                styles.destructive,
+                !matches || busy || uncertain ? styles.disabled : null,
+              ]}
+              disabled={!matches || busy || uncertain}
               onPress={() => void remove()}
               accessibilityRole="button"
-              accessibilityState={{ disabled: !matches || busy, busy }}
+              accessibilityState={{ disabled: !matches || busy || uncertain, busy }}
             >
               {busy ? (
                 <ActivityIndicator color={colors.white} />

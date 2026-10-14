@@ -20,13 +20,13 @@ shadcn's inspected Button, CSS-variable mapping and theme registry validate patt
 | Border `--rb-border` | `#DCE2DE` | `#303A34` |
 | Identity `--rb-brand` | `#00A86B` | `#00A86B` |
 | Text/link green `--rb-brand-text` | `#007A4D` | `#45CF99` |
-| Action `--rb-action` | `#007A4D` | `#32CF94` |
+| Action `--rb-action` | `#064E3B` | `#32CF94` |
 | On action `--rb-on-action` | `#FFFFFF` | `#071B13` |
 | Selected stars `--rb-star` | `#B97D0C` | `#F2B94B` |
 | Danger `--rb-danger` | `#B33A3A` | `#FF8F8F` |
 | Focus `--rb-focus` | `#005FCC` | `#7AB8FF` |
 
-The public shell uses warm cream `#F8F5F0`, white surfaces, deep forest `#064E3B` actions / `#04382C` hover, charcoal `#171A18`, secondary `#52625A` and border `#D8DED9`. Public dark mode uses `#0E1712` canvas, `#17241C` surfaces and `#9ED5B9` actions with dark foreground. These scoped values do not change global owner or native tokens. Pricing follows the actual public theme; it has no forced dark band. Brand green is an identity accent, not the background for small white labels. Use `action` for owner primary buttons and `brand-text` for small green text. Status includes words/icons, never color alone. Keep actual token definitions in CSS/native theme; do not create a competing token layer in a component.
+The public shell uses warm cream `#F8F5F0`, white surfaces, deep forest `#064E3B` actions / `#04382C` hover, charcoal `#171A18`, secondary `#52625A` and border `#D8DED9`. Public dark mode uses `#0E1712` canvas, `#17241C` surfaces and `#9ED5B9` actions with dark foreground. Owner light and native actions now share forest `#064E3B`, hover `#04382C` and pressed `#032B22`; other owner neutrals and dark tokens remain unchanged. Pricing follows the actual public theme; it has no forced dark band. Brand green is an identity accent, not the background for small white labels. Use `action` for owner primary buttons and `brand-text` for small green text. Status includes words/icons, never color alone. Keep actual token definitions in CSS/native theme; do not create a competing token layer in a component.
 
 ## Typography and spacing
 
@@ -82,7 +82,7 @@ For affected routes: mobile 390px, tablet 768px, desktop 1280px, plus 320px refl
 
 The homepage header/hero now uses scoped warm cream `#F8F5F0`, white product surfaces, forest actions `#064E3B` / hover `#04382C`, charcoal `#171A18`, secondary `#52625A`, border `#D8DED9`, and the recognizable bright-green mark. The latest user-provided Veyra/Midday examples resolved the display direction: centered Instrument Serif, with an italic second line and real product proof below. Geist remains for body/controls; Customer Page typography and flow remain isolated. Dark homepage treatment uses `#0E1712` canvas and `#9ED5B9` actions with dark foreground, preserving contrast.
 
-This first direction is limited to the header/hero and its existing sample component. It leads with the owner benefit, keeps setup as the primary action, and brings the full Tag/phone proof into the first mobile viewport. Native disclosure navigation retains every mobile destination. The opt-in `hero` presentation leaves the Product route's default sample appearance intact. Global tokens and owner surfaces have not migrated. See `docs/design/HOMEPAGE_DIRECTION.md` for scope and validation. The user subsequently requested continuation across the public pages; the remaining recovery work in `docs/design/PR67_LAUNCH_GAPS.md` remains a separate task.
+This first direction is limited to the header/hero and its existing sample component. It leads with the owner benefit, keeps setup as the primary action, and brings the full Tag/phone proof into the first mobile viewport. Native disclosure navigation retains every mobile destination. The opt-in `hero` presentation leaves the Product route's default sample appearance intact. At that first pass, global tokens and owner surfaces had not migrated; the owner continuation below subsequently aligned light action colors. See `docs/design/HOMEPAGE_DIRECTION.md` for scope and validation. The user subsequently requested continuation across the public pages; the remaining recovery work in `docs/design/PR67_LAUNCH_GAPS.md` remains a separate task.
 
 ## Public pages continuation — 13 October 2026
 
@@ -93,3 +93,7 @@ Keep public mobile navigation in one native disclosure, with every existing dest
 Pricing uses 16px bordered cards and restrained 48–56px tabular prices. Starter's actual trial is the primary action; Growth and Pro use secondary actions. Align comparison rows at desktop widths; let stacked mobile cards size to their content. Say “Paid plan includes” before paid allowances and keep the one-Tag/no-text trial restriction beside its action. No invented popularity, lifting cards, green glow or duplicated common benefits. Catalog values and plan-preserving sign-in destinations remain authoritative.
 
 Evidence and scope: `docs/design/PUBLIC_PAGES_PASS.md`; before/after gallery: `docs/design/public-pages/review.html`. Owner recovery and external launch checks remain tracked separately in `PR67_LAUNCH_GAPS.md`.
+
+## Owner continuation
+
+Responsive headers place explanations above actions on mobile; desktop Tag actions stay around 28rem. Feedback has an explicit heading, truthful rating-only copy and separate Read / Sorted states. Settings groups identity and account controls; business switching appears for actual multiple memberships. Photo replacement/removal saves a draft through the existing API; Publish remains explicit. Check authoritative state after an uncertain write before offering another append, send or creation. Shared reads have a 20-second deadline and writes a 30-second deadline, without automatic replay. NFC retains its full-screen composition inside a focus-trapping, Escape-dismissible Radix dialog. Evidence and an importable Figma board: `docs/design/owner-app/`. Direct Figma editing/import was unavailable to verify.

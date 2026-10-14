@@ -114,7 +114,7 @@ export async function proxy(request: NextRequest) {
     url.pathname = "/login";
     // Carries where they were going, so signing in lands them there instead of
     // dumping them on a home page to navigate again.
-    url.searchParams.set("next", pathname);
+    url.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(url);
   }
 

@@ -75,3 +75,7 @@ Read `frontend/AGENTS.md` and the relevant **installed** Next.js guide under `fr
 ## Requested design tools
 
 Impeccable, Awesome Design MD (Stripe reference) and UI Design Agent Kit are installed locally under `.agents/skills`; upstream shadcn is cloned at `design-kit/`. These reference checkouts are ignored rather than vendored into the product. `scripts/dev/install-design-references.py` recreates pinned installations; see `docs/design/reference-lock.json` for exact commits. User requirements and this existing product's contract outrank external templates or skill defaults. Do not introduce approval pauses, replacement branding or a new frontend merely because a reference suggests them.
+
+## Request recovery and multi-business QR
+
+Use shared owner request deadlines (20-second reads, 30-second writes), catch restoration failures and finish busy states. A lost response is an uncertain outcome: reconcile server state before retrying non-idempotent appends, sends or creation. Never automatically replay a write. The authenticated QR hook keeps Bearer authorization and `credentials: omit`; pass the server-verified organization ID as `X-Organization-Id` for multiple memberships. The backend still checks membership and resource tenancy. The public QR/customer path stays separate. Respect account deletion’s existing `signInRemoved` response on web and native.

@@ -1,7 +1,15 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/components/ui/toast", () => ({ notify: { error: vi.fn(), success: vi.fn() } }));
+vi.mock("@/components/ui/toast", () => ({
+  notify: { error: vi.fn(), success: vi.fn() },
+}));
 
 const getSession = vi.fn();
 vi.mock("@/lib/supabase/browser", () => ({
@@ -15,8 +23,12 @@ const STAND_URL = "https://reviewboost.fit/q/abc123DEF456ghi";
 
 /** A stand-in for the browser's NDEFReader, recording what was written. */
 class FakeNDEFReader {
-  static writes: Array<{ records: Array<{ recordType: string; data: string }> }> = [];
-  static onScan: ((emit: (records: unknown[]) => void, fail: () => void) => void) | null = null;
+  static writes: Array<{
+    records: Array<{ recordType: string; data: string }>;
+  }> = [];
+  static onScan:
+    ((emit: (records: unknown[]) => void, fail: () => void) => void) | null =
+    null;
   static writeError: Error | null = null;
   static scanError: Error | null = null;
   static scans = 0;
@@ -37,7 +49,9 @@ class FakeNDEFReader {
     );
   }
 
-  async write(message: { records: Array<{ recordType: string; data: string }> }) {
+  async write(message: {
+    records: Array<{ recordType: string; data: string }>;
+  }) {
     if (FakeNDEFReader.writeGate) await FakeNDEFReader.writeGate;
     if (FakeNDEFReader.writeError) throw FakeNDEFReader.writeError;
     FakeNDEFReader.writes.push(message);
@@ -46,7 +60,11 @@ class FakeNDEFReader {
 
 /** An NDEF record as the browser hands it over: bytes plus an encoding. */
 function record(recordType: string, text: string) {
-  return { recordType, data: new TextEncoder().encode(text), encoding: "utf-8" };
+  return {
+    recordType,
+    data: new TextEncoder().encode(text),
+    encoding: "utf-8",
+  };
 }
 
 /**
@@ -66,7 +84,9 @@ describe("Program Tag sheet", () => {
     FakeNDEFReader.scanError = null;
     FakeNDEFReader.scans = 0;
     FakeNDEFReader.writeGate = null;
-    getSession.mockResolvedValue({ data: { session: { access_token: "token" } } });
+    getSession.mockResolvedValue({
+      data: { session: { access_token: "token" } },
+    });
     vi.stubGlobal("NDEFReader", FakeNDEFReader);
   });
 
@@ -76,13 +96,18 @@ describe("Program Tag sheet", () => {
   });
 
   /** url lookup → ok; provisioning POST → caller's choice. */
-  function mockFetch({ provisionOk = true, standUrl = STAND_URL }: { provisionOk?: boolean; standUrl?: string } = {}) {
+  function mockFetch({
+    provisionOk = true,
+    standUrl = STAND_URL,
+  }: { provisionOk?: boolean; standUrl?: string } = {}) {
     const calls: string[] = [];
     const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       calls.push(`${init?.method ?? "GET"} ${url}`);
       if (url.includes("/qr")) {
-        return new Response(JSON.stringify({ data: { standUrl } }), { status: 200 });
+        return new Response(JSON.stringify({ data: { standUrl } }), {
+          status: 200,
+        });
       }
       return new Response("{}", { status: provisionOk ? 200 : 503 });
     });
@@ -92,7 +117,11 @@ describe("Program Tag sheet", () => {
 
   /** The sheet's own state, rather than copy that appears in title and body. */
   function phase(): string | null {
-    return document.querySelector("[data-nfc-phase]")?.getAttribute("data-nfc-phase") ?? null;
+    return (
+      document
+        .querySelector("[data-nfc-phase]")
+        ?.getAttribute("data-nfc-phase") ?? null
+    );
   }
 
   async function hold() {
@@ -101,18 +130,28 @@ describe("Program Tag sheet", () => {
 
   /** The owner-visible scene, as opposed to the machine phase underneath. */
   function scene(): string | null {
-    return document.querySelector("[data-nfc-scene]")?.getAttribute("data-nfc-scene") ?? null;
+    return (
+      document
+        .querySelector("[data-nfc-scene]")
+        ?.getAttribute("data-nfc-scene") ?? null
+    );
   }
 
   function renderSheet(onReady = vi.fn(), onClose = vi.fn()) {
     render(
-      <ProgramTagSheet standId="stand-1" open onClose={onClose} onReady={onReady} />,
+      <ProgramTagSheet
+        standId="stand-1"
+        open
+        onClose={onClose}
+        onReady={onReady}
+      />,
     );
     return onReady;
   }
 
   function title(): string | null {
-    return document.getElementById("nfc-title")?.textContent ?? null;
+    const titleId = screen.getByRole("dialog").getAttribute("aria-labelledby");
+    return document.getElementById(titleId ?? "")?.textContent ?? null;
   }
 
   it("never programs a chip with anything but a ReviewBoost /q/ link — not even one the server sent", async () => {
@@ -123,11 +162,21 @@ describe("Program Tag sheet", () => {
     ]) {
       const calls = mockFetch({ standUrl });
       FakeNDEFReader.onScan = (emit) => act(() => emit([]));
-      const { unmount } = render(<ProgramTagSheet standId="stand-1" open onClose={vi.fn()} onReady={vi.fn()} />);
+      const { unmount } = render(
+        <ProgramTagSheet
+          standId="stand-1"
+          open
+          onClose={vi.fn()}
+          onReady={vi.fn()}
+        />,
+      );
       await hold();
       await waitFor(() => expect(phase()).toBe("failed"));
       expect(FakeNDEFReader.writes, standUrl).toHaveLength(0);
-      expect(calls.filter((call) => call.startsWith("POST")), standUrl).toHaveLength(0);
+      expect(
+        calls.filter((call) => call.startsWith("POST")),
+        standUrl,
+      ).toHaveLength(0);
       unmount();
     }
   });
@@ -177,7 +226,8 @@ describe("Program Tag sheet", () => {
 
   it("does not rewrite a Tag that already points here", async () => {
     const calls = mockFetch();
-    FakeNDEFReader.onScan = (emit) => act(() => emit([record("url", STAND_URL)]));
+    FakeNDEFReader.onScan = (emit) =>
+      act(() => emit([record("url", STAND_URL)]));
 
     const onReady = renderSheet();
     await hold();
@@ -226,7 +276,10 @@ describe("Program Tag sheet", () => {
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes("/qr")) {
-          return new Response(JSON.stringify({ data: { standUrl: STAND_URL } }), { status: 200 });
+          return new Response(
+            JSON.stringify({ data: { standUrl: STAND_URL } }),
+            { status: 200 },
+          );
         }
         return new Response("{}", { status: provisionOk ? 200 : 503 });
       }),
@@ -347,7 +400,10 @@ describe("Program Tag sheet", () => {
   });
 
   it("says when it could not reach ReviewBoost, before touching the Tag", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("offline"))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(new TypeError("offline"))),
+    );
 
     renderSheet();
     await hold();

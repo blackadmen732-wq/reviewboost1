@@ -76,6 +76,7 @@ export function InsightsView({
               <p className="mt-2 max-w-[36ch] text-base leading-relaxed text-muted">
                 Your insights will appear as customers respond.
               </p>
+              <Link href="/stands" className="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline-offset-4 hover:underline">View your Tags</Link>
             </section>
           ) : state === "quiet" ? (
             <section className="max-w-[36rem]">

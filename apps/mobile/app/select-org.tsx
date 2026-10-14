@@ -1,4 +1,10 @@
-import { View, Text, StyleSheet, FlatList, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+} from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -8,7 +14,15 @@ import { colors, radii, fonts } from "@/theme";
 import type { Organization } from "@/data/types";
 
 export default function SelectOrgScreen() {
-  const { organizations, selectOrg, name, logout, orgLoading, orgError } = useAuth();
+  const {
+    organizations,
+    selectOrg,
+    name,
+    logout,
+    orgLoading,
+    orgError,
+    refreshOrganizations,
+  } = useAuth();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
@@ -69,11 +83,26 @@ export default function SelectOrgScreen() {
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           orgLoading ? (
-            <ActivityIndicator size="large" color={colors.brand} style={styles.spinner} />
+            <ActivityIndicator
+              size="large"
+              color={colors.brand}
+              style={styles.spinner}
+            />
           ) : orgError ? (
-            <Text style={styles.errorText}>{orgError}</Text>
+            <View>
+              <Text style={styles.errorText}>{orgError}</Text>
+              <Tappable
+                kind="row"
+                onPress={() => void refreshOrganizations()}
+                accessibilityRole="button"
+              >
+                <Text style={styles.logoutText}>Try again</Text>
+              </Tappable>
+            </View>
           ) : (
-            <Text style={styles.empty}>No organizations found for this account</Text>
+            <Text style={styles.empty}>
+              No organizations found for this account
+            </Text>
           )
         }
       />
@@ -84,7 +113,11 @@ export default function SelectOrgScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
   headerText: { flex: 1 },
   greeting: { fontSize: 24, ...fonts.heading, color: colors.ink },
   subtitle: { fontSize: 15, color: colors.inkMuted, marginTop: 4 },
@@ -106,8 +139,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   orgName: { fontSize: 18, ...fonts.subheading, color: colors.ink },
-  role: { fontSize: 14, color: colors.inkMuted, marginTop: 2, textTransform: "capitalize" },
-  empty: { textAlign: "center", color: colors.inkFaint, marginTop: 40, fontSize: 15 },
-  errorText: { textAlign: "center", color: colors.danger, marginTop: 12, fontSize: 14 },
+  role: {
+    fontSize: 14,
+    color: colors.inkMuted,
+    marginTop: 2,
+    textTransform: "capitalize",
+  },
+  empty: {
+    textAlign: "center",
+    color: colors.inkFaint,
+    marginTop: 40,
+    fontSize: 15,
+  },
+  errorText: {
+    textAlign: "center",
+    color: colors.danger,
+    marginTop: 12,
+    fontSize: 14,
+  },
   spinner: { marginTop: 40 },
 });

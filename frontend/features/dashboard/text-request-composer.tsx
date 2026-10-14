@@ -20,7 +20,7 @@ import {
   type ConsentMethod,
   type TextRequestTemplateId,
 } from "@/lib/sms/text-request-templates";
-import { supabaseBrowser } from "@/lib/supabase/browser";
+import { ownerFetch } from "@/lib/api/owner-fetch";
 
 interface Balance {
   monthly: number;
@@ -99,25 +99,16 @@ export function TextRequestComposer({
   const [consentMethod, setConsentMethod] = useState<ConsentMethod | "">("");
   const [consentConfirmed, setConsentConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [sendUncertain, setSendUncertain] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function authorizedFetch(
     path: string,
     body: unknown,
   ): Promise<Response> {
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
-
-    if (!session)
-      throw new Error("Your session expired. Please sign in again.");
-
-    return fetch(path, {
+    return ownerFetch(path, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
   }
@@ -183,6 +174,7 @@ export function TextRequestComposer({
       notify.success("Queued", "We will send it and show the result here.");
       router.refresh();
     } catch (caught) {
+      setSendUncertain(true);
       setError(
         caught instanceof Error ? caught.message : "Something went wrong.",
       );
@@ -237,6 +229,7 @@ export function TextRequestComposer({
 
   const canSend =
     canSendRequests &&
+    !sendUncertain &&
     preview !== null &&
     preview.eligibility.allowed &&
     standId !== "" &&
@@ -248,7 +241,37 @@ export function TextRequestComposer({
 
   return (
     <div className="flex flex-col gap-6">
-      <BalanceLine balance={balance} />
+      {sendUncertain ? (
+        <InlineNotice kind="info">
+          <p>Could not confirm sending. Check Recent before trying again.</p>
+          <Button
+            variant="secondary"
+            className="mt-3"
+            onClick={() => {
+              router.refresh();
+              clearPreview();
+              setSendUncertain(false);
+            }}
+          >
+            Check recent requests
+          </Button>
+        </InlineNotice>
+      ) : null}
+      <div>
+        <BalanceLine balance={balance} />
+        {balance.total === 0 ? (
+          <p className="mt-2 max-w-[48ch] text-sm leading-relaxed text-muted">
+            You can preview a request now. Sending needs available texts and the
+            customer’s recorded agreement.{" "}
+            <Link
+              href="/settings/billing"
+              className="font-medium text-brand-text underline underline-offset-4"
+            >
+              View billing and allowance
+            </Link>
+          </p>
+        ) : null}
+      </div>
 
       <section
         className="flex flex-col gap-5"
@@ -403,7 +426,7 @@ export function TextRequestComposer({
                       <input
                         type="radio"
                         name="consent-method"
-                          className="accent-action"
+                        className="accent-action"
                         value={id}
                         checked={consentMethod === id}
                         onChange={() => setConsentMethod(id)}
