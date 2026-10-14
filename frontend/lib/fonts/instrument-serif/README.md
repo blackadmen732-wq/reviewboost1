@@ -1,6 +1,6 @@
 # Instrument Serif
 
-Unmodified Regular and Italic files, self-hosted with `next/font/local` for the homepage display heading only. Body/owner typography remains Geist; customer typography remains Inter Tight/DM Sans.
+Unmodified Regular and Italic files, self-hosted with `next/font/local` for public marketing display headings. Body/owner typography remains Geist; customer typography remains Inter Tight/DM Sans. The shared declaration is `../public-editorial.ts`.
 
 Source: https://github.com/google/fonts/tree/66928797f271fed5ee428544e7229685e2d90127/ofl/instrumentserif
 

@@ -79,11 +79,10 @@
   }
 }
 
-/* First visual-direction pass: homepage header and hero only. The customer
-   canvas, owner theme and other public routes keep their own design tokens. */
-.public-shell--home .public-header,
-.public-shell--home .public-hero {
+/* Public-site palette. Owner and live customer surfaces keep their own tokens. */
+.public-shell {
   --rb-canvas: #f8f5f0;
+  --rb-surface: #ffffff;
   --rb-quiet: #eeebe5;
   --rb-ink: #171a18;
   --rb-muted: #52625a;
@@ -96,12 +95,12 @@
   background: var(--rb-canvas);
   color: var(--rb-ink);
 }
-.public-shell--home .public-header {
+.public-shell .public-header {
   position: relative;
   z-index: 10;
   border-bottom-color: transparent;
 }
-.public-shell--home .public-header__row {
+.public-shell .public-header__row {
   max-width: 1184px;
   height: 80px;
 }
@@ -261,7 +260,7 @@
   margin-top: 8px;
   font-size: 12px;
 }
-.public-shell--home .public-header ::selection,
+.public-shell .public-header ::selection,
 .public-shell--home .public-hero ::selection {
   color: #fff;
   background: #064e3b;
@@ -291,7 +290,7 @@
   }
 }
 @media (max-width: 767px) {
-  .public-shell--home .public-header__row {
+  .public-shell .public-header__row {
     height: 72px;
     gap: 8px;
   }
@@ -335,9 +334,9 @@
   }
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .public-shell--home .public-header,
-  :root:not([data-theme="light"]) .public-shell--home .public-hero {
+  :root:not([data-theme="light"]) .public-shell {
     --rb-canvas: #0e1712;
+    --rb-surface: #17241c;
     --rb-quiet: #1d2a22;
     --rb-ink: #f5f3ed;
     --rb-muted: #b5bfb6;
@@ -353,7 +352,7 @@
   }
 }
 @media (max-width: 359px) {
-  .public-shell--home .public-header__row > div > .button {
+  .public-shell .public-header__row > div > .button {
     display: none;
   }
   .product-demo--hero .product-demo__objects {
@@ -373,9 +372,9 @@
     margin-block: 12px;
   }
 }
-:root[data-theme="dark"] .public-shell--home .public-header,
-:root[data-theme="dark"] .public-shell--home .public-hero {
+:root[data-theme="dark"] .public-shell {
   --rb-canvas: #0e1712;
+  --rb-surface: #17241c;
   --rb-quiet: #1d2a22;
   --rb-ink: #f5f3ed;
   --rb-muted: #b5bfb6;
@@ -388,4 +387,199 @@
 }
 :root[data-theme="dark"] .product-demo--hero fieldset button {
   color: #e1b454;
+}
+
+.public-shell .public-header nav a[aria-current="page"] {
+  color: var(--rb-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 7px;
+}
+.public-display {
+  margin: 0;
+  font-family: var(--font-public-editorial), serif;
+  font-size: clamp(3rem, 5.6vw, 4.5rem);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.public-article--marketing {
+  width: 100%;
+  max-width: 1184px;
+  margin-inline: auto;
+  padding: 64px 32px 80px;
+}
+.public-article__intro {
+  max-width: 720px;
+  margin-inline: auto;
+  text-align: center;
+}
+.public-article__intro > p {
+  margin-inline: auto;
+}
+.public-intro-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 24px;
+}
+.public-article__media {
+  margin-top: 48px;
+}
+.public-article__media .product-demo--hero {
+  margin-top: 0;
+}
+.public-article__body {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 720px;
+  margin: 56px auto 0;
+  font-size: 16px;
+  line-height: 1.65;
+}
+.public-article__body h2 {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+.public-article__body p {
+  max-width: 60ch;
+  color: var(--rb-muted);
+}
+.public-article__body section > p {
+  margin-top: 12px;
+}
+.public-product-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  padding-block: 32px;
+  border-block: 1px solid var(--rb-border);
+}
+.public-product-details {
+  border-block: 1px solid var(--rb-border);
+}
+.public-product-details summary {
+  display: list-item;
+  min-height: 56px;
+  padding-block: 16px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.public-product-details > div {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+.public-product-details summary:focus-visible {
+  outline: 3px solid var(--rb-focus);
+  outline-offset: 4px;
+}
+.public-flow {
+  border-top: 1px solid var(--rb-border);
+}
+.public-flow > li {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 24px;
+  padding-block: 28px;
+  border-bottom: 1px solid var(--rb-border);
+}
+.public-flow__number {
+  color: var(--rb-action);
+  font-family: var(--font-public-editorial), serif;
+  font-size: 40px;
+  line-height: 1;
+}
+.public-pricing__inner {
+  max-width: 1184px;
+  margin-inline: auto;
+  padding: 64px 32px 72px;
+}
+.public-pricing__intro {
+  max-width: 680px;
+  margin-inline: auto;
+  text-align: center;
+}
+.public-plans {
+  display: grid;
+  gap: 24px;
+  max-width: 480px;
+  margin-inline: auto;
+}
+.public-plan {
+  display: flex;
+  flex-direction: column;
+  padding: 28px;
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  background: var(--rb-surface);
+  transition: border-color 180ms ease-out;
+}
+.public-plan:hover,
+.public-plan:focus-within {
+  border-color: var(--rb-action);
+}
+.public-plan__fit {
+  min-height: 48px;
+  margin-top: 8px;
+  color: var(--rb-muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.public-plan__terms {
+  min-height: 72px;
+}
+@media (min-width: 1024px) {
+  .public-plans {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: 1040px;
+  }
+}
+@media (max-width: 767px) {
+  .public-article--marketing,
+  .public-pricing__inner {
+    padding: 40px 20px 48px;
+  }
+  .public-article__media,
+  .public-article__body {
+    margin-top: 40px;
+  }
+  .public-product-options {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    padding-block: 24px;
+  }
+  .public-flow > li {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 16px;
+    padding-block: 24px;
+  }
+  .public-flow__number {
+    font-size: 32px;
+  }
+  .public-article__body h2 {
+    font-size: 20px;
+  }
+  .public-plan {
+    padding: 24px;
+  }
+  .public-plan__fit {
+    min-height: 0;
+  }
+  .public-plan__terms {
+    min-height: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .public-plan {
+    transition: none;
+  }
 }

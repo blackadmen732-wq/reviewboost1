@@ -7,21 +7,41 @@ import { PublicArticle } from "@/features/public/public-article";
 
 export const metadata: Metadata = {
   title: "How it works",
-  description: "Put a Tag where people pay. They scan and rate. Everyone is offered Google.",
+  description:
+    "Put a Tag where people pay. They scan and rate. Everyone is offered Google.",
 };
 
 export default function HowItWorksPage() {
   return (
     <PublicArticle
+      marketing
+      currentPath="/how-it-works"
       title="How it works"
-      lede="Three steps. The rating never chooses who gets to leave a Google review."
+      lede="From your counter to your Feedback, in three steps."
+      actions={
+        <>
+          <Button asChild variant="action" className="w-auto">
+            <Link href={START_HREF}>Get started</Link>
+          </Button>
+          <Link
+            href="/product#customer-example"
+            className="public-hero__sample-link"
+          >
+            Try the customer example
+          </Link>
+        </>
+      }
     >
-      <ol className="flex flex-col gap-10">
+      <ol className="public-flow">
         {HOW_IT_WORKS.map((step, index) => (
           <li key={step.title}>
-            <p className="text-sm font-medium text-muted">{String(index + 1).padStart(2, "0")}</p>
-            <h2 className="!mt-2">{step.title}</h2>
-            <p className="mt-2">{step.body}</p>
+            <span className="public-flow__number" aria-hidden="true">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <div>
+              <h2>{step.title}</h2>
+              <p className="mt-2">{step.body}</p>
+            </div>
           </li>
         ))}
       </ol>
@@ -34,11 +54,6 @@ export default function HowItWorksPage() {
         told you about. The Google link is offered the same way whatever the
         rating was.
       </p>
-      <div className="mt-4 max-w-xs">
-        <Button asChild variant="action">
-          <Link href={START_HREF}>Get started</Link>
-        </Button>
-      </div>
     </PublicArticle>
   );
 }
