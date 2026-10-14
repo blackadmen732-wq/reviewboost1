@@ -49,7 +49,16 @@ export function isValidGoogleReviewUrl(value: string): boolean {
 }
 
 /**
- * The URL a printed code or an NFC tag resolves to.
+ * Strict form for writes: a link that opens Google's review-writing box. The
+ * rule lives in `lib/security/google-review-url.ts` so the owner's form, this
+ * server and the database (`public._is_google_review_writing_url`) apply one
+ * definition; tests assert all three agree.
+ */
+export { isGoogleReviewWritingUrl } from "@/lib/security/google-review-url";
+
+/**
+ * The URL a printed code or an NFC tag resolves to. Production code uses
+ * `canonicalTagUrl` (lib/server/tag-url.ts), which also checks the result.
  *
  * Built against the configured frontend origin and nothing from the request, so
  * it cannot become an open redirect. The token is encoded, keeping it a single

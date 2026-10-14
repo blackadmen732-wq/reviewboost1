@@ -3,13 +3,15 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Tappable } from "@/components/tappable";
+import { BrandLockup } from "@/components/brand-lockup";
 import { useAuth } from "@/data/auth-context";
 import { colors, radii, fonts } from "@/theme";
 
@@ -24,8 +26,11 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const codeField = useRef<TextInput>(null);
-  const { sendCode, verifyCode } = useAuth();
+  const { sendCode, verifyCode, sessionError } = useAuth();
   const router = useRouter();
+  // The back link sits under the status bar / Dynamic Island on every
+  // iPhone, rather than at a fixed 64pt that only fits some of them.
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
@@ -33,7 +38,8 @@ export default function LoginScreen() {
     return () => clearTimeout(timer);
   }, [secondsLeft]);
 
-  const canSubmitEmail = email.trim().length >= 5 && email.includes("@") && !submitting;
+  const canSubmitEmail =
+    email.trim().length >= 5 && email.includes("@") && !submitting;
   const canSubmitCode = code.length === CODE_LENGTH && !submitting;
 
   const handleSendCode = async () => {
@@ -43,14 +49,15 @@ export default function LoginScreen() {
     setSubmitting(true);
 
     try {
-      const err = await sendCode(address);
-      if (err) {
-        setError(err);
+      const result = await sendCode(address);
+      if (result.kind === "failed") {
+        setError(result.message);
         return;
       }
       setEmail(address);
       setCode("");
       setStep("code");
+      if (result.kind === "throttled") setError(result.message);
       setSecondsLeft(RESEND_SECONDS);
       setTimeout(() => codeField.current?.focus(), 100);
     } catch {
@@ -65,9 +72,10 @@ export default function LoginScreen() {
     setError(null);
     setSubmitting(true);
     try {
-      const err = await sendCode(email);
-      if (err) {
-        setError(err);
+      const result = await sendCode(email);
+      if (result.kind !== "sent") {
+        setError(result.message);
+        if (result.kind === "throttled") setSecondsLeft(RESEND_SECONDS);
         return;
       }
       setCode("");
@@ -109,8 +117,8 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.inner}>
-          <Pressable
-            style={styles.backButton}
+          <Tappable
+            style={[styles.backButton, { top: insets.top + 8 }]}
             onPress={() => {
               setStep("email");
               setError(null);
@@ -119,13 +127,18 @@ export default function LoginScreen() {
             accessibilityRole="button"
           >
             <Text style={styles.backText}>← Use a different email</Text>
-          </Pressable>
+          </Tappable>
 
           <Text style={styles.brand}>Check your email</Text>
           <Text style={styles.subtitle}>
             We sent a {CODE_LENGTH}-digit code to {email}
           </Text>
 
+          {sessionError && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{sessionError}</Text>
+            </View>
+          )}
           {error && (
             <View style={styles.errorBox}>
               <Text style={styles.errorText}>{error}</Text>
@@ -138,7 +151,9 @@ export default function LoginScreen() {
             placeholder="000000"
             placeholderTextColor={colors.inkFaint}
             value={code}
-            onChangeText={(value) => setCode(value.replace(/\D/g, "").slice(0, CODE_LENGTH))}
+            onChangeText={(value) =>
+              setCode(value.replace(/\D/g, "").slice(0, CODE_LENGTH))
+            }
             keyboardType="number-pad"
             autoComplete="one-time-code"
             textContentType="oneTimeCode"
@@ -146,7 +161,7 @@ export default function LoginScreen() {
             editable={!submitting}
           />
 
-          <Pressable
+          <Tappable
             style={[styles.button, !canSubmitCode && styles.buttonDisabled]}
             onPress={handleVerify}
             disabled={!canSubmitCode}
@@ -157,18 +172,25 @@ export default function LoginScreen() {
             ) : (
               <Text style={styles.buttonText}>Sign in</Text>
             )}
-          </Pressable>
+          </Tappable>
 
-          <Pressable
+          <Tappable
             style={styles.resendButton}
             onPress={handleResend}
             disabled={secondsLeft > 0 || submitting}
             accessibilityRole="button"
           >
-            <Text style={[styles.resendText, secondsLeft > 0 && styles.resendDisabled]}>
-              {secondsLeft > 0 ? `Send a new code in ${secondsLeft}s` : "Send a new code"}
+            <Text
+              style={[
+                styles.resendText,
+                secondsLeft > 0 && styles.resendDisabled,
+              ]}
+            >
+              {secondsLeft > 0
+                ? `Send a new code in ${secondsLeft}s`
+                : "Send a new code"}
             </Text>
-          </Pressable>
+          </Tappable>
         </View>
       </KeyboardAvoidingView>
     );
@@ -180,10 +202,21 @@ export default function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.inner}>
-        <Text style={styles.brand}>ReviewBoost</Text>
+        <View style={styles.brand}>
+          <BrandLockup height={40} />
+        </View>
         <Text style={styles.subtitle}>
-          Enter your email and we&apos;ll send you a sign-in code. No password needed.
+          Enter your email and we&apos;ll send you a sign-in code. No password
+          needed.
         </Text>
+
+        {sessionError && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText} accessibilityLiveRegion="polite">
+              {sessionError}
+            </Text>
+          </View>
+        )}
 
         {error && (
           <View style={styles.errorBox}>
@@ -204,7 +237,7 @@ export default function LoginScreen() {
           editable={!submitting}
         />
 
-        <Pressable
+        <Tappable
           style={[styles.button, !canSubmitEmail && styles.buttonDisabled]}
           onPress={handleSendCode}
           disabled={!canSubmitEmail}
@@ -215,7 +248,7 @@ export default function LoginScreen() {
           ) : (
             <Text style={styles.buttonText}>Continue</Text>
           )}
-        </Pressable>
+        </Tappable>
       </View>
     </KeyboardAvoidingView>
   );
@@ -224,7 +257,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   inner: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
-  brand: { fontSize: 32, ...fonts.heading, color: colors.brandText, textAlign: "center" },
+  brand: { alignItems: "center" },
   subtitle: {
     fontSize: 16,
     color: colors.inkMuted,
@@ -233,7 +266,13 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     lineHeight: 22,
   },
-  backButton: { position: "absolute", top: 64, left: 24 },
+  backButton: {
+    position: "absolute",
+    left: 16,
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
   backText: { fontSize: 15, color: colors.inkMuted },
   errorBox: {
     backgroundColor: colors.dangerBg,

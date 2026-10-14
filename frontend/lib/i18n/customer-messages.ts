@@ -32,6 +32,7 @@ export interface CustomerMessages {
   handoffBody: string;
   openReviewPage: string;
   poweredBy: string;
+  footerPromise: string;
   businessLogoAlt: (businessName: string) => string;
 }
 
@@ -51,7 +52,7 @@ const en: CustomerMessages = {
   loadErrorBody: "Check your connection and try again.",
   tryAgain: "Try again",
   ratingHeading: "How was your visit?",
-  ratingSupport: "Tap a star to let us know.",
+  ratingSupport: "Tap a star to continue to Google",
   ratingGroup: "Rate your visit from 1 to 5 stars",
   ratingSpoken: {
     1: "1 star — Not good",
@@ -76,6 +77,7 @@ const en: CustomerMessages = {
   handoffBody: "Taking you to the public review page…",
   openReviewPage: "Open the review page",
   poweredBy: "Powered by ReviewBoost",
+  footerPromise: "Real businesses. Real feedback. A brighter tomorrow.",
   businessLogoAlt: (businessName) => `${businessName} logo`,
 };
 
@@ -89,7 +91,7 @@ const es: CustomerMessages = {
   loadErrorBody: "Revisa tu conexión e inténtalo de nuevo.",
   tryAgain: "Intentar de nuevo",
   ratingHeading: "¿Cómo estuvo tu visita?",
-  ratingSupport: "Toca una estrella para contarnos.",
+  ratingSupport: "Toca una estrella para continuar a Google",
   ratingGroup: "Califica tu visita de 1 a 5 estrellas",
   ratingSpoken: {
     1: "1 estrella — No estuvo bien",
@@ -114,6 +116,7 @@ const es: CustomerMessages = {
   handoffBody: "Te llevamos a la página pública de reseñas…",
   openReviewPage: "Abrir la página de reseñas",
   poweredBy: "Con tecnología de ReviewBoost",
+  footerPromise: "Negocios reales. Comentarios reales. Un mañana más brillante.",
   businessLogoAlt: (businessName) => `Logo de ${businessName}`,
 };
 
@@ -127,7 +130,7 @@ const ht: CustomerMessages = {
   loadErrorBody: "Verifye koneksyon ou epi eseye ankò.",
   tryAgain: "Eseye ankò",
   ratingHeading: "Kijan vizit ou te ye?",
-  ratingSupport: "Peze yon etwal pou fè nou konnen.",
+  ratingSupport: "Peze yon etwal pou kontinye sou Google",
   ratingGroup: "Bay vizit ou ant 1 ak 5 etwal",
   ratingSpoken: {
     1: "1 etwal — Pa bon",
@@ -152,6 +155,7 @@ const ht: CustomerMessages = {
   handoffBody: "N ap mennen ou sou paj revi piblik la…",
   openReviewPage: "Ouvri paj revi a",
   poweredBy: "ReviewBoost mache paj sa a",
+  footerPromise: "Biznis reyèl. Kòmantè reyèl. Yon demen pi klere.",
   businessLogoAlt: (businessName) => `Logo ${businessName}`,
 };
 

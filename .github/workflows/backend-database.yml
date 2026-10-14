@@ -14,12 +14,14 @@ on:
   push:
     paths:
       - "supabase/**"
+      - "scripts/backend/**"
       - "frontend/lib/server/**"
       - "frontend/app/api/**"
       - ".github/workflows/backend-database.yml"
   pull_request:
     paths:
       - "supabase/**"
+      - "scripts/backend/**"
       - "frontend/lib/server/**"
       - "frontend/app/api/**"
       - ".github/workflows/backend-database.yml"
@@ -41,7 +43,9 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned. `latest` means a CLI release can change what `db reset`,
+          # `db diff` or the advisors report without any commit here.
+          version: 2.117.0
 
       - name: Start Supabase
         run: supabase start --exclude studio,imgproxy,edge-runtime,logflare,vector,pooler
@@ -70,12 +74,47 @@ jobs:
       - name: Row level security and isolation tests
         run: supabase test db
 
-      - name: Supabase advisors
-        # Surfaces missing RLS, exposed views, and mutable search_path on
-        # functions. Non-blocking for now because the report includes advice
-        # about tables later phases will add.
-        continue-on-error: true
-        run: supabase inspect db outliers || true
+      - name: Supabase security advisor (blocking on ERROR)
+        # The same linter the hosted dashboard runs. ERROR-level security
+        # findings (RLS disabled on an exposed table, a SECURITY DEFINER view,
+        # auth.users exposed, ...) stop the merge. WARN-level ones are reviewed
+        # individually in docs/backend/SECURITY_REVIEW.md and pinned by
+        # supabase/tests/privilege_surface_test.sql, so they are printed, not
+        # fatal.
+        run: supabase db advisors --local --type security --level warn --fail-on error
+
+      - name: Supabase performance advisor (report only)
+        # Informational: unindexed foreign keys and unused indexes are judged
+        # against real query plans, not added blindly (docs/backend/SCALING.md).
+        run: supabase db advisors --local --type performance --level warn --fail-on none
+
+  upgrade:
+    name: Populated upgrades (hosted schema and pre-destination)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL 16 and pgTAP
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-16 postgresql-16-pgtap
+
+      - name: Hosted schema -> head, with data
+        # The production forward path. The hosted ledger records the first 36
+        # migrations (through 20260901213000); this proves the rest apply on
+        # top of a populated database without losing or granting anything.
+        run: sudo -E scripts/backend/local-postgres.sh upgrade 20260901213000 hosted
+
+      - name: Pre-destination -> head, with the old SMS ledger
+        run: sudo -E scripts/backend/local-postgres.sh upgrade 20260902000800 populated
+
+      - name: pgTAP suites on the plain-Postgres shim
+        # A second, independent run of every suite, so a failure that only
+        # appears without the Supabase images is still caught.
+        run: |
+          sudo -E scripts/backend/local-postgres.sh reset
+          sudo -E scripts/backend/local-postgres.sh test
 
   contract:
     name: Type check, build, and contract tests
@@ -123,7 +162,7 @@ jobs:
           # Exit status comes from grep, not from a trailing pipe stage — a
           # `grep ... | head` here always succeeds and the check silently
           # passes forever.
-          if git grep -nIE '(sk_live_|re_[A-Za-z0-9_]{20,}|SK[0-9a-f]{32}|AC[0-9a-f]{32}|ghp_[A-Za-z0-9]{30,})' \
+          if git grep -nIE '(sk_live_|(^|[^A-Za-z0-9_])re_[A-Za-z0-9_]{20,}|SK[0-9a-f]{32}|AC[0-9a-f]{32}|ghp_[A-Za-z0-9]{30,})' \
                -- ':!*.md' ':!.github/**' ':!.githooks/**'; then
             echo "::error::A live credential appears to be committed."
             exit 1

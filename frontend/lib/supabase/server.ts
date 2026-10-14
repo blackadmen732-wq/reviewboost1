@@ -40,9 +40,23 @@ export async function supabaseServer() {
   );
 }
 
-/** The signed-in user, or null. Never throws — callers decide what to do. */
+/**
+ * The signed-in user, or null. Never throws — callers decide what to do.
+ *
+ * "Never throws" has to be enforced, not just promised. `createServerClient`
+ * throws outright when the Supabase URL or key is missing, so on an environment
+ * without them this used to crash every caller — including `/login`, which is
+ * where an unauthenticated visitor is sent, making the way back in a 500.
+ *
+ * Any failure to establish who the viewer is means "nobody", which is the
+ * fail-closed answer: callers treat null as signed out.
+ */
 export async function currentUser() {
-  const supabase = await supabaseServer();
-  const { data } = await supabase.auth.getUser();
-  return data.user;
+  try {
+    const supabase = await supabaseServer();
+    const { data } = await supabase.auth.getUser();
+    return data.user;
+  } catch {
+    return null;
+  }
 }

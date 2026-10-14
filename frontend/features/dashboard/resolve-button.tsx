@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { notify } from "@/components/ui/toast";
-import { supabaseBrowser } from "@/lib/supabase/browser";
+import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
 
 /**
  * "Sorted" — and the way back out of it.
@@ -36,34 +36,32 @@ export function ResolveButton({
   async function setResolved(resolved: boolean) {
     setBusy(true);
 
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
-
-    if (!session) {
+    try {
+      const response = await ownerFetch(
+        `/api/v1/customer-responses/${responseId}/resolve`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resolved }),
+        },
+      );
+      if (!response.ok) {
+        notify.error("Could not save that", "Please try again.");
+        return;
+      }
+      router.refresh();
+      if (resolved) notify.success("Sorted", "Nice one.");
+    } catch (caught) {
+      router.refresh();
+      notify.error(
+        "Could not confirm that change",
+        caught instanceof SessionExpiredError
+          ? caught.message
+          : "Check the feedback status before trying again.",
+      );
+    } finally {
       setBusy(false);
-      notify.error("Please sign in again", "Your session expired.");
-      return;
     }
-
-    const response = await fetch(`/api/v1/customer-responses/${responseId}/resolve`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ resolved }),
-    });
-
-    setBusy(false);
-
-    if (!response.ok) {
-      notify.error("Could not save that", "Please try again.");
-      return;
-    }
-
-    router.refresh();
-    if (resolved) notify.success("Sorted", "Nice one.");
   }
 
   if (isResolved) {
@@ -72,7 +70,7 @@ export function ResolveButton({
         type="button"
         disabled={busy}
         onClick={() => void setResolved(false)}
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] disabled:opacity-50"
+        className="animate-fade-in inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] disabled:opacity-50"
       >
         <RotateCcw className="size-4" aria-hidden="true" />
         Not sorted after all
@@ -81,7 +79,12 @@ export function ResolveButton({
   }
 
   return (
-    <Button loading={busy} loadingLabel="Saving…" onClick={() => void setResolved(true)}>
+    <Button
+      variant="action"
+      loading={busy}
+      loadingLabel="Saving…"
+      onClick={() => void setResolved(true)}
+    >
       <Check className="size-5" aria-hidden="true" />
       Mark as sorted
     </Button>

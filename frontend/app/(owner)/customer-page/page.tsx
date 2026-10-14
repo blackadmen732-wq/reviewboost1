@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 
-import { AppShell } from "@/features/dashboard/app-shell";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { CustomerPageEditor } from "@/features/customer-page/customer-page-editor";
-import { getOwnerCounts, requireOwner } from "@/lib/server/owner-data";
+import {
+  getOwnerCounts,
+  listStands,
+  requireOwner,
+} from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Customer Page — ReviewBoost",
+  title: "Customer Page",
   robots: { index: false, follow: false },
 };
 
@@ -13,27 +17,39 @@ export const dynamic = "force-dynamic";
 
 export default async function CustomerPagePage() {
   const { organization } = await requireOwner("/customer-page");
-  const counts = await getOwnerCounts(organization.orgId, organization.timezone);
+  const [counts, stands] = await Promise.all([
+    getOwnerCounts(organization.orgId, organization.timezone),
+    listStands(organization.orgId),
+  ]);
+  const previewStand = stands.find((stand) => stand.status === "active");
 
-  const canEdit = organization.role === "owner" || organization.role === "admin";
+  const canEdit =
+    organization.role === "owner" || organization.role === "admin";
 
   return (
-    <AppShell unreadCount={counts.unread}>
-      <h1 className="mb-1 text-2xl font-semibold tracking-[-0.02em] text-ink">Customer Page</h1>
-      <p className="mb-6 text-sm text-muted">
-        What customers see when they scan one of your tags.
-      </p>
+    <OwnerShell unreadCount={counts.unread} businessName={organization.name}>
+      {/* Tighter than the shared PageHeader: title, description, photo,
+          preview and Publish read as one workflow on a phone. */}
+      <header className="mb-6">
+        <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
+          Customer page
+        </h1>
+        <p className="mt-2 max-w-[40ch] text-base leading-relaxed text-muted">
+          What customers see when they scan one of your Tags.
+        </p>
+      </header>
 
       {canEdit ? (
         <CustomerPageEditor
           businessName={organization.name}
-          isPublished={false}
+          previewStandId={previewStand?.standId ?? null}
         />
       ) : (
         <p className="text-sm text-muted">
-          Only owners and admins can edit the customer page. Ask the account owner to make changes.
+          Only owners and admins can edit the customer page. Ask the account
+          owner to make changes.
         </p>
       )}
-    </AppShell>
+    </OwnerShell>
   );
 }

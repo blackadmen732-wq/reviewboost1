@@ -1,0 +1,34 @@
+{
+  "renderer": "Actual LaunchScreen component via react-native-web; native Image resource resolved to its identical PNG URI in preview harness",
+  "nativeDeviceVerified": false,
+  "rows": [
+    {
+      "width": 320,
+      "height": 568,
+      "errors": [],
+      "overflow": false,
+      "buttons": 0
+    },
+    {
+      "width": 390,
+      "height": 776,
+      "errors": [],
+      "overflow": false,
+      "buttons": 0
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "errors": [],
+      "overflow": false,
+      "buttons": 0
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "errors": [],
+      "overflow": false,
+      "buttons": 0
+    }
+  ]
+}

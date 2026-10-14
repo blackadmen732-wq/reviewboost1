@@ -181,10 +181,30 @@
   gap: clamp(3px, 1.5vw, 8px);
 }
 .star-option {
+  position: relative;
   display: block;
   width: clamp(52px, 16vw, 68px);
   height: clamp(56px, 17vw, 70px);
   flex: 0 0 clamp(52px, 16vw, 68px);
+}
+
+/* Nothing hid this input, so the browser painted its own radio circle above
+   every star. The customer page now renders VisitStars instead, but this
+   component is still importable and should not carry the defect with it. */
+.star-option__input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.star-option__input:disabled {
+  cursor: default;
 }
 .star-option__label {
   display: grid;

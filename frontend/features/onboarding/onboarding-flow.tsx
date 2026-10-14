@@ -1,13 +1,28 @@
 "use client";
 
-import { ArrowLeft, Check, Download, ExternalLink, Printer, RefreshCw, Store } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Download,
+  ExternalLink,
+  Printer,
+  RefreshCw,
+  Store,
+} from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
+import { TestGoogleLinkButton } from "@/features/dashboard/google-link-care";
+import {
+  GOOGLE_LINK_BLAST,
+  GOOGLE_LINK_LATER,
+} from "@/features/dashboard/google-link-copy";
 import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
-import { isValidatedGoogleReviewUrl } from "@/lib/security/google-review-url";
+import { isGoogleReviewWritingUrl } from "@/lib/security/google-review-url";
+import { billingForPlan } from "@/lib/owner/plan-choice";
+import { PLAN_CATALOG, type PlanId } from "@/lib/owner/plan-catalog";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -32,11 +47,16 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
 type Step = "name" | "google" | "done";
 
 interface Created {
+  organizationId?: string;
   standUrl: string;
   standId: string;
 }
 
-export function OnboardingFlow() {
+export function OnboardingFlow({
+  selectedPlan = null,
+}: {
+  selectedPlan?: PlanId | null;
+}) {
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState("");
   const [googleUrl, setGoogleUrl] = useState("");
@@ -44,10 +64,14 @@ export function OnboardingFlow() {
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Created | null>(null);
 
-  const qr = useAuthenticatedQr(created?.standId ?? null);
+  const qr = useAuthenticatedQr(
+    created?.standId ?? null,
+    created?.organizationId,
+  );
 
   const trimmedUrl = googleUrl.trim();
-  const urlLooksRight = trimmedUrl !== "" && isValidatedGoogleReviewUrl(trimmedUrl);
+  const urlLooksRight =
+    trimmedUrl !== "" && isGoogleReviewWritingUrl(trimmedUrl);
 
   function slugify(value: string): string {
     // Generated rather than asked for. "Choose a web address" is a question
@@ -64,57 +88,71 @@ export function OnboardingFlow() {
     return base.length >= 3 ? `${base}-${suffix}` : `business-${suffix}`;
   }
 
+  /**
+   * Create the business, and never strand the owner if the network drops.
+   *
+   * The session lookup and the POST used to sit outside any try/catch with
+   * `busy` already set, so a rejected request escaped the voided click handler
+   * and left both Continue and "I will do this later" spinning and disabled,
+   * with no error shown. That is the first screen of the product, and the only
+   * way out was a reload that loses what they typed.
+   */
   async function finish(withUrl: string | undefined) {
     setBusy(true);
     setError(null);
 
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
+    try {
+      const {
+        data: { session },
+      } = await supabaseBrowser().auth.getSession();
 
-    if (!session) {
-      setBusy(false);
-      setError("Your session expired. Please sign in again.");
-      return;
-    }
+      if (!session) {
+        setError("Your session expired. Please sign in again.");
+        return;
+      }
 
-    const response = await fetch("/api/v1/onboarding", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        name: name.trim(),
-        slug: slugify(name),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-        defaultLocale: "en",
-        locationName: name.trim(),
-        ...(withUrl ? { googleReviewUrl: withUrl } : {}),
-      }),
-    });
+      const response = await fetch("/api/v1/onboarding", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          slug: slugify(name),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          defaultLocale: "en",
+          locationName: name.trim(),
+          ...(withUrl ? { googleReviewUrl: withUrl } : {}),
+        }),
+      });
 
-    setBusy(false);
+      if (!response.ok) {
+        setError(
+          response.status === 409
+            ? "That name is already taken. Try adding your street or city."
+            : "Something went wrong. Please try again.",
+        );
+        return;
+      }
 
-    if (!response.ok) {
+      const body = (await response.json()) as { data: Created };
+      setCreated(body.data);
+      setStep("done");
+    } catch {
       setError(
-        response.status === 409
-          ? "That name is already taken. Try adding your street or city."
-          : "Something went wrong. Please try again.",
+        "Could not reach ReviewBoost. Check your connection and try again.",
       );
-      return;
+    } finally {
+      setBusy(false);
     }
-
-    const body = (await response.json()) as { data: Created };
-    setCreated(body.data);
-    setStep("done");
   }
 
   // ------------------------------------------------------------ step 1 -----
 
   if (step === "name") {
     return (
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8" data-onboarding-step="name">
         <Progress current={1} />
 
         <div className="flex flex-col gap-2">
@@ -124,7 +162,9 @@ export function OnboardingFlow() {
           <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
             What is your business called?
           </h1>
-          <p className="text-base text-muted">This is what customers will see.</p>
+          <p className="text-base text-muted">
+            Use the name on your shop or business.
+          </p>
         </div>
 
         <div className="flex flex-col gap-3">
@@ -141,10 +181,13 @@ export function OnboardingFlow() {
             }}
             className="h-16 text-lg"
           />
+          {urlLooksRight ? <TestGoogleLinkButton url={trimmedUrl} /> : null}
+
           {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
         </div>
 
         <Button
+          variant="action"
           size="lg"
           disabled={name.trim().length < 2}
           onClick={() => {
@@ -162,7 +205,7 @@ export function OnboardingFlow() {
 
   if (step === "google") {
     return (
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8" data-onboarding-step="google">
         <BackButton onClick={() => setStep("name")} />
         <Progress current={2} />
 
@@ -173,6 +216,7 @@ export function OnboardingFlow() {
           <p className="text-base text-muted">
             This is where customers go to leave you a review.
           </p>
+          <p className="text-sm text-muted">{GOOGLE_LINK_BLAST}</p>
         </div>
 
         {/* Numbered, three steps, no paragraph. Someone who has never done this
@@ -232,8 +276,8 @@ export function OnboardingFlow() {
 
           {trimmedUrl !== "" && !urlLooksRight ? (
             <InlineNotice kind="error">
-              That does not look like a Google link. It should start with
-              g.page or google.com.
+              That does not look like a Google link. It should start with g.page
+              or google.com.
             </InlineNotice>
           ) : null}
 
@@ -242,6 +286,7 @@ export function OnboardingFlow() {
 
         <div className="flex flex-col gap-3">
           <Button
+            variant="action"
             size="lg"
             loading={busy}
             loadingLabel="Setting up…"
@@ -253,9 +298,16 @@ export function OnboardingFlow() {
 
           {/* Always available. The person who cannot find this link today is
               exactly the person who must not be locked out today. */}
-          <Button variant="ghost" loading={busy} onClick={() => void finish(undefined)}>
+          <Button
+            variant="ghost"
+            loading={busy}
+            onClick={() => void finish(undefined)}
+          >
             I will do this later
           </Button>
+          <p className="text-sm text-muted" data-google-unset="true">
+            {GOOGLE_LINK_LATER}
+          </p>
         </div>
       </div>
     );
@@ -266,7 +318,11 @@ export function OnboardingFlow() {
   return (
     <div className="flex flex-col items-center gap-8 text-center">
       <div className="grid size-20 place-items-center rounded-full bg-brand-soft">
-        <Check className="size-10 text-brand-text" strokeWidth={3} aria-hidden="true" />
+        <Check
+          className="size-10 text-brand-text"
+          strokeWidth={3}
+          aria-hidden="true"
+        />
       </div>
 
       <div className="flex flex-col gap-2">
@@ -277,8 +333,9 @@ export function OnboardingFlow() {
             business puts this on the counter and finds out from a customer.
             The door opens when a plan does. */}
         <p className="text-base text-muted">
-          Choose a plan to switch it on. Seven days free, and nothing is
-          charged until the trial ends.
+          {selectedPlan
+            ? `Your ${PLAN_CATALOG[selectedPlan].name} choice is saved. Review the price and payment details next to switch on your Tag.`
+            : "Choose a plan to switch it on. Starter is free for seven days, and nothing is charged until the trial ends."}
         </p>
       </div>
 
@@ -288,7 +345,9 @@ export function OnboardingFlow() {
             <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center">
               <div className="flex flex-col items-center gap-3">
                 <p className="text-sm text-muted">
-                  {qr.status === "expired" ? "Please sign in again" : "Could not load QR code"}
+                  {qr.status === "expired"
+                    ? "Please sign in again"
+                    : "Could not load QR code"}
                 </p>
                 <button
                   type="button"
@@ -316,8 +375,10 @@ export function OnboardingFlow() {
       ) : null}
 
       <div className="flex w-full flex-col gap-3">
-        <Button size="lg" asChild>
-          <a href="/settings/billing">Choose a plan</a>
+        <Button variant="action" size="lg" asChild>
+          <a href={billingForPlan(selectedPlan)}>
+            {selectedPlan ? "Continue to your plan" : "Choose a plan"}
+          </a>
         </Button>
         <Button variant="secondary" onClick={() => window.print()}>
           <Printer className="size-5" aria-hidden="true" />
@@ -341,7 +402,11 @@ export function OnboardingFlow() {
 
 function Progress({ current }: { current: number }) {
   return (
-    <div className="flex items-center gap-2" role="img" aria-label={`Step ${current} of 3`}>
+    <div
+      className="flex items-center gap-2"
+      role="img"
+      aria-label={`Step ${current} of 3`}
+    >
       {[1, 2, 3].map((step) => (
         <span
           key={step}

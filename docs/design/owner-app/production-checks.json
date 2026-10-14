@@ -1,0 +1,15 @@
+{
+  "productionBuild": true,
+  "fixtureExclusion": true,
+  "localDevelopmentTierServices": true,
+  "httpsCanonicalOriginConfigured": true,
+  "ownerNavigation": true,
+  "themeHydration": true,
+  "scopedQR": true,
+  "nfcFocusAndEscape": true,
+  "savedCustomerEditor": true,
+  "browserExceptions": [],
+  "figmaDirectEditing": false,
+  "figmaImportVerified": false,
+  "svgBrowserRendering": true
+}

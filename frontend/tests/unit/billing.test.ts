@@ -196,6 +196,23 @@ describe("the webhook sink", () => {
     expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_complete")).toBe(false);
     expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_fail")).toBe(true);
   });
+
+  it("completes the cancellation that follows an account deletion", async () => {
+    // The deletion route cancels in Stripe and the cascade removes the
+    // customer row, so this event can never be placed. Left unprocessed, it
+    // held /internal/health at 503 forever, because Stripe got a 200 and never
+    // sent it again.
+    rpcResults.set("rpc_billing_org_for_customer", { data: null, error: null });
+    const event = stripeEvent({ type: "customer.subscription.deleted" });
+    (event.data.object as { status: string }).status = "canceled";
+    const { POST } = await import("@/app/api/v1/webhooks/stripe/route");
+    const response = await POST(signedRequest(JSON.stringify(event)) as never);
+
+    expect(response.status).toBe(200);
+    expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_complete")).toBe(true);
+    expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_fail")).toBe(false);
+    expect(rpcCalls.some(({ name }) => name === "rpc_billing_apply_subscription")).toBe(false);
+  });
 });
 
 describe("what each event does", () => {
@@ -209,6 +226,46 @@ describe("what each event does", () => {
     // The event's own timestamp travels with it: that is what makes an
     // out-of-order delivery detectable at the database.
     expect(call?.args["p_event_created"]).toBeTypeOf("string");
+  });
+
+  it("never takes a plan from subscription metadata", async () => {
+    // The old hole: a price nobody sells, with `plan_id=pro` written into the
+    // subscription's metadata. The plan sent to the database must be null,
+    // leaving the database's price map to refuse it.
+    const { applyStripeEvent } = await import("@/lib/server/billing-service");
+    const event = stripeEvent();
+    const subscription = event.data.object as Record<string, unknown>;
+    subscription["metadata"] = { plan_id: "pro" };
+    subscription["items"] = {
+      data: [{ price: { id: "price_not_ours" }, current_period_start: 1, current_period_end: 2 }],
+    };
+
+    await applyStripeEvent(event as never);
+
+    const call = rpcCalls.find(({ name }) => name === "rpc_billing_apply_subscription");
+    expect(call?.args["p_stripe_price_id"]).toBe("price_not_ours");
+    expect(call?.args["p_plan_id"]).toBeNull();
+  });
+
+  it("fails an unmapped price loudly, so Stripe retries and an operator sees it", async () => {
+    rpcResults.set("rpc_billing_apply_subscription", {
+      data: null,
+      error: { message: "unknown_price", code: "P0001" },
+    });
+    const { receiveStripeWebhook } = await import("@/lib/server/billing-service");
+    const { logger } = await import("@/lib/server/logger");
+    const errorSpy = vi.spyOn(logger, "error");
+
+    await expect(receiveStripeWebhook(stripeEvent() as never)).rejects.toBeTruthy();
+
+    expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_complete")).toBe(false);
+    const failed = rpcCalls.find(({ name }) => name === "rpc_stripe_event_fail");
+    expect(String(failed?.args["p_error"])).toContain("unknown_price");
+    expect(errorSpy).toHaveBeenCalledWith(
+      "billing.price_unmapped",
+      expect.objectContaining({ reason: "unknown_price", priceId: "price_starter_test" }),
+    );
+    errorSpy.mockRestore();
   });
 
   it("reports a stale event as stale rather than as applied", async () => {
@@ -245,7 +302,9 @@ describe("what each event does", () => {
 
     const call = rpcCalls.find(({ name }) => name === "rpc_billing_apply_invoice_paid");
     expect(call?.args["p_invoice_id"]).toBe("in_test1");
-    expect(call?.args["p_plan_id"]).toBe("starter");
+    // The price travels, not a plan name: the database maps it.
+    expect(call?.args["p_stripe_price_id"]).toBe("price_starter_test");
+    expect(call?.args).not.toHaveProperty("p_plan_id");
     expect(call?.args["p_amount_paid"]).toBe(4900);
   });
 
@@ -282,7 +341,7 @@ describe("what each event does", () => {
 
     const call = rpcCalls.find(({ name }) => name === "rpc_billing_apply_invoice_paid");
     expect(call?.args["p_invoice_id"]).toBe("in_dahlia");
-    expect(call?.args["p_plan_id"]).toBe("growth");
+    expect(call?.args["p_stripe_price_id"]).toBe("price_growth_test");
   });
 
   it("mints nothing on a failed payment", async () => {

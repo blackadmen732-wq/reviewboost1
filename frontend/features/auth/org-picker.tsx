@@ -22,13 +22,19 @@ export function OrgPicker({
     (orgId: string) => {
       setError(null);
       startTransition(async () => {
-        const result = await selectOrganization(orgId);
-        if (result?.error) {
-          setError(result.error);
-          return;
+        try {
+          const result = await selectOrganization(orgId);
+          if (result?.error) {
+            setError(result.error);
+            return;
+          }
+          router.push(next);
+          router.refresh();
+        } catch {
+          setError(
+            "Could not switch business. Check your connection and try again.",
+          );
         }
-        router.push(next);
-        router.refresh();
       });
     },
     [next, router],
@@ -48,13 +54,19 @@ export function OrgPicker({
             <Building2 className="size-5 text-brand-text" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-medium text-ink">{org.name}</p>
+            <p className="truncate text-base font-medium text-ink">
+              {org.name}
+            </p>
             <p className="text-sm text-muted capitalize">{org.role}</p>
           </div>
         </button>
       ))}
 
-      {error ? <p className="mt-2 text-center text-sm text-[color:var(--rb-error)]">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="mt-2 text-center text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

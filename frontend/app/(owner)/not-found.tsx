@@ -1,9 +1,9 @@
-import { ArrowLeft, SearchX } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { AppShell } from "@/features/dashboard/app-shell";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 
 /**
  * Something that is not there.
@@ -33,13 +33,12 @@ import { AppShell } from "@/features/dashboard/app-shell";
  */
 export default function OwnerNotFound() {
   return (
-    <AppShell>
+    <OwnerShell>
       <EmptyState
-        icon={SearchX}
         title="We could not find that"
         description="It may have been removed, or the link might be out of date."
         action={
-          <Button asChild>
+          <Button asChild variant="action">
             <Link href="/home">
               <ArrowLeft className="size-5" aria-hidden="true" />
               Back to home
@@ -47,6 +46,6 @@ export default function OwnerNotFound() {
           </Button>
         }
       />
-    </AppShell>
+    </OwnerShell>
   );
 }

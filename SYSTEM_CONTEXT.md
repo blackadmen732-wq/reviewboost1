@@ -37,7 +37,7 @@ persists for years.
 ReviewBoost does two things:
 
 1. **Makes asking for honest feedback effortless and consistent** — a physical
-   stand a customer taps or scans, and SMS to customers who already visited.
+   Tag a customer taps or scans, and SMS to customers who already visited.
 2. **Surfaces an unhappy experience to the business quickly**, so they can
    attempt service recovery — *in addition to*, never instead of, the customer's
    public review opportunity.
@@ -85,31 +85,38 @@ threshold-based routing of the public review opportunity.
 
 ## 3. The physical layer
 
-### Stands — IMPLEMENTED, CI-TESTED — not live-verified
+### Tags — IMPLEMENTED, CI-TESTED — not DEVICE-VERIFIED
 
-A stand is a row with an unguessable public identifier used in a short URL. It
-carries a label, brand colours, and an active flag, and renders as PNG or SVG at
-high error correction so it survives being scuffed or partially covered.
+A Tag is a row with an unguessable public identifier used in a short URL. It
+carries a label and an active flag, and renders as PNG or SVG at high error
+correction so it survives being scuffed or partially covered.
 
-The internal identifier never leaves the server, so stands cannot be enumerated.
+The internal identifier never leaves the server, so Tags cannot be enumerated.
+The QR image itself is fetched with the owner's bearer token and held as an
+object URL — it is never a plain `<img src>` pointing at the API, which would
+hand a token-bearing URL to the browser.
 
 Capability split (do not collapse these):
 
-- **Web owner dashboard:** create and manage stands, export QR (SVG / PNG /
-  JSON), Copy NFC Link, NFC Tools instructions, and Web NFC write on supported
-  Android Chrome.
-- **Mobile Stands tab:** list existing stands by location, open stand detail,
-  share or open the stand URL, and native NFC provisioning (owner/admin). Mobile
-  does **not** create stands or export QR SVG/PNG; the empty state tells the
-  owner to create a stand from the web dashboard.
+- **Web owner dashboard:** create and manage Tags, export QR (SVG / PNG /
+  JSON), and program NFC on supported Android Chrome.
+- **Mobile Tags tab:** list existing Tags by location, open Tag detail, share
+  or open the Tag URL, and native NFC programming (owner/admin). Mobile does
+  **not** create Tags or export QR SVG/PNG; the empty state points the owner at
+  the web dashboard.
 
-Those surfaces have unit-test coverage in CI. They have not been live-verified
-on printed hardware in the field.
+"Copy NFC Link" and the NFC Tools fallback instructions used to be listed here.
+They lived in `features/dashboard/stand-card.tsx`, which nothing rendered and
+which has been deleted along with `web-nfc-writer.tsx`. The flow they belonged
+to was replaced when NFC collapsed to a single visible operation.
+
+Those surfaces have unit-test coverage in CI. Nothing here has been exercised
+on a printed code or a physical chip.
 
 ### The tap flow — APPROVED
 
 ```
-Customer taps or scans the stand
+Customer taps or scans the Tag
         ↓
 Page opens — no app, no install, no typing
         ↓
@@ -130,7 +137,7 @@ The distinction from the legacy flow: the public opportunity is presented on
 ### NFC provisioning — IMPLEMENTED, CI-TESTED — not live-verified
 
 An NFC tag holds one ReviewBoost HTTPS URL (`{PUBLIC_FRONTEND_URL}/q/{token}`).
-The guest never needs the ReviewBoost app. QR and NFC for the same stand resolve
+The guest never needs the ReviewBoost app. QR and NFC for the same Tag resolve
 to the same token.
 
 Software that exists:
@@ -138,11 +145,23 @@ Software that exists:
 - Native NDEF URI write in the Expo app (`apps/mobile/lib/nfc.ts`), with
   read-back verification and role-gated UI (owner/admin). Requires a
   development/preview build — not Expo Go.
-- Web NFC writer on the owner stand page, feature-detected (Android Chrome).
-- Copy NFC Link and NFC Tools fallback instructions.
+- Web NFC in `features/tags/program-tag-sheet.tsx`, feature-detected
+  (Android Chrome), opened from the Tag detail page.
 - `rpc_record_nfc_provision` plus `POST /api/v1/review-stands/[standId]/nfc-provision`.
-- Token-rotation awareness: a stand whose token moved after the last write
-  should be treated as needing a rewrite.
+- Token-rotation awareness: a Tag whose token moved after the last write is
+  treated as needing a rewrite.
+
+What an owner sees is one operation: **Program NFC → Hold Near Reader → a
+green check → Done**, returning to the Tag automatically. Looking, reading,
+programming and checking are real steps and none of them is a screen. The three
+exceptions are the moments that need a human decision — a Tag that already
+carries something, a Tag that cannot be read, and a write that succeeded while
+the server confirmation did not. Copy lives in `lib/owner/nfc-presentation.ts`
+and is mirrored on native in `apps/mobile/lib/nfc-scenes.ts`.
+
+Nothing claims physical distance. NFC reports none, so no progress bar and no
+"getting closer" may be invented; `tests/unit/owner-states.test.ts` checks for
+that vocabulary.
 
 CI (`.github/workflows/mobile-release-validation.yml`) evaluates
 `expo config --type public` and asserts `NFCReaderUsageDescription`, the
@@ -159,7 +178,7 @@ GitHub issue #31 is the canonical NFC spec and remains open.
 
 Not built, not costed, not agreed. Missing: tag catalogue, purchasing, ordering,
 fulfilment, and shipping. A second revenue line, and a retention lever: a
-business with stands physically present does not quietly churn.
+business with Tags physically present does not quietly churn.
 
 Every physical unit should carry **both** NFC and a printed QR — NFC for phones
 that read from the lock screen, QR as the universal fallback.
@@ -188,30 +207,91 @@ Metrics must describe *recovery*, never *prevention*.
 
 **Unresolved items nag.** Open private feedback stays visible until actioned.
 
-**Peak–end.** The stand is the last interaction of a visit. Getting it right is
+**Peak–end.** The Tag is the last interaction of a visit. Getting it right is
 worth doing for its own sake.
 
 ---
 
 ## 5. The three revenue lines
 
-### 5.1 Subscription — NOT BUILT
+### 5.1 Subscription — IMPLEMENTED, CI-TESTED — not LIVE-VERIFIED
 
-No subscription plans, billing enforcement, trial flow, cancellation flow, or
-Stripe integration exists in the current repository.
+This section used to read "No subscription plans, billing enforcement, trial
+flow, cancellation flow, or Stripe integration exists in the current
+repository." Every clause of that is now false.
 
-#### Subscription requirements — PROPOSED
+**The offer is frozen.** No free plan. Starter $49 (1 / 3 / 150) is the only
+plan with a trial: seven days at $0, card required (1 location, 1 Tag, 0 SMS),
+and only for a business that has never subscribed. Growth $79 (2 / 8 / 500) and
+Pro $129 (5 / 25 / 1,500) have no trial and are charged at checkout.
+`PLAN_CATALOG.trialDays` in `frontend/lib/owner/plan-catalog.ts` is the one
+place this is written; checkout, the pricing page and the billing screen read it.
 
-- Define plans in code so pricing changes appear in a diff.
-- Offer a trial without a card.
+The database is the authority, not a frontend constant:
+`app.entitlement_tag_limit`, `app.entitlement_location_limit` and
+`app.entitlement_monthly_sms` in `20260915000400_entitlements.sql` decide what a
+plan allows, and `tests/unit/pricing-plans.test.ts` parses that migration so the
+published price list cannot drift from what is enforced.
+
+What exists: Stripe Checkout with `payment_method_collection: "always"`, the
+Customer Portal, signature-verified webhooks with a durable inbox keyed by
+Stripe's event id, out-of-order protection, and the entitlement written in the
+same transaction as the subscription row. A missing entitlement row fails
+closed. `past_due` is a grace period that creates nothing new but closes no
+door a customer can see.
+
+Wallets (Apple Pay, Google Pay, Link) are not restricted in code — Checkout
+does not set `payment_method_types` — so they appear when the Stripe Dashboard
+enables them. Enabling them, and Apple Pay domain verification, are Dashboard
+tasks against the live domain.
+
+Requirements that still hold, and their status:
+
+- Define plans in code so pricing changes appear in a diff. **Done** — in SQL,
+  which is stronger.
 - Store amounts in **integer minor currency units**, with the currency recorded
-  on every entry. Never use floating point.
-- Enforce plans at campaign creation, quota reservation, immediately before each
-  send, during long campaigns, and during reconciliation.
-- Make cancellation self-service, without retention traps.
+  on every entry. Never floating point. **Done.**
+- Enforce plans at creation, quota reservation, immediately before each send,
+  and during reconciliation. **Done**, under a lock inside the creating
+  transaction rather than in an HTTP pre-check.
+- Make cancellation self-service, without retention traps. **Done** — Billing,
+  then Manage subscription, which is Stripe's own portal.
+- ~~Offer a trial without a card.~~ **Overruled.** The frozen offer requires a
+  card up front; a trial that can be taken without one is a free plan with a
+  timer, which this product does not have.
 
-Any future Stripe behavior must be designed and verified when the integration is
-built.
+No live charge has ever been made. There are no Stripe credentials in this
+environment.
+
+### 5.1a Ending the relationship — IMPLEMENTED, CI-TESTED
+
+Deleting an account is a product surface, not a support request, because both
+app stores require it to be startable in-app (Apple 5.1.1(v), and Play rejects
+listings without an in-app route plus a public URL).
+
+`public.rpc_delete_organization(org, confirmation)` is one hard delete. Owner
+only — an admin runs the business, ending it is not part of that. Identity is
+never an argument: the actor is `auth.uid()`, so there is no shape of the call
+in which one person names another. The typed business name is checked in the
+function as well as the form, because a confirmation enforced only by a form is
+a convention.
+
+It is a single `delete from public.organizations`; every tenant table carries
+`org_id ... on delete cascade`, and `supabase/tests/account_deletion_test.sql`
+asks the catalog for every table with an `org_id` column and fails if any still
+holds a row — so a table added later with the wrong foreign key fails there
+rather than silently retaining a phone number.
+
+The Stripe subscription is cancelled **before** anything is deleted, and if
+that fails nothing is deleted at all. A business still being charged for an
+account that no longer exists is the one outcome worth refusing. Invoices
+survive; both parties are required to keep records of money that has moved, and
+`/delete-account` says so rather than implying Stripe forgets too.
+
+Surfaces: `/settings/delete` on web, Account → Delete account on native, both
+calling `POST /api/v1/account/deletion`. `/delete-account` is public and
+readable signed out, because the person who most needs it has often already
+lost access.
 
 ### 5.2 Hardware — NOT BUILT
 
@@ -286,7 +366,7 @@ creates allocations yet.
 
 ```
 1. Finishes their visit
-2. Taps the stand
+2. Taps the Tag
 3. "How did we do?"
 4. Taps a rating
 5. Public Google review opportunity — same for every rating
@@ -311,22 +391,48 @@ Opt-Out, 10DLC, inbound reliability) is **not live-verified**.
 
 ---
 
-## 7. Owner dashboard — IMPLEMENTED — UNVERIFIED
+## 7. Owner dashboard — IMPLEMENTED, CI-TESTED — not live-verified
 
-The Next.js application contains owner pages for sign-in, onboarding,
-organization selection, home, feedback, praise, reviews, stands, customers, and
-settings. Stands include QR export, Copy NFC Link, NFC Tools instructions, and
-(on supported Android Chrome) Web NFC write. There is **no Text Requests owner
-UI**. The interface and server-side data assembly exist, but have not been
-live-tested against production infrastructure.
+**Primary navigation is Home, Feedback, Text Requests and Tags, with Settings
+separate.** That list is fixed: Praise, Reviews, Customers and Campaigns are
+not primary product navigation. `features/dashboard/nav-items.ts` is the
+authority and `tests/unit/owner-shell-nav.test.ts` holds it there.
 
-Design rules:
+Routes that exist beyond the nav: `/praise`, `/reviews`, `/customers`. They are
+reachable by URL and are not linked from anywhere in the product. Existing
+unlinked is compliant; promoting one into the nav is not.
 
-- **Headline is movement** — a rating trend, not a static number
-- **Recovery is the hero metric** — "12 recovery conversations opened", "9 resolved". Never "reviews prevented"
-- **Money always visible** — spend to date and remaining allowance. No surprise bills
-- **Per-stand scan counts**, so placement becomes learnable
-- **Open recovery tasks** persist until actioned
+Also present: sign-in, onboarding, organization selection, Tag detail, the
+Customer Page editor, Billing, and `/settings/delete`.
+
+Corrections to what this section used to say, each of which was false by the
+time anyone read it:
+
+- It said "There is **no Text Requests owner UI**". There is —
+  `app/(owner)/text-requests/` with
+  `features/dashboard/text-request-composer.tsx`, on real balances, and the
+  owner never sees a segment count or an encoding.
+- It said Tags include "Copy NFC Link, NFC Tools instructions". Those existed
+  only in `features/dashboard/stand-card.tsx`, which nothing rendered and which
+  has been deleted. The live Tag detail is `features/tags/tag-detail.tsx`,
+  and NFC is one visible operation: Program NFC → Hold Near Reader → a green
+  check → Done.
+- It said "stands" throughout. The product says **Tag**. `review_stands`,
+  `/stands` and `standUrl` remain as identifiers, deliberately — they are
+  attached to live tokens and a printed URL — but nothing a person reads says
+  "stand", and `tests/unit/tag-vocabulary.test.ts` enforces that.
+
+Design rules — these are intent, and two of them are **NOT BUILT**:
+
+- **Headline is movement** — a rating trend, not a static number. IMPLEMENTED
+- **Money always visible** — remaining allowance and plan state. IMPLEMENTED
+- **Open recovery tasks** persist until actioned. IMPLEMENTED (read/resolve
+  state on a rating, with the append-only action thread)
+- **Recovery is the hero metric** — "12 recovery conversations opened".
+  **NOT BUILT.** No such counter exists. The rule that *does* bind is the
+  second half: never "reviews prevented", which `public-copy.test.ts` enforces
+- **Per-Tag scan counts**, so placement becomes learnable. **NOT BUILT.**
+  Nothing counts scans
 
 ---
 
@@ -337,7 +443,7 @@ Design rules:
 Next.js 16, App Router, TypeScript strict. PostgreSQL via Supabase with Row
 Level Security and Supabase Auth (GoTrue). An Expo 57 / React Native mobile
 application uses Expo Router, OTP sign-in, and the authenticated APIs for Live
-Feed, Feedback, and Stands (mock data has been removed). Native NFC writing and
+Feed, Feedback, and Tags (mock data has been removed). Native NFC writing and
 EAS release config exist; neither is live-verified / live-released.
 
 Database migrations and **326** planned pgTAP assertions have run successfully
@@ -390,9 +496,16 @@ system.**
 ### Implemented in the current repository — PARTIALLY VERIFIED
 
 Tenant isolation via row security; short-lived access tokens with rotating
-refresh tokens and reuse detection; account lockout; TOTP; AES-256-GCM for PII
-(including phone numbers on Text Requests) with keyed HMAC lookups; CSRF;
-layered rate limiting; recursive log redaction.
+refresh tokens and reuse detection (Supabase Auth, `supabase/config.toml`);
+per-IP sign-in and code-verification rate limits (Supabase Auth — there is no
+per-account lockout); AES-256-GCM for PII (including phone numbers on Text
+Requests) with keyed HMAC lookups; CSRF; layered rate limiting; recursive log
+redaction.
+
+**Not implemented: MFA / TOTP.** `[auth.mfa.totp]` and `[auth.mfa.phone]` are
+disabled in `supabase/config.toml`, there is no enrollment flow, and no route
+checks for an `aal2` session. Nothing in the product is protected by a second
+factor, and no copy may say otherwise.
 
 Migrations and pgTAP security tests, including tenant-isolation and privilege
 attacks, have run successfully against CI databases. This is not evidence of a
@@ -409,7 +522,7 @@ against production infrastructure.
 - Tenant identity derived from authenticated server context only
 - Parameterised SQL everywhere
 - Every exposed tenant table carries row security
-- MFA required for billing, member administration, integration connection, API key creation, PII export, and organisation deletion
+- MFA required for billing, member administration, integration connection, API key creation, PII export, and organisation deletion — **APPROVED BUT NOT IMPLEMENTED (launch decision open).** Enforcing it needs TOTP enabled in Supabase Auth, an enrollment screen, and a server-side `aal2` check on those routes; enforcing the check without enrollment would lock every owner out of billing and deletion. See docs/backend/LAUNCH_GATE.md
 - Append-only audit and financial ledgers
 - CI runs type checking, tests, secret scanning, and dependency audit
 
@@ -420,16 +533,22 @@ against production infrastructure.
 ### Does not exist
 
 Hardware catalogue, ordering, fulfilment · Google Business Profile integration ·
-POS integrations · AI reply drafting · admin portal · monitoring and alerting ·
-backups and restore drill · load testing · contacts as first-class entities ·
-campaign scheduling · print templates · Stripe billing / subscription · Text
-Requests owner UI · EAS project link, TestFlight, and Play submission
+POS integrations · AI reply drafting · admin portal · external monitoring and
+alerting · backups and restore drill · load testing · contacts as first-class
+entities · campaign scheduling · per-Tag scan counts · a "recovery
+conversations" metric · data export · TestFlight and Play submission
+
+Removed from this list because they now exist: **Stripe billing / subscription**
+(§5.1) and the **Text Requests owner UI** (`app/(owner)/text-requests/`). Both
+sat here long after they shipped, which is the failure mode this document is
+supposed to prevent — a gap list nobody prunes stops being read.
 
 ### Exists, CI-tested, not live-verified
 
-NFC provisioning software (native write, Web NFC, NFC Tools fallback, QR). Text
+NFC programming (native write, Web NFC, QR — the NFC Tools fallback is gone
+with the dead component that held it). Account deletion, web and native. Text
 Requests backend (consent, suppression, outbox, quota, Twilio adapter). Mobile
-Live Feed / Feedback / Stands live-API hooks. EAS release configuration. The
+Live Feed / Feedback / Tags live-API hooks. EAS release configuration. The
 full live Next.js owner and customer flow against production. External provider
 accounts have not been contacted.
 
