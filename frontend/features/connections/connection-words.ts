@@ -7,6 +7,8 @@ export function stateLabel(state: string, appName: string): { label: string; ton
   switch (state) {
     case "active":
       return { label: "On", tone: "good" };
+    case "list_added":
+      return { label: "Added", tone: "good" };
     case "connecting":
       return { label: "Setting up", tone: "info" };
     case "authorization_required":

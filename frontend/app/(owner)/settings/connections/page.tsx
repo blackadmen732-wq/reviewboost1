@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/features/dashboard/app-shell";
 import { ConnectionsDirectory } from "@/features/connections/connections-directory";
+import { listCustomerLists } from "@/lib/server/customers/list-import";
 import { listConnections, providerDirectory } from "@/lib/server/integrations/connection-service";
+import { providerLogo } from "@/lib/server/integrations/logos";
 import { CATEGORY_LABELS } from "@/lib/server/integrations/registry";
 import { requireOwner } from "@/lib/server/owner-data";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -26,10 +28,17 @@ export default async function ConnectionsPage() {
   const { organization } = await requireOwner("/settings/connections");
   if (!["owner", "admin"].includes(organization.role)) notFound();
 
-  const connections = await listConnections(await supabaseServer(), organization.orgId, "page:/settings/connections");
-  const stateByProvider = new Map(connections.map((connection) => [connection.providerId, connection.state]));
+  const requestId = "page:/settings/connections";
+  const db = await supabaseServer();
+  const [connections, lists] = await Promise.all([
+    listConnections(db, organization.orgId, requestId),
+    listCustomerLists(db, organization.orgId, requestId),
+  ]);
+  const stateByProvider = new Map<string, string>(connections.map((connection) => [connection.providerId, connection.state]));
+  if (lists.length > 0) stateByProvider.set("google_sheets", "list_added");
   const providers = providerDirectory().map((provider) => ({
     ...provider,
+    logoSrc: providerLogo(provider.id),
     connectionState: stateByProvider.get(provider.id) ?? null,
   }));
 

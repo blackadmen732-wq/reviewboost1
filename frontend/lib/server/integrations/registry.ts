@@ -19,10 +19,11 @@ import type { ProviderId, VisitKind, WorkflowId } from "@/lib/server/integration
 
 export type Availability = "available" | "in_setup" | "planned";
 
-export type Category = "pos" | "appointments" | "salon" | "fitness";
+export type Category = "pos" | "appointments" | "salon" | "fitness" | "lists";
 
 export const CATEGORY_LABELS: Record<Category, string> = {
   pos: "Point of sale",
+  lists: "Customer lists",
   appointments: "Appointments",
   salon: "Salons and spas",
   fitness: "Fitness",
@@ -41,6 +42,13 @@ export interface WorkflowDefinition {
 
 export interface ProviderDefinition {
   id: string;
+  /**
+   * How an owner connects it. `oauth` apps are ongoing connections that sync
+   * (Square). A `list` is read once when the owner picks it and keeps no
+   * access afterwards (a Google Sheet); it never goes through the OAuth
+   * routes or the sync pipeline.
+   */
+  connectKind: "oauth" | "list";
   displayName: string;
   /** Short mark for the card when there is no logo asset. */
   monogram: string;
@@ -54,6 +62,7 @@ export interface ProviderDefinition {
 
 const SQUARE: ProviderDefinition = {
   id: "square",
+  connectKind: "oauth",
   displayName: "Square",
   monogram: "Sq",
   categories: ["pos", "appointments"],
@@ -99,6 +108,7 @@ const SQUARE: ProviderDefinition = {
 
 const FAKE: ProviderDefinition = {
   id: "fake",
+  connectKind: "oauth",
   displayName: "Test provider",
   monogram: "T",
   categories: ["pos", "appointments"],
@@ -137,6 +147,7 @@ const FAKE: ProviderDefinition = {
 function planned(id: string, displayName: string, monogram: string, categories: Category[], summary: string): ProviderDefinition {
   return {
     id,
+    connectKind: "oauth",
     displayName,
     monogram,
     categories,
@@ -156,6 +167,39 @@ const PLANNED: readonly ProviderDefinition[] = [
 ];
 
 /**
+ * Google Sheets works only where its keys are set (docs: GOOGLE_SHEETS.md)
+ * and a default country is set, because a sheet's numbers are usually typed
+ * without one. Until then the card says "Coming soon" and offers no sign-in.
+ */
+export function googleSheetsConfigured(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID &&
+      process.env.NEXT_PUBLIC_GOOGLE_API_KEY &&
+      /^\d{6,20}$/.test(process.env.NEXT_PUBLIC_GOOGLE_PROJECT_NUMBER ?? "") &&
+      /^\d{1,3}$/.test(process.env.SMS_DEFAULT_COUNTRY_CALLING_CODE ?? ""),
+  );
+}
+
+function googleSheets(): ProviderDefinition {
+  return {
+    id: "google_sheets",
+    connectKind: "list",
+    displayName: "Google Sheets",
+    monogram: "GS",
+    categories: ["lists"],
+    summary: "Bring in customers from a Google Sheet you already keep.",
+    dataRead: ["Only the one sheet you pick", "Names and phone numbers in it"],
+    cannotDo: [
+      "See any other file in your Google account",
+      "Change your sheet",
+      "Text anyone. Customers still need to agree first.",
+    ],
+    availability: googleSheetsConfigured() ? "available" : "in_setup",
+    workflows: [],
+  };
+}
+
+/**
  * The fake provider shows up only where someone switched it on, and never in
  * production. Production on Vercel is `VERCEL_ENV=production`; elsewhere a
  * plain production build counts too unless it is a Vercel preview.
@@ -168,7 +212,7 @@ export function fakeProviderEnabled(): boolean {
 }
 
 export function listProviders(): ProviderDefinition[] {
-  return [...(fakeProviderEnabled() ? [FAKE] : []), SQUARE, ...PLANNED];
+  return [...(fakeProviderEnabled() ? [FAKE] : []), SQUARE, googleSheets(), ...PLANNED];
 }
 
 export function getProvider(id: string): ProviderDefinition | null {
@@ -178,7 +222,7 @@ export function getProvider(id: string): ProviderDefinition | null {
 /** A provider an owner can actually connect in this environment. */
 export function getConnectableProvider(id: string): (ProviderDefinition & { id: ProviderId }) | null {
   const provider = getProvider(id);
-  if (!provider || provider.availability !== "available") return null;
+  if (!provider || provider.availability !== "available" || provider.connectKind !== "oauth") return null;
   return provider as ProviderDefinition & { id: ProviderId };
 }
 

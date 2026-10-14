@@ -1,6 +1,6 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Check, FileSpreadsheet, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -11,6 +11,8 @@ export interface DirectoryProvider {
   id: string;
   displayName: string;
   monogram: string;
+  /** The company's official logo file, when one has been added. */
+  logoSrc: string | null;
   categories: readonly string[];
   summary: string;
   availability: "available" | "in_setup" | "planned";
@@ -92,34 +94,55 @@ export function ConnectionsDirectory({ providers, categoryLabels }: ConnectionsD
         group.items.length === 0 ? null : (
           <section key={group.title} className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{group.title}</h2>
-            {group.items.map((provider) => {
-              const status = provider.connectionState ? stateLabel(provider.connectionState, provider.displayName) : null;
-              const badge =
-                status ??
-                (provider.availability === "in_setup"
-                  ? { label: "Coming soon", tone: "info" }
-                  : provider.availability === "planned"
-                    ? { label: "Planned", tone: "info" }
-                    : null);
-              return (
-                <Link
-                  key={provider.id}
-                  href={`/settings/connections/${provider.id}`}
-                  className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-                >
-                  <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet text-sm font-semibold text-ink" aria-hidden="true">
-                    {provider.monogram}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-base font-medium text-ink">{provider.displayName}</p>
-                    <p className="text-sm text-muted">{provider.summary}</p>
-                  </div>
-                  {badge ? (
-                    <span className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-semibold", TONE[badge.tone])}>{badge.label}</span>
-                  ) : null}
-                </Link>
-              );
-            })}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {group.items.map((provider) => {
+                const status = provider.connectionState ? stateLabel(provider.connectionState, provider.displayName) : null;
+                const connected = status?.tone === "good";
+                const soon =
+                  !status && provider.availability !== "available"
+                    ? provider.availability === "in_setup"
+                      ? "Soon"
+                      : "Planned"
+                    : null;
+                return (
+                  <Link
+                    key={provider.id}
+                    href={`/settings/connections/${provider.id}`}
+                    aria-label={`${provider.displayName}. ${status?.label ?? soon ?? "Add"}`}
+                    className="group flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:border-[color:var(--rb-border-strong)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+                  >
+                    <span className="grid size-11 shrink-0 place-items-center rounded-[10px] border border-border bg-surface text-sm font-semibold text-ink" aria-hidden="true">
+                      {provider.logoSrc ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- a small local brand file
+                        <img src={provider.logoSrc} alt="" className="size-[60%] object-contain" />
+                      ) : provider.id === "google_sheets" ? (
+                        <FileSpreadsheet className="size-5" />
+                      ) : (
+                        provider.monogram
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-semibold text-ink">{provider.displayName}</p>
+                      <p className="mt-0.5 text-sm text-muted">{provider.summary}</p>
+                      {status && !connected ? (
+                        <span className={cn("mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold", TONE[status.tone])}>{status.label}</span>
+                      ) : null}
+                    </div>
+                    {connected ? (
+                      <span className="grid size-8 shrink-0 place-items-center rounded-[8px] bg-brand-soft text-brand-text" aria-hidden="true">
+                        <Check className="size-4" strokeWidth={2.5} />
+                      </span>
+                    ) : soon ? (
+                      <span className="shrink-0 rounded-[6px] bg-quiet px-2 py-1 text-xs font-medium text-muted" aria-hidden="true">{soon}</span>
+                    ) : !status ? (
+                      <span className="grid size-8 shrink-0 place-items-center rounded-[8px] border border-border text-ink transition-colors group-hover:bg-quiet" aria-hidden="true">
+                        <Plus className="size-4" />
+                      </span>
+                    ) : null}
+                  </Link>
+                );
+              })}
+            </div>
           </section>
         ),
       )}
