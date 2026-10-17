@@ -410,22 +410,32 @@ export async function receiveStripeWebhook(
 
   try {
     const outcome = await applyStripeEvent(event);
-    if (outcome !== "unknown_customer") {
-      await service.rpc("rpc_stripe_event_complete", { p_event_id: event.id });
-    } else {
-      // Left unprocessed on purpose: an event whose customer we cannot place
-      // is visible in the inbox for someone to look at, not silently dropped.
-      await service.rpc("rpc_stripe_event_fail", {
-        p_event_id: event.id,
-        p_error: "no organization for this Stripe customer",
-      });
+    if (outcome === "unknown_customer") {
+      // A newly created Stripe customer may arrive before its organization
+      // link is visible. Keep the inbox unprocessed AND return a retryable
+      // HTTP 500: a successful 200 would stop Stripe from redelivering it.
+      throw new Error("no organization for this Stripe customer");
     }
+
+    const { error: completeError } = await service.rpc("rpc_stripe_event_complete", {
+      p_event_id: event.id,
+    });
+    // Stripe may retry if we couldn't persist the completion marker. The
+    // subscription and invoice handlers are idempotent, so this is safe.
+    if (completeError) throw completeError;
+
     return { outcome };
   } catch (error) {
-    await service.rpc("rpc_stripe_event_fail", {
+    const { error: failError } = await service.rpc("rpc_stripe_event_fail", {
       p_event_id: event.id,
       p_error: describeError(error),
     });
+    if (failError) {
+      logger.error("billing.webhook_failure_record_failed", {
+        eventId: event.id,
+        reason: describeError(failError),
+      });
+    }
     throw error;
   }
 }
@@ -459,6 +469,12 @@ export async function readBillingState(
 
   if (entitlement.error) {
     logger.error("billing.state_failed", { requestId, orgId, error: entitlement.error });
+    throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
+  }
+
+  if (balance.error) {
+    // A failed balance lookup must not masquerade as "zero SMS credits".
+    logger.error("billing.balance_failed", { requestId, orgId, error: balance.error });
     throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
   }
 
