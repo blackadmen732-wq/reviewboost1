@@ -186,15 +186,35 @@ describe("the webhook sink", () => {
     expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_complete")).toBe(true);
   });
 
-  it("leaves an event whose customer it cannot place visible in the inbox", async () => {
+  it("returns a retryable 500 for an unlinked Stripe customer", async () => {
     rpcResults.set("rpc_billing_org_for_customer", { data: null, error: null });
     const body = JSON.stringify(stripeEvent());
     const { POST } = await import("@/app/api/v1/webhooks/stripe/route");
     const response = await POST(signedRequest(body) as never);
 
-    expect(response.status).toBe(200);
+    // Do not acknowledge an unprocessed event: Stripe must retry when the
+    // organization link becomes available.
+    expect(response.status).toBe(500);
     expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_complete")).toBe(false);
     expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_fail")).toBe(true);
+  });
+
+  it("does not acknowledge an event when recording completion fails", async () => {
+    rpcResults.set("rpc_stripe_event_complete", { data: null, error: { message: "database write failed" } });
+    const { POST } = await import("@/app/api/v1/webhooks/stripe/route");
+    const response = await POST(signedRequest(JSON.stringify(stripeEvent())) as never);
+
+    expect(response.status).toBe(500);
+    expect(rpcCalls.some(({ name }) => name === "rpc_stripe_event_fail")).toBe(true);
+  });
+
+  it("still returns 500 if even recording the webhook failure fails", async () => {
+    rpcResults.set("rpc_stripe_event_complete", { data: null, error: { message: "database write failed" } });
+    rpcResults.set("rpc_stripe_event_fail", { data: null, error: { message: "failure ledger unavailable" } });
+    const { POST } = await import("@/app/api/v1/webhooks/stripe/route");
+    const response = await POST(signedRequest(JSON.stringify(stripeEvent())) as never);
+
+    expect(response.status).toBe(500);
   });
 
   it("completes the cancellation that follows an account deletion", async () => {
@@ -398,6 +418,26 @@ describe("what the owner is told", () => {
     expect(state.planId).toBeNull();
     expect(state.status).toBe("suspended");
     expect(state.smsBalance).toEqual({ monthly: 0, purchased: 0, total: 0 });
+  });
+
+  it("fails closed when the SMS credit balance lookup fails", async () => {
+    tableRows.set("entitlement_snapshots", [
+      {
+        plan_id: "starter",
+        status: "active",
+        cancel_at_period_end: false,
+        trial_ends_at: null,
+        current_period_end: null,
+      },
+    ]);
+    rpcResults.set("rpc_sms_balance", { data: null, error: { message: "database offline" } });
+
+    const { readBillingState } = await import("@/lib/server/billing-service");
+    const { createClient } = await import("@supabase/supabase-js");
+
+    await expect(
+      readBillingState({ db: createClient("", "") as never, userId: "u" }, ORG, "req-balance-error"),
+    ).rejects.toMatchObject({ status: 503 });
   });
 
   it("carries the locked prices and limits rather than letting a page hardcode them", async () => {
