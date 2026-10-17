@@ -296,7 +296,23 @@ export function tokenDigestKeyVersion(): number {
  * refuses, because the business believes it is subscribed.
  */
 export function stripeSecretKey(): string {
-  return read("STRIPE_SECRET_KEY");
+  const key = read("STRIPE_SECRET_KEY");
+  const live = /^(sk|rk)_live_/.test(key);
+  const test = /^(sk|rk)_test_/.test(key);
+
+  // The readiness gate also checks this, but it must hold on the actual
+  // payment path even if someone bypasses the gate or removes monitoring.
+  if (!live && !test) {
+    throw new ConfigError("STRIPE_SECRET_KEY must be a Stripe secret or restricted key.");
+  }
+  if (isPaidProductionTier() && !live) {
+    throw new ConfigError("STRIPE_SECRET_KEY must use live mode in production.");
+  }
+  if (!isPaidProductionTier() && !test) {
+    throw new ConfigError("STRIPE_SECRET_KEY must use test mode outside production.");
+  }
+
+  return key;
 }
 
 /**

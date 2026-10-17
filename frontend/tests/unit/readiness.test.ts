@@ -219,6 +219,30 @@ describe("no fake SMS for paying customers", () => {
 });
 
 describe("Stripe", () => {
+  it("refuses a live Stripe key on the preview payment path, not only at readiness", async () => {
+    configure({ VERCEL_ENV: "preview" });
+    const { stripeSecretKey } = await import("@/lib/server/env");
+    expect(() => stripeSecretKey()).toThrow(/must use test mode outside production/);
+  });
+
+  it("refuses a test Stripe key on the production payment path", async () => {
+    configure({ STRIPE_SECRET_KEY: "sk_test_example" });
+    const { stripeSecretKey } = await import("@/lib/server/env");
+    expect(() => stripeSecretKey()).toThrow(/must use live mode in production/);
+  });
+
+  it("accepts a test key on the preview payment path", async () => {
+    configure({ VERCEL_ENV: "preview", STRIPE_SECRET_KEY: "sk_test_example" });
+    const { stripeSecretKey } = await import("@/lib/server/env");
+    expect(stripeSecretKey()).toBe("sk_test_example");
+  });
+
+  it("refuses malformed Stripe credentials before reaching the SDK", async () => {
+    configure({ VERCEL_ENV: "preview", STRIPE_SECRET_KEY: "placeholder" });
+    const { stripeSecretKey } = await import("@/lib/server/env");
+    expect(() => stripeSecretKey()).toThrow(/secret or restricted key/);
+  });
+
   it("refuses a test-mode key in production", async () => {
     configure({ STRIPE_SECRET_KEY: "sk_test_abc" });
     expect(problemsOf(await gate())).toMatch(/live-mode key in production/);
