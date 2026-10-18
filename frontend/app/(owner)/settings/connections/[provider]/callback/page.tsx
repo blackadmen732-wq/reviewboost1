@@ -29,7 +29,7 @@ export default async function ConnectionCallbackPage({
 }) {
   const { provider: providerId } = await params;
   const provider = getProvider(providerId);
-  if (!provider) notFound();
+  if (!provider || provider.connectKind !== "oauth") notFound();
   const { organization } = await requireOwner(`/settings/connections/${provider.id}`);
   if (!["owner", "admin"].includes(organization.role)) notFound();
 
