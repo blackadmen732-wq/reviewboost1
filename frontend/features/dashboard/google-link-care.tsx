@@ -171,7 +171,7 @@ export function GoogleLinkCare({
             value={draft}
             disabled={busy}
             invalid={error !== null || (trimmed !== "" && !draftLooksRight)}
-            placeholder="https://g.page/..."
+            placeholder="https://g.page/r/…"
             onChange={(event) => {
               setDraft(event.target.value);
               setError(null);

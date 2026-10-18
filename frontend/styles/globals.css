@@ -239,6 +239,24 @@
   a {
     color: inherit;
   }
+  /* No double-tap zoom delay on anything tappable. */
+  button,
+  a,
+  [role="button"],
+  input,
+  select,
+  label {
+    touch-action: manipulation;
+  }
+  /* Headlines break evenly; paragraphs avoid a lone last word. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
   ::selection {
     background: var(--rb-brand-soft);
     color: var(--rb-ink);

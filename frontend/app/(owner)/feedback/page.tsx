@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { FeedbackList } from "@/features/dashboard/feedback-list";
@@ -74,18 +75,28 @@ export default async function FeedbackPage({
       {items.length === 0 ? (
         filtered ? (
           <EmptyState
-            title="No ratings match"
-            description="Nothing in these ratings fits the filter."
+            title="No ratings match this filter."
+            description="Clear the filter to see every rating."
+            action={
+              <Button asChild variant="secondary" size="sm">
+                <Link href="/feedback?show=all">Clear filter</Link>
+              </Button>
+            }
           />
         ) : showAll ? (
           <EmptyState
-            title="Nothing yet"
-            description="When a customer rates you, it shows up here."
+            title="Nothing yet."
+            description="Ratings show up here after customers tap or scan your Tag."
+            action={
+              <Button asChild variant="secondary" size="sm">
+                <Link href="/stands">Go to Set up</Link>
+              </Button>
+            }
           />
         ) : (
           <EmptyState
-            title="All caught up"
-            description="Nothing is waiting on you. Anything already sorted is under Everything."
+            title="All caught up."
+            description="Nothing is waiting on you. Sorted ratings are under Everything."
           />
         )
       ) : (

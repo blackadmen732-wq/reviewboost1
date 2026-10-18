@@ -88,7 +88,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               className="size-5 animate-spin motion-reduce:animate-none"
               aria-hidden="true"
             />
-            <span>{loadingLabel ?? "Loading…"}</span>
+            {/* Keep saying what is happening: the given label ("Sending…"),
+                otherwise the button's own words, never a generic "Loading". */}
+            {loadingLabel ? <span>{loadingLabel}</span> : children}
           </>
         ) : (
           children
