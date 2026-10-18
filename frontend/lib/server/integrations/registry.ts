@@ -199,6 +199,22 @@ function googleSheets(): ProviderDefinition {
   };
 }
 
+/** A CSV file needs no keys, only a default country for numbers typed without one. */
+function csvFile(): ProviderDefinition {
+  return {
+    id: "csv",
+    connectKind: "list",
+    displayName: "Spreadsheet file (CSV)",
+    monogram: "CSV",
+    categories: ["lists"],
+    summary: "Upload a customer list saved from Excel, Numbers or any spreadsheet.",
+    dataRead: ["Only the file you pick", "Names and phone numbers in it"],
+    cannotDo: ["See anything else on your computer", "Change your file", "Text anyone. Customers still need to agree first."],
+    availability: /^\d{1,3}$/.test(process.env.SMS_DEFAULT_COUNTRY_CALLING_CODE ?? "") ? "available" : "in_setup",
+    workflows: [],
+  };
+}
+
 /**
  * The fake provider shows up only where someone switched it on, and never in
  * production. Production on Vercel is `VERCEL_ENV=production`; elsewhere a
@@ -212,7 +228,7 @@ export function fakeProviderEnabled(): boolean {
 }
 
 export function listProviders(): ProviderDefinition[] {
-  return [...(fakeProviderEnabled() ? [FAKE] : []), SQUARE, googleSheets(), ...PLANNED];
+  return [...(fakeProviderEnabled() ? [FAKE] : []), SQUARE, googleSheets(), csvFile(), ...PLANNED];
 }
 
 export function getProvider(id: string): ProviderDefinition | null {

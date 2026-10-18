@@ -102,3 +102,12 @@ Without it, the card shows a plain sheet icon.
 | Column guessing | `frontend/features/connections/sheet-columns.ts` |
 | Screen | `frontend/features/connections/google-sheets-import.tsx` |
 | Unit tests | `frontend/tests/unit/customer-lists.test.ts` |
+
+## CSV upload
+
+Settings → Connections → Spreadsheet file (CSV) uses the same column check,
+preview, import, re-import and removal as Google Sheets. The file is read in
+the owner's browser; only names and phone numbers are sent, and only the
+file's name is kept. Comma, semicolon and tab files from Excel, Numbers and
+Google Sheets all work, including a title line above the header. It needs no
+keys, only `SMS_DEFAULT_COUNTRY_CALLING_CODE`.

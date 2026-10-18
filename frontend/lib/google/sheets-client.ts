@@ -235,3 +235,33 @@ export async function pickGoogleSheet(config: GoogleConfig): Promise<PickedSheet
     throw error;
   }
 }
+
+/**
+ * A CSV file the owner picked, shaped like a picked Google Sheet so the same
+ * column check, preview and import run on it. Read entirely in the browser.
+ */
+export async function openCsvFile(file: File): Promise<PickedSheet> {
+  const { parseCsv, MAX_CSV_BYTES } = await import("@/lib/csv/parse");
+  if (file.size > MAX_CSV_BYTES) {
+    throw new GoogleSheetsError("That file is too big. Split it into files of up to 2,000 people.", "too_big");
+  }
+  const looksCsv = /\.(csv|txt|tsv)$/i.test(file.name) || /csv|text\/plain|tab-separated/i.test(file.type);
+  if (!looksCsv) {
+    throw new GoogleSheetsError("That isn't a CSV file. In Excel or Numbers, save the list as CSV and pick that file.", "not_a_sheet");
+  }
+  let text: string;
+  try {
+    text = await file.text();
+  } catch {
+    throw new GoogleSheetsError("That file couldn't be read. Try saving it again as CSV.", "read_failed");
+  }
+  const cells = parseCsv(text);
+  const title = file.name.replace(/\.(csv|txt|tsv)$/i, "").slice(0, 120) || "Customer list";
+  return {
+    id: "",
+    title,
+    tabs: [{ title, rowCount: cells.length }],
+    readTab: async () => cells,
+    done: () => undefined,
+  };
+}

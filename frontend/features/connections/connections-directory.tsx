@@ -115,7 +115,7 @@ export function ConnectionsDirectory({ providers, categoryLabels }: ConnectionsD
                       {provider.logoSrc ? (
                         // eslint-disable-next-line @next/next/no-img-element -- a small local brand file
                         <img src={provider.logoSrc} alt="" className="size-[60%] object-contain" />
-                      ) : provider.id === "google_sheets" ? (
+                      ) : provider.id === "google_sheets" || provider.id === "csv" ? (
                         <FileSpreadsheet className="size-5" />
                       ) : (
                         provider.monogram

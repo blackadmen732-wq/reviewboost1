@@ -39,7 +39,8 @@ export default async function ProviderPage({ params }: { params: Promise<{ provi
   const db = await supabaseServer();
 
   if (provider.connectKind === "list") {
-    const lists = await listCustomerLists(db, organization.orgId, requestId);
+    const source = provider.id === "csv" ? "csv" : "google_sheets";
+    const lists = await listCustomerLists(db, organization.orgId, requestId, source);
     const available = provider.availability === "available";
     return (
       <AppShell businessName={organization.name}>
@@ -48,6 +49,7 @@ export default async function ProviderPage({ params }: { params: Promise<{ provi
           Connections
         </Link>
         <GoogleSheetsImport
+          source={source}
           provider={{
             displayName: provider.displayName,
             monogram: provider.monogram,
@@ -58,7 +60,7 @@ export default async function ProviderPage({ params }: { params: Promise<{ provi
             available,
           }}
           google={
-            available
+            available && source === "google_sheets"
               ? {
                   clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
                   apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY!,

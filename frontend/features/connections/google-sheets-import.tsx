@@ -17,7 +17,7 @@ import {
   type Cell,
   type ColumnChoice,
 } from "@/features/connections/sheet-columns";
-import { MAX_SHEET_ROWS, pickGoogleSheet, preloadGoogle, type PickedSheet } from "@/lib/google/sheets-client";
+import { MAX_SHEET_ROWS, openCsvFile, pickGoogleSheet, preloadGoogle, type PickedSheet } from "@/lib/google/sheets-client";
 
 interface ProviderView {
   displayName: string;
@@ -49,7 +49,11 @@ interface ImportResult {
   unusableCount: number;
 }
 
+export type ListSource = "google_sheets" | "csv";
+
 interface GoogleSheetsImportProps {
+  /** Which front door: Google's picker, or a CSV file from the owner's computer. */
+  source: ListSource;
   provider: ProviderView;
   google: { clientId: string; apiKey: string; projectNumber: string } | null;
   lists: readonly SheetListSummary[];
@@ -69,18 +73,39 @@ type Step =
  * the name and the phone, then bring the people in. Nothing here texts anyone,
  * and ReviewBoost keeps no access to the Google account afterwards.
  */
-export function GoogleSheetsImport({ provider, google, lists }: GoogleSheetsImportProps) {
+export function GoogleSheetsImport({ source, provider, google, lists }: GoogleSheetsImportProps) {
   const [step, setStep] = useState<Step>({ kind: "start" });
   const [error, setError] = useState<string | null>(null);
   const sheetRef = useRef<PickedSheet | null>(null);
 
+  const fileInput = useRef<HTMLInputElement>(null);
+  const ready = source === "csv" ? provider.available : Boolean(google);
+
   useEffect(() => {
-    if (google) preloadGoogle();
+    if (source === "google_sheets" && google) preloadGoogle();
     // Whatever happens, the Google permission does not outlive this screen.
     return () => sheetRef.current?.done();
-  }, [google]);
+  }, [google, source]);
+
+  async function openFile(file: File) {
+    setError(null);
+    setStep({ kind: "opening" });
+    try {
+      const sheet = await openCsvFile(file);
+      sheetRef.current = sheet;
+      const cells = await sheet.readTab(sheet.tabs[0]!.title);
+      setStep({ kind: "review", sheet, tab: sheet.tabs[0]!.title, cells, choice: guessColumns(cells) });
+    } catch (caught) {
+      setError(errorMessage(caught));
+      setStep({ kind: "start" });
+    }
+  }
 
   async function choose() {
+    if (source === "csv") {
+      fileInput.current?.click();
+      return;
+    }
     if (!google) return;
     setError(null);
     sheetRef.current?.done();
@@ -107,9 +132,9 @@ export function GoogleSheetsImport({ provider, google, lists }: GoogleSheetsImpo
         </div>
       </header>
 
-      {!google ? (
+      {!ready ? (
         <InlineNotice title="Coming soon">
-          We&apos;re finishing {provider.displayName}. You can&apos;t add a sheet yet.
+          We&apos;re finishing {provider.displayName}. You can&apos;t add a list yet.
         </InlineNotice>
       ) : null}
 
@@ -135,7 +160,7 @@ export function GoogleSheetsImport({ provider, google, lists }: GoogleSheetsImpo
               <InlineNotice kind="error">{error}</InlineNotice>
             </div>
           ) : null}
-          {google ? (
+          {ready && source === "google_sheets" ? (
             <>
               <Button className="mt-4" loading={step.kind === "opening"} loadingLabel="Opening Google…" onClick={choose}>
                 Choose a Google Sheet
@@ -145,11 +170,35 @@ export function GoogleSheetsImport({ provider, google, lists }: GoogleSheetsImpo
               </p>
             </>
           ) : null}
+          {ready && source === "csv" ? (
+            <>
+              <input
+                ref={fileInput}
+                type="file"
+                accept=".csv,.tsv,.txt,text/csv,text/plain"
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden="true"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file) void openFile(file);
+                }}
+              />
+              <Button className="mt-4" loading={step.kind === "opening"} loadingLabel="Reading the file…" onClick={choose}>
+                Choose a CSV file
+              </Button>
+              <p className="mt-2 text-sm text-muted">
+                In Excel or Numbers, use Save As or Export and pick CSV. The file is read on your device; only names and phone numbers are sent.
+              </p>
+            </>
+          ) : null}
         </section>
       ) : null}
 
       {step.kind === "review" ? (
         <Review
+          source={source}
           step={step}
           error={error}
           onChange={(next) => setStep(next)}
@@ -171,7 +220,7 @@ export function GoogleSheetsImport({ provider, google, lists }: GoogleSheetsImpo
         </section>
       ) : null}
 
-      {step.kind === "done" ? <Done title={step.title} result={step.result} onAnother={() => setStep({ kind: "start" })} /> : null}
+      {step.kind === "done" ? <Done source={source} title={step.title} result={step.result} onAnother={() => setStep({ kind: "start" })} /> : null}
 
       {lists.length > 0 ? <Lists lists={lists} /> : null}
     </div>
@@ -198,6 +247,7 @@ export function ProviderMark({ provider, size = "lg" }: { provider: Pick<Provide
 // ----------------------------------------------------------------- review ---
 
 function Review({
+  source,
   step,
   error,
   onChange,
@@ -206,6 +256,7 @@ function Review({
   onSaving,
   onSaved,
 }: {
+  source: ListSource;
   step: Extract<Step, { kind: "review" }>;
   error: string | null;
   onChange: (next: Step) => void;
@@ -240,7 +291,10 @@ function Review({
     try {
       const result = await connectionsApi<ImportResult>("/api/v1/customers/lists", {
         method: "POST",
-        body: { source: "google_sheets", label: sheet.title.slice(0, 120), sourceRef: sheet.id, rows },
+        body:
+          source === "google_sheets"
+            ? { source, label: sheet.title.slice(0, 120), sourceRef: sheet.id, rows }
+            : { source, label: sheet.title.slice(0, 120), rows },
       });
       onSaved(sheet.title, result);
     } catch (caught) {
@@ -274,7 +328,7 @@ function Review({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold text-ink">{sheet.title}</h2>
         <button type="button" onClick={onPickAgain} className="min-h-11 text-sm font-medium text-muted underline-offset-4 hover:text-ink hover:underline">
-          Pick a different sheet
+          {source === "csv" ? "Pick a different file" : "Pick a different sheet"}
         </button>
       </div>
 
@@ -362,7 +416,7 @@ function Review({
 
 // ------------------------------------------------------------------- done ---
 
-function Done({ title, result, onAnother }: { title: string; result: ImportResult; onAnother: () => void }) {
+function Done({ source, title, result, onAnother }: { source: ListSource; title: string; result: ImportResult; onAnother: () => void }) {
   const router = useRouter();
   useEffect(() => {
     router.refresh();
@@ -388,13 +442,17 @@ function Done({ title, result, onAnother }: { title: string; result: ImportResul
               ? "The phone number couldn't be used (too short, too long, or not a real number), or there wasn't one. "
               : "There was no phone number. "}
             Rows {result.unusable.map((item) => item.row).join(", ")}
-            {result.unusableCount > result.unusable.length ? ` and ${result.unusableCount - result.unusable.length} more` : ""}. Fix them in the sheet, then add it again.
+            {result.unusableCount > result.unusable.length ? ` and ${result.unusableCount - result.unusable.length} more` : ""}. Fix them in your list, then add it again.
           </InlineNotice>
         </div>
       ) : null}
-      <p className="mt-4 text-sm text-muted">We&apos;ve let go of the Google permission. Add the sheet again any time to bring in changes.</p>
+      <p className="mt-4 text-sm text-muted">
+        {source === "google_sheets"
+          ? "We've let go of the Google permission. Add the sheet again any time to bring in changes."
+          : "Add the file again any time to bring in changes. Nobody is added twice."}
+      </p>
       <Button className="mt-4" variant="secondary" onClick={onAnother}>
-        Add another sheet
+        {source === "google_sheets" ? "Add another sheet" : "Add another file"}
       </Button>
     </section>
   );
@@ -414,8 +472,8 @@ function Lists({ lists }: { lists: readonly SheetListSummary[] }) {
       const result = await connectionsApi<{ contactsRemoved: number }>(`/api/v1/customers/lists/${removing.id}/remove`, { method: "POST" });
       notify.success(
         result.contactsRemoved
-          ? `Removed ${removing.label ?? "the sheet"} and ${result.contactsRemoved} ${result.contactsRemoved === 1 ? "person" : "people"} only it had.`
-          : `Removed ${removing.label ?? "the sheet"}.`,
+          ? `Removed ${removing.label ?? "the list"} and ${result.contactsRemoved} ${result.contactsRemoved === 1 ? "person" : "people"} only it had.`
+          : `Removed ${removing.label ?? "the list"}.`,
       );
       setRemoving(null);
       router.refresh();
@@ -428,12 +486,12 @@ function Lists({ lists }: { lists: readonly SheetListSummary[] }) {
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Sheets you&apos;ve added</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Lists you&apos;ve added</h2>
       <ul className="divide-y divide-border rounded-[var(--radius-card)] border border-border bg-surface">
         {lists.map((list) => (
           <li key={list.id} className="flex items-center gap-4 p-4">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-medium text-ink">{list.label ?? "Google Sheet"}</p>
+              <p className="truncate text-base font-medium text-ink">{list.label ?? "Customer list"}</p>
               <p className="text-sm text-muted">
                 {formatWhen(list.createdAt)} · {(list.created + list.updated + list.unchanged).toLocaleString()} people
                 {list.rowsUnusable ? ` · ${list.rowsUnusable.toLocaleString()} rows skipped` : ""}
@@ -448,9 +506,9 @@ function Lists({ lists }: { lists: readonly SheetListSummary[] }) {
       <AlertDialog
         open={removing !== null}
         onOpenChange={(open) => (open ? null : setRemoving(null))}
-        title={`Remove ${removing?.label ?? "this sheet"}?`}
-        description="People who only came from this sheet are removed from ReviewBoost. Anyone you also know from somewhere else, or who has visited, stays. Your Google Sheet isn't changed."
-        confirmLabel="Remove sheet"
+        title={`Remove ${removing?.label ?? "this list"}?`}
+        description="People who only came from this list are removed from ReviewBoost. Anyone you also know from somewhere else, or who has visited, stays. Your original file or sheet isn't changed."
+        confirmLabel="Remove list"
         onConfirm={remove}
         loading={busy}
       />

@@ -13,7 +13,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 create schema if not exists tests;
 
-select plan(27);
+select plan(29);
 
 create or replace function tests.cl_set_actor(p_user_id uuid) returns void
 language plpgsql as $$
@@ -178,10 +178,27 @@ select is(
     (select names_differ from public.customers where id = '7e000000-0000-0000-0000-000000000001'),
     false, 'a list name alone does not mark a contact as having two names');
 
+-- ================================================================ CSV =====
+
+create temp table csv_import as
+select * from app.customer_list_import('7c000000-0000-0000-0000-00000000000a',
+    '7b000000-0000-0000-0000-000000000001', 'csv', 'Clients', null, 1, 0,
+    jsonb_build_array(tests.cl_row('1', 'Ana Ruiz')));
+
+select results_eq(
+    $$ select created_count, updated_count from csv_import $$,
+    $$ values (0, 1) $$,
+    'a CSV row for a person already known from a sheet matches them, adding no contact');
+
+select is(
+    (select count(distinct p.source_kind)::int from public.customer_source_profiles p
+       join public.customers c on c.id = p.customer_id where c.phone_hash = repeat('1', 64)),
+    2, 'the person now has a Google Sheets profile and a CSV profile');
+
 -- ========================================================== isolation =====
 
 select tests.cl_set_actor('7b000000-0000-0000-0000-000000000001');
-select is((select count(*)::int from public.customer_list_imports), 2, 'the owner sees their two imports');
+select is((select count(*)::int from public.customer_list_imports), 3, 'the owner sees their three imports');
 select tests.cl_set_actor('7b000000-0000-0000-0000-000000000002');
 select is((select count(*)::int from public.customer_list_imports), 0, 'a member sees no imports');
 select tests.cl_set_actor('7b000000-0000-0000-0000-000000000003');
@@ -209,7 +226,7 @@ select is(
 select is(
     app.customer_list_remove('7c000000-0000-0000-0000-00000000000a',
         '7b000000-0000-0000-0000-000000000001', (select import_id from second_import)),
-    3, 'removing the current import deletes the contacts only it knew about');
+    2, 'removing the current import deletes only the contacts nothing else knows (Ana stays: she is also on the CSV)');
 
 select is(
     (select count(*)::int from public.customers where id = '7e000000-0000-0000-0000-000000000001'),

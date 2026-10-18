@@ -30,12 +30,14 @@ export default async function ConnectionsPage() {
 
   const requestId = "page:/settings/connections";
   const db = await supabaseServer();
-  const [connections, lists] = await Promise.all([
+  const [connections, sheetLists, csvLists] = await Promise.all([
     listConnections(db, organization.orgId, requestId),
-    listCustomerLists(db, organization.orgId, requestId),
+    listCustomerLists(db, organization.orgId, requestId, "google_sheets"),
+    listCustomerLists(db, organization.orgId, requestId, "csv"),
   ]);
   const stateByProvider = new Map<string, string>(connections.map((connection) => [connection.providerId, connection.state]));
-  if (lists.length > 0) stateByProvider.set("google_sheets", "list_added");
+  if (sheetLists.length > 0) stateByProvider.set("google_sheets", "list_added");
+  if (csvLists.length > 0) stateByProvider.set("csv", "list_added");
   const providers = providerDirectory().map((provider) => ({
     ...provider,
     logoSrc: providerLogo(provider.id),

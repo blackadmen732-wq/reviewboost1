@@ -34,14 +34,27 @@ const rowSchema = z.strictObject({
   phone: z.string().max(40).nullable(),
 });
 
-export const listImportSchema = z.strictObject({
-  source: z.literal("google_sheets"),
-  /** The sheet's title as the owner sees it. */
-  label: z.string().trim().min(1).max(120),
-  /** Google's id for the file. Only a keyed digest of it is kept. */
-  sourceRef: z.string().regex(/^[A-Za-z0-9_-]{10,200}$/),
-  rows: z.array(rowSchema).max(MAX_LIST_ROWS),
-});
+const labelSchema = z.string().trim().min(1).max(120);
+const rowsSchema = z.array(rowSchema).max(MAX_LIST_ROWS);
+
+export const listImportSchema = z.discriminatedUnion("source", [
+  z.strictObject({
+    source: z.literal("google_sheets"),
+    /** The sheet's title as the owner sees it. */
+    label: labelSchema,
+    /** Google's id for the file. Only a keyed digest of it is kept. */
+    sourceRef: z.string().regex(/^[A-Za-z0-9_-]{10,200}$/),
+    rows: rowsSchema,
+  }),
+  z.strictObject({
+    /** A CSV file read in the owner's browser. Only its name is kept. */
+    source: z.literal("csv"),
+    label: labelSchema,
+    rows: rowsSchema,
+  }),
+]);
+
+export type ListSourceKind = ListImportInput["source"];
 
 export type ListImportInput = z.infer<typeof listImportSchema>;
 
@@ -112,7 +125,7 @@ export async function importCustomerList(
     p_actor: actorId,
     p_source: input.source,
     p_label: input.label,
-    p_ref_digest: sourceRefDigest(input.sourceRef),
+    p_ref_digest: input.source === "google_sheets" ? sourceRefDigest(input.sourceRef) : null,
     p_rows_received: input.rows.length,
     p_rows_unusable: unusable.length,
     p_rows: prepared,
@@ -172,12 +185,17 @@ export interface ListImportSummary {
 }
 
 /** Live (not removed) imports, newest first, read through the caller's RLS. */
-export async function listCustomerLists(db: SupabaseClient, orgId: string, requestId: string): Promise<ListImportSummary[]> {
+export async function listCustomerLists(
+  db: SupabaseClient,
+  orgId: string,
+  requestId: string,
+  source: ListSourceKind = "google_sheets",
+): Promise<ListImportSummary[]> {
   const { data, error } = await db
     .from("customer_list_imports")
     .select("id, source_label, created_at, rows_received, rows_unusable, created_count, updated_count, unchanged_count")
     .eq("org_id", orgId)
-    .eq("source", "google_sheets")
+    .eq("source", source)
     .eq("status", "active")
     .order("created_at", { ascending: false })
     .limit(20);

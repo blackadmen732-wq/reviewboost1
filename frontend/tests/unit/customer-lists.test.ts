@@ -183,6 +183,17 @@ describe("bringing in a list", () => {
     expect(listImportSchema.safeParse({ ...base, rows: [{ row: 2, name: "A", phone: "1", email: "x" }] }).success).toBe(false);
   });
 
+  it("accepts a CSV list with no file id and keeps no digest for it", async () => {
+    const { importCustomerList, listImportSchema } = await load();
+    expect(listImportSchema.safeParse({ source: "csv", label: "Clients", rows: [] }).success).toBe(true);
+    expect(listImportSchema.safeParse({ source: "csv", label: "Clients", sourceRef: "1AbCdEfGhIjKlMnOp", rows: [] }).success).toBe(false);
+    expect(listImportSchema.safeParse({ source: "google_sheets", label: "Clients", rows: [] }).success).toBe(false);
+    rpc.mockResolvedValue({ data: [{ import_id: "i2", created_count: 1, updated_count: 0, unchanged_count: 0 }], error: null });
+    await importCustomerList(ORG, USER, { source: "csv", label: "Clients", rows: [{ row: 2, name: "Ana", phone: "3055550101" }] }, "req");
+    const [, args] = rpc.mock.calls[0]!;
+    expect(args).toMatchObject({ p_source: "csv", p_ref_digest: null });
+  });
+
   it("says a business it can't find is not found", async () => {
     const { importCustomerList } = await load();
     rpc.mockResolvedValue({ data: null, error: { code: "P0002", message: "not_found_or_forbidden" } });
