@@ -12,7 +12,7 @@ import type { ProviderId, VisitKind, WorkflowId } from "@/lib/server/integration
  *   in_setup    — being built, or not configured in this environment: "Coming soon".
  *   planned     — on the list, nothing built: "Planned".
  *
- * Square is `in_setup` until its adapter lands (stage 2). The `fake` provider
+ * Square is `in_setup` until its contacts-only OAuth and import are wired. The `fake` provider
  * is a test double for local development and preview environments; it is
  * never listed in production.
  */
@@ -65,45 +65,18 @@ const SQUARE: ProviderDefinition = {
   connectKind: "oauth",
   displayName: "Square",
   monogram: "Sq",
-  categories: ["pos", "appointments"],
-  summary: "Find customers from your Square sales or appointments.",
-  dataRead: [
-    "Your locations",
-    "Names and phone numbers of customers who visited",
-    "When they paid or had an appointment",
-  ],
+  categories: ["lists", "pos"],
+  summary: "Bring customer names and phone numbers from your Square account.",
+  dataRead: ["Customer names", "Customer phone numbers"],
   cannotDo: [
+    "Read sales, payment amounts, bookings, or card information",
     "Change anything in Square",
-    "See card numbers or what people bought",
-    "Text anyone. Customers still need to agree first.",
+    "Automatically text imported contacts. SMS consent is checked separately.",
   ],
+  // Contacts-only OAuth and import are not wired yet. No deceptive Connect
+  // button until we can sync authorized accounts end to end.
   availability: "in_setup",
-  workflows: [
-    {
-      id: "payments",
-      label: "Sales (Square Point of Sale)",
-      stream: "payments",
-      visitKind: "payment",
-      scopes: ["MERCHANT_PROFILE_READ", "CUSTOMERS_READ", "PAYMENTS_READ"],
-      permissions: [
-        { label: "Your locations", reason: "To match Square places to yours" },
-        { label: "Customers who visited", reason: "To find their name and number" },
-        { label: "When they paid", reason: "To know who visited and when" },
-      ],
-    },
-    {
-      id: "appointments",
-      label: "Appointments (Square Appointments)",
-      stream: "bookings",
-      visitKind: "appointment",
-      scopes: ["MERCHANT_PROFILE_READ", "CUSTOMERS_READ", "APPOINTMENTS_READ", "APPOINTMENTS_ALL_READ"],
-      permissions: [
-        { label: "Your locations", reason: "To match Square places to yours" },
-        { label: "Customers who booked", reason: "To find their name and number" },
-        { label: "When their appointment was", reason: "To know who visited and when" },
-      ],
-    },
-  ],
+  workflows: [],
 };
 
 const FAKE: ProviderDefinition = {
@@ -160,10 +133,11 @@ function planned(id: string, displayName: string, monogram: string, categories: 
 }
 
 const PLANNED: readonly ProviderDefinition[] = [
-  planned("vagaro", "Vagaro", "V", ["appointments", "salon"], "Bookings for salons and spas."),
-  planned("toast", "Toast", "To", ["pos"], "Point of sale for restaurants."),
-  planned("clover", "Clover", "Cl", ["pos"], "Point of sale for restaurants and shops."),
-  planned("mindbody", "Mindbody", "M", ["appointments", "fitness"], "Classes and appointments for studios."),
+  planned("vagaro", "Vagaro", "V", ["lists", "salon"], "Bring in your salon customer contacts."),
+  planned("toast", "Toast", "To", ["lists", "pos"], "Bring in restaurant customer contacts."),
+  planned("clover", "Clover", "Cl", ["lists", "pos"], "Bring in customer contacts from Clover."),
+  planned("mindbody", "Mindbody", "M", ["lists", "fitness"], "Bring in your studio customer contacts."),
+  planned("google_contacts", "Google Contacts", "GC", ["lists"], "Bring in customers saved in Google Contacts."),
 ];
 
 /**
