@@ -13,7 +13,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(14);
+select plan(21);
 
 create or replace function tests.as_user(p_user_id uuid) returns void
 language plpgsql as $$
@@ -135,6 +135,50 @@ select set_config('request.jwt.claims', '', true);
 select is_empty(
     $$ select * from public.rpc_my_account_deletion_blockers() $$,
     'without a session the answer names nobody');
+
+-- ------------------------------------------- the locked step (prepare) ----
+
+select function_privs_are('public', 'rpc_prepare_my_account_deletion', array[]::text[],
+    'anon', array[]::text[], 'anonymous callers cannot prepare a deletion');
+
+select tests.as_user('00000000-1801-0000-0000-0000000000b1');
+select results_eq(
+    $$ select name from public.rpc_prepare_my_account_deletion() $$,
+    $$ values ('Solo Salon'::text) $$,
+    'the only owner of a business is refused, by name');
+
+select tests.as_postgres();
+select is(
+    (select count(*)::int from public.organization_members
+      where user_id = '00000000-1801-0000-0000-0000000000b1'),
+    2,
+    'a refused prepare changes nothing');
+
+-- The first co-owner to go leaves; the second is then the only owner.
+select tests.as_user('00000000-1801-0000-0000-0000000000b2');
+select is_empty(
+    $$ select * from public.rpc_prepare_my_account_deletion() $$,
+    'a co-owner may prepare to leave');
+
+select tests.as_postgres();
+select is(
+    (select count(*)::int from public.organization_members
+      where user_id = '00000000-1801-0000-0000-0000000000b2'),
+    0,
+    'preparing removes all of their memberships before the login goes');
+
+select tests.as_user('00000000-1801-0000-0000-0000000000b1');
+select results_eq(
+    $$ select name from public.rpc_my_account_deletion_blockers() order by name $$,
+    $$ values ('Shared Shop'::text), ('Solo Salon'::text) $$,
+    'the remaining co-owner is now the only owner, so they cannot also leave');
+
+select tests.as_postgres();
+select throws_ok(
+    $$ select * from public.rpc_prepare_my_account_deletion() $$,
+    '28000',
+    'not_authenticated',
+    'without a session nothing is prepared');
 
 -- --------------------------------------------- the delete the API performs ----
 

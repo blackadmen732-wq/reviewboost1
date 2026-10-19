@@ -86,6 +86,14 @@ describe("deleting your own account", () => {
     expect(deletedIds()).toEqual(["user-1"]);
   });
 
+  it("leaves the teams in the locked database step before deleting the login", async () => {
+    await call("POST", { confirmation: "delete" });
+    const order = events.map((event) => event.name);
+    expect(order).toContain("rpc_prepare_my_account_deletion");
+    expect(order).not.toContain("rpc_my_account_deletion_blockers");
+    expect(order.indexOf("rpc_prepare_my_account_deletion")).toBeLessThan(order.indexOf("deleteUser"));
+  });
+
   it("refuses an extra field such as a user id", async () => {
     const response = await call("POST", { confirmation: "delete", userId: "someone-else" });
     expect(response.status).toBe(400);
@@ -120,7 +128,7 @@ describe("deleting your own account", () => {
     const response = await call("POST", { confirmation: "delete" });
     expect(response.status).toBe(503);
     const body = (await response.json()) as { error: { message: string } };
-    expect(body.error.message).toMatch(/not deleted/i);
+    expect(body.error.message).toMatch(/wasn't deleted/i);
   });
 
   it("rejects a request without a session", async () => {

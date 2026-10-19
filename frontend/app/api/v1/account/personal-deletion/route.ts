@@ -80,7 +80,9 @@ export async function POST(request: NextRequest): Promise<Response> {
       });
     }
 
-    const blockers = await soleOwnedBusinesses(context, requestId);
+    // Check and leave every team in one locked step, so two co-owners
+    // deleting at once cannot both go (rpc_prepare_my_account_deletion).
+    const blockers = await soleOwnedBusinesses(context, requestId, "rpc_prepare_my_account_deletion");
     if (blockers.length > 0) {
       throw new ApiError(409, ERROR_CODE.ownsBusiness, ownsBusinessMessage(blockers), {
         details: blockers.map((blocker) => ({ field: "business", message: blocker.name })),
@@ -89,11 +91,13 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const { error } = await serviceRoleClient().auth.admin.deleteUser(context.userId);
     if (error) {
+      // They have already left their teams; a retry finds no memberships and
+      // only has the login left to delete.
       logger.error("account.personal_delete_failed", { requestId, error: error.message });
       throw new ApiError(
         503,
         ERROR_CODE.serviceUnavailable,
-        "Your account was not deleted. Try again shortly.",
+        "You've been removed from your businesses, but your sign-in wasn't deleted yet. Try again.",
       );
     }
 
@@ -110,8 +114,9 @@ export async function POST(request: NextRequest): Promise<Response> {
 async function soleOwnedBusinesses(
   context: AuthenticatedContext,
   requestId: string,
+  fn: "rpc_my_account_deletion_blockers" | "rpc_prepare_my_account_deletion" = "rpc_my_account_deletion_blockers",
 ): Promise<Blocker[]> {
-  const { data, error } = await context.db.rpc("rpc_my_account_deletion_blockers");
+  const { data, error } = await context.db.rpc(fn);
   if (error) {
     logger.error("account.personal_blockers_failed", { requestId, error: error.message });
     throw new ApiError(

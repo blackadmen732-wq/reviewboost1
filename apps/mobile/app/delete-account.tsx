@@ -33,6 +33,7 @@ export default function DeleteAccountScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uncertain, setUncertain] = useState(false);
+  const [onlyMe, setOnlyMe] = useState(false);
 
   const businessName = activeOrg?.name ?? "";
   const matches =
@@ -88,7 +89,7 @@ export default function DeleteAccountScreen() {
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <Stack.Screen options={{ title: "Delete account" }} />
       <ScrollView contentContainerStyle={styles.content}>
-        {!isOwner ? (
+        {!isOwner || onlyMe ? (
           <PersonalDeletion hasBusiness={Boolean(activeOrg)} />
         ) : (
           <>
@@ -165,10 +166,18 @@ export default function DeleteAccountScreen() {
               <Text style={styles.cancelText}>Keep my account</Text>
             </Tappable>
 
+            {/* A co-owner may leave and keep the business running. The server
+                refuses only a business's sole owner, and says which one. */}
+            <Tappable
+              style={styles.cancel}
+              onPress={() => setOnlyMe(true)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.cancelText}>Delete only my account</Text>
+            </Tappable>
             <Text style={styles.body}>
-              To keep the business and remove only yourself, the business needs
-              another owner first. Then a team member can delete their own
-              account here.
+              Keeps the business for its other owner. If you're the only owner,
+              delete the business instead.
             </Text>
           </>
         )}

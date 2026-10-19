@@ -28,8 +28,9 @@
 --   * The login itself is removed by the API with the Auth Admin API, exactly
 --     like the business path does today. Memberships and the profile cascade.
 --
--- This function only decides whether it is allowed. It changes nothing, so a
--- lost response or a retry can never half-delete anyone.
+-- `rpc_my_account_deletion_blockers` only reads, for the screen.
+-- `rpc_prepare_my_account_deletion` decides and leaves under a lock, so two
+-- co-owners deleting at once cannot both go (see below).
 
 -- ============================================== notes outlive their author ===
 
@@ -79,3 +80,59 @@ comment on function public.rpc_my_account_deletion_blockers() is
 
 revoke all on function public.rpc_my_account_deletion_blockers() from public, anon;
 grant execute on function public.rpc_my_account_deletion_blockers() to authenticated;
+
+-- ============================================== the step that commits ===
+
+-- Check and leave, in one transaction, before the login is deleted.
+--
+-- The read above is for the screen. Deciding on it alone would race: two
+-- co-owners deleting at the same moment could each see the other still
+-- there, and both go, leaving a business nobody can run. So this function
+-- locks every business the caller owns (in id order, so two callers cannot
+-- deadlock), checks again under the lock, and only then removes the caller's
+-- memberships. A second co-owner waits on the lock, then sees they are now
+-- the only owner and is refused.
+--
+-- Returns the blocking businesses, or nothing when the caller has left them
+-- all. The API deletes the login only on an empty result. If that delete then
+-- fails, the person has left their teams and still has a login that reaches
+-- nothing; a retry finds no memberships and finishes.
+create or replace function public.rpc_prepare_my_account_deletion()
+returns table (org_id uuid, name text)
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+    v_user uuid := (select auth.uid());
+begin
+    if v_user is null then
+        raise exception 'not_authenticated' using errcode = '28000';
+    end if;
+
+    perform 1
+    from public.organizations o
+    where o.id in (
+        select m.org_id
+        from public.organization_members m
+        where m.user_id = v_user and m.status = 'active' and m.role = 'owner'
+    )
+    order by o.id
+    for update;
+
+    return query
+        select b.org_id, b.name from public.rpc_my_account_deletion_blockers() b;
+    if found then
+        return;
+    end if;
+
+    delete from public.organization_members where user_id = v_user;
+end;
+$$;
+
+comment on function public.rpc_prepare_my_account_deletion() is
+    'Personal deletion, step one: under a lock on the caller''s businesses, refuse if they are any business''s only owner, otherwise remove all their memberships. The API then deletes the login.';
+
+revoke all on function public.rpc_prepare_my_account_deletion() from public, anon;
+grant execute on function public.rpc_prepare_my_account_deletion() to authenticated;
