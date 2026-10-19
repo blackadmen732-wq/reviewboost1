@@ -39,6 +39,10 @@ export const ERROR_CODE = {
   quotaExhausted: "quota_exhausted",
   notEligible: "not_eligible",
   limitReached: "limit_reached",
+  // Deleting your own login while you are the only owner of a business. The
+  // business has to be deleted (or given another owner) first; `details`
+  // names which ones.
+  ownsBusiness: "owns_business",
   requestTimeout: "request_timeout",
   internalError: "internal_error",
   serviceUnavailable: "service_unavailable",

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AuthFrame } from "@/features/auth/auth-frame";
@@ -46,6 +47,17 @@ export default async function OnboardingPage({
   return (
     <AuthFrame align="start">
       <OnboardingFlow selectedPlan={selectedPlan} />
+      {/* Someone who signed in and decided against it must not have to create
+          a business to delete their account (launch gap L1). */}
+      <p className="mt-10 text-center text-sm text-muted">
+        Changed your mind?{" "}
+        <Link
+          href="/settings/delete-my-account"
+          className="font-medium text-ink underline underline-offset-4 hover:no-underline"
+        >
+          Delete my account
+        </Link>
+      </p>
     </AuthFrame>
   );
 }
