@@ -180,6 +180,7 @@ export function OnboardingFlow({
               setError(null);
             }}
             className="h-16 text-lg"
+            invalid={error !== null && name.trim().length < 2}
           />
           {urlLooksRight ? <TestGoogleLinkButton url={trimmedUrl} /> : null}
 
@@ -189,8 +190,12 @@ export function OnboardingFlow({
         <Button
           variant="action"
           size="lg"
-          disabled={name.trim().length < 2}
           onClick={() => {
+            // Never a dead grey button: pressing it says what is missing.
+            if (name.trim().length < 2) {
+              setError("Enter your business name to continue.");
+              return;
+            }
             setError(null);
             setStep("google");
           }}
@@ -290,8 +295,14 @@ export function OnboardingFlow({
             size="lg"
             loading={busy}
             loadingLabel="Setting up…"
-            disabled={!urlLooksRight}
-            onClick={() => void finish(trimmedUrl)}
+            onClick={() => {
+              if (!urlLooksRight) {
+                // A wrong link already has its own message under the field.
+                if (trimmedUrl === "") setError("Paste your Google link first, or tap “I will do this later”.");
+                return;
+              }
+              void finish(trimmedUrl);
+            }}
           >
             Continue
           </Button>

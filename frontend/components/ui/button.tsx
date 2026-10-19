@@ -23,8 +23,9 @@ export const buttonVariants = cva(
         action:
           // Disabled is neutral grey, not faded green: a washed-out green
           // reads as broken, grey reads as "not yet".
-          // Constitution Action green. White on #007A4D is ~5.4:1 — AA for
-          // normal text. Brand green (#00A86B) is never used here.
+          // The action colour: near-black #1A1A19 with a white label (17:1)
+          // in light mode, near-white with a dark label in dark mode. Brand
+          // green (#00A86B) is never used here.
           "border-action bg-action text-on-action shadow-[var(--shadow-button)] hover:border-action-hover hover:bg-action-hover hover:shadow-[var(--shadow-button-hover)] active:bg-action-pressed focus-visible:ring-[color:var(--rb-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:border-border disabled:bg-quiet disabled:text-muted disabled:shadow-none disabled:opacity-100",
         secondary:
           "border-border bg-surface text-ink shadow-[var(--shadow-control)] hover:border-[color:var(--rb-border-strong)] hover:bg-quiet",
@@ -87,7 +88,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               className="size-5 animate-spin motion-reduce:animate-none"
               aria-hidden="true"
             />
-            <span>{loadingLabel ?? "Loading…"}</span>
+            {/* Keep saying what is happening: the given label ("Sending…"),
+                otherwise the button's own words, never a generic "Loading". */}
+            {loadingLabel ? <span>{loadingLabel}</span> : children}
           </>
         ) : (
           children

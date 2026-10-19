@@ -123,6 +123,22 @@ export function CustomerPageEditor({
     [heroUrl],
   );
 
+  // Leaving while a photo uploads or a save is unconfirmed would lose it.
+  // The browser's own "Leave site?" prompt is the honest warning here.
+  const unsettled =
+    !draftSaved ||
+    draftSaving ||
+    ["preparing", "signing", "uploading", "confirming"].includes(uploadState) ||
+    publishState === "publishing";
+  useEffect(() => {
+    if (!unsettled) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsettled]);
+
   /** PUT is idempotent content replacement. Check an uncertain response before retry. */
   const saveDraft = useCallback(
     async (content: CustomerPageContent): Promise<boolean> => {

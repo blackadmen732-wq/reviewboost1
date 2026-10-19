@@ -125,16 +125,16 @@ describe("brand migration", () => {
     expect(token("rb-brand", "light").toLowerCase()).toBe("#00a86b");
   });
 
-  it("locks the cooled constitution light palette", () => {
-    expect(token("rb-canvas", "light").toLowerCase()).toBe("#f6f7f5");
+  it("locks the warm-white light palette", () => {
+    expect(token("rb-canvas", "light").toLowerCase()).toBe("#fcfcfb");
     expect(token("rb-surface", "light").toLowerCase()).toBe("#ffffff");
-    expect(token("rb-quiet", "light").toLowerCase()).toBe("#f0f2f0");
-    expect(token("rb-ink", "light").toLowerCase()).toBe("#171a18");
-    expect(token("rb-muted", "light").toLowerCase()).toBe("#66706a");
-    expect(token("rb-border", "light").toLowerCase()).toBe("#dce2de");
-    expect(token("rb-action", "light").toLowerCase()).toBe("#064e3b");
-    expect(token("rb-action-hover", "light").toLowerCase()).toBe("#04382c");
-    expect(token("rb-action-pressed", "light").toLowerCase()).toBe("#032b22");
+    expect(token("rb-quiet", "light").toLowerCase()).toBe("#edece8");
+    expect(token("rb-ink", "light").toLowerCase()).toBe("#1a1a19");
+    expect(token("rb-muted", "light").toLowerCase()).toBe("#6b6b67");
+    expect(token("rb-border", "light").toLowerCase()).toBe("#e2e2e1");
+    expect(token("rb-action", "light").toLowerCase()).toBe("#1a1a19");
+    expect(token("rb-action-hover", "light").toLowerCase()).toBe("#333331");
+    expect(token("rb-action-pressed", "light").toLowerCase()).toBe("#000000");
     expect(token("rb-on-action", "light").toLowerCase()).toBe("#ffffff");
     expect(token("rb-brand-soft", "light").toLowerCase()).toBe("#e3f5ec");
     expect(token("rb-star", "light").toLowerCase()).toBe("#b97d0c");
@@ -142,7 +142,7 @@ describe("brand migration", () => {
     expect(token("rb-focus", "light").toLowerCase()).toBe("#005fcc");
   });
 
-  it("uses action green for white-text buttons, not brand green", () => {
+  it("uses the action colour for white-text buttons, not brand green", () => {
     expect(contrast("#FFFFFF", token("rb-action", "light"))).toBeGreaterThanOrEqual(AA_TEXT);
     expect(contrast("#FFFFFF", token("rb-brand", "light"))).toBeLessThan(AA_TEXT);
   });

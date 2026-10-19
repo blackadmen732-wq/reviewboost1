@@ -34,7 +34,7 @@ export default async function TagDetailPage({
           href="/stands"
           className="text-sm font-medium text-muted underline-offset-4 hover:text-ink hover:underline"
         >
-          Tags
+          Set up
         </Link>
       </p>
       <TagDetail

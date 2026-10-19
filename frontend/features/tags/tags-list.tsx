@@ -37,7 +37,7 @@ export function TagsList({ stands }: { stands: Stand[] }) {
             >
               <span
                 aria-hidden="true"
-                className="grid size-12 shrink-0 place-items-center rounded-[12px] bg-[#10130f] text-white shadow-[inset_0_0_0_1px_rgb(255_255_255/8%)] transition-transform duration-150 group-active:scale-95"
+                className="grid size-12 shrink-0 place-items-center rounded-[12px] bg-ink text-canvas transition-transform duration-150 group-active:scale-95"
               >
                 <QrCode className="size-6" strokeWidth={1.75} />
               </span>

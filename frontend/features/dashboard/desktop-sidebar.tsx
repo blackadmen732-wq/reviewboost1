@@ -50,7 +50,7 @@ export function DesktopSidebar({
                     "flex min-h-14 items-center gap-3 rounded-[var(--radius-control)] px-3",
                     "text-[0.9375rem] transition-colors duration-150",
                     "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
-                    active ? "bg-brand-soft font-semibold text-brand-text" : "font-medium text-muted hover:text-ink",
+                    active ? "bg-quiet font-semibold text-ink" : "font-medium text-muted hover:bg-quiet/60 hover:text-ink",
                   )}
                 >
                   <Icon className="size-5" strokeWidth={active ? 2.25 : 1.75} aria-hidden="true" />

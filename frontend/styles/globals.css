@@ -30,26 +30,28 @@
 
 :root {
   color-scheme: light dark;
-  /* Constitution palette, neutrals cooled 2026-09-25: the cream canvas, beige
-     quiet surface and brown-gold star read as tan across large areas, and dark
-     mode was a warm brown-black. Brand green is identity, never a white-label
-     button. Action green is the only filled CTA green. */
-  --rb-canvas: #f6f7f5;
+  /* Warm-white palette, 2026-10-18: the owner picked Claude's warm white
+     (#FCFCFB) over the cream and the cooled grey-green. Neutrals carry no tint
+     to fight the green. Filled buttons are near-black so the product stops
+     reading as Trustpilot's green-and-forest; brand green is identity and good
+     news only, never a white-label button. Cards separate by hairlines, not
+     fills: canvas and white are 1.02:1 apart on purpose. */
+  --rb-canvas: #fcfcfb;
   --rb-surface: #ffffff;
-  --rb-quiet: #f0f2f0;
-  --rb-ink: #171a18;
-  --rb-muted: #66706a;
-  --rb-border: #dce2de;
-  --rb-border-strong: #b9c3bd;
+  --rb-quiet: #edece8;
+  --rb-ink: #1a1a19;
+  --rb-muted: #6b6b67;
+  --rb-border: #e2e2e1;
+  --rb-border-strong: #8f8f8a;
   --rb-brand: #00a86b;
   --rb-brand-hover: #009a61;
   --rb-brand-active: #008f5b;
   --rb-brand-soft: #e3f5ec;
-  --rb-brand-text: #007a4d;
+  --rb-brand-text: #00754a;
   --rb-on-brand: #0d2118;
-  --rb-action: #064e3b;
-  --rb-action-hover: #04382c;
-  --rb-action-pressed: #032b22;
+  --rb-action: #1a1a19;
+  --rb-action-hover: #333331;
+  --rb-action-pressed: #000000;
   --rb-on-action: #ffffff;
   --rb-star: #b97d0c;
   --rb-star-soft: #fff7e5;
@@ -88,38 +90,38 @@
   --rb-motion-page: 180ms;
   --rb-logo-clearspace: 0.25;
   --shadow-control: 0 1px 0 rgb(23 26 24 / 4%);
-  --shadow-button: 0 1px 0 rgb(0 91 57 / 18%);
-  --shadow-button-hover: 0 1px 0 rgb(0 91 57 / 24%);
+  --shadow-button: inset 0 1px 0 rgb(255 255 255 / 16%), inset 0 -1px 0 rgb(0 0 0 / 20%), 0 1px 2px rgb(0 0 0 / 12%);
+  --shadow-button-hover: inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 -1px 0 rgb(0 0 0 / 24%), 0 2px 4px rgb(0 0 0 / 14%);
   --shadow-card: none;
   --shadow-float: 0 -1px 0 rgb(23 26 24 / 8%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --rb-canvas: #0c100e;
-    --rb-surface: #131816;
-    --rb-quiet: #19201c;
-    --rb-ink: #f7f9f7;
-    --rb-muted: #abb5af;
-    --rb-border: #303a34;
-    --rb-border-strong: #465149;
+    --rb-canvas: #191918;
+    --rb-surface: #212120;
+    --rb-quiet: #2c2c2a;
+    --rb-ink: #f5f5f3;
+    --rb-muted: #a8a8a2;
+    --rb-border: #3a3a37;
+    --rb-border-strong: #75756f;
     --rb-brand: #00a86b;
     --rb-brand-hover: #17c07f;
     --rb-brand-active: #21cf8c;
     --rb-brand-soft: #143729;
     --rb-brand-text: #45cf99;
     --rb-on-brand: #071b13;
-    --rb-action: #32cf94;
-    --rb-action-hover: #4ad8a3;
-    --rb-action-pressed: #2bb885;
-    --rb-on-action: #071b13;
+    --rb-action: #f5f5f3;
+    --rb-action-hover: #ffffff;
+    --rb-action-pressed: #e2e2df;
+    --rb-on-action: #1a1a19;
     --rb-star: #f2b94b;
     --rb-star-soft: #3a2e14;
     --rb-danger: #ff8f8f;
     --rb-danger-soft: #452323;
     --rb-info: #78b5f4;
   --rb-warning: #f0b45a;
-  --rb-raised: #202722;
+  --rb-raised: #262624;
     --rb-focus: #7ab8ff;
     --rb-focus-soft: rgb(77 142 255 / 34%);
     --shadow-control: 0 1px 0 rgb(0 0 0 / 40%);
@@ -132,22 +134,22 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --rb-canvas: #f6f7f5;
+  --rb-canvas: #fcfcfb;
   --rb-surface: #ffffff;
-  --rb-quiet: #f0f2f0;
-  --rb-ink: #171a18;
-  --rb-muted: #66706a;
-  --rb-border: #dce2de;
-  --rb-border-strong: #b9c3bd;
+  --rb-quiet: #edece8;
+  --rb-ink: #1a1a19;
+  --rb-muted: #6b6b67;
+  --rb-border: #e2e2e1;
+  --rb-border-strong: #8f8f8a;
   --rb-brand: #00a86b;
   --rb-brand-hover: #009a61;
   --rb-brand-active: #008f5b;
   --rb-brand-soft: #e3f5ec;
-  --rb-brand-text: #007a4d;
+  --rb-brand-text: #00754a;
   --rb-on-brand: #0d2118;
-  --rb-action: #064e3b;
-  --rb-action-hover: #04382c;
-  --rb-action-pressed: #032b22;
+  --rb-action: #1a1a19;
+  --rb-action-hover: #333331;
+  --rb-action-pressed: #000000;
   --rb-on-action: #ffffff;
   --rb-star: #b97d0c;
   --rb-star-soft: #fff7e5;
@@ -160,30 +162,30 @@
 :root[data-theme="dark"],
 .dark {
   color-scheme: dark;
-  --rb-canvas: #0c100e;
-  --rb-surface: #131816;
-  --rb-quiet: #19201c;
-  --rb-ink: #f7f9f7;
-  --rb-muted: #abb5af;
-  --rb-border: #303a34;
-  --rb-border-strong: #465149;
+  --rb-canvas: #191918;
+  --rb-surface: #212120;
+  --rb-quiet: #2c2c2a;
+  --rb-ink: #f5f5f3;
+  --rb-muted: #a8a8a2;
+  --rb-border: #3a3a37;
+  --rb-border-strong: #75756f;
   --rb-brand: #00a86b;
   --rb-brand-hover: #17c07f;
   --rb-brand-active: #21cf8c;
   --rb-brand-soft: #143729;
   --rb-brand-text: #45cf99;
   --rb-on-brand: #071b13;
-  --rb-action: #32cf94;
-  --rb-action-hover: #4ad8a3;
-  --rb-action-pressed: #2bb885;
-  --rb-on-action: #071b13;
+  --rb-action: #f5f5f3;
+  --rb-action-hover: #ffffff;
+  --rb-action-pressed: #e2e2df;
+  --rb-on-action: #1a1a19;
   --rb-star: #f2b94b;
   --rb-star-soft: #3a2e14;
   --rb-danger: #ff8f8f;
   --rb-danger-soft: #452323;
   --rb-info: #78b5f4;
   --rb-warning: #f0b45a;
-  --rb-raised: #202722;
+  --rb-raised: #262624;
   --rb-focus: #7ab8ff;
   --rb-focus-soft: rgb(77 142 255 / 34%);
 }
@@ -236,6 +238,24 @@
   }
   a {
     color: inherit;
+  }
+  /* No double-tap zoom delay on anything tappable. */
+  button,
+  a,
+  [role="button"],
+  input,
+  select,
+  label {
+    touch-action: manipulation;
+  }
+  /* Headlines break evenly; paragraphs avoid a lone last word. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
   }
   ::selection {
     background: var(--rb-brand-soft);
@@ -291,6 +311,9 @@
   font-size: 0.9375rem;
   line-height: 1.45;
 }
+/* In the components layer so a skeleton's own rounded-* class (a round step
+   number, a 12px button) wins over this default, as on the real element. */
+@layer components {
 .skeleton {
   display: block;
   border-radius: 9px;
@@ -302,6 +325,7 @@
   );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.45s ease-in-out infinite;
+}
 }
 @keyframes skeleton-shimmer {
   to {

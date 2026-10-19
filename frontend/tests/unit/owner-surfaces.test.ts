@@ -103,9 +103,9 @@ describe("the owner surfaces show real state", () => {
     }
   });
 
-  it("names the physical thing Tags in the navigation", () => {
+  it("names the setup tab Set up in the navigation", () => {
     const nav = source("features/dashboard/nav-items.ts");
-    expect(nav).toMatch(/label: "Tags"/);
+    expect(nav).toMatch(/label: "Set up"/);
     expect(nav).toMatch(/label: "Text Requests"/);
   });
 

@@ -1,27 +1,34 @@
+/**
+ * The same palette as the web app (frontend/styles/globals.css, light mode),
+ * chosen 18 October 2026: warm white canvas, white surfaces, near-black
+ * action buttons, brand green for identity and success only. DESIGN.md §3.
+ * The launch screen's #005B3E field is separate and unchanged.
+ */
 export const colors = {
   brand: "#00a86b",
-  brandText: "#007a4d",
+  brandText: "#00754a",
   onBrand: "#0d2118",
   brandHover: "#009a61",
   brandActive: "#008f5b",
-  action: "#064e3b",
-  actionHover: "#04382c",
-  actionPressed: "#032b22",
+  action: "#1a1a19",
+  actionHover: "#333331",
+  actionPressed: "#000000",
   onAction: "#ffffff",
 
-  canvas: "#F6F7F5",
+  canvas: "#FCFCFB",
   surface: "#FFFFFF",
-  surfaceAlt: "#F0F2F0",
+  surfaceAlt: "#EDECE8",
 
-  ink: "#171A18",
-  inkMuted: "#5D655F",
+  ink: "#1A1A19",
+  inkMuted: "#6B6B67",
   // The web's muted grey. #9CA3AF measured 2.5:1 on white and was used for
-  // statuses, times and labels; this is 5.1:1 on white and 4.6:1 on the
-  // darkest surface it sits on.
-  inkFaint: "#66706a",
+  // statuses, times and labels; this is 5.2:1 on the canvas and 4.5:1 on
+  // surfaceAlt, the darkest surface it sits on.
+  inkFaint: "#6B6B67",
 
-  border: "#D8DED9",
-  borderLight: "#B7C0BA",
+  border: "#E2E2E1",
+  // The web's --rb-border-strong: outlines that must be seen (3.16:1).
+  borderLight: "#8F8F8A",
 
   danger: "#b33a3a",
   dangerBg: "#FEF2F2",
@@ -33,8 +40,8 @@ export const colors = {
   infoBg: "#EFF6FF",
   info: "#356d8c",
 
-  starFilled: "#bf7d00",
-  starEmpty: "#D1D5DB",
+  starFilled: "#B97D0C",
+  starEmpty: "#8F8F8A",
 
   white: "#FFFFFF",
 } as const;

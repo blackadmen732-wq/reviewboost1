@@ -15,12 +15,12 @@ function source(path: string): string {
 }
 
 describe("OwnerShell IA", () => {
-  it("desktop is Home / Feedback / Text Requests / Tags / Settings", () => {
+  it("desktop is Home / Feedback / Text Requests / Set up / Settings", () => {
     expect(DESKTOP_NAV.map((item) => item.label)).toEqual([
       "Home",
       "Feedback",
       "Text Requests",
-      "Tags",
+      "Set up",
       "Settings",
     ]);
     expect(DESKTOP_NAV.map((item) => item.href)).toEqual([
@@ -35,7 +35,7 @@ describe("OwnerShell IA", () => {
   it("mobile is four tabs, Settings reached by profile", () => {
     // The phone bar's own labels, locked separately from the desktop ones:
     // "Text Requests" wrapped to two lines at 320px, so the bar says "Texts".
-    expect(MOBILE_NAV.map(mobileLabelOf)).toEqual(["Home", "Feedback", "Texts", "Tags"]);
+    expect(MOBILE_NAV.map(mobileLabelOf)).toEqual(["Home", "Feedback", "Texts", "Set up"]);
     expect(MOBILE_NAV.map((item) => item.href)).toEqual([
       "/home",
       "/feedback",

@@ -136,18 +136,18 @@ describe("Tag readiness after programming", () => {
   it("starts out needing NFC", () => {
     setQr("ready", "blob:code");
     render(<TagDetail stand={stand} canManage />);
-    expect(screen.getByText(/Needs NFC/)).toBeVisible();
+    expect(screen.getByText(/NFC not programmed/)).toBeVisible();
   });
 
-  it("stops saying Needs NFC as soon as programming reports success", () => {
+  it("stops saying NFC not programmed as soon as programming reports success", () => {
     setQr("ready", "blob:code");
     render(<TagDetail stand={stand} canManage />);
-    expect(screen.getByText(/Needs NFC/)).toBeVisible();
+    expect(screen.getByText(/NFC not programmed/)).toBeVisible();
 
     expect(capturedOnReady).toBeTypeOf("function");
     act(() => capturedOnReady?.());
 
-    expect(screen.queryByText(/Needs NFC/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/NFC not programmed/)).not.toBeInTheDocument();
     expect(screen.getByText(/Ready/)).toBeVisible();
   });
 

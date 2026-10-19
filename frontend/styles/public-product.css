@@ -81,17 +81,17 @@
 
 /* Public-site palette. Owner and live customer surfaces keep their own tokens. */
 .public-shell {
-  --rb-canvas: #f8f5f0;
+  --rb-canvas: #fcfcfb;
   --rb-surface: #ffffff;
-  --rb-quiet: #eeebe5;
-  --rb-ink: #171a18;
-  --rb-muted: #52625a;
-  --rb-border: #d8ded9;
-  --rb-action: #064e3b;
-  --rb-action-hover: #04382c;
-  --rb-action-pressed: #032d23;
+  --rb-quiet: #edece8;
+  --rb-ink: #1a1a19;
+  --rb-muted: #6b6b67;
+  --rb-border: #e2e2e1;
+  --rb-action: #1a1a19;
+  --rb-action-hover: #333331;
+  --rb-action-pressed: #000000;
   --rb-on-action: #ffffff;
-  --rb-brand-text: #064e3b;
+  --rb-brand-text: #00754a;
   background: var(--rb-canvas);
   color: var(--rb-ink);
 }
@@ -126,7 +126,8 @@
   display: block;
 }
 .public-hero__title span:last-child {
-  color: var(--rb-action);
+  /* The one green word on the page: identity, not a button. */
+  color: var(--rb-brand-text);
   font-style: italic;
 }
 .public-hero__lede {
@@ -335,17 +336,17 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .public-shell {
-    --rb-canvas: #0e1712;
-    --rb-surface: #17241c;
-    --rb-quiet: #1d2a22;
-    --rb-ink: #f5f3ed;
-    --rb-muted: #b5bfb6;
-    --rb-border: #34483c;
-    --rb-action: #9ed5b9;
-    --rb-action-hover: #b4e2ca;
-    --rb-action-pressed: #8cc7a8;
-    --rb-on-action: #0a2418;
-    --rb-brand-text: #9ed5b9;
+    --rb-canvas: #191918;
+    --rb-surface: #212120;
+    --rb-quiet: #2c2c2a;
+    --rb-ink: #f5f5f3;
+    --rb-muted: #a8a8a2;
+    --rb-border: #3a3a37;
+    --rb-action: #f5f5f3;
+    --rb-action-hover: #ffffff;
+    --rb-action-pressed: #e2e2df;
+    --rb-on-action: #1a1a19;
+    --rb-brand-text: #45cf99;
   }
   :root:not([data-theme="light"]) .product-demo--hero fieldset button {
     color: #e1b454;
@@ -373,17 +374,17 @@
   }
 }
 :root[data-theme="dark"] .public-shell {
-  --rb-canvas: #0e1712;
-  --rb-surface: #17241c;
-  --rb-quiet: #1d2a22;
-  --rb-ink: #f5f3ed;
-  --rb-muted: #b5bfb6;
-  --rb-border: #34483c;
-  --rb-action: #9ed5b9;
-  --rb-action-hover: #b4e2ca;
-  --rb-action-pressed: #8cc7a8;
-  --rb-on-action: #0a2418;
-  --rb-brand-text: #9ed5b9;
+  --rb-canvas: #191918;
+  --rb-surface: #212120;
+  --rb-quiet: #2c2c2a;
+  --rb-ink: #f5f5f3;
+  --rb-muted: #a8a8a2;
+  --rb-border: #3a3a37;
+  --rb-action: #f5f5f3;
+  --rb-action-hover: #ffffff;
+  --rb-action-pressed: #e2e2df;
+  --rb-on-action: #1a1a19;
+  --rb-brand-text: #45cf99;
 }
 :root[data-theme="dark"] .product-demo--hero fieldset button {
   color: #e1b454;
