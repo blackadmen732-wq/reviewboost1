@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { AppShell } from "@/features/dashboard/app-shell";
 import { GoogleLinkCare } from "@/features/dashboard/google-link-care";
 import { EditableRow } from "@/features/dashboard/settings-form";
@@ -75,9 +76,7 @@ export default async function SettingsPage() {
 
   return (
     <AppShell businessName={organization.name}>
-      <h1 className="mb-6 text-2xl font-semibold tracking-[-0.02em] text-ink">
-        Settings
-      </h1>
+      <PageHeader title="Settings" />
 
       <section className="mb-6 flex flex-col gap-3">
         <EditableRow

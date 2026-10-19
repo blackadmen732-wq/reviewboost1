@@ -82,7 +82,7 @@ function ManagedTagDetail({
 }) {
   const router = useRouter();
   const qr = useAuthenticatedQr(stand.standId, organizationId);
-  // Set the moment a Tag is programmed so the header stops saying "Needs NFC"
+  // Set the moment a Tag is programmed so the header stops saying "NFC not programmed"
   // while router.refresh() fetches the server's version. Without it the owner
   // programmed a Tag, watched it succeed, and was still told it needed doing.
   const [justProgrammedAt, setJustProgrammedAt] = useState<string | null>(null);

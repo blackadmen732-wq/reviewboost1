@@ -311,6 +311,9 @@
   font-size: 0.9375rem;
   line-height: 1.45;
 }
+/* In the components layer so a skeleton's own rounded-* class (a round step
+   number, a 12px button) wins over this default, as on the real element. */
+@layer components {
 .skeleton {
   display: block;
   border-radius: 9px;
@@ -322,6 +325,7 @@
   );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.45s ease-in-out infinite;
+}
 }
 @keyframes skeleton-shimmer {
   to {

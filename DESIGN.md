@@ -4,23 +4,7 @@ This is the one design document for ReviewBoost. Colours, type, layout, every sc
 
 Who it's for: a busy owner of a barbershop, salon, restaurant or shop who is not good with technology. They use the app between customers, one-handed, on a phone. Every screen has to make sense to that person in about three seconds.
 
-Contents
-1. The one rule: always show where you are, what's happening, and what's next
-2. How everything connects (app map)
-3. Colour
-4. Type, spacing, shape, depth, motion
-5. Layout and navigation
-6. Components
-7. Every screen
-8. The customer's side
-9. Texting, shown like a delivery tracker
-10. Connections (bringing in customer lists)
-11. Money: Stripe on the web, free iPhone app
-12. Words: how the app talks
-13. Rules we must follow (Apple, Google, accessibility)
-14. How we check our work
-15. Build checklist
-16. Locked decisions and history
+Contents: 1 the one rule · 2 app map · 3 colour · 4 type and motion · 5 layout · 6 components · 7 screens · 8 customer side · 9 texting · 10 Connections · 11 money · 12 words · 13 rules · 14 checking · 15 checklist · 16 decisions.
 
 ---
 
@@ -299,7 +283,12 @@ Used only to confirm something that already happened ("Page published"). Toasts 
 
 ### 6.11 Skeleton
 
-Use a skeleton only for loads that take more than about 300ms. It has the same shape as the content that will replace it.
+Every owner page has a `loading.tsx` next to it (Home, Feedback, Insights, a rating, Set up, a Tag, Texts, Settings). The rules:
+
+- Nav, title and data-free headings are real; only the data area is grey.
+- Same paddings, radii, row heights and button sizes as the real page, so nothing jumps.
+- Two or three rows, never a long fake list. A soft shimmer that stops under reduced motion.
+- Check on Slow 3G: a blank page or a jump means the skeleton is wrong.
 
 ### 6.12 Stars
 
@@ -349,7 +338,7 @@ This is the one place an owner programs anything.
 
 ### 7.3 One Tag `/stands/[id]`
 
-- **Status:** "Live · programmed Oct 14", "Not programmed" or "Needs rewriting".
+- **Status:** "Ready", "NFC not programmed", or "Code changed: reprint and reprogram" (`tagReadinessLabel`). The Tags list shows the code and the chip separately: "QR ready" / "Reprint QR" and "NFC ready" / "Program NFC" / "Reprogram NFC".
 - **Next action:**
   - Not programmed: "Program Tag" on Android with NFC, otherwise "Print code".
   - Live: "Print code" as a secondary action.
@@ -595,7 +584,7 @@ For every screen that changes:
 | 10 | Tapped / Rated steps on texts | 🔨 |
 | 11 | Square connection | 🔨 after 👤 Square developer app |
 | 12 | Google Sheets "keep in sync" | 🔨 after 👤 server OAuth secret |
-| 13 | iPhone app: same tokens in `theme.ts`, read-only Billing | 🔨 check |
+| 13 | iPhone app: same tokens in `theme.ts` (warm white, black actions) | ✅ PR #82 |
 | 14 | Production database backup and migration reconciliation | 👤 |
 | 15 | Turn GitHub Actions back on (account setting) | 👤 |
 | 16 | Legal check on the low-rating flow | 👤 |
@@ -610,8 +599,4 @@ For every screen that changes:
 - **Billing:** free iPhone app first; add Apple In-App Purchase only if App Review asks.
 - **Website:** the Veyra/Midday-style serif headline, the real Tag and phone proof, and the forest demo band.
 - **iPhone launch screen:** a flat `#005B3E` field with the white handwritten wordmark (320pt on iOS, 180dp on Android). It hands off as soon as the first screen is ready (`docs/mobile/LAUNCH_SCREEN.md`).
-- **References:**
-  - Stripe: hierarchy and legible numbers, but not its indigo or fonts.
-  - shadcn: button and token patterns, but not its runtime.
-  - Pinned references: `docs/design/reference-lock.json`.
-  - Evidence: `docs/design/`.
+- **References:** Stripe for hierarchy and legible numbers (not its indigo or fonts); shadcn for button and token patterns (not its runtime). Pins: `docs/design/reference-lock.json`; evidence: `docs/design/`.
