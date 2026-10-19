@@ -328,7 +328,8 @@ export interface ActionNote {
   noteId: string;
   body: string;
   authorName: string;
-  authorId: string;
+  /** Null once the writer deleted their own account; the note stays. */
+  authorId: string | null;
   createdAt: string;
 }
 
@@ -356,7 +357,13 @@ export async function listActionNotes(orgId: string, responseId: string): Promis
 
   if (error) dataFailure("list_action_notes", error);
   const rows = data ?? [];
-  const authorIds = [...new Set(rows.map((row) => row.author_id as string))];
+  const authorIds = [
+    ...new Set(
+      rows
+        .map((row) => row.author_id as string | null)
+        .filter((id): id is string => id !== null),
+    ),
+  ];
 
   // A separate lookup rather than an embed: `author_id` references auth.users,
   // which PostgREST cannot traverse to public.profiles, so there is no
@@ -381,8 +388,13 @@ export async function listActionNotes(orgId: string, responseId: string): Promis
     // "Someone on your team" rather than a blank byline. A profile can be
     // missing a display name, and an empty name next to an action reads as a
     // rendering bug rather than as missing data.
-    authorName: names.get(row.author_id as string) || "Someone on your team",
-    authorId: row.author_id as string,
+    // A null author deleted their own account (migration 20261018000100);
+    // the business keeps what they wrote.
+    authorName:
+      row.author_id === null
+        ? "Former team member"
+        : names.get(row.author_id as string) || "Someone on your team",
+    authorId: (row.author_id as string | null) ?? null,
     createdAt: row.created_at as string,
   }));
 }

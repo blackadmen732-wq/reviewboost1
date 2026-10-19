@@ -11,7 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router, Stack } from "expo-router";
 
 import { Tappable } from "@/components/tappable";
-import { apiFetch, ApiError } from "@/data/api";
+import { accountFetch, apiFetch, ApiError } from "@/data/api";
 import { useAuth } from "@/data/auth-context";
 import { colors, fonts, radii } from "@/theme";
 
@@ -89,12 +89,7 @@ export default function DeleteAccountScreen() {
       <Stack.Screen options={{ title: "Delete account" }} />
       <ScrollView contentContainerStyle={styles.content}>
         {!isOwner ? (
-          <View style={styles.card}>
-            <Text style={styles.body}>
-              Only an owner can delete the business. If you want your own access
-              removed, ask an owner to remove you from the team.
-            </Text>
-          </View>
+          <PersonalDeletion hasBusiness={Boolean(activeOrg)} />
         ) : (
           <>
             <View style={styles.warning}>
@@ -169,10 +164,139 @@ export default function DeleteAccountScreen() {
             <Tappable style={styles.cancel} onPress={() => router.back()}>
               <Text style={styles.cancelText}>Keep my account</Text>
             </Tappable>
+
+            <Text style={styles.body}>
+              To keep the business and remove only yourself, the business needs
+              another owner first. Then a team member can delete their own
+              account here.
+            </Text>
           </>
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/**
+ * Deleting your own login (launch gap L1, Apple 5.1.1(v)).
+ *
+ * For a team member, or someone signed in with no business. Uses the same
+ * endpoint as the web. The server refuses the only owner of a business and
+ * says which one; that is shown rather than a generic failure.
+ */
+function PersonalDeletion({ hasBusiness }: { hasBusiness: boolean }) {
+  const { logout } = useAuth();
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<string | null>(null);
+  const [uncertain, setUncertain] = useState(false);
+
+  async function remove() {
+    if (busy || uncertain) return;
+    if (typed.trim().toLowerCase() !== "delete") {
+      setError("Type delete to confirm.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await accountFetch<{ data: { deleted: boolean } }>(
+        "/api/v1/account/personal-deletion",
+        { method: "POST", body: JSON.stringify({ confirmation: typed.trim() }) },
+      );
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.code === "owns_business") {
+        setBlocked(caught.message);
+      } else {
+        const unknownOutcome = !(caught instanceof ApiError) || caught.status >= 500;
+        setUncertain(unknownOutcome);
+        setError(
+          caught instanceof ApiError && !unknownOutcome
+            ? caught.message
+            : "We couldn't confirm whether your account was deleted. Sign in again to check before trying again.",
+        );
+      }
+      setBusy(false);
+      return;
+    }
+    // The login is gone server-side; clearing the local copy can't undo that.
+    await logout();
+    setBusy(false);
+    router.replace("/login");
+  }
+
+  if (blocked) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.body}>{blocked}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <View style={styles.warning}>
+        <Text style={styles.warningTitle}>This cannot be undone.</Text>
+        <Text style={styles.warningBody}>
+          {hasBusiness
+            ? "Your sign-in is deleted and you're removed from every team. The business keeps its ratings and Tags. Notes you wrote stay, marked Former team member."
+            : "Your sign-in is deleted. You won't be able to sign in with it again."}
+        </Text>
+      </View>
+
+      <View>
+        <Text style={styles.label}>Type delete to confirm</Text>
+        <TextInput
+          style={styles.input}
+          value={typed}
+          onChangeText={(value) => {
+            setTyped(value);
+            if (error === "Type delete to confirm.") setError(null);
+          }}
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!busy}
+          accessibilityLabel="Type delete to confirm deleting your account"
+        />
+      </View>
+
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+
+      {uncertain ? (
+        <Tappable
+          style={styles.cancel}
+          onPress={() => {
+            void logout().then(() => router.replace("/login"));
+          }}
+          accessibilityRole="button"
+        >
+          <Text style={styles.cancelText}>Sign in again to check</Text>
+        </Tappable>
+      ) : (
+        <Tappable
+          style={[styles.destructive, busy ? styles.disabled : null]}
+          disabled={busy}
+          onPress={() => void remove()}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busy, busy }}
+        >
+          {busy ? (
+            <ActivityIndicator color={colors.white} />
+          ) : (
+            <Text style={styles.destructiveText}>Delete my account</Text>
+          )}
+        </Tappable>
+      )}
+
+      <Tappable style={styles.cancel} onPress={() => router.back()}>
+        <Text style={styles.cancelText}>Keep my account</Text>
+      </Tappable>
+    </>
   );
 }
 

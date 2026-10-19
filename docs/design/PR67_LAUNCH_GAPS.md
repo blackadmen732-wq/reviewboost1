@@ -1,5 +1,21 @@
 # PR #67 launch-gap report
 
+## Status, 18 October 2026
+
+| Gap | Status | Where |
+|---|---|---|
+| L1 personal account deletion | **Built**, needs TestFlight check | Migration `20261018000100_personal_account_deletion.sql` (local only, not production); `/api/v1/account/personal-deletion`; `/settings/delete-my-account`; native `PersonalDeletion`; links from the empty org picker, onboarding and the non-owner deletion screen. Notes keep the business's record as "Former team member". The only owner of a business is asked to delete it first. |
+| L2 editor draft / remove photo | Fixed earlier on this branch | `customer-page-editor.tsx` (explicit `heroAssetId: null`, Remove photo, draft save after upload) |
+| L3 uncertain writes | Fixed earlier on this branch | Editor write deadline; web and native deletion show "could not confirm" and offer a check instead of a second delete; native honours `signInRemoved` |
+| L4 bounded requests | Fixed earlier on this branch | `lib/api/read-deadline.ts`, `apps/mobile/data/read-deadline.ts` (20 s reads, 30 s writes) |
+| L5 store metadata promised customer notes | **Fixed** | `docs/mobile/APP_STORE_METADATA.md` rewritten; `store-docs-truthfulness.test.ts` now guards it |
+
+Still external: everything in the checklist at the end of this file (TestFlight, Stripe test mode, SMS sandbox, App Store Connect, production migration review).
+
+---
+
+The original report follows.
+
 12 October 2026. Source baseline: PR67 `1036e2e1`, main `0155948c`, PR75 `10655e4a`, PR76 `1246a281`. This report includes the authorized repair working tree. It does not certify the deployed website or a TestFlight build. The user's latest execution order is audit → identify blockers → propose small fixes → approve the next workflow → implement → verify. Newly identified gaps below remain proposals.
 
 ## What exists and what was verified
