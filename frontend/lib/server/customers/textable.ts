@@ -21,6 +21,14 @@ import { serviceRoleClient } from "@/lib/server/supabase";
  */
 
 export const MAX_PICKER_CUSTOMERS = 2000;
+/**
+ * Rows per read. The Data API caps every response (`max_rows` = 1000 in
+ * supabase/config.toml), silently, so one 2,000-row read returns 1,000. Pages
+ * stay under it. The source lookup is chunked too, because its ids travel in
+ * the URL.
+ */
+const PAGE_ROWS = 500;
+const ID_CHUNK = 150;
 
 export type TextableStatus = "can_text" | "no_consent" | "opted_out" | "on_hold";
 
@@ -74,51 +82,67 @@ export async function listTextableCustomers(
   orgId: string,
   requestId: string,
 ): Promise<TextableCustomer[]> {
-  const { data, error } = await db
-    .from("customers")
-    .select("id, phone_hash, phone_last_four, display_name_encrypted")
-    .eq("org_id", orgId)
-    .order("last_seen_at", { ascending: false })
-    .limit(MAX_PICKER_CUSTOMERS);
-  if (error) {
-    logger.error("customers.textable_list_failed", { requestId, code: error.code });
-    throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Your customers couldn't be loaded.");
+  const rows: CustomerRow[] = [];
+  for (let from = 0; from < MAX_PICKER_CUSTOMERS; from += PAGE_ROWS) {
+    const to = Math.min(from + PAGE_ROWS, MAX_PICKER_CUSTOMERS) - 1;
+    const { data, error } = await db
+      .from("customers")
+      .select("id, phone_hash, phone_last_four, display_name_encrypted")
+      .eq("org_id", orgId)
+      // id breaks ties, so a page boundary never repeats or skips a row.
+      .order("last_seen_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) {
+      logger.error("customers.textable_list_failed", { requestId, code: error.code });
+      throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Your customers couldn't be loaded.");
+    }
+    const page = (data ?? []) as CustomerRow[];
+    rows.push(...page);
+    if (page.length < to - from + 1) break;
   }
-  const rows = (data ?? []) as CustomerRow[];
   if (rows.length === 0) return [];
 
-  const ids = rows.map((row) => row.id);
-  const profiles = await db
-    .from("customer_source_profiles")
-    .select("customer_id, source_kind")
-    .eq("org_id", orgId)
-    .eq("status", "active")
-    .in("customer_id", ids);
-  if (profiles.error) {
-    logger.error("customers.textable_sources_failed", { requestId, code: profiles.error.code });
-    throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Your customers couldn't be loaded.");
+  const profileRows: Array<{ customer_id: string; source_kind: string }> = [];
+  for (let i = 0; i < rows.length; i += ID_CHUNK) {
+    const ids = rows.slice(i, i + ID_CHUNK).map((row) => row.id);
+    const profiles = await db
+      .from("customer_source_profiles")
+      .select("customer_id, source_kind")
+      .eq("org_id", orgId)
+      .eq("status", "active")
+      .in("customer_id", ids);
+    if (profiles.error) {
+      logger.error("customers.textable_sources_failed", { requestId, code: profiles.error.code });
+      throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Your customers couldn't be loaded.");
+    }
+    profileRows.push(...((profiles.data ?? []) as Array<{ customer_id: string; source_kind: string }>));
   }
   const sourcesById = new Map<string, Set<string>>();
-  for (const profile of (profiles.data ?? []) as Array<{ customer_id: string; source_kind: string }>) {
+  for (const profile of profileRows) {
     const label = SOURCE_LABEL[profile.source_kind] ?? "Imported";
     const set = sourcesById.get(profile.customer_id) ?? new Set<string>();
     set.add(label);
     sourcesById.set(profile.customer_id, set);
   }
 
-  const gate = await serviceRoleClient().rpc("rpc_sms_can_send_many", {
-    p_org_id: orgId,
-    p_phone_hashes: rows.map((row) => row.phone_hash),
-    p_purpose: "review_request",
-  });
-  if (gate.error) {
-    // Fail closed: without the gate's answer nobody is shown as textable.
-    logger.error("customers.textable_gate_failed", { requestId, code: gate.error.code });
-    throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Your customers couldn't be loaded.");
-  }
+  // The gate's answers come back as rows, so they are capped like any read:
+  // ask in pages too.
   const statusByHash = new Map<string, TextableStatus>();
-  for (const row of (gate.data ?? []) as Array<{ phone_hash: string; allowed: boolean; reason: string | null }>) {
-    statusByHash.set(row.phone_hash, statusFromGate(row.allowed, row.reason));
+  for (let i = 0; i < rows.length; i += PAGE_ROWS) {
+    const gate = await serviceRoleClient().rpc("rpc_sms_can_send_many", {
+      p_org_id: orgId,
+      p_phone_hashes: rows.slice(i, i + PAGE_ROWS).map((row) => row.phone_hash),
+      p_purpose: "review_request",
+    });
+    if (gate.error) {
+      // Fail closed: without the gate's answer nobody is shown as textable.
+      logger.error("customers.textable_gate_failed", { requestId, code: gate.error.code });
+      throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Your customers couldn't be loaded.");
+    }
+    for (const row of (gate.data ?? []) as Array<{ phone_hash: string; allowed: boolean; reason: string | null }>) {
+      statusByHash.set(row.phone_hash, statusFromGate(row.allowed, row.reason));
+    }
   }
 
   return rows.map((row) => {

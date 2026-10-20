@@ -32,19 +32,37 @@ afterAll(() => {
 });
 beforeEach(() => rpc.mockReset());
 
-/** A chainable stand-in for the caller's RLS-scoped client. */
+/**
+ * A chainable stand-in for the caller's RLS-scoped client. Like the real Data
+ * API it returns at most 1,000 rows per read, and it records each read's
+ * range and id-list size.
+ */
 function fakeDb(tables: Record<string, { data: unknown; error: unknown }>) {
-  const reads: string[] = [];
+  const reads: Array<{ table: string; range: [number, number] | null; ids: number }> = [];
   return {
     reads,
     from(table: string) {
-      reads.push(table);
       const result = tables[table] ?? { data: [], error: null };
+      const read = { table, range: null as [number, number] | null, ids: 0 };
+      reads.push(read);
       const builder: Record<string, unknown> = {};
-      for (const method of ["select", "eq", "in", "order", "limit"]) builder[method] = () => builder;
+      for (const method of ["select", "eq", "order", "limit"]) builder[method] = () => builder;
+      builder["in"] = (_column: string, values: unknown[]) => {
+        read.ids = values.length;
+        return builder;
+      };
+      builder["range"] = (from: number, to: number) => {
+        read.range = [from, to];
+        return builder;
+      };
+      const rows = () => {
+        if (!Array.isArray(result.data)) return result.data;
+        const sliced = read.range ? result.data.slice(read.range[0], read.range[1] + 1) : result.data;
+        return sliced.slice(0, 1000);
+      };
       builder["maybeSingle"] = () =>
         Promise.resolve({ data: Array.isArray(result.data) ? (result.data[0] ?? null) : result.data, error: result.error });
-      builder["then"] = (resolve: (value: unknown) => unknown) => resolve(result);
+      builder["then"] = (resolve: (value: unknown) => unknown) => resolve({ data: rows(), error: result.error });
       return builder;
     },
   };
@@ -110,6 +128,37 @@ describe("the texting status in the picker", () => {
         statusText: "Hasn't agreed to texts yet",
       },
     ]);
+  });
+
+  it("reads past the Data API's 1,000-row cap in pages, and asks the gate in pages", async () => {
+    const { listTextableCustomers } = await import("@/lib/server/customers/textable");
+    const many = Array.from({ length: 1200 }, (_, i) => ({
+      id: `c${i}`,
+      phone_hash: `hash${String(i).padStart(28, "0")}`,
+      phone_last_four: "0101",
+      display_name_encrypted: null,
+    }));
+    const db = fakeDb({ customers: { data: many, error: null } });
+    const gateCalls: string[][] = [];
+    rpc.mockImplementation((...call: unknown[]) => {
+      const hashes = ((call[1] ?? {}) as { p_phone_hashes?: string[] }).p_phone_hashes ?? [];
+      gateCalls.push(hashes);
+      return Promise.resolve({
+        data: hashes.map((hash) => ({ phone_hash: hash, allowed: true, reason: null })),
+        error: null,
+      });
+    });
+
+    const list = await listTextableCustomers(db as never, ORG, "req");
+
+    expect(list).toHaveLength(1200);
+    expect(list.every((customer) => customer.status === "can_text")).toBe(true);
+    const customerReads = db.reads.filter((read) => read.table === "customers");
+    expect(customerReads.every((read) => read.range && read.range[1] - read.range[0] + 1 <= 500)).toBe(true);
+    const sourceReads = db.reads.filter((read) => read.table === "customer_source_profiles");
+    expect(sourceReads.every((read) => read.ids <= 150)).toBe(true);
+    expect(gateCalls.length).toBe(3);
+    expect(gateCalls.every((hashes) => hashes.length > 0 && hashes.length <= 500)).toBe(true);
   });
 
   it("fails closed: no gate answer means an error, never 'Can text'", async () => {
