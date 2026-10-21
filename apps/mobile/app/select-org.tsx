@@ -100,9 +100,22 @@ export default function SelectOrgScreen() {
               </Tappable>
             </View>
           ) : (
-            <Text style={styles.empty}>
-              No organizations found for this account
-            </Text>
+            <View>
+              <Text style={styles.empty}>
+                No organizations found for this account
+              </Text>
+              {/* Someone with no business must still be able to delete their
+                  account in the app (launch gap L1, Apple 5.1.1(v)). */}
+              <Tappable
+                kind="row"
+                onPress={() => router.push("/delete-account")}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.logoutText, styles.deleteLink]}>
+                  Delete my account
+                </Text>
+              </Tappable>
+            </View>
           )
         }
       />
@@ -158,4 +171,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   spinner: { marginTop: 40 },
+  deleteLink: { textAlign: "center", marginTop: 24, textDecorationLine: "underline" },
 });

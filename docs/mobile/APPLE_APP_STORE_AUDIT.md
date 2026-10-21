@@ -127,7 +127,7 @@ audit found on the branch as it stood; "Now" is after the fixes in this PR (see 
 | L3 | Policy content | 5.1.1(i) | Covers collection, sharing, retention and in-app deletion. Its storage section described only a browser cookie. Support's "How do I delete my account?" said to email us, and `/delete-account` named only the web route. | NEEDS FIX | PASS — policy mentions the app's on-device session storage; Support and `/delete-account` name the in-app route |
 | L4 | Purpose strings | 5.1.1(ii) | NFC string is specific. `NSFaceIDUsageDescription` ("Allow … to access your Face ID biometric data") was added by the secure-store plugin for a feature the app never uses. `NSLocalNetworkUsageDescription` ("Expo Dev Launcher uses the local network…") and `NSBonjourServices` were added by the dev client to every build. | NEEDS FIX | PASS — Face ID removed; dev-client keys stripped from production builds |
 | L5 | Data minimisation | 5.1.1(iii) | The app asks for an email address and nothing else. | PASS | PASS |
-| L6 | Account deletion in the app | 5.1.1(v) | Owners: typed-confirmation deletion that cancels billing, deletes the business and removes the login when it belongs to nothing else. Non-owners and business-less accounts: no path (Blocker 2). | NEEDS FIX | BLOCKED on the data decision in §6 |
+| L6 | Account deletion in the app | 5.1.1(v) | Owners: typed-confirmation deletion that cancels billing, deletes the business and removes the login when it belongs to nothing else. Non-owners and business-less accounts: delete their own login after typing "delete"; the only owner of a business is asked to delete it first (§6, built for launch gap L1). | BUILT | Needs TestFlight check |
 | L7 | Data use and sharing | 5.1.2 | No advertising, no data brokers, no third-party AI. Processors only (§5). | PASS | PASS |
 | L8 | Kids | 5.1.4 | Not directed at children; not in the Kids category. | NOT APPLICABLE | NOT APPLICABLE |
 | L9 | App Privacy ("nutrition label") | App Store Connect | Answers drafted from code (§5). | NEEDS APP STORE CONNECT SETUP | NEEDS APP STORE CONNECT SETUP |
@@ -223,7 +223,18 @@ What blocks a simple "delete my login" endpoint: `response_notes.author_id` is
 feedback cannot be deleted without deciding what happens to those notes, which are part of
 the business's records.
 
-Proposed (not built — it is a data-retention decision and a production migration):
+**Built 18 October 2026 (launch gap L1), using the first option below.** Migration
+`20261018000100_personal_account_deletion.sql` (not applied to production), endpoint
+`/api/v1/account/personal-deletion` (`GET` = may I, `POST {confirmation: "delete"}`),
+web page `/settings/delete-my-account`, native `PersonalDeletion` in
+`apps/mobile/app/delete-account.tsx`, and a "Delete my account" link in the empty org picker
+and in onboarding. Tests: `supabase/tests/personal_account_deletion_test.sql`,
+`personal-account-deletion-route.test.ts`, `personal-deletion-flow.test.tsx`,
+`account-fetch.test.ts`. If you would rather delete a person's notes than keep them as
+"Former team member", say so before the migration reaches production. Still to verify on
+TestFlight.
+
+The original proposal, for the record:
 
 - Migration: `response_notes.author_id` becomes nullable with `ON DELETE SET NULL`; notes
   stay with the business as "Former team member". (Alternative: delete the person's notes.

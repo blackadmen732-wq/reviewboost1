@@ -36,8 +36,8 @@ script on 2026-09-26, not estimated.
 
 ### Promotional text (170 max; can change without a new build)
 
-> See every rating the moment it arrives, read your customers' notes, and program your
-> ReviewBoost Tags from your iPhone.
+> See every rating the moment it arrives, keep track of what your team did about it, and
+> program your ReviewBoost Tags from your iPhone.
 
 ### Description (4000 max)
 
@@ -54,7 +54,7 @@ LIVE FEED
 See ratings arrive as they happen, from every Tag.
 
 FEEDBACK
-Read each rating and the customer's note, if they left one. Unread feedback stands out.
+Read each rating as it comes in, with the Tag it came from. Unread feedback stands out.
 
 TAGS
 Program the NFC chip in a ReviewBoost Tag straight from your iPhone. ReviewBoost reads the chip before writing, never replaces something already on it without asking you first, and reads it back afterwards to confirm the write. You can also preview exactly what a customer sees, or share a Tag's link.
@@ -98,11 +98,11 @@ App Store Connect Help, read 2026-09-26.
 | In-app controls | Parental controls | **No** | None |
 | In-app controls | Age assurance | **No** | None |
 | Capabilities | Unrestricted web access | **No** | No in-app browser or WebView. Privacy, Terms, Support and "Open customer page" open fixed ReviewBoost URLs in Safari, outside the app (`Linking.openURL`) |
-| Capabilities | User-generated content | **No** | Apple defines this as "broad distribution of content created by users". A customer's note is shown only to the members of the business it was written for. Nothing is published, shared between businesses or discoverable. See the note below the table |
+| Capabilities | User-generated content | **No** | Apple defines this as "broad distribution of content created by users". Customers give a star rating and nothing else; there is no box for them to write in. The only free text is a private note a business's own team adds to a rating, seen only by that team. Nothing is published, shared between businesses or discoverable. See the note below the table |
 | Capabilities | Social media | **No** | No feed of other people's content, no likes, no shares |
 | Capabilities | Messaging and chat | **No** | Users of the app cannot message each other. The Texts tab only shows the status of texts sent from the web app. There is no composer in the app |
 | Capabilities | Advertising | **No** | No ads, no ad SDK |
-| Mature themes | Profanity / crude humour; horror / fear; alcohol, tobacco or drugs | **None** | The app's own content has none. Customer notes are private free text (see the note) |
+| Mature themes | Profanity / crude humour; horror / fear; alcohol, tobacco or drugs | **None** | The app's own content has none. Team notes are private free text (see the note) |
 | Medical or wellness | Medical or treatment information; health or wellness topics | **None** | |
 | Sexuality or nudity | All three | **None** | |
 | Violence | All four | **None** | |
@@ -111,7 +111,7 @@ App Store Connect Help, read 2026-09-26.
 
 **Expected result: 4+.**
 
-On user-generated content: if App Review reads private customer notes as user-generated
+On user-generated content: if App Review reads a team's private notes as user-generated
 content, answering **Yes** still gives **4+** (Apple lists user-generated content under 4+).
 The rating does not depend on this judgement. The honest answer is still No, because
 Apple's definition is about broad distribution. Review Guideline 1.2's duties to filter,
@@ -190,11 +190,14 @@ Do this only after the production migration is live. The app's routes need it (a
      Review demo; or
      (b) a real checkout on a 100%-off coupon.
      Do not record a paid subscription that was not paid for.
-4. Create some feedback the honest way: open the demo Tag's customer page on a phone, rate
-   it about five times with a mix of stars, and leave two or three short notes, such as
-   "Great flat white, slow at lunch".
-5. On a TestFlight build, sign in with the email and code and confirm every tab loads.
-6. After the review, rotate the code, or unset both variables if no review is pending.
+4. Create some feedback the honest way: open the demo Tag's customer page on a phone and
+   rate it about five times with a mix of stars. Customers only pick stars; there is
+   nothing for them to type.
+5. Create a **second, non-owner account** for the deletion check: invite a fictional team
+   member to the demo business, sign in as them once, and keep its email and emailed code
+   handy. App Review may ask to see that a team member can delete their own account.
+6. On a TestFlight build, sign in with the email and code and confirm every tab loads.
+7. After the review, rotate the code, or unset both variables if no review is pending.
 
 ### Attachments
 
@@ -213,7 +216,7 @@ Sign-in normally uses a six-digit code sent by email. Enter the demo email on th
 
 WHAT TO LOOK AT
 - Feed: ratings as they arrive.
-- Feedback: each rating and the customer's note. Tap a row for detail.
+- Feedback: each rating, with the Tag it came from. Tap a row for detail.
 - Texts: the status of review requests sent by text from the ReviewBoost web app, and the message balance. The app itself sends no messages.
 - Tags: open "Front counter". "Open customer page" shows exactly what a customer sees. "Share Link" shares it.
 - Account: plan status, Privacy, Terms, Support, Sign out, Delete account.
@@ -231,17 +234,15 @@ RATINGS AND REVIEWS
 Every rating, one star or five, is offered the same review destination. ReviewBoost does not filter or hide reviews, and cannot know whether a customer goes on to post one.
 
 ACCOUNT DELETION
-Account > Delete account deletes the business, its Tags and all its ratings after the owner types the business name, and cancels the subscription first. The public page https://reviewboost.fit/delete-account explains the same thing.
+Account > Delete account works for every account type. An owner deletes the business, its Tags and all its ratings after typing the business name; the subscription is cancelled first, and the login goes too if it was their last business. A team member, or someone who never created a business, deletes their own login after typing "delete"; the business they worked for is untouched. The only owner of a business is asked to delete that business first, so no business is left without an owner. The public page https://reviewboost.fit/delete-account explains the same thing.
 
 PRIVACY
 No tracking, no ads, no analytics SDKs. The only data the app collects is the user's email address and account ID, for sign-in.
 ```
 
 > Before pasting, check that the account-deletion paragraph is still true for the build
-> being submitted. Today in-app deletion covers business **owners** only (audit §6,
-> Blocker 2). The reviewer account is an owner, so the flow works for the reviewer. Apple's
-> rule, though, covers every account type. Resolve Blocker 2 before submission rather
-> than relying on that.
+> being submitted. Personal (non-owner) deletion was added for launch gap L1; confirm it on
+> TestFlight with the second demo account from step 5 before submitting.
 
 ## 7. Screenshots
 
@@ -257,8 +258,8 @@ not be used. Guideline 2.3.3 requires screenshots that show the app in use.
 | # | Screen | State to capture | Optional caption |
 |---|---|---|---|
 | 1 | Feed | Several fresh ratings, mixed stars | See every rating as it arrives |
-| 2 | Feedback list | Unread and read rows, at least two with notes | Read what your customers said |
-| 3 | Feedback detail | A rating with a note | Every note, in one place |
+| 2 | Feedback list | Unread and read rows, mixed stars | Every rating, from every Tag |
+| 3 | Feedback detail | One rating with its Tag and time | See where each rating came from |
 | 4 | Tag detail | "Front counter" with Program NFC visible | Program Tags from your iPhone |
 | 5 | NFC sheet | The "Ready to write" sheet over the Tag | Checked before, verified after |
 | 6 | Texts | Balance card and a few statuses. Use a staging business with fictional numbers if the demo business has none | Follow your review requests |
@@ -268,7 +269,7 @@ Rules for the captures:
 
 - The real status bar. No mock-ups, no device frames that hide the UI, no invented
   numbers.
-- No real customer data and no real phone numbers. Fictional notes only.
+- No real customer data and no real phone numbers.
 - No prices, no "free trial", no "subscribe" in captions (Guideline 3.1.3(f)).
 - If you use captions, keep them to the short lines above, in the app's own font and
   colours.
@@ -356,7 +357,8 @@ done.** Then:
 ## 12. Pre-submission checklist
 
 - [ ] Production migration applied and verified (audit Blocker 1).
-- [ ] Account deletion for every account type (audit Blocker 2 / §6).
+- [ ] Account deletion for every account type (audit Blocker 2 / §6): built for launch gap
+      L1 (owner, team member, no business); still to confirm on TestFlight.
 - [ ] `eas init` committed; App ID has NFC Tag Reading; production build on Xcode 26.6.
 - [ ] Reviewer env vars set; demo business ready (§6); sign-in tested on TestFlight.
 - [ ] §9 NFC matrix and §10 device pass recorded.

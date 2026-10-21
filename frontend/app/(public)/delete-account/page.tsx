@@ -55,8 +55,20 @@ export default function DeleteAccountPage() {
         and every rating are removed. Nobody has to approve it and there is no waiting period.
       </p>
       <p>
-        Only an owner can do this. If you are on someone else&rsquo;s team and
-        want your own access removed, ask an owner to remove you.
+        Only an owner can delete a business. If you are on someone else&rsquo;s
+        team, or you signed in and never set up a business, you can still
+        delete your own account: open{" "}
+        <Link
+          href="/settings/delete-my-account"
+          className="font-medium text-ink underline underline-offset-2 hover:no-underline"
+        >
+          Delete my account
+        </Link>{" "}
+        on the web, or Account then Delete account in the app, and type
+        &ldquo;delete&rdquo;. Your sign-in and your place on every team are
+        removed straight away. The businesses keep their ratings, and notes you
+        wrote stay, marked &ldquo;Former team member&rdquo;. If you are the
+        only owner of a business, delete that business first.
       </p>
 
       <h2>If you cannot sign in</h2>

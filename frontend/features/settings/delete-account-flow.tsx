@@ -45,11 +45,21 @@ export function DeleteAccountFlow({
     typed.trim().toLowerCase() === businessName.trim().toLowerCase();
 
   if (!isOwner) {
+    // A team member can't delete the business, but can always delete their
+    // own account (launch gap L1, Apple 5.1.1(v)).
     return (
-      <p className="rounded-[var(--radius-card)] border border-border bg-quiet p-4 text-base leading-relaxed text-ink">
-        Only an owner can delete the business. If you want your own access
-        removed, ask an owner to remove you from the team.
-      </p>
+      <div className="flex flex-col gap-4">
+        <p className="rounded-[var(--radius-card)] border border-border bg-quiet p-4 text-base leading-relaxed text-ink">
+          Only an owner can delete the business. You can delete your own
+          account. The business and its ratings stay.
+        </p>
+        <Button asChild>
+          <Link href="/settings/delete-my-account">Delete my account</Link>
+        </Button>
+        <Button variant="secondary" asChild>
+          <Link href="/settings">Keep my account</Link>
+        </Button>
+      </div>
     );
   }
 
@@ -195,6 +205,17 @@ export function DeleteAccountFlow({
           <Link href="/settings">Keep my account</Link>
         </Button>
       </div>
+
+      <p className="text-sm leading-relaxed text-muted">
+        Want to keep the business and remove only yourself?{" "}
+        <Link
+          href="/settings/delete-my-account"
+          className="font-medium text-ink underline underline-offset-4 hover:no-underline"
+        >
+          Delete only my account
+        </Link>
+        . The business needs another owner first.
+      </p>
     </div>
   );
 }

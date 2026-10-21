@@ -136,6 +136,23 @@ describe("the App Store listing describes this product", () => {
     expect(userIdRow![2]).toMatch(/not used for analytics/i);
   });
 
+  it("the iPhone metadata pack promises no customer notes either (launch gap L5)", () => {
+    // APP_STORE_METADATA.md is the text typed into App Store Connect, and it
+    // still said "read your customers' notes" after the public flow became
+    // stars only. Team notes (what the business did about a rating) are real
+    // and may be mentioned; a customer's note may not.
+    const metadata = prose("docs/mobile/APP_STORE_METADATA.md");
+    expect(metadata).not.toMatch(
+      /customers?'?s? notes?\b|customer note|written feedback|feedback from customers|leave (two or three )?(short )?notes/i,
+    );
+  });
+
+  it("the iPhone metadata pack says deletion covers every account type", () => {
+    const metadata = prose("docs/mobile/APP_STORE_METADATA.md");
+    expect(metadata).toMatch(/works for every account type/i);
+    expect(metadata).not.toMatch(/covers business \*\*owners\*\* only/i);
+  });
+
   it("names the NFC labels the app actually shows", () => {
     // A reviewer following instructions that name a button which is not there
     // files a rejection, not a bug report.
