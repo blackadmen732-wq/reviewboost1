@@ -77,6 +77,7 @@ export const EXPECTED_MIGRATIONS: readonly string[] = [
   "integrations_foundation",
   "local_customer_page_assets",
   "customer_list_imports",
+  "personal_account_deletion",
   "sms_can_send_many",
   "integration_service_reads",
   "connections_review_fixes",

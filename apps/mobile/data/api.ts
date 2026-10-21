@@ -8,6 +8,8 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public requestId?: string,
+    /** The API's stable error code, e.g. "owns_business". */
+    public code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -19,12 +21,27 @@ export async function apiFetch<T>(
   orgId: string,
   init?: RequestInit,
 ): Promise<T> {
-  if (!API_URL) {
-    throw new ApiError("EXPO_PUBLIC_API_URL is not configured", 0);
-  }
-
   if (!orgId) {
     throw new ApiError("No organization selected", 0);
+  }
+  return send<T>(path, orgId, init);
+}
+
+/**
+ * For the few calls about the signed-in person rather than a business, such
+ * as deleting your own account, which must work with no business at all.
+ */
+export async function accountFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  return send<T>(path, null, init);
+}
+
+async function send<T>(
+  path: string,
+  orgId: string | null,
+  init?: RequestInit,
+): Promise<T> {
+  if (!API_URL) {
+    throw new ApiError("EXPO_PUBLIC_API_URL is not configured", 0);
   }
 
   const request = async (signal?: AbortSignal): Promise<T> => {
@@ -39,7 +56,7 @@ export async function apiFetch<T>(
     const url = `${API_URL}${path}`;
     const headers: Record<string, string> = {
       Authorization: `Bearer ${data.session.access_token}`,
-      "X-Organization-Id": orgId,
+      ...(orgId ? { "X-Organization-Id": orgId } : {}),
       "Content-Type": "application/json",
       ...(init?.headers as Record<string, string>),
     };
@@ -62,7 +79,11 @@ export async function apiFetch<T>(
         (typeof err === "string" && err) ??
         (body as Record<string, unknown>)?.message ??
         res.statusText;
-      throw new ApiError(String(message), res.status, requestId);
+      const code =
+        err && typeof err === "object"
+          ? ((err as Record<string, unknown>).code as string | undefined)
+          : undefined;
+      throw new ApiError(String(message), res.status, requestId, code);
     }
 
     return body as T;
