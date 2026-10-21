@@ -5,7 +5,7 @@ export const colors = {
   brandHover: "#009a61",
   brandActive: "#008f5b",
 
-  canvas: "#f8f5f0",
+  canvas: "#fcfcfb",
   surface: "#FFFFFF",
   surfaceAlt: "#F5F3EF",
 

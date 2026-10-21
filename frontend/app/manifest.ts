@@ -18,7 +18,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Collect honest reviews for your local business.",
     start_url: "/home",
     display: "standalone",
-    background_color: "#F8F5F0",
+    background_color: "#FCFCFB",
     theme_color: "#00A86B",
     icons: [
       { src: "/brand/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
