@@ -141,7 +141,7 @@ async function settleInbox(
 async function processInboxRow(svc: SupabaseClient, row: InboxRow, worker: string, summary: ProcessSummary): Promise<void> {
   let loaded;
   try {
-    loaded = await loadConnection(svc, row.connection_id);
+    loaded = await loadConnection(svc, row.org_id, row.connection_id);
   } catch (caught) {
     if (caught instanceof ConnectionUnavailableError) {
       await settleInbox(svc, row, worker, "skipped", caught.code);
@@ -150,9 +150,14 @@ async function processInboxRow(svc: SupabaseClient, row: InboxRow, worker: strin
     }
     if (caught instanceof ProviderError) {
       // Refresh was refused: the connection is now reauth_required and the
-      // event is held until the owner signs in again.
-      await settleInbox(svc, row, worker, "retry", caught.classification.reason, 3600);
-      summary.inboxRetried += 1;
+      // event is held until the owner signs in again. A refresh that only
+      // failed for now is retried on the usual backoff.
+      const classification = caught.classification;
+      const backoff =
+        classification.kind === "retryable" ? backoffSeconds(row.attempts, classification.retryAfterMs) : 3600;
+      const settled = await settleInbox(svc, row, worker, "retry", classification.reason, backoff);
+      if (settled === "dead_letter") summary.inboxDeadLettered += 1;
+      else summary.inboxRetried += 1;
       return;
     }
     throw caught;
@@ -271,10 +276,23 @@ async function advanceRun(
 
   let loaded;
   try {
-    loaded = await loadConnection(svc, run.connection_id);
+    loaded = await loadConnection(svc, run.org_id, run.connection_id);
   } catch (caught) {
     if (caught instanceof ConnectionUnavailableError) return finish("failed", caught.code, null);
-    if (caught instanceof ProviderError) return finish("failed", caught.classification.reason, null);
+    if (caught instanceof ProviderError) {
+      const classification = caught.classification;
+      if (classification.kind !== "retryable") return finish("failed", classification.reason, null);
+      // The token could not be refreshed just now; the run waits and tries again.
+      const { error } = await svc.rpc("rpc_integration_retry_run", {
+        p_run_id: run.id,
+        p_worker: worker,
+        p_error_code: classification.reason,
+        p_backoff_seconds: backoffSeconds(run.attempts, classification.retryAfterMs),
+      });
+      if (error) throw error;
+      summary.runsRetried += 1;
+      return;
+    }
     throw caught;
   }
 

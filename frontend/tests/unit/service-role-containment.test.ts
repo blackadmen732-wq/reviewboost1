@@ -43,7 +43,7 @@ const IMPORTERS: Record<string, string> = {
   "app/api/v1/text-requests/route.ts": "per-organization rate-limit RPC (the bucket table is service-only)",
   // Connections (brought onto #67 from #76/#79/#84). Each calls reviewed
   // public.rpc_* functions only; the three reads that used to query tables
-  // directly go through migration 20261021000100.
+  // directly go through migrations 20261021000100 and 20261021000200.
   "lib/server/customers/list-import.ts": "list import/remove RPCs (encrypted rows, no consent written)",
   "lib/server/customers/textable.ts": "rpc_sms_can_send_many: the one texting gate, for the picker",
   "lib/server/integrations/connection-service.ts": "integration lifecycle, OAuth state and read RPCs",
@@ -130,6 +130,20 @@ describe("service-role containment", () => {
           .map(() => file.path),
       );
     expect(offenders).toEqual([]);
+  });
+
+  // The service-role client handed to a helper as a parameter is invisible to
+  // the checks above (the helper never names serviceRoleClient). Helpers take
+  // it under one of these names, so a table query through any of them fails.
+  const HANDED_IN = /\b(?:svc|service|serviceClient|admin)\s*(?:\.\s*schema\([^)]*\)\s*)?\.\s*from\s*\(/;
+
+  it("never queries a table through a service-role client handed in as a parameter", () => {
+    const offenders = files.filter((file) => HANDED_IN.test(file.text)).map((file) => file.path);
+    expect(offenders).toEqual([]);
+  });
+
+  it("catches a handed-in table query when one is planted", () => {
+    expect(HANDED_IN.test(`async function load(svc: SupabaseClient) {\n  await svc\n    .from("integration_credentials");\n}`)).toBe(true);
   });
 
   it("catches a table query when one is planted (the check itself works)", () => {

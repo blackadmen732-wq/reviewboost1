@@ -79,4 +79,5 @@ export const EXPECTED_MIGRATIONS: readonly string[] = [
   "customer_list_imports",
   "sms_can_send_many",
   "integration_service_reads",
+  "connections_review_fixes",
 ];

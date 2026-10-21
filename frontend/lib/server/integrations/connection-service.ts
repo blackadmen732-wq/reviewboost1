@@ -455,13 +455,16 @@ async function withProvider<T>(
   const svc = serviceRoleClient();
   let loaded;
   try {
-    loaded = await loadConnection(svc, connectionId);
+    loaded = await loadConnection(svc, orgId, connectionId);
   } catch (caught) {
     if (caught instanceof ConnectionUnavailableError) {
       throw new ApiError(409, ERROR_CODE.providerUnavailable, "This connection can't be reached right now.");
     }
     if (caught instanceof ProviderError && caught.classification.kind === "auth") {
       throw new ApiError(409, ERROR_CODE.connectionStateInvalid, "Sign in again to keep this connected.");
+    }
+    if (caught instanceof ProviderError) {
+      throw new ApiError(503, ERROR_CODE.providerUnavailable, "This connection can't be reached right now.");
     }
     throw caught;
   }
@@ -687,7 +690,7 @@ export async function disconnect(
   // Load the tokens before they are deleted, so access can be revoked.
   let loaded: Awaited<ReturnType<typeof loadConnection>> | null = null;
   try {
-    loaded = await loadConnection(svc, connectionId);
+    loaded = await loadConnection(svc, context.orgId, connectionId);
   } catch (caught) {
     logger.warn("integrations.disconnect_without_tokens", { requestId, connectionId, error: caught });
   }

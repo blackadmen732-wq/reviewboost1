@@ -56,58 +56,67 @@ export class ConnectionUnavailableError extends Error {
   }
 }
 
-const CONNECTION_COLUMNS = "id, org_id, provider_id, workflow_id, external_account_id, state, granted_scopes";
+/** One row from `rpc_integration_load_connection`: the connection, its tokens, its chosen places. */
+interface LoadedRow extends ConnectionRow, CredentialRow {
+  mapped_location_ids: string[] | null;
+}
 
 /**
  * Load a connection and its tokens, refreshing them first when the adapter
  * says they are due. Refresh is single-flight across workers; a worker that
  * loses the race uses the tokens it has, which are still valid.
+ *
+ * The read goes through a service-role function scoped to the business and
+ * connection asked about; this module never queries a table directly.
  */
 export async function loadConnection(
   svc: SupabaseClient,
+  orgId: string,
   connectionId: string,
   now: Date = new Date(),
 ): Promise<LoadedConnection> {
-  const { data: connection, error } = await svc
-    .from("integration_connections")
-    .select(CONNECTION_COLUMNS)
-    .eq("id", connectionId)
-    .maybeSingle();
+  const { data, error } = await svc.rpc("rpc_integration_load_connection", {
+    p_org_id: orgId,
+    p_connection_id: connectionId,
+  });
   if (error) throw error;
-  if (!connection) throw new ConnectionUnavailableError("connection_not_found");
+  const loadedRow = (Array.isArray(data) ? data[0] : data) as LoadedRow | null | undefined;
+  if (!loadedRow) throw new ConnectionUnavailableError("connection_not_found");
 
-  const row = connection as ConnectionRow;
+  const row: ConnectionRow = {
+    id: loadedRow.id,
+    org_id: loadedRow.org_id,
+    provider_id: loadedRow.provider_id,
+    workflow_id: loadedRow.workflow_id,
+    external_account_id: loadedRow.external_account_id,
+    state: loadedRow.state,
+    granted_scopes: loadedRow.granted_scopes,
+  };
   const adapter = getAdapter(row.provider_id);
   const provider = getProvider(row.provider_id);
   const workflow = provider ? getWorkflow(provider, row.workflow_id) : null;
   if (!adapter || !workflow) throw new ConnectionUnavailableError("provider_not_available");
 
-  const { data: credentials, error: credError } = await svc
-    .from("integration_credentials")
-    .select("access_token_enc, refresh_token_enc, access_expires_at, refresh_expires_at, last_refreshed_at")
-    .eq("connection_id", connectionId)
-    .maybeSingle();
-  if (credError) throw credError;
-  if (!credentials) throw new ConnectionUnavailableError("credentials_missing");
+  if (!loadedRow.access_token_enc) throw new ConnectionUnavailableError("credentials_missing");
+  const credentialRow: CredentialRow = {
+    access_token_enc: loadedRow.access_token_enc,
+    refresh_token_enc: loadedRow.refresh_token_enc,
+    access_expires_at: loadedRow.access_expires_at,
+    refresh_expires_at: loadedRow.refresh_expires_at,
+    last_refreshed_at: loadedRow.last_refreshed_at,
+  };
 
   const binding: CredentialBinding = {
     orgId: row.org_id,
     providerId: row.provider_id,
     externalAccountId: row.external_account_id,
   };
-  const credentialRow = credentials as CredentialRow;
   let tokens = openTokens(credentialRow, binding, row.granted_scopes ?? []);
 
   const lastRefreshed = credentialRow.last_refreshed_at ? new Date(credentialRow.last_refreshed_at) : null;
   if (adapter.shouldRefresh(tokens, lastRefreshed, now)) {
-    tokens = await refreshTokens(svc, row, adapter, tokens, binding);
+    tokens = await refreshTokens(svc, row, adapter, tokens, binding, now);
   }
-
-  const { data: mappings, error: mappingError } = await svc
-    .from("integration_location_mappings")
-    .select("external_location_id")
-    .eq("connection_id", connectionId);
-  if (mappingError) throw mappingError;
 
   return {
     connection: row,
@@ -115,7 +124,7 @@ export async function loadConnection(
     workflow,
     ctx: { tokens, externalAccountId: row.external_account_id },
     binding,
-    mappedLocations: new Set(((mappings ?? []) as Array<{ external_location_id: string }>).map((m) => m.external_location_id)),
+    mappedLocations: new Set(loadedRow.mapped_location_ids ?? []),
   };
 }
 
@@ -125,13 +134,19 @@ async function refreshTokens(
   adapter: ProviderAdapter,
   tokens: LoadedConnection["ctx"]["tokens"],
   binding: CredentialBinding,
+  now: Date,
 ): Promise<LoadedConnection["ctx"]["tokens"]> {
   const { data: locked, error } = await svc.rpc("rpc_integration_lock_refresh", {
     p_connection_id: connection.id,
     p_seconds: 60,
   });
   if (error) throw error;
-  if (locked !== true) return tokens;
+  // Another worker is refreshing. Its result lands in the store; until then
+  // the current token serves only while it is still valid.
+  if (locked !== true) {
+    if (stillValid(tokens, now)) return tokens;
+    throw new ProviderError({ kind: "retryable", reason: "network" }, "refresh_in_progress");
+  }
 
   let refreshed;
   try {
@@ -142,9 +157,15 @@ async function refreshTokens(
       await reportOutcome(svc, connection, classification);
       throw new ProviderError(classification);
     }
-    // A failed refresh of a still-valid token is not fatal; try again later.
     logger.warn("integrations.refresh_failed", { connectionId: connection.id, reason: classification.reason });
-    return tokens;
+    // A failed refresh of a still-valid token is not fatal; try again later.
+    if (stillValid(tokens, now)) return tokens;
+    // An expired token is not used: the provider would refuse it as an auth
+    // failure and the owner would be asked to sign in again over an outage.
+    const retry: ProviderErrorClass =
+      classification.kind === "retryable" ? classification : { kind: "retryable", reason: "server_error" };
+    await reportOutcome(svc, connection, retry);
+    throw new ProviderError(retry, "refresh_failed");
   }
 
   const sealed = sealTokens(refreshed, binding);
@@ -160,6 +181,11 @@ async function refreshTokens(
   });
   if (storeError) throw storeError;
   return refreshed;
+}
+
+/** A token with no stated expiry is taken as valid; the provider decides. */
+function stillValid(tokens: LoadedConnection["ctx"]["tokens"], now: Date): boolean {
+  return !tokens.accessExpiresAt || tokens.accessExpiresAt.getTime() > now.getTime();
 }
 
 /** Tell the database what a provider call said about the connection's health. */

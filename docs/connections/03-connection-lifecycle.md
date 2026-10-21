@@ -73,7 +73,7 @@ Health transitions (`active` only):
 | `authorization_required` | Recorded, not processed | No | No | No |
 | `active` | Yes | Yes | Yes | Yes |
 | `reauth_required` | Recorded, processed after reauth | No | No | Already-synced records stay usable; the composer says the source needs attention |
-| `unavailable` | Yes (Square pushes even if its API is degraded) | Backed off | Disabled | Yes, with a staleness note |
+| `unavailable` | Yes (Square pushes even if its API is degraded); still processed, with backoff | Backed off, never stopped: the scheduled reconcile and queued retries are what find the provider back and return it to `active` | Disabled | Yes, with a staleness note |
 | `error` | Recorded, held | No | No | Yes, with a note |
 | `disconnecting`, `disconnected` | Rejected with 200 and dropped (so the provider stops retrying), counted | No | No | Records from this source follow the disconnect policy (doc 5 §5.8) |
 
