@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
+import { CustomerPicker, type PickerCustomer } from "@/features/dashboard/customer-picker";
 import { notify } from "@/components/ui/toast";
 import {
   CONSENT_ATTESTATION_VERSION,
@@ -47,6 +48,12 @@ interface TextRequestComposerProps {
   balance: Balance;
   tags: readonly TagOption[];
   recent: readonly RecentRequest[];
+  /**
+   * Customers brought in through Connections, for owners and admins. Empty
+   * when there are none; null when they couldn't be loaded, which is said
+   * rather than shown as an empty list.
+   */
+  customers?: readonly PickerCustomer[] | null;
 }
 
 interface Eligibility {
@@ -88,8 +95,12 @@ export function TextRequestComposer({
   tags,
   recent,
   canSendRequests,
+  customers = [],
 }: TextRequestComposerProps) {
   const router = useRouter();
+  const hasCustomers = customers !== null && customers.length > 0;
+  const [mode, setMode] = useState<"customer" | "number">(hasCustomers ? "customer" : "number");
+  const [customer, setCustomer] = useState<PickerCustomer | null>(null);
   const [phone, setPhone] = useState("");
   const [standId, setStandId] = useState(tags[0]?.standId ?? "");
   const [templateId, setTemplateId] = useState<TextRequestTemplateId>(
@@ -124,12 +135,22 @@ export function TextRequestComposer({
     );
   }
 
+  // Exactly one of the two goes to the server: a chosen customer (whose number
+  // the server looks up) or the number typed here.
+  function recipient(): { customerId: string } | { phone: string } {
+    return mode === "customer" && customer
+      ? { customerId: customer.customerId }
+      : { phone: phone.trim() };
+  }
+
+  const hasRecipient = mode === "customer" ? customer !== null : phone.trim().length >= 3;
+
   async function runPreview() {
     setBusy(true);
     setError(null);
     try {
       const response = await authorizedFetch("/api/v1/text-requests/preview", {
-        phone: phone.trim(),
+        ...recipient(),
         standId,
         templateId,
       });
@@ -159,7 +180,7 @@ export function TextRequestComposer({
     setError(null);
     try {
       const response = await authorizedFetch("/api/v1/text-requests", {
-        phone: phone.trim(),
+        ...recipient(),
         standId,
         templateId,
       });
@@ -170,6 +191,7 @@ export function TextRequestComposer({
       }
 
       setPhone("");
+      setCustomer(null);
       setPreview(null);
       notify.success("Queued", "We will send it and show the result here.");
       router.refresh();
@@ -189,7 +211,7 @@ export function TextRequestComposer({
     setError(null);
     try {
       const response = await authorizedFetch("/api/v1/text-requests/consent", {
-        phone: phone.trim(),
+        ...recipient(),
         standId,
         method: consentMethod,
         wordingVersion: CONSENT_ATTESTATION_VERSION,
@@ -300,22 +322,55 @@ export function TextRequestComposer({
           </InlineNotice>
         ) : (
           <>
-            <label className="flex flex-col gap-1 text-sm font-medium text-muted">
-              Customer&apos;s mobile number
-              <input
-                className="min-h-14 rounded-[var(--radius-control)] border border-border bg-canvas px-4 text-base text-ink"
-                type="tel"
-                inputMode="tel"
-                autoComplete="off"
-                disabled={busy}
-                value={phone}
-                onChange={(event) => {
-                  setPhone(event.target.value);
+            {customers === null ? (
+              <InlineNotice kind="info">
+                <p>Your customers couldn&rsquo;t be loaded. You can still type a number, or reload to try again.</p>
+              </InlineNotice>
+            ) : null}
+
+            {mode === "customer" && hasCustomers ? (
+              <CustomerPicker
+                customers={customers ?? []}
+                selected={customer}
+                onSelect={(next) => {
+                  setCustomer(next);
                   clearPreview();
                 }}
-                placeholder="+1 555 123 4567"
               />
-            </label>
+            ) : (
+              <label className="flex flex-col gap-1 text-sm font-medium text-muted">
+                Customer&apos;s mobile number
+                <input
+                  className="min-h-14 rounded-[var(--radius-control)] border border-border bg-canvas px-4 text-base text-ink"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="off"
+                  disabled={busy}
+                  value={phone}
+                  onChange={(event) => {
+                    setPhone(event.target.value);
+                    clearPreview();
+                  }}
+                  placeholder="+1 555 123 4567"
+                />
+              </label>
+            )}
+
+            {hasCustomers ? (
+              <button
+                type="button"
+                disabled={busy}
+                className="-mt-2 min-h-11 self-start text-sm font-medium text-ink underline underline-offset-4 hover:no-underline"
+                onClick={() => {
+                  setMode(mode === "customer" ? "number" : "customer");
+                  setCustomer(null);
+                  setPhone("");
+                  clearPreview();
+                }}
+              >
+                {mode === "customer" ? "Type a number instead" : "Choose from your customers"}
+              </button>
+            ) : null}
 
             <label className="flex flex-col gap-1 text-sm font-medium text-muted">
               Which Tag
@@ -489,7 +544,7 @@ export function TextRequestComposer({
                 type="button"
                 variant="secondary"
                 onClick={() => void runPreview()}
-                disabled={busy || phone.trim().length < 3 || standId === ""}
+                disabled={busy || !hasRecipient || standId === ""}
               >
                 Preview text request
               </Button>

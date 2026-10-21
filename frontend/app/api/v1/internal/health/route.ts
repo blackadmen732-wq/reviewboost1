@@ -48,6 +48,23 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
 
+    // Connections: the same idea. A webhook inbox that is not draining, events
+    // that gave up, and switched-on connections that have not read anything
+    // in a day are each silent until an owner notices missing customers.
+    const { data: integrationData, error: integrationError } = await serviceRoleClient().rpc("rpc_integration_health");
+    if (integrationError) {
+      throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Health is unavailable.");
+    }
+    const integration = Array.isArray(integrationData)
+      ? (integrationData[0] as Record<string, unknown> | undefined)
+      : undefined;
+    const integrationInboxPending = Number(integration?.["inbox_pending"] ?? 0);
+    const integrationInboxAge = Number(integration?.["oldest_pending_age_s"] ?? 0);
+    const integrationDeadLetters = Number(integration?.["dead_letters"] ?? 0);
+    const connectionsStalled = Number(integration?.["connections_stalled"] ?? 0);
+    const runsFailed24h = Number(integration?.["runs_failed_24h"] ?? 0);
+    const connectionsByState = (integration?.["connections_by_state"] ?? {}) as Record<string, number>;
+
     const outboxPending = Number(row?.["outbox_pending"] ?? 0);
     const oldestPendingAge = Number(row?.["oldest_pending_age_s"] ?? 0);
     const providerUnknown = Number(row?.["provider_unknown"] ?? 0);
@@ -65,6 +82,9 @@ export async function GET(request: NextRequest): Promise<Response> {
     if (deadLetter > 0) problems.push("dead_letters");
     if (stripeWebhooks > 0) problems.push("stripe_webhooks_unprocessed");
     if (smsWebhooks > 0) problems.push("sms_webhooks_unprocessed");
+    if (integrationInboxAge > 900) problems.push("integration_inbox_backlog");
+    if (integrationDeadLetters > 0) problems.push("integration_dead_letters");
+    if (connectionsStalled > 0) problems.push("connections_stalled");
 
     // The scheduler. A worker that has not succeeded within its cadence
     // (plus slack for one missed run) means nothing is being sent or settled,
@@ -103,6 +123,16 @@ export async function GET(request: NextRequest): Promise<Response> {
         outbox: { pending: outboxPending, deadLetter, oldestPendingAgeSeconds: oldestPendingAge },
         providerUnknown: { count: providerUnknown, oldestAgeSeconds: oldestUnknownAge },
         webhooks: { sms: smsWebhooks, stripe: stripeWebhooks },
+        connections: {
+          byState: connectionsByState,
+          stalled: connectionsStalled,
+          runsFailed24h,
+          inbox: {
+            pending: integrationInboxPending,
+            deadLetter: integrationDeadLetters,
+            oldestPendingAgeSeconds: integrationInboxAge,
+          },
+        },
       },
       requestId,
     });

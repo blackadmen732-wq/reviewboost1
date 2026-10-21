@@ -41,6 +41,15 @@ const IMPORTERS: Record<string, string> = {
   "app/api/v1/internal/maintenance/route.ts": "scheduled maintenance RPCs",
   "app/api/v1/internal/readiness/route.ts": "readiness: catalog RPC and Storage bucket check",
   "app/api/v1/text-requests/route.ts": "per-organization rate-limit RPC (the bucket table is service-only)",
+  // Connections (brought onto #67 from #76/#79/#84). Each calls reviewed
+  // public.rpc_* functions only; the three reads that used to query tables
+  // directly go through migration 20261021000100.
+  "lib/server/customers/list-import.ts": "list import/remove RPCs (encrypted rows, no consent written)",
+  "lib/server/customers/textable.ts": "rpc_sms_can_send_many: the one texting gate, for the picker",
+  "lib/server/integrations/connection-service.ts": "integration lifecycle, OAuth state and read RPCs",
+  "lib/server/integrations/route-helpers.ts": "per-organization rate-limit RPC for Connections routes",
+  "lib/server/integrations/sync-runner.ts": "worker: inbox, run, checkpoint and apply RPCs (no user session exists)",
+  "app/api/v1/webhooks/integrations/[provider]/route.ts": "verified provider webhook into the inbox RPC (no user session exists)",
 };
 
 const STORAGE_ALLOWED = new Set([
