@@ -8,6 +8,7 @@ import { publicFrontendUrl } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { standUrl } from "@/lib/server/google-review-url";
 import { logger } from "@/lib/server/logger";
+import { resolveCustomerPhone } from "@/lib/server/customers/textable";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import { getProviderRate } from "@/lib/server/sms/provider";
 import { estimateMessageCost } from "@/lib/server/sms/cost";
@@ -98,13 +99,37 @@ function requireOneStandRef(
   }
 }
 
+/**
+ * Who gets the text: a number typed by the owner, or a customer brought in
+ * through Connections. Exactly one. A customer's number is looked up on the
+ * server (`resolveCustomerPhone`) and never travels to the browser.
+ */
+const recipientSchema = {
+  phone: z.string().min(3).max(40).optional(),
+  customerId: uuidSchema("Choose a customer.").optional(),
+};
+
+function requireOneRecipient(
+  value: { phone?: string | undefined; customerId?: string | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  if (Boolean(value.phone) === Boolean(value.customerId)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["phone"],
+      message: "Type a mobile number or choose a customer.",
+    });
+  }
+}
+
 export const previewSchema = z
   .strictObject({
-    phone: z.string().min(3).max(40),
+    ...recipientSchema,
     ...standRefSchema,
     templateId: templateIdSchema.optional(),
   })
-  .superRefine(requireOneStandRef);
+  .superRefine(requireOneStandRef)
+  .superRefine(requireOneRecipient);
 
 /*
  * There is deliberately no `consent` field here any more. Sending used to
@@ -114,16 +139,17 @@ export const previewSchema = z
  */
 export const scheduleSchema = z
   .strictObject({
-    phone: z.string().min(3).max(40),
+    ...recipientSchema,
     ...standRefSchema,
     templateId: templateIdSchema.optional(),
     // An explicit client idempotency key makes a deliberate retry exact.
     idempotencyKey: z.string().min(8).max(200).optional(),
   })
-  .superRefine(requireOneStandRef);
+  .superRefine(requireOneStandRef)
+  .superRefine(requireOneRecipient);
 
 export const consentAttestationSchema = z.strictObject({
-  phone: z.string().min(3).max(40),
+  ...recipientSchema,
   standId: uuidSchema("Choose which Tag the link should point at."),
   method: z.enum(CONSENT_METHOD_IDS, { message: "Say how the customer agreed." }),
   wordingVersion: z.literal(CONSENT_ATTESTATION_VERSION, {
@@ -131,9 +157,22 @@ export const consentAttestationSchema = z.strictObject({
   }),
   // Literally true: the owner ticked the confirmation, not merely sent the form.
   confirmed: z.literal(true, { message: "Please confirm the customer agreed." }),
-});
+}).superRefine(requireOneRecipient);
 
 export type ScheduleInput = z.infer<typeof scheduleSchema>;
+
+/** The number to text: the typed one, or the chosen customer's, looked up here. */
+async function recipientPhone(
+  context: OrganizationContext,
+  input: { phone?: string | undefined; customerId?: string | undefined },
+  requestId: string,
+): Promise<string> {
+  if (input.customerId) {
+    return resolveCustomerPhone(context.db, context.orgId, input.customerId, requestId);
+  }
+  // The schema guarantees one of the two.
+  return input.phone ?? "";
+}
 export type PreviewInput = z.infer<typeof previewSchema>;
 export type ConsentAttestationInput = z.infer<typeof consentAttestationSchema>;
 
@@ -359,7 +398,7 @@ export async function previewTextRequest(
   input: PreviewInput,
   requestId: string,
 ): Promise<PreviewResult> {
-  const normalized = normalizePhone(input.phone, phoneOptions());
+  const normalized = normalizePhone(await recipientPhone(context, input, requestId), phoneOptions());
   const stored = toStoredPhone(normalized);
   const stand = await resolveStand(context, input);
   const businessName = await loadBusinessName(context);
@@ -399,7 +438,7 @@ export async function recordConsentAttestation(
   input: ConsentAttestationInput,
   requestId: string,
 ): Promise<ConsentAttestationResult> {
-  const normalized = normalizePhone(input.phone, phoneOptions());
+  const normalized = normalizePhone(await recipientPhone(context, input, requestId), phoneOptions());
   const stored = toStoredPhone(normalized);
   const stand = await resolveStand(context, { standId: input.standId });
 
@@ -447,7 +486,7 @@ export async function scheduleTextRequest(
   input: ScheduleInput,
   requestId: string,
 ): Promise<ScheduleResult> {
-  const normalized = normalizePhone(input.phone, phoneOptions());
+  const normalized = normalizePhone(await recipientPhone(context, input, requestId), phoneOptions());
   const stored = toStoredPhone(normalized);
   const stand = await resolveStand(context, input);
   // Refuse before anything is reserved: no consent, an opt-out or a suppression
