@@ -64,9 +64,9 @@ export function CustomerPicker({
 
   if (selected) {
     return (
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-muted">Customer</span>
-        <div className="flex min-h-14 items-center justify-between gap-3 rounded-[var(--radius-control)] border border-border bg-canvas px-4 py-2">
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium text-ink">Customer</span>
+        <div className="flex min-h-14 items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[color:var(--rb-border-strong)] bg-surface px-4 py-2">
           <div className="min-w-0">
             <p className="truncate text-base font-medium text-ink">{customerLabel(selected)}</p>
             <StatusLine customer={selected} />
@@ -84,13 +84,13 @@ export function CustomerPicker({
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={inputId} className="text-sm font-medium text-muted">
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={inputId} className="text-sm font-medium text-ink">
         Customer
       </label>
       <input
         id={inputId}
-        className="min-h-14 rounded-[var(--radius-control)] border border-border bg-canvas px-4 text-base text-ink"
+        className="min-h-14 rounded-[var(--radius-control)] border border-[color:var(--rb-border-strong)] bg-surface px-4 text-base text-ink shadow-[var(--shadow-control)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-muted focus-visible:border-[color:var(--rb-focus)] focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
         type="search"
         autoComplete="off"
         placeholder="Search by name or last 4 digits"

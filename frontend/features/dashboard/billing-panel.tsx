@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils/cn";
 import { withWriteDeadline } from "@/lib/api/read-deadline";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
+class SignedOut extends Error {}
+
 type PlanId = "starter" | "growth" | "pro";
 type Status = "trialing" | "active" | "past_due" | "cancelled" | "suspended";
 
@@ -288,8 +290,7 @@ export function BillingPanel({
       const {
         data: { session },
       } = await supabaseBrowser().auth.getSession();
-      if (!session)
-        throw new Error("Your session expired. Please sign in again.");
+      if (!session) throw new SignedOut("Your session expired. Please sign in again.");
 
       const response = await withWriteDeadline(
         async (signal) =>
@@ -319,8 +320,11 @@ export function BillingPanel({
 
       window.location.assign(payload.data.url);
     } catch (caught) {
+      // A dropped connection reads "Failed to fetch"; nobody should see that.
       setError(
-        caught instanceof Error ? caught.message : "Something went wrong.",
+        caught instanceof SignedOut
+          ? caught.message
+          : "Could not reach ReviewBoost. Check your connection and try again.",
       );
     } finally {
       setBusy(null);
@@ -329,6 +333,12 @@ export function BillingPanel({
 
   const currentPlan = PLANS.find((plan) => plan.id === billing.planId);
   const firstSubscription = billing.planId === null;
+  // One black button among the plans, as on the pricing page: the plan the
+  // owner already picked there, otherwise the trial for a first subscription.
+  // The cards used to turn black only on hover, so on a phone there was no
+  // main action at all.
+  const recommended: PlanId | null =
+    selectedPlan ?? (firstSubscription ? (PLANS.find((plan) => plan.trialDays > 0)?.id ?? null) : null);
   const periodEnd = formatDate(billing.currentPeriodEnd);
 
   // A real problem gets the red banner above everything; the card below then
@@ -570,8 +580,8 @@ export function BillingPanel({
                 </p>
                 <Button
                   type="button"
-                  variant="secondary"
-                  className="mt-5 group-hover:border-action group-hover:bg-action group-hover:text-on-action group-focus-within:border-action group-focus-within:bg-action group-focus-within:text-on-action"
+                  variant={recommended === plan.id ? "action" : "secondary"}
+                  className="mt-5"
                   onClick={() =>
                     void act({ action: "checkout", planId: plan.id }, plan.id)
                   }

@@ -146,6 +146,7 @@ export function InstallPrompt() {
         </p>
       ) : (
         <Button
+          variant="secondary"
           className="mt-3"
           onClick={async () => {
             if (!deferred) return;

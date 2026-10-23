@@ -23,7 +23,11 @@
   --color-star: var(--rb-star);
   --color-star-soft: var(--rb-star-soft);
   --color-danger: var(--rb-danger);
+  --color-danger-soft: var(--rb-danger-soft);
+  --color-warning: var(--rb-warning);
+  --color-warning-soft: var(--rb-warning-soft);
   --color-info: var(--rb-info);
+  --color-info-soft: var(--rb-info-soft);
   --color-focus: var(--rb-focus);
   --font-sans: var(--font-geist-sans);
 }
@@ -120,8 +124,10 @@
     --rb-danger: #ff8f8f;
     --rb-danger-soft: #452323;
     --rb-info: #78b5f4;
-  --rb-warning: #f0b45a;
-  --rb-raised: #262624;
+    --rb-info-soft: #1b2a3a;
+    --rb-warning: #f0b45a;
+    --rb-warning-soft: #3a2a12;
+    --rb-raised: #262624;
     --rb-focus: #7ab8ff;
     --rb-focus-soft: rgb(77 142 255 / 34%);
     --shadow-control: 0 1px 0 rgb(0 0 0 / 40%);
@@ -156,8 +162,17 @@
   --rb-danger: #b33a3a;
   --rb-danger-soft: #fce8e8;
   --rb-info: #2663a0;
+  --rb-info-soft: #eaf2fb;
+  --rb-warning: #9a6415;
+  --rb-warning-soft: #fff6e7;
+  --rb-raised: #ffffff;
   --rb-focus: #005fcc;
   --rb-focus-soft: rgb(0 95 204 / 28%);
+  /* A light choice on a phone set to dark must not keep dark shadows. */
+  --shadow-control: 0 1px 0 rgb(23 26 24 / 4%);
+  --shadow-button: inset 0 1px 0 rgb(255 255 255 / 16%), inset 0 -1px 0 rgb(0 0 0 / 20%), 0 1px 2px rgb(0 0 0 / 12%);
+  --shadow-button-hover: inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 -1px 0 rgb(0 0 0 / 24%), 0 2px 4px rgb(0 0 0 / 14%);
+  --shadow-float: 0 -1px 0 rgb(23 26 24 / 8%);
 }
 :root[data-theme="dark"],
 .dark {
@@ -184,10 +199,17 @@
   --rb-danger: #ff8f8f;
   --rb-danger-soft: #452323;
   --rb-info: #78b5f4;
+  --rb-info-soft: #1b2a3a;
   --rb-warning: #f0b45a;
+  --rb-warning-soft: #3a2a12;
   --rb-raised: #262624;
   --rb-focus: #7ab8ff;
   --rb-focus-soft: rgb(77 142 255 / 34%);
+  /* And a dark choice on a phone set to light must not keep light ones. */
+  --shadow-control: 0 1px 0 rgb(0 0 0 / 40%);
+  --shadow-button: 0 1px 0 rgb(0 0 0 / 40%);
+  --shadow-button-hover: 0 1px 0 rgb(0 0 0 / 50%);
+  --shadow-float: 0 -1px 0 rgb(0 0 0 / 50%);
 }
 
 /* These are resets, so they belong in Tailwind's base layer.

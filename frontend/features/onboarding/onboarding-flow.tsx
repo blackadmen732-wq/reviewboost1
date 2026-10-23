@@ -18,6 +18,8 @@ import { TestGoogleLinkButton } from "@/features/dashboard/google-link-care";
 import {
   GOOGLE_LINK_BLAST,
   GOOGLE_LINK_LATER,
+  GOOGLE_LINK_NOT_REVIEW_LINK,
+  googleLinkState,
 } from "@/features/dashboard/google-link-copy";
 import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
 import { isGoogleReviewWritingUrl } from "@/lib/security/google-review-url";
@@ -60,7 +62,8 @@ export function OnboardingFlow({
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState("");
   const [googleUrl, setGoogleUrl] = useState("");
-  const [busy, setBusy] = useState(false);
+  /** Which button started the save, so only that one shows it is working. */
+  const [busy, setBusy] = useState<"link" | "later" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Created | null>(null);
 
@@ -98,7 +101,7 @@ export function OnboardingFlow({
    * way out was a reload that loses what they typed.
    */
   async function finish(withUrl: string | undefined) {
-    setBusy(true);
+    setBusy(withUrl ? "link" : "later");
     setError(null);
 
     try {
@@ -144,7 +147,7 @@ export function OnboardingFlow({
         "Could not reach ReviewBoost. Check your connection and try again.",
       );
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -182,7 +185,6 @@ export function OnboardingFlow({
             className="h-16 text-lg"
             invalid={error !== null && name.trim().length < 2}
           />
-          {urlLooksRight ? <TestGoogleLinkButton url={trimmedUrl} /> : null}
 
           {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
         </div>
@@ -273,16 +275,22 @@ export function OnboardingFlow({
           {/* Confirmation the instant it is right, so nobody submits and waits
               to find out. A green tick here removes real anxiety. */}
           {urlLooksRight ? (
-            <p className="flex items-center gap-2 text-sm font-medium text-brand-text">
-              <Check className="size-4" aria-hidden="true" />
-              That is the right link
-            </p>
+            <>
+              <p className="flex items-center gap-2 text-sm font-medium text-brand-text">
+                <Check className="size-4" aria-hidden="true" />
+                That is the right link
+              </p>
+              {/* Open it before saving it: the one check that proves it is
+                  this business's own review box. */}
+              <TestGoogleLinkButton url={trimmedUrl} />
+            </>
           ) : null}
 
           {trimmedUrl !== "" && !urlLooksRight ? (
             <InlineNotice kind="error">
-              That does not look like a Google link. It should start with g.page
-              or google.com.
+              {googleLinkState(trimmedUrl) === "legacy"
+                ? GOOGLE_LINK_NOT_REVIEW_LINK
+                : "That does not look like a Google link. It should start with g.page or google.com."}
             </InlineNotice>
           ) : null}
 
@@ -293,7 +301,8 @@ export function OnboardingFlow({
           <Button
             variant="action"
             size="lg"
-            loading={busy}
+            loading={busy === "link"}
+            disabled={busy === "later"}
             loadingLabel="Setting up…"
             onClick={() => {
               if (!urlLooksRight) {
@@ -311,7 +320,9 @@ export function OnboardingFlow({
               exactly the person who must not be locked out today. */}
           <Button
             variant="ghost"
-            loading={busy}
+            loading={busy === "later"}
+            disabled={busy === "link"}
+            loadingLabel="Setting up…"
             onClick={() => void finish(undefined)}
           >
             I will do this later

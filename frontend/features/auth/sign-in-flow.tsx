@@ -188,6 +188,9 @@ export function SignInFlow({
         <p className="text-base leading-relaxed text-muted">
           Use your business email. We will send you a code to sign in. No
           password to remember.
+          {/* Sign in and Get started are the same door, and the screen says
+              so: someone new should not wonder whether they need an account. */}
+          {intent === "signin" ? " New here? The same code creates your account." : null}
         </p>
       </div>
 
@@ -230,8 +233,15 @@ export function SignInFlow({
       <p className="text-sm leading-relaxed text-muted">
         By continuing you agree to our{" "}
         <a
+          href="/terms"
+          className="font-medium text-ink underline underline-offset-4 hover:no-underline"
+        >
+          terms
+        </a>{" "}
+        and{" "}
+        <a
           href="/privacy"
-          className="font-medium text-ink underline-offset-4 hover:underline"
+          className="font-medium text-ink underline underline-offset-4 hover:no-underline"
         >
           privacy policy
         </a>

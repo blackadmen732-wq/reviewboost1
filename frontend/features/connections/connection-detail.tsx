@@ -165,7 +165,7 @@ function NotConnected({ provider }: { provider: ProviderView }) {
               <InlineNotice kind="error">{error}</InlineNotice>
             </div>
           ) : null}
-          <Button className="mt-4" loading={busy} loadingLabel="Opening…" onClick={connect} disabled={!workflowId}>
+          <Button variant="action" className="mt-4" loading={busy} loadingLabel="Opening…" onClick={connect} disabled={!workflowId}>
             Connect {provider.displayName}
           </Button>
           <p className="mt-2 text-sm text-muted">Connecting doesn&apos;t text anyone. You&apos;ll choose places and run a check first.</p>
@@ -185,6 +185,7 @@ function NeedsPermission({ provider, connection }: { provider: ProviderView; con
       </InlineNotice>
       {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
       <Button
+        variant="action"
         className="mt-4"
         loading={busy}
         onClick={async () => {
@@ -352,6 +353,7 @@ function Setup({ provider, connection, mappings, places }: ConnectionDetailProps
           customer&apos;s agreement.
         </p>
         <Button
+          variant="action"
           className="mt-3"
           loading={busy === "activate"}
           disabled={!tested || busy !== null}
@@ -389,6 +391,7 @@ function Connected({ provider, connection, mappings, runs, issues }: ConnectionD
             Access ended, so nothing new is coming in. Your customers and history are kept.
           </InlineNotice>
           <Button
+            variant="action"
             className="mt-4"
             loading={busy}
             onClick={async () => {

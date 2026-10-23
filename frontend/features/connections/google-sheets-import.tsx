@@ -162,7 +162,7 @@ export function GoogleSheetsImport({ source, provider, google, lists }: GoogleSh
           ) : null}
           {ready && source === "google_sheets" ? (
             <>
-              <Button className="mt-4" loading={step.kind === "opening"} loadingLabel="Opening Google…" onClick={choose}>
+              <Button variant="action" className="mt-4" loading={step.kind === "opening"} loadingLabel="Opening Google…" onClick={choose}>
                 Choose a Google Sheet
               </Button>
               <p className="mt-2 text-sm text-muted">
@@ -185,7 +185,7 @@ export function GoogleSheetsImport({ source, provider, google, lists }: GoogleSh
                   if (file) void openFile(file);
                 }}
               />
-              <Button className="mt-4" loading={step.kind === "opening"} loadingLabel="Reading the file…" onClick={choose}>
+              <Button variant="action" className="mt-4" loading={step.kind === "opening"} loadingLabel="Reading the file…" onClick={choose}>
                 Choose a CSV file
               </Button>
               <p className="mt-2 text-sm text-muted">
@@ -407,7 +407,7 @@ function Review({
         </div>
       ) : null}
 
-      <Button className="mt-4" onClick={save} disabled={tooMany || withPhone === 0 || choice.phone === null || tabBusy}>
+      <Button variant="action" className="mt-4" onClick={save} disabled={tooMany || withPhone === 0 || choice.phone === null || tabBusy}>
         Add these people
       </Button>
     </section>

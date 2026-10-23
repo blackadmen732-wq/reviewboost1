@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { CustomerPicker, type PickerCustomer } from "@/features/dashboard/customer-picker";
 import { notify } from "@/components/ui/toast";
 import {
@@ -21,7 +23,14 @@ import {
   type ConsentMethod,
   type TextRequestTemplateId,
 } from "@/lib/sms/text-request-templates";
-import { ownerFetch } from "@/lib/api/owner-fetch";
+import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
+
+/** A failed fetch says "Failed to fetch" or "Load failed"; an owner gets this. */
+function reachError(caught: unknown): string {
+  return caught instanceof SessionExpiredError
+    ? caught.message
+    : "Could not reach ReviewBoost. Check your connection and try again.";
+}
 
 interface Balance {
   monthly: number;
@@ -112,6 +121,8 @@ export function TextRequestComposer({
   const [busy, setBusy] = useState(false);
   const [sendUncertain, setSendUncertain] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** What is missing before a preview can be asked for, said on the tap. */
+  const [missing, setMissing] = useState<string | null>(null);
 
   async function authorizedFetch(
     path: string,
@@ -166,9 +177,7 @@ export function TextRequestComposer({
       setConsentMethod("");
       setConsentConfirmed(false);
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Something went wrong.",
-      );
+      setError(reachError(caught));
     } finally {
       setBusy(false);
     }
@@ -196,10 +205,10 @@ export function TextRequestComposer({
       notify.success("Queued", "We will send it and show the result here.");
       router.refresh();
     } catch (caught) {
+      // The notice above says what to do; the cause is only worth naming when
+      // it is the session.
       setSendUncertain(true);
-      setError(
-        caught instanceof Error ? caught.message : "Something went wrong.",
-      );
+      setError(caught instanceof SessionExpiredError ? caught.message : null);
     } finally {
       setBusy(false);
     }
@@ -233,9 +242,7 @@ export function TextRequestComposer({
       );
       notify.success("Saved", "Their agreement is recorded.");
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Something went wrong.",
-      );
+      setError(reachError(caught));
     } finally {
       setBusy(false);
     }
@@ -247,6 +254,7 @@ export function TextRequestComposer({
     setPreview(null);
     setConsentMethod("");
     setConsentConfirmed(false);
+    setMissing(null);
   }
 
   const canSend =
@@ -315,9 +323,9 @@ export function TextRequestComposer({
             <p>Create a Tag first — the message carries its link.</p>
             <Link
               href="/stands"
-              className="mt-2 inline-block text-brand-text underline"
+              className="mt-2 inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4"
             >
-              Go to Tags
+              Go to Set up
             </Link>
           </InlineNotice>
         ) : (
@@ -338,10 +346,9 @@ export function TextRequestComposer({
                 }}
               />
             ) : (
-              <label className="flex flex-col gap-1 text-sm font-medium text-muted">
+              <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
                 Customer&apos;s mobile number
-                <input
-                  className="min-h-14 rounded-[var(--radius-control)] border border-border bg-canvas px-4 text-base text-ink"
+                <Input
                   type="tel"
                   inputMode="tel"
                   autoComplete="off"
@@ -372,10 +379,9 @@ export function TextRequestComposer({
               </button>
             ) : null}
 
-            <label className="flex flex-col gap-1 text-sm font-medium text-muted">
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
               Which Tag
-              <select
-                className="min-h-14 rounded-[var(--radius-control)] border border-border bg-canvas px-4 text-base text-ink"
+              <NativeSelect
                 disabled={busy}
                 value={standId}
                 onChange={(event) => {
@@ -390,17 +396,17 @@ export function TextRequestComposer({
                       : tag.label}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
 
             <fieldset disabled={busy} className="flex flex-col gap-2">
-              <legend className="mb-1 text-sm font-medium text-muted">
+              <legend className="mb-1 text-sm font-medium text-ink">
                 Message
               </legend>
               {TEXT_REQUEST_TEMPLATE_IDS.map((id) => (
                 <label
                   key={id}
-                  className="flex min-h-14 cursor-pointer items-start gap-3 rounded-[var(--radius-control)] border border-border bg-canvas p-4 text-base text-ink"
+                  className="flex min-h-14 cursor-pointer items-start gap-3 rounded-[var(--radius-control)] border border-border bg-surface p-4 text-base text-ink transition-colors hover:border-[color:var(--rb-border-strong)] has-[:checked]:border-[color:var(--rb-ink)] has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[color:var(--rb-focus-soft)]"
                 >
                   <input
                     type="radio"
@@ -442,9 +448,9 @@ export function TextRequestComposer({
                   {preview.body}
                 </p>
                 <p className="text-sm text-muted">
-                  Uses {preview.segments}{" "}
-                  {preview.segments === 1 ? "credit" : "credits"}. Your balance
-                  is {balance.total}.
+                  Counts as {preview.segments}{" "}
+                  {preview.segments === 1 ? "text" : "texts"}. You have{" "}
+                  {balance.total.toLocaleString()} left.
                 </p>
               </section>
             ) : null}
@@ -529,35 +535,64 @@ export function TextRequestComposer({
 
             {preview && balance.total < preview.segments ? (
               <InlineNotice kind="info">
-                <p>You need more credits to send this request.</p>
+                <p>
+                  This needs {preview.segments}{" "}
+                  {preview.segments === 1 ? "text" : "texts"} and you have{" "}
+                  {balance.total.toLocaleString()} left.
+                </p>
                 <Link
                   href="/settings/billing"
-                  className="mt-2 inline-block text-brand-text underline"
+                  className="mt-2 inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4"
                 >
-                  View billing and credits
+                  View billing and texts
                 </Link>
               </InlineNotice>
             ) : null}
 
-            <div className="flex flex-wrap gap-3">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => void runPreview()}
-                disabled={busy || !hasRecipient || standId === ""}
-              >
-                Preview text request
-              </Button>
-              <Button
-                type="button"
-                variant="action"
-                onClick={() => void send()}
-                loading={busy}
-                loadingLabel="Sending…"
-                disabled={!canSend}
-              >
-                Send text request
-              </Button>
+            {/* One button, and it is the next step: Preview until the server
+                has shown the exact text, then Send once that number may be
+                texted. A Send that cannot be pressed is not drawn: the reason
+                it cannot is already on the screen. */}
+            <div className="flex flex-col gap-2">
+              {preview === null ? (
+                <Button
+                  type="button"
+                  variant="action"
+                  className="sm:w-auto"
+                  onClick={() => {
+                    if (!hasRecipient) {
+                      setMissing(
+                        mode === "customer"
+                          ? "Choose a customer first."
+                          : "Type the customer’s mobile number first.",
+                      );
+                      return;
+                    }
+                    setMissing(null);
+                    void runPreview();
+                  }}
+                  loading={busy}
+                  loadingLabel="Getting the exact text…"
+                >
+                  Preview text request
+                </Button>
+              ) : canSend ? (
+                <Button
+                  type="button"
+                  variant="action"
+                  className="sm:w-auto"
+                  onClick={() => void send()}
+                  loading={busy}
+                  loadingLabel="Sending…"
+                >
+                  Send text request
+                </Button>
+              ) : null}
+              {missing ? (
+                <p role="alert" className="text-sm font-medium text-danger" data-composer-missing>
+                  {missing}
+                </p>
+              ) : null}
             </div>
           </>
         )}
@@ -601,7 +636,7 @@ const STATUS: Record<
   provider_unknown: { label: "Delivery unknown", tone: "wait" },
   delivered: { label: "Delivered", tone: "ok" },
   failed: { label: "Not delivered", tone: "bad" },
-  suppressed: { label: "Not sent — number opted out or blocked", tone: "off" },
+  suppressed: { label: "Not sent · opted out or blocked", tone: "off" },
   cancelled: { label: "Cancelled", tone: "off" },
 };
 
@@ -661,16 +696,20 @@ function RecentList({ recent }: { recent: readonly RecentRequest[] }) {
                   isNew(item) && "animate-row-in",
                 )}
               >
-                <span className="text-base tabular-nums text-ink">
-                  ••• {item.recipientLastFour ?? "????"}
-                </span>
-                <span className="text-sm text-muted">
-                  {relativeDay(item.createdAt)}
+                {/* Number over time, status on the right: three columns
+                    broke "••• 2210" across two lines at phone width. */}
+                <span className="min-w-0 flex-1">
+                  <span className="block whitespace-nowrap text-base tabular-nums text-ink">
+                    ••• {item.recipientLastFour ?? "????"}
+                  </span>
+                  <span className="block text-sm text-muted">
+                    {relativeDay(item.createdAt)}
+                  </span>
                 </span>
                 <span
                   key={item.status}
                   className={cn(
-                    "ml-auto inline-flex items-center gap-1.5 text-sm",
+                    "inline-flex shrink-0 items-center gap-1.5 text-right text-sm",
                     statusMoved(item) && "animate-fade-in",
                     status.tone === "bad"
                       ? "font-medium text-danger"

@@ -160,20 +160,23 @@ it("records consent separately and never includes it in the send request", async
   );
   const phone = screen.getByLabelText("Customer's mobile number");
   fireEvent.change(phone, { target: { value: "+15555550123" } });
-  const send = screen.getByRole("button", { name: "Send text request" });
-  expect(send).toBeDisabled();
+  // There is no Send to press until the server has shown the exact text and
+  // said this number may be texted: not a disabled one, none at all.
+  const sendButton = () => screen.queryByRole("button", { name: "Send text request" });
+  expect(sendButton()).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Preview text request" }));
   await screen.findByRole("heading", {
     name: "Did this customer agree to a text?",
   });
-  expect(send).toBeDisabled();
+  expect(sendButton()).toBeNull();
   fireEvent.click(screen.getByRole("radio", { name: /in person/i }));
   fireEvent.click(
     screen.getByRole("checkbox", { name: /this customer agreed/i }),
   );
-  expect(send).toBeDisabled();
+  expect(sendButton()).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Save their agreement" }));
-  await waitFor(() => expect(send).toBeEnabled());
+  const send = await screen.findByRole("button", { name: "Send text request" });
+  expect(send).toBeEnabled();
   const consentCall = fetcher.mock.calls.find(([url]) =>
     url.endsWith("/consent"),
   );
@@ -190,5 +193,5 @@ it("records consent separately and never includes it in the send request", async
     templateId: "thanks_v1",
   });
   await waitFor(() => expect(phone).toHaveValue(""));
-  expect(send).toBeDisabled();
+  expect(sendButton()).toBeNull();
 });
