@@ -7,7 +7,7 @@ import { requireOwner } from "@/lib/server/owner-data";
 import { cn } from "@/lib/utils/cn";
 
 export const metadata: Metadata = {
-  title: "Test provider — ReviewBoost",
+  title: "Test provider",
   robots: { index: false, follow: false },
 };
 

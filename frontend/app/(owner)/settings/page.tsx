@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import {
+  ChevronRight,
   CreditCard,
   Eye,
   ImageUp,
@@ -8,19 +9,23 @@ import {
   Plug,
   Shield,
   Trash2,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { PageHeader } from "@/components/ui/page-header";
-import { AppShell } from "@/features/dashboard/app-shell";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
+import { GOOGLE_LINK_BLAST } from "@/features/dashboard/google-link-copy";
 import { GoogleLinkCare } from "@/features/dashboard/google-link-care";
-import { EditableRow } from "@/features/dashboard/settings-form";
+import { EditableRow, GoogleLinkHelp } from "@/features/dashboard/settings-form";
 import { SignOutButton } from "@/features/dashboard/sign-out-button";
 import { AddLocationButton } from "@/features/settings/add-location-button";
 import { ThemeControl } from "@/features/settings/theme-control";
 import { ownerOrAdmin, permissionsFor } from "@/lib/owner/permissions";
 import { getEntitlementSnapshot } from "@/lib/server/entitlements-service";
 import {
+  getUnreadCount,
   listLocations,
   listUserOrganizations,
   requireOwner,
@@ -63,294 +68,232 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const { user, organization } = await requireOwner("/settings");
   const supabase = await supabaseServer();
-  const [locations, entitlements, organizations] = await Promise.all([
+  const [locations, entitlements, organizations, unread] = await Promise.all([
     listLocations(organization.orgId),
     getEntitlementSnapshot(
       { userId: user.id, db: supabase },
       organization.orgId,
     ),
     listUserOrganizations(),
+    getUnreadCount(organization.orgId),
   ]);
   const can = permissionsFor(organization.role);
   const readOnly = !can.editSettings;
   const several = locations.length > 1;
 
+  const ownerOrAdminRole = organization.role === "owner" || organization.role === "admin";
+
   return (
-    <AppShell businessName={organization.name}>
+    <OwnerShell unreadCount={unread} businessName={organization.name}>
       <PageHeader title="Settings" />
 
-      <section className="mb-6 flex flex-col gap-3">
-        <EditableRow
-          field="businessName"
-          label="Business"
-          value={organization.name}
-          placeholder="The Corner Cafe"
-          readOnly={readOnly}
-        />
+      <div className="flex max-w-[40rem] flex-col gap-10">
+        <Section title="Business">
+          <EditableRow
+            field="businessName"
+            label="Name"
+            value={organization.name}
+            placeholder="The Corner Cafe"
+            readOnly={readOnly}
+          />
+          {readOnly ? (
+            <p className="text-sm text-muted">{ownerOrAdmin("change these settings")}</p>
+          ) : null}
+          {organizations.length > 1 ? (
+            <Link
+              href="/select-org"
+              className="inline-flex min-h-11 items-center self-start text-sm font-medium text-ink underline underline-offset-4 hover:no-underline"
+            >
+              Switch business
+            </Link>
+          ) : null}
+        </Section>
 
-        {readOnly ? (
-          <p className="text-sm text-muted">
-            {ownerOrAdmin("change these settings")}
-          </p>
-        ) : null}
-      </section>
+        <Section title={several ? "Places" : "Place"}>
+          {locations.map((location, index) => (
+            <div
+              key={location.locationId}
+              className={
+                several && index > 0
+                  ? "flex flex-col gap-3 border-t border-border pt-6"
+                  : "flex flex-col gap-3"
+              }
+              data-location-id={location.locationId}
+            >
+              <EditableRow
+                field="locationName"
+                label={several ? "Place name" : "Name"}
+                value={location.name}
+                placeholder="High Street"
+                context={{ locationId: location.locationId }}
+                readOnly={readOnly}
+              />
+              {/* The Google link gets its own care UX — paste, Test, Open, Save —
+                  because this is the one field whose silent mistake sends every
+                  customer from that place's Tags to the wrong page. Changing it
+                  takes effect on the next scan; printed codes and NFC tags are
+                  untouched. */}
+              <GoogleLinkCare
+                value={location.destination?.url ?? null}
+                locationId={location.locationId}
+                readOnly={readOnly}
+              />
+            </div>
+          ))}
 
-      <section
-        className="mb-6 flex flex-col gap-3"
-        aria-labelledby="places-heading"
-      >
-        <h2 id="places-heading" className="text-base font-semibold text-ink">
-          {several ? "Places" : "Place"}
-        </h2>
-
-        {locations.map((location, index) => (
-          <div
-            key={location.locationId}
-            className={
-              several && index > 0
-                ? "mt-3 flex flex-col gap-3 border-t border-border pt-6"
-                : "flex flex-col gap-3"
-            }
-            data-location-id={location.locationId}
-          >
-            <EditableRow
-              field="locationName"
-              label={several ? "Place name" : "Place"}
-              value={location.name}
-              placeholder="High Street"
-              context={{ locationId: location.locationId }}
-              readOnly={readOnly}
-            />
-            {/* The Google link gets its own care UX — paste, Test, Open, Save —
-                because this is the one field whose silent mistake sends every
-                customer from that place's Tags to the wrong page. Changing it
-                takes effect on the next scan; printed codes and NFC tags are
-                untouched. */}
-            <GoogleLinkCare
-              value={location.destination?.url ?? null}
-              locationId={location.locationId}
-              readOnly={readOnly}
-            />
+          {/* Said once for every place, not repeated under each one. */}
+          <div>
+            <p className="max-w-[46ch] text-sm leading-relaxed text-muted">{GOOGLE_LINK_BLAST}</p>
+            <GoogleLinkHelp />
           </div>
-        ))}
 
-        {can.editSettings && entitlements.canCreateLocation ? (
-          <AddLocationButton />
-        ) : can.editSettings && locations.length > 0 ? (
-          <p className="text-sm text-muted">
-            Your plan includes {entitlements.locationLimit}{" "}
-            {entitlements.locationLimit === 1 ? "place" : "places"}.
-          </p>
-        ) : null}
-      </section>
-
-      {/* The Customer Page is reached from here and from Home's setup list —
-          not from the bottom bar, which stays the four things an owner does
-          every day. Everyone can open it; the editor itself tells a member or
-          viewer that only an owner or admin can change it. */}
-      <section
-        className="mb-6 flex flex-col gap-3"
-        aria-labelledby="customer-page-heading"
-      >
-        <h2
-          id="customer-page-heading"
-          className="text-base font-semibold text-ink"
-        >
-          Customer page
-        </h2>
-        <Link
-          href="/customer-page"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <ImageUp className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Your photo</p>
+          {can.editSettings && entitlements.canCreateLocation ? (
+            <AddLocationButton />
+          ) : can.editSettings && locations.length > 0 ? (
             <p className="text-sm text-muted">
-              What customers see when they scan a Tag.
+              Your plan includes {entitlements.locationLimit}{" "}
+              {entitlements.locationLimit === 1 ? "place" : "places"}.
             </p>
-          </div>
-        </Link>
-      </section>
+          ) : null}
+        </Section>
 
-      {/* Owners and admins only: connecting an app reads customer data. Not a
-          nav destination; it is set up once and then left alone. */}
-      {organization.role === "owner" || organization.role === "admin" ? (
-        <section className="mb-6 flex flex-col gap-3">
-          <h2 className="text-base font-semibold text-ink">Apps</h2>
-          <Link
-            href="/settings/connections"
-            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-          >
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-              <Plug className="size-5 text-muted" aria-hidden="true" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-medium text-ink">Connections</p>
+        {/* The Customer Page is reached from here, Set up and Home's setup list
+            — not from the bottom bar, which stays the four things an owner does
+            every day. Connections is owners and admins only: connecting an app
+            reads customer data. */}
+        <Section title="Your page, apps and plan">
+          <RowList>
+            <Row href="/customer-page" icon={ImageUp} title="Customer page" detail="Your photo, and what customers see when they scan a Tag." />
+            {ownerOrAdminRole ? (
+              <Row href="/settings/connections" icon={Plug} title="Connections" detail="Bring in customers from the apps you already use." />
+            ) : null}
+            <Row href="/settings/billing" icon={CreditCard} title="Billing" detail="Your plan, texts left, and payment." />
+          </RowList>
+        </Section>
+
+        <Section title="Appearance">
+          <div className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-base font-medium text-ink">Theme</p>
               <p className="text-sm text-muted">
-                Bring in customers from the apps you already use.
+                System follows this device. Your choice is kept on this device only.
               </p>
             </div>
-          </Link>
-        </section>
-      ) : null}
-
-      <section className="mb-6 flex flex-col gap-3">
-        <h2 className="text-base font-semibold text-ink">Plan</h2>
-        <Link
-          href="/settings/billing"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <CreditCard className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Billing</p>
-            <p className="text-sm text-muted">
-              Your plan, messages left, and payment.
-            </p>
+            <ThemeControl />
           </div>
-        </Link>
-      </section>
+        </Section>
 
-      <section
-        className="mb-6 flex flex-col gap-3"
-        aria-labelledby="appearance-heading"
-      >
-        <h2
-          id="appearance-heading"
-          className="text-base font-semibold text-ink"
-        >
-          Appearance
-        </h2>
-        <div className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-base font-medium text-ink">Theme</p>
-            <p className="text-sm text-muted">
-              System follows this device. Your choice is kept on this device
-              only.
-            </p>
+        {/* A real person to contact, and a plain answer about customer data. A
+            barber deciding whether to put our code on their counter wants to
+            know who is behind it. Seeing exactly what a customer sees is what
+            makes an owner comfortable putting the Tag out at all. */}
+        <Section title="Help">
+          <RowList>
+            <Row href="mailto:help@reviewboost.fit" icon={LifeBuoy} title="Ask us anything" detail="Questions about Tags, billing or your Google link." external />
+            <Row href="/stands" icon={Eye} title="See what customers see" detail="Scan your own code to try it." />
+            <Row href="/privacy" icon={Shield} title="Privacy policy" detail="What we collect and how to delete your account." />
+          </RowList>
+        </Section>
+
+        <Section title="Account">
+          {/* Not editable. Changing the sign-in address is an account-recovery
+              operation, not a setting — done carelessly it locks someone out of
+              their own business with no way back in. */}
+          <div className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+              <Mail className="size-5 text-muted" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-muted">Signed in as</p>
+              <p className="break-words text-base font-medium text-ink">{user.email ?? "—"}</p>
+            </div>
           </div>
-          <ThemeControl />
-        </div>
-      </section>
+          <SignOutButton />
+          {/* The deletion screen does the deletion; an app that creates
+              accounts lets someone close one from inside it. Everyone gets the
+              way out: only an owner can delete the business, and anyone else
+              is taken to deleting their own sign-in. No timeframe is promised:
+              a deletion promise is the worst place to be approximately right. */}
+          <RowList>
+            {can.deleteBusiness ? (
+              <Row href="/settings/delete" icon={Trash2} title="Delete this business" detail="Removes the business, its Tags and ratings. Cancelling is the way to stop billing without losing anything." danger />
+            ) : (
+              <Row href="/settings/delete-my-account" icon={Trash2} title="Delete my account" detail={`Removes your sign-in. ${organization.name} and its ratings stay.`} danger />
+            )}
+          </RowList>
+        </Section>
+      </div>
+    </OwnerShell>
+  );
+}
 
-      <section className="mb-6 flex flex-col gap-3">
-        <h2 className="text-base font-semibold text-ink">Signed-in account</h2>
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  const id = `settings-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
+  return (
+    <section aria-labelledby={id} className="flex flex-col gap-3">
+      <h2 id={id} className="text-base font-semibold text-ink">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
 
-        {/* Not editable. Changing the sign-in address is an account-recovery
-            operation, not a setting — done carelessly it locks someone out of
-            their own business with no way back in. */}
-        <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <Mail className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-muted">Signed in as</p>
-            <p className="break-words text-base font-medium text-ink">
-              {user.email ?? "—"}
-            </p>
-          </div>
-        </div>
-      </section>
+/**
+ * Related links as one list, the way a phone's own Settings groups them: one
+ * outline, rows divided by hairlines, a chevron on each. Seven separate cards
+ * under seven headings made a two-place business scroll for three screens.
+ */
+function RowList({ children }: { children: ReactNode }) {
+  return (
+    <ul className="divide-y divide-border overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">
+      {children}
+    </ul>
+  );
+}
 
-      {/* A real person to contact, and a plain answer about customer data. A
-          barber deciding whether to put our code on their counter wants to know
-          who is behind it — a faceless product is one they will not recommend to
-          the shop next door. */}
-      <section className="mb-6 flex flex-col gap-3">
-        <h2 className="text-base font-semibold text-ink">Help</h2>
-
-        <a
-          href="mailto:help@reviewboost.fit"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft">
-            <LifeBuoy className="size-5 text-brand-text" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Ask us anything</p>
-            <p className="text-sm text-muted">
-              Questions about Tags, billing or your Google link.
-            </p>
-          </div>
+function Row({
+  href,
+  icon: Icon,
+  title,
+  detail,
+  external = false,
+  danger = false,
+}: {
+  href: string;
+  icon: LucideIcon;
+  title: string;
+  detail: string;
+  external?: boolean;
+  danger?: boolean;
+}) {
+  const body = (
+    <>
+      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
+        <Icon className={danger ? "size-5 text-danger" : "size-5 text-muted"} aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={danger ? "block text-base font-medium text-danger" : "block text-base font-medium text-ink"}>
+          {title}
+        </span>
+        <span className="block text-sm text-muted">{detail}</span>
+      </span>
+      <ChevronRight className="size-5 shrink-0 text-[color:var(--rb-border-strong)]" aria-hidden="true" />
+    </>
+  );
+  const className =
+    "flex min-h-16 items-center gap-4 px-4 py-3 transition-colors duration-150 hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[color:var(--rb-focus-soft)]";
+  return (
+    <li>
+      {external ? (
+        <a href={href} className={className}>
+          {body}
         </a>
-
-        {/* Seeing exactly what a customer sees is the single thing that makes an
-            owner comfortable putting this on their counter. */}
-        <Link
-          href="/stands"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <Eye className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">
-              See what customers see
-            </p>
-            <p className="text-sm text-muted">Scan your own code to try it.</p>
-          </div>
+      ) : (
+        <Link href={href} className={className}>
+          {body}
         </Link>
-
-        <Link
-          href="/privacy"
-          className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-            <Shield className="size-5 text-muted" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-ink">Privacy policy</p>
-            <p className="text-sm text-muted">
-              What we collect and how to delete your account.
-            </p>
-          </div>
-        </Link>
-      </section>
-
-      <section className="mb-6 flex flex-col gap-3">
-        <h2 className="text-base font-semibold text-ink">Account actions</h2>
-
-        {/* Goes to the deletion screen, which does the deletion. It used to
-            open a mail client: a person had to ask us and then wait to be
-            believed, and an app that creates accounts has to let someone close
-            one from inside it. /delete-account stays for anyone already locked
-            out, and for the store listings that need a public URL. */}
-        {can.deleteBusiness ? (
-          <Link
-            href="/settings/delete"
-            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-          >
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-quiet">
-              <Trash2 className="size-5 text-muted" aria-hidden="true" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-medium text-ink">
-                Delete this business
-              </p>
-              {/* No timeframe. "within 30 days" was a retention commitment nobody
-                  had agreed to operationally, and a deletion promise is the worst
-                  place to be approximately right. */}
-              <p className="text-sm text-muted">
-                Removes this business, its Tags and ratings. Cancelling is the
-                way to stop billing without losing anything.
-              </p>
-            </div>
-          </Link>
-        ) : null}
-      </section>
-
-      {organizations.length > 1 ? (
-        <Link
-          href="/select-org"
-          className="mb-4 inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline underline-offset-4"
-        >
-          Switch business
-        </Link>
-      ) : null}
-      <SignOutButton />
-    </AppShell>
+      )}
+    </li>
   );
 }

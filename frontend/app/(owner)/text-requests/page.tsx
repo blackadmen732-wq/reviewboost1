@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/ui/page-header";
-import { AppShell } from "@/features/dashboard/app-shell";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { TextRequestComposer } from "@/features/dashboard/text-request-composer";
 import { permissionsFor } from "@/lib/owner/permissions";
 import { listStands, requireOwner } from "@/lib/server/owner-data";
 import { listTextableCustomers, type TextableCustomer } from "@/lib/server/customers/textable";
 import { logger } from "@/lib/server/logger";
 import { supabaseServer } from "@/lib/supabase/server";
-import { readSmsBalance, listRecentTextRequests } from "@/lib/server/owner-data";
+import { getUnreadCount, readSmsBalance, listRecentTextRequests } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
   title: "Text Requests",
@@ -31,10 +31,11 @@ export const dynamic = "force-dynamic";
 export default async function TextRequestsPage() {
   const { organization } = await requireOwner("/text-requests");
 
-  const [balance, stands, recent] = await Promise.all([
+  const [balance, stands, recent, unread] = await Promise.all([
     readSmsBalance(organization.orgId),
     listStands(organization.orgId),
     listRecentTextRequests(organization.orgId),
+    getUnreadCount(organization.orgId),
   ]);
 
   const sendable = stands.filter((stand) => stand.status === "active");
@@ -53,7 +54,7 @@ export default async function TextRequestsPage() {
   }
 
   return (
-    <AppShell businessName={organization.name}>
+    <OwnerShell unreadCount={unread} businessName={organization.name}>
       <PageHeader
         title="Text Requests"
         description="Send a customer the link to your Tag. One message, one review request."
@@ -70,6 +71,6 @@ export default async function TextRequestsPage() {
         canSendRequests={permissionsFor(organization.role).sendTextRequests}
         customers={customers}
       />
-    </AppShell>
+    </OwnerShell>
   );
 }

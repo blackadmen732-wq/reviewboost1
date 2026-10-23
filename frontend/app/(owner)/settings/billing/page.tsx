@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 
-import { AppShell } from "@/features/dashboard/app-shell";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { BillingPanel } from "@/features/dashboard/billing-panel";
 import { billingForPlan, parsePlanChoice } from "@/lib/owner/plan-choice";
 import { permissionsFor } from "@/lib/owner/permissions";
-import { readOwnerBilling, requireOwner } from "@/lib/server/owner-data";
+import { BackLink } from "@/components/ui/back-link";
+import { getUnreadCount, readOwnerBilling, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
   title: "Billing",
@@ -28,13 +29,17 @@ export default async function BillingPage({
 }) {
   const selectedPlan = parsePlanChoice((await searchParams).plan);
   const { organization } = await requireOwner(billingForPlan(selectedPlan));
-  const billing = await readOwnerBilling(organization.orgId);
+  const [billing, unread] = await Promise.all([
+    readOwnerBilling(organization.orgId),
+    getUnreadCount(organization.orgId),
+  ]);
 
   return (
-    <AppShell businessName={organization.name}>
+    <OwnerShell unreadCount={unread} businessName={organization.name}>
+      <BackLink href="/settings">Settings</BackLink>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">
-          Billing &amp; Usage
+          Billing
         </h1>
         <p className="mt-1 text-base text-muted">
           Your plan, what it includes, and what you are using.
@@ -46,6 +51,6 @@ export default async function BillingPage({
         billing={billing}
         canManage={permissionsFor(organization.role).manageBilling}
       />
-    </AppShell>
+    </OwnerShell>
   );
 }

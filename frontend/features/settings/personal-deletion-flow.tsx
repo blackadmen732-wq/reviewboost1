@@ -181,7 +181,7 @@ export function PersonalDeletionFlow() {
           nobody to run or close {check.names.length === 1 ? "it" : "them"}. Delete the
           business first. When it was your last one, your account is deleted with it.
         </InlineNotice>
-        <Button asChild>
+        <Button variant="secondary" className="text-danger" asChild>
           <Link href="/settings/delete">Delete my business</Link>
         </Button>
         <Button variant="secondary" asChild>

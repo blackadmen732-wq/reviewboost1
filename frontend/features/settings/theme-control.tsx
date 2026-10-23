@@ -88,11 +88,13 @@ export function ThemeControl() {
             aria-checked={selected}
             onClick={() => applyChoice(option.value)}
             className={cn(
-              "min-h-10 min-w-[4.5rem] rounded-[9px] px-4 text-sm font-medium transition-[background-color,color,box-shadow] duration-150",
+              "min-h-11 min-w-[4.5rem] rounded-[9px] px-4 text-sm transition-[background-color,color,box-shadow] duration-150",
               "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
+              // Selected is a raised white segment in ink, like the phone's own
+              // control. Green means "good" here and nothing else.
               selected
-                ? "bg-brand-soft text-brand-text shadow-[var(--shadow-control)]"
-                : "text-muted hover:text-ink",
+                ? "bg-surface font-semibold text-ink shadow-[var(--shadow-control)]"
+                : "font-medium text-muted hover:text-ink",
             )}
           >
             {option.label}

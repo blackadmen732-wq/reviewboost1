@@ -35,6 +35,7 @@ export default function OwnerNotFound() {
   return (
     <OwnerShell>
       <EmptyState
+        headingLevel="h1"
         title="We could not find that"
         description="It may have been removed, or the link might be out of date."
         action={

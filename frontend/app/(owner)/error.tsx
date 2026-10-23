@@ -11,6 +11,7 @@ export default function OwnerError({ reset }: { reset: () => void }) {
   return (
     <OwnerShell>
       <EmptyState
+        headingLevel="h1"
         title="That did not work"
         description="Try again. If it keeps happening, wait a moment and come back."
         action={

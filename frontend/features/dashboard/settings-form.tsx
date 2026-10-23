@@ -244,7 +244,7 @@ export function GoogleLinkHelp() {
       href="https://support.google.com/business/answer/7035772"
       target="_blank"
       rel="noreferrer noopener"
-      className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-brand-text underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+      className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-text underline underline-offset-4 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
     >
       Where do I find this?
       <ExternalLink className="size-3.5" aria-hidden="true" />

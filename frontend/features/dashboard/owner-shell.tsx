@@ -16,10 +16,11 @@ import { PageTransition } from "@/features/dashboard/page-transition";
  */
 export function OwnerShell({
   children,
-  unreadCount = 0,
+  unreadCount,
   businessName,
 }: {
   children: ReactNode;
+  /** The Feedback badge. Absent on loading and error screens: the nav keeps the last one. */
   unreadCount?: number | undefined;
   businessName?: string | undefined;
 }) {
@@ -57,6 +58,3 @@ export function OwnerShell({
     </div>
   );
 }
-
-/** @deprecated Use OwnerShell. Kept so existing owner routes compile. */
-export const AppShell = OwnerShell;

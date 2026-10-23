@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AppShell } from "@/features/dashboard/app-shell";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 
 /**
  * Settings while the business and its Google link load. The title is real;
@@ -9,9 +9,9 @@ import { AppShell } from "@/features/dashboard/app-shell";
  */
 export default function SettingsLoading() {
   return (
-    <AppShell>
+    <OwnerShell>
       <PageHeader title="Settings" />
-      <div className="flex max-w-[36rem] flex-col gap-10" aria-busy="true" aria-label="Loading Settings">
+      <div className="flex max-w-[36rem] flex-col gap-10" role="status" aria-busy="true" aria-label="Loading Settings">
         {[0, 1, 2].map((section) => (
           <section key={section}>
             <Skeleton className="h-5 w-40" />
@@ -20,6 +20,6 @@ export default function SettingsLoading() {
           </section>
         ))}
       </div>
-    </AppShell>
+    </OwnerShell>
   );
 }

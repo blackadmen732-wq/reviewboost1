@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { AppShell } from "@/features/dashboard/app-shell";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { ConnectionsDirectory } from "@/features/connections/connections-directory";
 import { listCustomerLists } from "@/lib/server/customers/list-import";
 import { listConnections, providerDirectory } from "@/lib/server/integrations/connection-service";
 import { providerLogo } from "@/lib/server/integrations/logos";
 import { CATEGORY_LABELS } from "@/lib/server/integrations/registry";
-import { requireOwner } from "@/lib/server/owner-data";
+import { BackLink } from "@/components/ui/back-link";
+import { getUnreadCount, requireOwner } from "@/lib/server/owner-data";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Connections — ReviewBoost",
+  title: "Connections",
   robots: { index: false, follow: false },
 };
 
@@ -30,10 +31,11 @@ export default async function ConnectionsPage() {
 
   const requestId = "page:/settings/connections";
   const db = await supabaseServer();
-  const [connections, sheetLists, csvLists] = await Promise.all([
+  const [connections, sheetLists, csvLists, unread] = await Promise.all([
     listConnections(db, organization.orgId, requestId),
     listCustomerLists(db, organization.orgId, requestId, "google_sheets"),
     listCustomerLists(db, organization.orgId, requestId, "csv"),
+    getUnreadCount(organization.orgId),
   ]);
   const stateByProvider = new Map<string, string>(connections.map((connection) => [connection.providerId, connection.state]));
   if (sheetLists.length > 0) stateByProvider.set("google_sheets", "list_added");
@@ -45,7 +47,8 @@ export default async function ConnectionsPage() {
   }));
 
   return (
-    <AppShell businessName={organization.name}>
+    <OwnerShell unreadCount={unread} businessName={organization.name}>
+      <BackLink href="/settings">Settings</BackLink>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Connections</h1>
         <p className="mt-1 text-base text-muted">
@@ -54,6 +57,6 @@ export default async function ConnectionsPage() {
       </div>
 
       <ConnectionsDirectory providers={providers} categoryLabels={CATEGORY_LABELS} />
-    </AppShell>
+    </OwnerShell>
   );
 }

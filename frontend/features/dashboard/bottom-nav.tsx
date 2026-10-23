@@ -4,14 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { MOBILE_NAV, isActive, mobileLabelOf } from "@/features/dashboard/nav-items";
+import { badgeCount } from "@/features/dashboard/unread-memory";
 import { cn } from "@/lib/utils/cn";
 
 /**
  * Phone tabs. Four items, never five, each label on one line:
  * Home · Feedback · Texts · Tags.
  */
-export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
+export function BottomNav({ unreadCount }: { unreadCount?: number | undefined }) {
   const pathname = usePathname();
+  const unread = badgeCount(unreadCount);
 
   return (
     <nav
@@ -26,7 +28,7 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
         {MOBILE_NAV.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
-          const badge = item.badge === "unread" ? unreadCount : 0;
+          const badge = item.badge === "unread" ? unread : 0;
 
           return (
             <li key={item.href} className="flex-1">
@@ -48,8 +50,10 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
                   />
                   {badge > 0 ? (
                     <span
-                      className="absolute -right-2 -top-1 grid min-w-5 place-items-center rounded-full bg-ink px-1 text-[0.6875rem] font-semibold text-canvas"
+                      className="absolute -right-2 -top-1 grid min-w-5 place-items-center rounded-full bg-ink px-1 text-xs font-semibold tabular-nums text-canvas"
+                      role="img"
                       aria-label={`${badge} unread`}
+                      data-unread-badge
                     >
                       {badge > 9 ? "9+" : badge}
                     </span>

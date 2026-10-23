@@ -5,19 +5,21 @@ import { usePathname } from "next/navigation";
 
 import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
 import { DESKTOP_NAV, isActive } from "@/features/dashboard/nav-items";
+import { badgeCount } from "@/features/dashboard/unread-memory";
 import { cn } from "@/lib/utils/cn";
 
 /**
  * Desktop navigation. Quiet on purpose — the page is the product.
  */
 export function DesktopSidebar({
-  unreadCount = 0,
+  unreadCount,
   businessName,
 }: {
   unreadCount?: number | undefined;
   businessName?: string | undefined;
 }) {
   const pathname = usePathname();
+  const unread = badgeCount(unreadCount);
 
   return (
     <aside
@@ -39,7 +41,7 @@ export function DesktopSidebar({
           {DESKTOP_NAV.map((item) => {
             const active = isActive(pathname, item.href);
             const Icon = item.icon;
-            const badge = item.badge === "unread" ? unreadCount : 0;
+            const badge = item.badge === "unread" ? unread : 0;
 
             return (
               <li key={item.href}>
@@ -58,8 +60,10 @@ export function DesktopSidebar({
 
                   {badge > 0 ? (
                     <span
-                      className="grid min-w-6 place-items-center rounded-full bg-ink px-1.5 text-xs font-semibold text-canvas"
+                      className="grid min-w-6 place-items-center rounded-full bg-ink px-1.5 text-xs font-semibold tabular-nums text-canvas"
+                      role="img"
                       aria-label={`${badge} unread`}
+                      data-unread-badge
                     >
                       {badge > 99 ? "99+" : badge}
                     </span>

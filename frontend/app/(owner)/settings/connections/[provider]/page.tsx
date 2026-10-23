@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import { ChevronLeft } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { AppShell } from "@/features/dashboard/app-shell";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { ConnectionDetail } from "@/features/connections/connection-detail";
 import {
   listConnections,
@@ -16,11 +14,12 @@ import { listCustomerLists } from "@/lib/server/customers/list-import";
 import { getAdapter } from "@/lib/server/integrations/adapters";
 import { providerLogo } from "@/lib/server/integrations/logos";
 import { getProvider } from "@/lib/server/integrations/registry";
-import { listLocations, requireOwner } from "@/lib/server/owner-data";
+import { BackLink } from "@/components/ui/back-link";
+import { getUnreadCount, listLocations, requireOwner } from "@/lib/server/owner-data";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Connections — ReviewBoost",
+  title: "Connections",
   robots: { index: false, follow: false },
 };
 
@@ -37,17 +36,15 @@ export default async function ProviderPage({ params }: { params: Promise<{ provi
 
   const requestId = `page:/settings/connections/${provider.id}`;
   const db = await supabaseServer();
+  const unread = await getUnreadCount(organization.orgId);
 
   if (provider.connectKind === "list") {
     const source = provider.id === "csv" ? "csv" : "google_sheets";
     const lists = await listCustomerLists(db, organization.orgId, requestId, source);
     const available = provider.availability === "available";
     return (
-      <AppShell businessName={organization.name}>
-        <Link href="/settings/connections" className="mb-4 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-muted hover:text-ink">
-          <ChevronLeft className="size-4" aria-hidden="true" />
-          Connections
-        </Link>
+      <OwnerShell unreadCount={unread} businessName={organization.name}>
+        <BackLink href="/settings/connections">Connections</BackLink>
         <GoogleSheetsImport
           source={source}
           provider={{
@@ -70,7 +67,7 @@ export default async function ProviderPage({ params }: { params: Promise<{ provi
           }
           lists={lists}
         />
-      </AppShell>
+      </OwnerShell>
     );
   }
   const connection =
@@ -85,11 +82,8 @@ export default async function ProviderPage({ params }: { params: Promise<{ provi
     : [[], [], [], await listLocations(organization.orgId)];
 
   return (
-    <AppShell businessName={organization.name}>
-      <Link href="/settings/connections" className="mb-4 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-muted hover:text-ink">
-        <ChevronLeft className="size-4" aria-hidden="true" />
-        Connections
-      </Link>
+    <OwnerShell unreadCount={unread} businessName={organization.name}>
+      <BackLink href="/settings/connections">Connections</BackLink>
 
       <ConnectionDetail
         provider={{
@@ -112,6 +106,6 @@ export default async function ProviderPage({ params }: { params: Promise<{ provi
         issues={issues}
         places={places.map((place) => ({ id: place.locationId, name: place.name }))}
       />
-    </AppShell>
+    </OwnerShell>
   );
 }

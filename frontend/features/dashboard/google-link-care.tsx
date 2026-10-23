@@ -229,6 +229,7 @@ export function GoogleLinkCare({
               Cancel
             </Button>
           </div>
+          <GoogleLinkHelp />
         </div>
       ) : (
         <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
@@ -308,24 +309,20 @@ export function GoogleLinkCare({
         </div>
       )}
 
-      {!editing ? (
-        <p className="max-w-[42ch] text-sm leading-relaxed text-muted">
-          {GOOGLE_LINK_BLAST}
-        </p>
-      ) : null}
-
+      {/* What the link does, and where to find one, are said once under
+          every place (settings/page.tsx) and again while editing; repeating
+          both under each place doubled the page for a two-place business. */}
       {!editing && savedState !== "missing" ? (
         <Button
           variant="secondary"
-          className="w-auto"
+          size="sm"
+          className="w-auto self-start"
           onClick={() => refuseOrOpen(value ?? "", speakRefusal)}
         >
           <ExternalLink className="size-4" aria-hidden="true" />
           Open
         </Button>
       ) : null}
-
-      <GoogleLinkHelp />
     </div>
   );
 }

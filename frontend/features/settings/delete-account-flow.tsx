@@ -53,7 +53,7 @@ export function DeleteAccountFlow({
           Only an owner can delete the business. You can delete your own
           account. The business and its ratings stay.
         </p>
-        <Button asChild>
+        <Button variant="secondary" className="text-danger" asChild>
           <Link href="/settings/delete-my-account">Delete my account</Link>
         </Button>
         <Button variant="secondary" asChild>
