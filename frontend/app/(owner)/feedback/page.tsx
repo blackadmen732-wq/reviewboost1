@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
-import { FeedbackList } from "@/features/dashboard/feedback-list";
+import { FeedbackList, tagLabels } from "@/features/dashboard/feedback-list";
 import { FeedbackTabs } from "@/features/dashboard/feedback-tabs";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import {
@@ -14,7 +14,7 @@ import {
   parseFeedbackFilters,
   type FeedbackFilters,
 } from "@/lib/owner/insights";
-import { getOwnerCounts, listLocations, listReviews, requireOwner } from "@/lib/server/owner-data";
+import { getOwnerCounts, listLocations, listReviews, listStands, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
   title: "Feedback",
@@ -25,6 +25,11 @@ export const dynamic = "force-dynamic";
 
 /**
  * The inbox: Needs you, and Everything.
+ *
+ * Needs you is what is waiting on the business: anything unread, and any
+ * rating of three stars or fewer that nobody has marked sorted. A 5-star that
+ * has been read leaves it by itself; it used to stay until someone "sorted"
+ * praise, which made clearing the list a chore and hid the complaints in it.
  *
  * Everything can arrive filtered from Insights — one star value, one place,
  * the same days the breakdown counted — so an owner who taps "2 stars: 6
@@ -48,16 +53,18 @@ export default async function FeedbackPage({
   const filtered = filters !== null && hasFeedbackFilters(filters);
   const span = filters ? filterInstants(organization.timezone, filters) : null;
 
-  const [{ items, hasMore }, counts] = await Promise.all([
+  const [{ items, hasMore }, counts, stands] = await Promise.all([
     listReviews(organization.orgId, {
       limit: 50,
-      ...(showAll ? {} : { openOnly: true }),
+      ...(showAll ? {} : { needsAttention: true }),
       ...(filters?.rating ? { rating: filters.rating } : {}),
       ...(filters?.locationId ? { locationId: filters.locationId } : {}),
       ...(span ? { submittedFrom: span.from, submittedBefore: span.before } : {}),
     }),
     getOwnerCounts(organization.orgId, organization.timezone),
+    listStands(organization.orgId),
   ]);
+  const tagLabel = tagLabels(stands);
 
   return (
     <OwnerShell unreadCount={counts.unread} businessName={organization.name}>
@@ -96,7 +103,7 @@ export default async function FeedbackPage({
         ) : (
           <EmptyState
             title="All caught up."
-            description="Nothing is waiting on you. Sorted ratings are under Everything."
+            description="Nothing is waiting on you. Every rating, sorted or read, is under Everything."
           />
         )
       ) : (
@@ -110,6 +117,7 @@ export default async function FeedbackPage({
               isRead: item.isRead,
               isResolved: item.isResolved,
               noteCount: item.noteCount,
+              tagLabel: tagLabel(item.standId),
             }))}
           />
           {hasMore ? (

@@ -14,7 +14,7 @@ export default function InsightsLoading() {
     <OwnerShell>
       <PageHeader title="Feedback" description="Ratings from your customers." />
       <FeedbackTabs active="insights" />
-      <div className="flex flex-col gap-10" aria-busy="true" aria-label="Loading insights">
+      <div className="flex flex-col gap-10" role="status" aria-busy="true" aria-label="Loading insights">
         <Skeleton className="h-[3.25rem] w-full rounded-full sm:w-[19rem]" />
         <div>
           <Skeleton className="h-14 w-32" />

@@ -82,6 +82,11 @@ export function ActionThread({
   const canSubmit = body.trim().length > 0 && !busy && !uncertain;
 
   async function add() {
+    // Never a dead button: an empty note says what is missing.
+    if (body.trim().length === 0 && !busy && !uncertain) {
+      setError("Write what you did first, then save it.");
+      return;
+    }
     if (!canSubmit) return;
     setBusy(true);
     setError(null);
@@ -183,7 +188,10 @@ export function ActionThread({
       ) : null}
       <Textarea
         value={body}
-        onChange={(event) => setBody(event.target.value)}
+        onChange={(event) => {
+          setBody(event.target.value);
+          if (error && !uncertain) setError(null);
+        }}
         disabled={busy}
         rows={3}
         maxLength={2000}
@@ -191,10 +199,11 @@ export function ActionThread({
         placeholder="Checked with the team and agreed what to change…"
       />
 
+      {/* Secondary: "Mark as sorted" above is this screen's one black button. */}
       <Button
-        variant="action"
-        className="mt-3"
-        disabled={!canSubmit}
+        variant="secondary"
+        className="mt-3 sm:w-auto"
+        disabled={uncertain}
         loading={busy}
         loadingLabel="Saving…"
         onClick={() => void add()}

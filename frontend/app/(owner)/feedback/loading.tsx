@@ -15,7 +15,7 @@ export default function FeedbackLoading() {
     <OwnerShell>
       <PageHeader title="Feedback" description="Ratings from your customers." />
       <FeedbackTabs />
-      <div className="divide-y divide-border border-y border-border" aria-busy="true" aria-label="Loading ratings">
+      <div className="divide-y divide-border border-y border-border" role="status" aria-busy="true" aria-label="Loading ratings">
         {[0, 1, 2].map((row) => (
           <div key={row} className="flex min-h-14 flex-col justify-center gap-2 py-3.5 pl-5">
             <Skeleton className="h-4 w-24" />

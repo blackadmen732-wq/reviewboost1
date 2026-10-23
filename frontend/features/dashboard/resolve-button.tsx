@@ -26,9 +26,15 @@ import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
 export function ResolveButton({
   responseId,
   isResolved,
+  quiet = false,
 }: {
   responseId: string;
   isResolved: boolean;
+  /**
+   * A 4 or 5 star rating, read: nothing is waiting on it, so sorting it is
+   * offered but is not the screen's one black button.
+   */
+  quiet?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -80,7 +86,8 @@ export function ResolveButton({
 
   return (
     <Button
-      variant="action"
+      variant={quiet ? "secondary" : "action"}
+      className="sm:w-auto"
       loading={busy}
       loadingLabel="Saving…"
       onClick={() => void setResolved(true)}
