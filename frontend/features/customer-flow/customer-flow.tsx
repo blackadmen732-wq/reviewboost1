@@ -378,7 +378,9 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
           kind={
             isUnavailableReviewLink(contextQuery.error)
               ? "unavailable"
-              : "error"
+              : isOfflineError(contextQuery.error)
+                ? "offline"
+                : "error"
           }
           locale={state.locale}
           messages={messages}

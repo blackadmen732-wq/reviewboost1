@@ -16,7 +16,10 @@ export interface CustomerMessages {
   unavailableHeading: string;
   unavailableBody: string;
   loadErrorHeading: string;
+  /** The page could not load because the phone has no connection. */
   loadErrorBody: string;
+  /** The page could not load or save because of us, not the phone. */
+  serverErrorBody: string;
   tryAgain: string;
   ratingHeading: string;
   ratingSupport: string;
@@ -50,6 +53,7 @@ const en: CustomerMessages = {
   unavailableBody: "Please ask the business for a new one.",
   loadErrorHeading: "That didn’t go through.",
   loadErrorBody: "Check your connection and try again.",
+  serverErrorBody: "Try again in a moment.",
   tryAgain: "Try again",
   ratingHeading: "How was your visit?",
   ratingSupport: "Tap a star to continue to Google",
@@ -70,7 +74,7 @@ const en: CustomerMessages = {
   },
   sending: "Sending…",
   submitErrorHeading: "That didn’t go through.",
-  submitErrorBody: "Your rating is still here. Check your connection and try again.",
+  submitErrorBody: "Your rating is still here. Try again in a moment.",
   offline: "You’re offline. We’ll try when you reconnect.",
   thanksHeading: "Thanks for sharing.",
   feedbackSent: (businessName) => `Your rating was sent to ${businessName}.`,
@@ -89,6 +93,7 @@ const es: CustomerMessages = {
   unavailableBody: "Pídele uno nuevo al negocio.",
   loadErrorHeading: "No se pudo enviar.",
   loadErrorBody: "Revisa tu conexión e inténtalo de nuevo.",
+  serverErrorBody: "Inténtalo de nuevo en un momento.",
   tryAgain: "Intentar de nuevo",
   ratingHeading: "¿Cómo estuvo tu visita?",
   ratingSupport: "Toca una estrella para continuar a Google",
@@ -109,7 +114,7 @@ const es: CustomerMessages = {
   },
   sending: "Enviando…",
   submitErrorHeading: "No se pudo enviar.",
-  submitErrorBody: "Tu calificación sigue aquí. Revisa tu conexión e inténtalo de nuevo.",
+  submitErrorBody: "Tu calificación sigue aquí. Inténtalo de nuevo en un momento.",
   offline: "No tienes conexión. Lo intentaremos cuando vuelvas a conectarte.",
   thanksHeading: "Gracias por compartir.",
   feedbackSent: (businessName) => `Tu calificación se envió a ${businessName}.`,
@@ -128,6 +133,7 @@ const ht: CustomerMessages = {
   unavailableBody: "Tanpri mande biznis la yon nouvo lyen.",
   loadErrorHeading: "Sa pa t pase.",
   loadErrorBody: "Verifye koneksyon ou epi eseye ankò.",
+  serverErrorBody: "Eseye ankò nan yon ti moman.",
   tryAgain: "Eseye ankò",
   ratingHeading: "Kijan vizit ou te ye?",
   ratingSupport: "Peze yon etwal pou kontinye sou Google",
@@ -148,7 +154,7 @@ const ht: CustomerMessages = {
   },
   sending: "N ap voye…",
   submitErrorHeading: "Sa pa t pase.",
-  submitErrorBody: "Nòt ou bay la toujou la. Verifye koneksyon ou epi eseye ankò.",
+  submitErrorBody: "Nòt ou bay la toujou la. Eseye ankò nan yon ti moman.",
   offline: "Ou pa konekte. N ap eseye lè ou rekonekte.",
   thanksHeading: "Mèsi paske ou pataje.",
   feedbackSent: (businessName) => `Nòt ou bay la te voye bay ${businessName}.`,

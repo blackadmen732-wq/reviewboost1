@@ -49,12 +49,17 @@ for (const colorScheme of ["light", "dark"] as const) {
 
       await page.goto("/q/fixture-api-error");
       await expect(page.getByRole("heading", { name: "That didn’t go through." })).toBeVisible();
+      // The server failed, not the phone: never tell this customer to check their connection.
+      await expect(page.getByText("Try again in a moment.")).toBeVisible();
+      await expect(page.getByText(/check your connection/i)).toHaveCount(0);
       await expectNoSeriousViolations(page);
 
       await page.goto("/q/fixture-response-error");
       await expect(page.getByRole("heading", { name: "How was your visit?" })).toBeVisible();
       await page.getByRole("radio", { name: "2 stars — Could be better" }).click();
       await expect(page.locator("#feedback-status")).toBeVisible();
+      await expect(page.locator("#feedback-status")).toContainText("Try again in a moment.");
+      await expect(page.locator("#feedback-status")).not.toContainText(/connection/i);
       await expectNoSeriousViolations(page);
 
       await context.setOffline(true);

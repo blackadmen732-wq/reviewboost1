@@ -114,7 +114,10 @@ describe("one-tap customer flow", () => {
     const user = await openRating("fixture-response-error");
     await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[2] }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Your rating is still here");
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Your rating is still here");
+    // The phone was online and the server failed, so the connection is not the cause.
+    expect(alert).not.toHaveTextContent(/connection/i);
     expect(navigate).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: customerMessages.en.tryAgain }));
@@ -142,6 +145,24 @@ describe("one-tap customer flow", () => {
     );
     await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
     await waitFor(() => expect(navigate).toHaveBeenCalledWith(FIXTURE_DESTINATION));
+  });
+
+  it("blames the connection only when the phone is offline", async () => {
+    // The context query retries once before giving up, so allow for its backoff.
+    renderWithProviders(<CustomerFlow token="fixture-api-error" />);
+    await screen.findByRole("heading", { name: customerMessages.en.loadErrorHeading }, { timeout: 4000 });
+    expect(screen.getByText(customerMessages.en.serverErrorBody)).toBeVisible();
+    expect(screen.queryByText(/check your connection/i)).toBeNull();
+    cleanup();
+
+    Object.defineProperty(window.navigator, "onLine", { configurable: true, value: false });
+    try {
+      renderWithProviders(<CustomerFlow token="fixture-valid" />);
+      await screen.findByRole("heading", { name: customerMessages.en.loadErrorHeading }, { timeout: 4000 });
+      expect(screen.getByText(customerMessages.en.loadErrorBody)).toBeVisible();
+    } finally {
+      Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
+    }
   });
 
   it("shows indistinguishable UI for unknown and inactive links", async () => {
