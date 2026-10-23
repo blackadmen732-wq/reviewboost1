@@ -51,6 +51,9 @@ describe("photo normalization", () => {
     expect(service).toContain("export const MAX_ASSET_BYTES = 5 * 1024 * 1024;");
     expect(MAX_UPLOAD_BYTES).toBe(5 * 1024 * 1024);
     expect(TARGET_BYTES).toBeLessThan(MAX_UPLOAD_BYTES);
+    // Every customer downloads this photo on the page they see at the counter.
+    // A budget near the bucket's 5 MiB let a 4.5 MB PNG reach them untouched.
+    expect(TARGET_BYTES).toBeLessThanOrEqual(1.5 * 1024 * 1024);
 
     const bucket = readFileSync(
       join(process.cwd(), "../supabase/migrations/20260926000100_customer_page_bucket.sql"),

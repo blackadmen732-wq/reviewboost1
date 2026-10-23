@@ -642,6 +642,66 @@ describe("Customer Page saved-photo recovery", () => {
     );
   });
 
+  it("says, without blocking, when a saved photo is too small to look sharp", async () => {
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: () => "blob:local-photo",
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init?: RequestInit) => {
+        const path = String(input);
+        const method = init?.method ?? "GET";
+        if (method === "GET")
+          return new Response(
+            JSON.stringify({ data: { draft: {}, published: null, publishedVersion: 0 } }),
+            { status: 200 },
+          );
+        if (path.endsWith("/assets") && method === "POST")
+          return new Response(
+            JSON.stringify({ data: { assetId: "small", path: "small.jpg", token: "local" } }),
+            { status: 200 },
+          );
+        if (path.endsWith("/assets"))
+          return new Response(
+            JSON.stringify({ data: { publicUrl: "https://example.test/small.jpg" } }),
+            { status: 200 },
+          );
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    normalizePhoto.mockResolvedValueOnce({
+      blob: new File(["x"], "small.jpg", { type: "image/jpeg" }),
+      type: "image/jpeg",
+      width: 800,
+      height: 600,
+      converted: false,
+    });
+
+    render(<CustomerPageEditor businessName="Test business" />);
+    await screen.findByRole("button", { name: "Add photo" });
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File(["x"], "small.jpg", { type: "image/jpeg" })] },
+    });
+
+    await screen.findByText(/Photo saved/);
+    expect(document.querySelector("[data-photo-note]")).toHaveTextContent(/may look soft/);
+    // The photo is still used: this is advice, not a refusal.
+    expect(document.querySelector("[data-hero-layer] img")).toHaveAttribute(
+      "src",
+      "https://example.test/small.jpg",
+    );
+
+    // A photo of ordinary size says nothing.
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File(["y"], "big.jpg", { type: "image/jpeg" })] },
+    });
+    await waitFor(() => expect(document.querySelector("[data-photo-note]")).toBeNull());
+  });
+
   it("confirms a publish that committed before its response was lost, with exactly one POST", async () => {
     const draft = { heroAssetId: null };
     let committed = false;

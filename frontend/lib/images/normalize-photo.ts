@@ -33,8 +33,20 @@
 /** Must match MAX_ASSET_BYTES in lib/server/customer-page-service.ts and the bucket. */
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
-/** Headroom under the hard limit, so a file is never refused by a rounding hair. */
-export const TARGET_BYTES = Math.floor(MAX_UPLOAD_BYTES * 0.9);
+/**
+ * What every customer downloads. The live page shows the photo as it was
+ * uploaded, with no resizing in between, to someone standing at a counter on
+ * mobile data. A 2400-pixel JPEG at the quality floor fits in this for an
+ * ordinary photo; one that does not is scaled down rather than sent heavy.
+ * Well under MAX_UPLOAD_BYTES, which only the bucket enforces.
+ */
+export const TARGET_BYTES = Math.floor(1.5 * 1024 * 1024);
+
+/**
+ * Below this on the long edge, a photo looks soft across a large phone. It is
+ * still accepted; the owner is told, so they can pick a sharper one.
+ */
+export const SOFT_LONG_EDGE = 1200;
 
 /**
  * The customer page shows the photo full-width on a phone: about 1170 × 1570

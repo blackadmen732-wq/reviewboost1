@@ -14,6 +14,7 @@ import { withWriteDeadline } from "@/lib/api/read-deadline";
 import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
 import {
   NormalizePhotoError,
+  SOFT_LONG_EDGE,
   normalizePhoto,
 } from "@/lib/images/normalize-photo";
 import { customerMessages } from "@/lib/i18n/customer-messages";
@@ -73,6 +74,8 @@ export function CustomerPageEditor({
   >("idle");
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
+  /** A quiet word about a photo that worked but will look soft. Never blocks. */
+  const [photoNote, setPhotoNote] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftSaved, setDraftSaved] = useState(true);
@@ -187,6 +190,7 @@ export function CustomerPageEditor({
       if (operation.current) return;
       operation.current = true;
       setUploadError(null);
+      setPhotoNote(null);
       setDraftSaveError(null);
       setStatusMsg(null);
       setPublishState("idle");
@@ -265,6 +269,11 @@ export function CustomerPageEditor({
             return fail("The photo could not be checked. Try again.");
           if (!mounted.current) return;
           setHeroUrl(data.publicUrl);
+          setPhotoNote(
+            Math.max(photo.width, photo.height) < SOFT_LONG_EDGE
+              ? "This photo is small, so it may look soft on larger phones. A bigger one will look sharper."
+              : null,
+          );
           const next = { ...draft, heroAssetId: ticket.assetId };
           setDraft(next);
           await saveDraft(next);
@@ -296,6 +305,7 @@ export function CustomerPageEditor({
     if (operation.current) return;
     operation.current = true;
     setUploadError(null);
+    setPhotoNote(null);
     setStatusMsg(null);
     setPublishState("idle");
     const next = { ...draft, heroAssetId: null };
@@ -540,8 +550,14 @@ export function CustomerPageEditor({
           ) : null}
         </div>
         <p className="mt-3 text-sm leading-relaxed text-muted">
-          Without a photo, the top stays white.
+          Your storefront, your team or your best dish. Upright photos fill
+          the top of the page best. Without a photo, the top stays white.
         </p>
+        {photoNote ? (
+          <p className="mt-2 text-sm leading-relaxed text-ink" data-photo-note>
+            {photoNote}
+          </p>
+        ) : null}
         {draftSaving ? (
           <p role="status" className="mt-3 text-sm text-muted">
             Saving your photo…
