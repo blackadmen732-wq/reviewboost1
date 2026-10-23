@@ -55,7 +55,7 @@ export function ProductDemo({ hero = false }: { hero?: boolean }) {
         </div>
         <PhoneFrame label={`${example.label} example customer page`}>
           <CustomerVisitView
-            headingAs="p"
+            preview
             heroUrl={photo}
             transform={DEFAULT_HERO_TRANSFORM}
             businessName={example.name}

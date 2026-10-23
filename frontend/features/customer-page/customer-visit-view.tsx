@@ -1,7 +1,7 @@
 "use client";
 
 import localFont from "next/font/local";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
 import {
@@ -67,11 +67,13 @@ export interface CustomerVisitViewProps {
   children: ReactNode;
   language?: ReactNode;
   /**
-   * The question is the page's heading on /q. Drawn inside another page — the
-   * owner's preview, the homepage demo — it must not be a second h1 there; it
-   * looks identical either way (.visit-heading sets every property).
+   * Drawn inside another page — the owner's preview, the homepage demo —
+   * rather than as the page itself. The question is then not a second h1
+   * there (it looks identical: .visit-heading sets every property), and the
+   * photo is not fetched first, because in a preview the phone around it is
+   * the larger thing on screen.
    */
-  headingAs?: "h1" | "p";
+  preview?: boolean;
 }
 
 export function CustomerVisitView({
@@ -83,8 +85,9 @@ export function CustomerVisitView({
   footerLine,
   children,
   language,
-  headingAs: Heading = "h1",
+  preview = false,
 }: CustomerVisitViewProps) {
+  const Heading = preview ? "p" : "h1";
   const crop = clampHeroTransform(transform);
 
   return (
@@ -96,7 +99,7 @@ export function CustomerVisitView({
     >
       <div className="visit-hero" data-hero-layer>
         {heroUrl ? (
-          <HeroImage src={heroUrl} transform={heroTransformStyle(crop)} />
+          <HeroImage src={heroUrl} transform={heroTransformStyle(crop)} first={!preview} />
         ) : (
           <div className="visit-hero__empty" aria-hidden="true" data-hero-empty />
         )}
@@ -140,30 +143,25 @@ export function CustomerVisitView({
 
 /**
  * The business's artwork. The hero keeps its size on the dark field while the
- * photo downloads, then the photo fades in — no layout jump, no white flash.
- * A photo already in the cache (or one that loaded before hydration) is shown
- * at once rather than waiting for an onLoad that already fired.
+ * photo downloads, so nothing jumps and nothing flashes white.
+ *
+ * Shown the moment the browser has it. It used to sit at opacity 0 until React
+ * had hydrated and seen it load, so on a slow phone the customer looked at an
+ * empty dark box for as long as the JavaScript took, with the photo already
+ * downloaded. On the customer's own page it is the largest thing on the
+ * screen, so there it is fetched first.
  */
-function HeroImage({ src, transform }: { src: string; transform: string }) {
-  const ref = useRef<HTMLImageElement>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    setLoaded(Boolean(ref.current?.complete && ref.current.naturalWidth > 0));
-  }, [src]);
-
+function HeroImage({ src, transform, first }: { src: string; transform: string; first: boolean }) {
   return (
     // Artwork origin is the owner's published/draft upload.
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      ref={ref}
       src={src}
       alt=""
       draggable={false}
       decoding="async"
+      fetchPriority={first ? "high" : "auto"}
       className="visit-hero__image"
-      data-loaded={loaded || undefined}
-      onLoad={() => setLoaded(true)}
       style={{ transform }}
     />
   );

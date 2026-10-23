@@ -681,7 +681,7 @@ export function CustomerPageEditor({
           size="editor"
         >
           <CustomerVisitView
-            headingAs="p"
+            preview
             heroUrl={heroUrl}
             transform={DEFAULT_HERO_TRANSFORM}
             businessName={businessName}

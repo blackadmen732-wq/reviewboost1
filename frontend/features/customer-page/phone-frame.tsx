@@ -82,6 +82,9 @@ export function PhoneFrame({
           aria-hidden="true"
           draggable={false}
           decoding="async"
+          // The largest thing on any page that draws a phone (the homepage's
+          // first screen measures it as the main content), so it goes first.
+          fetchPriority="high"
         />
       </div>
     </div>

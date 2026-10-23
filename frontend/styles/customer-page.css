@@ -42,19 +42,9 @@ html:has(.customer-live) {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0;
-  transition: opacity 220ms ease-out;
   transform-origin: center center;
   user-select: none;
   pointer-events: none;
-}
-
-.visit-hero__image[data-loaded] {
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .visit-hero__image { transition: none; }
 }
 
 /* No image uploaded yet: plain white. The top of the page is only ever the
