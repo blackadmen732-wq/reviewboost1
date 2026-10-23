@@ -27,7 +27,7 @@ That file is gitignored; never commit real values.
 
 | Variable | Required | Description |
 |---|---|---|
-| `PUBLIC_FRONTEND_URL` | yes (production) | Origin used in QR codes and NFC tags (`{PUBLIC_FRONTEND_URL}/q/{token}`). Production refuses to start without it. In production this MUST be `https://reviewboost.fit` — never `http://localhost:3000` or a `*.vercel.app` preview URL, because a stand printed against the wrong origin cannot be recalled. Use `http://localhost:3000` only in development. |
+| `PUBLIC_FRONTEND_URL` | yes (production and preview) | Origin used in QR codes and NFC tags (`{PUBLIC_FRONTEND_URL}/q/{token}`). Production refuses to start without it. In production this MUST be `https://reviewboost.fit` — never `http://localhost:3000` or a `*.vercel.app` preview URL, because a stand printed against the wrong origin cannot be recalled. Use `http://localhost:3000` only in development. Vercel previews also run with `NODE_ENV=production`, so the Preview environment needs its own HTTPS value (per branch in Vercel, or a fixed preview domain), used with Preview's separate Supabase project below; without it every preview answers `/login` with a 500. |
 
 ## Connections
 
