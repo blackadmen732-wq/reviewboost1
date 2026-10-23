@@ -792,6 +792,13 @@ html:has(.customer-live) {
   background: var(--rb-canvas);
 }
 
+/* With no button on screen (the success scene), the dialog focuses itself,
+   and the browser drew its focus outline round the whole sheet. The sheet is
+   not a control; its words reach screen readers through the live region. */
+.nfc-sheet:focus {
+  outline: none;
+}
+
 .nfc-sheet__panel {
   display: flex;
   width: 100%;
