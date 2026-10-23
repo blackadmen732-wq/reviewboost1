@@ -148,7 +148,7 @@ describe("OwnerHome", () => {
       await screen.findByRole("link", { name: /Preview customer page/ }),
     ).toBeVisible();
     // Besides those two, only the quiet way to the full steps.
-    expect(screen.getByRole("link", { name: /Open Set up/ })).toHaveAttribute("href", "/stands");
+    expect(screen.getByRole("link", { name: /See all steps/ })).toHaveAttribute("href", "/stands");
     expect(screen.getAllByRole("link")).toHaveLength(3);
   });
 

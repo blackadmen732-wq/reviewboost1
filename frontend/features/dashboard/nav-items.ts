@@ -1,4 +1,4 @@
-import { Home, ListChecks, MessageSquare, Send, Settings } from "lucide-react";
+import { Home, MessageSquare, QrCode, Send, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 /**
@@ -11,7 +11,7 @@ import type { LucideIcon } from "lucide-react";
  *
  * THE FOUR DESTINATIONS
  * ---------------------
- * Home, Feedback, Text Requests, Set up — plus Settings, which lives with the
+ * Home, Feedback, Text Requests, Tags — plus Settings, which lives with the
  * profile rather than in the bar. That is the whole product an owner uses.
  *
  * On the phone bar the third one reads "Texts": "Text Requests" wrapped onto
@@ -52,12 +52,13 @@ export const FEEDBACK: NavItem = {
   badge: "unread",
 };
 /**
- * Set up: the one place an owner programs anything (customer page, Tags,
- * a test). The physical thing on the counter is still called a Tag on the
- * page itself; the tab is named for the job, not the object. The route stays
+ * Tags: the one place an owner programs anything (customer page, Tags, a
+ * test). It was "Set up" for a while, but setup is done in the first week and
+ * the Tags are what an owner comes back here for, so the tab is named for what
+ * is there, the same as the iPhone app (and the same QR icon). The route stays
  * /stands so existing links and Tag pages keep working.
  */
-export const TAGS: NavItem = { href: "/stands", label: "Set up", icon: ListChecks };
+export const TAGS: NavItem = { href: "/stands", label: "Tags", icon: QrCode };
 /** Text Requests. Never "campaigns": V1 sends review requests and nothing else. */
 export const TEXT_REQUESTS: NavItem = {
   href: "/text-requests",

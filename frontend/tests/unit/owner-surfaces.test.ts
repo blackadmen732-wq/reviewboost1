@@ -103,10 +103,14 @@ describe("the owner surfaces show real state", () => {
     }
   });
 
-  it("names the setup tab Set up in the navigation", () => {
+  it("names the fourth tab Tags, the same as the iPhone app", () => {
     const nav = source("features/dashboard/nav-items.ts");
-    expect(nav).toMatch(/label: "Set up"/);
+    expect(nav).toMatch(/label: "Tags"/);
     expect(nav).toMatch(/label: "Text Requests"/);
+    // One product, one word: the web bar and the native tab bar agree.
+    const native = source("../apps/mobile/app/(tabs)/_layout.tsx");
+    expect(native).toMatch(/title: "Tags"/);
+    expect(nav).not.toMatch(/label: "Set up"/);
   });
 
   it("gives Home and Feedback one definition of unread", () => {

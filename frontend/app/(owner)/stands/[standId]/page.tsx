@@ -36,7 +36,7 @@ export default async function TagDetailPage({
 
   return (
     <OwnerShell unreadCount={unread} businessName={organization.name}>
-      <BackLink href="/stands">Set up</BackLink>
+      <BackLink href="/stands">Tags</BackLink>
       <TagDetail
         organizationId={organization.orgId}
         stand={stand}

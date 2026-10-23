@@ -142,10 +142,10 @@ function EmptyHome({ model, seenDone }: { model: HomeModel; seenDone: readonly s
 }
 
 /**
- * Where the business is in getting set up: Set up's own three steps, small.
+ * Where the business is in getting set up: the Tags page's three steps, small.
  * Plain rows, not cards: a tick for what is done and the current step in ink.
  * The action for the current step is the button above, so there is still
- * only one; the steps themselves, with "Show me how", live on Set up.
+ * only one; the steps themselves, with "Show me how", live on Tags.
  */
 function SetupSteps({
   steps,
@@ -230,7 +230,7 @@ function SetupSteps({
           href="/stands"
           className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
         >
-          Open Set up
+          See all steps
           <ChevronRight aria-hidden="true" className="size-4 text-muted" />
         </Link>
         {photoNudge ? (

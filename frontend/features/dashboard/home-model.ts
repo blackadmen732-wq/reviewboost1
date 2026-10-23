@@ -64,9 +64,9 @@ export interface HomePrimary {
 export type TagProgramPhase = "not-programmed" | "programmed" | "needs-reprogramming";
 
 /**
- * The new-owner path on Home is Set up's own three steps (setup-model), drawn
+ * The new-owner path on Home is the Tags page's own three steps (setup-model), drawn
  * small. Home used to keep a five-step list of its own, so the same business
- * read "1 of 5" on Home and "0 of 3 done" on Set up at the same moment.
+ * read "1 of 5" on Home and "0 of 3 done" on Tags at the same moment.
  */
 export type SetupStep = SetupStepView;
 export type SetupStepKey = SetupStepView["key"];

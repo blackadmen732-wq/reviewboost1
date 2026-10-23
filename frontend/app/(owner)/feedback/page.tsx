@@ -96,7 +96,7 @@ export default async function FeedbackPage({
             description="Ratings show up here after customers tap or scan your Tag."
             action={
               <Button asChild variant="secondary" size="sm">
-                <Link href="/stands">Go to Set up</Link>
+                <Link href="/stands">Go to Tags</Link>
               </Button>
             }
           />

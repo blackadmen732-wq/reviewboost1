@@ -1,6 +1,6 @@
 import { tagNeedsRewrite } from "@/lib/owner/tag-readiness";
 
-/** The parts of a Tag that Home and Set up read. */
+/** The parts of a Tag that Home and the Tags page read. */
 export interface HomeStand {
   standId: string;
   label: string;

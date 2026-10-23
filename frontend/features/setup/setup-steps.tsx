@@ -7,7 +7,7 @@ import { currentStep, type SetupStepView } from "@/features/setup/setup-model";
 import { cn } from "@/lib/utils/cn";
 
 /**
- * Set up, as three numbered steps. One sentence and at most one button per
+ * Setup, as three numbered steps. One sentence and at most one button per
  * step; the button sits only on the step to do next, so there is never a
  * question of what to press. "Show me how" opens plain instructions in place.
  */

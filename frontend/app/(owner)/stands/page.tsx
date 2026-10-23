@@ -23,14 +23,14 @@ import {
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Set up",
+  title: "Tags",
   robots: { index: false, follow: false },
 };
 
 export const dynamic = "force-dynamic";
 
 /**
- * Set up: the one place an owner programs anything. Three steps (customer
+ * Tags: the one place an owner programs anything. Three steps (customer
  * page, Tag, test), then the Tags themselves. Home, Feedback and Texts never
  * ask the owner to configure something; this page does, one step at a time.
  *
@@ -69,7 +69,7 @@ export default async function SetupPage() {
 
   return (
     <OwnerShell unreadCount={counts.unread} businessName={organization.name}>
-      <PageHeader title="Set up" description="Your customer page and your Tags, one step at a time." />
+      <PageHeader title="Tags" description="Your Tags and the customer page they open." />
 
       {billing ? (
         <div className="mb-8 max-w-[36rem]" data-service-notice={service}>

@@ -41,7 +41,7 @@ reviewboost.com ─────────────▶  /login  ────
  Pricing ─ Start free trial ──▶  Apple                 2 Google review link   ├─ Feedback ─────── ratings, Insights tab
  Privacy · Terms · Security      Email code              (or "I'll do it      │    └─ /feedback/[id]  one rating
  Support · Delete account                                 later")             ├─ Texts ────────── send review requests (consent-gated)
-                                                        3 Done → Set up        ├─ Set up ───────── 1 Customer page 2 Tag 3 Test
+                                                        3 Done → Tags          ├─ Tags ─────────── 1 Customer page 2 Tag 3 Test
                                                                                │    ├─ /customer-page  editor + live preview
                                                                                │    └─ /stands/[id]    one Tag: program / print
                                                                                └─ Settings ──────── business, Google link, theme,
@@ -55,13 +55,13 @@ Tag on the counter ── tap (NFC) or scan (QR) ──▶ /q/[token]  "How was 
                                                      └── rating lands in the owner's Feedback + Home in seconds
 
 IPHONE APP (free companion)
-Same sign-in, Home, Feedback, Texts, Set up, Settings. No purchase button. Account deletion in Settings.
+Same sign-in, Home, Feedback, Texts, Tags, Settings. No purchase button. Account deletion in Settings.
 ```
 
 The connecting threads:
 
-- **The Tag is the centre of everything.** Set up creates it. The customer taps it. Feedback shows what came from it. Home tells you when it needs attention (not programmed, needs rewriting).
-- **The Google review link** is entered once (in onboarding or Settings). It is used by the customer page, checked on Home ("Your link is a listing, not a review link"), and is Set up step 1.
+- **The Tag is the centre of everything.** Made in Tags. The customer taps it. Feedback shows what came from it. Home tells you when it needs attention (not programmed, needs rewriting).
+- **The Google review link** is entered once (in onboarding or Settings). It is used by the customer page, checked on Home ("Your link is a listing, not a review link"), and is step 1 in Tags.
 - **Customers** arrive from three places: a Tag rating, a Connections import, or a text request. Only **consent** decides who may be texted. An import never counts as consent.
 - **Billing** decides the text allowance. Texts shows the remaining credit. Billing is only ever changed on the web.
 
@@ -172,14 +172,14 @@ Headings use `text-wrap: balance`; paragraphs use `text-wrap: pretty`.
 
 **Phone (under 768px).**
 - Content is a single column with 16px side gutters.
-- A bottom bar holds **exactly four** tabs: **Home · Feedback · Texts · Set up**.
+- A bottom bar holds **exactly four** tabs: **Home · Feedback · Texts · Tags**.
 - Settings opens from the profile button at the top right.
 - The selected tab is ink and semibold; the others are muted. Green is never used for the selected tab.
 - Feedback carries the only badge (the unread count).
 - The page's main action sits above the bottom bar when it must always be reachable, such as Publish in the editor.
 
 **Desktop (1024px and up).**
-- A left sidebar holds Home, Feedback, Text Requests, Set up and Settings.
+- A left sidebar holds Home, Feedback, Text Requests, Tags and Settings.
 - The selected item has a quiet fill and semibold ink; hover is a lighter quiet fill.
 - Owner content is about 800px wide; the website is about 1080px.
 - The customer-page editor puts its controls beside a live phone preview.
@@ -239,7 +239,7 @@ Each status is a dot or icon plus a word.
 
 ### 6.4 Steps (the pizza tracker)
 
-Used for Set up, onboarding and the per-text tracker.
+Used for setup, onboarding and the per-text tracker.
 
 - Numbered circles connected by a line.
 - A finished step shows a green check with a short "done" sentence.
@@ -272,7 +272,7 @@ Used only to confirm something that already happened ("Page published"). Toasts 
 
 ### 6.9 EmptyState
 
-- Format: cause, then action. Write "Nothing yet. Ratings show up here after customers tap or scan your Tag." with a [Go to Set up] button.
+- Format: cause, then action. Write "Nothing yet. Ratings show up here after customers tap or scan your Tag." with a [Go to Tags] button.
 - A filtered list that comes back empty says "No ratings match this filter." with [Clear filter].
 - An empty to-do list says "All caught up."
 
@@ -283,7 +283,7 @@ Used only to confirm something that already happened ("Page published"). Toasts 
 
 ### 6.11 Skeleton
 
-Every owner page has a `loading.tsx` next to it (Home, Feedback, Insights, a rating, Set up, a Tag, Texts, Settings). The rules:
+Every owner page has a `loading.tsx` next to it (Home, Feedback, Insights, a rating, Tags, a Tag, Texts, Settings). The rules:
 
 - Nav, title and data-free headings are real; only the data area is grey.
 - Same paddings, radii, row heights and button sizes as the real page, so nothing jumps.
@@ -316,14 +316,14 @@ Each screen follows the same pattern: what it's for, its status line, its one ne
   - An attention card when something needs the owner.
   - "This week", comparing ratings this week with last week, in plain numbers.
   - Recent ratings, the newest three.
-  - A link to Set up while setup isn't finished.
+  - A link to Tags while setup isn't finished.
 - **States:**
-  - *New owner, no ratings:* Set up's three steps, small, with "Open Set up".
+  - *New owner, no ratings:* the three setup steps, small, with "See all steps".
   - *Active:* the content above.
   - *Google link is a listing, not a review link:* a warning card with "Fix link".
   - *Error:* "Home didn't load." with [Try again].
 
-### 7.2 Set up `/stands`
+### 7.2 Tags `/stands`
 
 This is the one place an owner programs anything.
 
@@ -366,7 +366,7 @@ This is the one place an owner programs anything.
   - Insights shows a real rating trend and distribution. Missing days appear as gaps, and a small-sample warning shows when there's too little data.
 - **One rating `/feedback/[id]`:** stars, time and Tag; opening it marks it read; "Mark as sorted" is black for 3★ or lower. Never labelled a Google review: we know a customer was **sent to** Google, not that they posted.
 - **Empty:**
-  - "Nothing yet. Ratings show up here after customers tap or scan your Tag." with [Go to Set up].
+  - "Nothing yet. Ratings show up here after customers tap or scan your Tag." with [Go to Tags].
   - "No ratings match this filter." with [Clear filter].
 
 ### 7.6 Texts `/text-requests`
@@ -410,7 +410,7 @@ Saving shows "Saved" inline. A failed save says "Didn't save. Try again." and ke
   2. "Paste your Google review link." This step has "Where do I find it?" and "I'll do this later".
   3. "You're in."
 - The Continue button is always tappable. If something's missing, tapping it explains, e.g. "Enter your business name to continue." The field is marked invalid.
-- Onboarding ends on Set up.
+- Onboarding ends on Tags.
 
 ### 7.10 Account deletion `/settings/delete` (also the public `/delete-account`)
 
@@ -594,7 +594,7 @@ For every screen that changes:
 ## 16. Locked decisions and history
 
 - **Palette, 18 Oct 2026:** warm white replaced the earlier cream (`#F8F5F0`) and forest-green buttons. Black is the action; green is identity and success.
-- **Navigation:** four phone tabs, forever. "Tags" became "Set up"; the route stays `/stands` so printed and existing links keep working. Insights is a tab inside Feedback. The old Reviews, Customers and Praise URLs redirect.
+- **Navigation:** four phone tabs, forever; the fourth is "Tags", as on iPhone. The route stays `/stands` so printed and existing links keep working. Insights is a tab inside Feedback. The old Reviews, Customers and Praise URLs redirect.
 - **Billing:** free iPhone app first; add Apple In-App Purchase only if App Review asks.
 - **Website:** the Veyra/Midday-style serif headline, the real Tag and phone proof, and the forest demo band.
 - **iPhone launch screen:** a flat `#005B3E` field with the white handwritten wordmark (320pt on iOS, 180dp on Android). It hands off as soon as the first screen is ready (`docs/mobile/LAUNCH_SCREEN.md`).

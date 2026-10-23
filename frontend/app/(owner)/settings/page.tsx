@@ -157,7 +157,7 @@ export default async function SettingsPage() {
           ) : null}
         </Section>
 
-        {/* The Customer Page is reached from here, Set up and Home's setup list
+        {/* The Customer Page is reached from here, Tags and Home's setup list
             — not from the bottom bar, which stays the four things an owner does
             every day. Connections is owners and admins only: connecting an app
             reads customer data. */}

@@ -1,7 +1,7 @@
 import { summarizeTags, type HomeStand } from "@/lib/owner/tag-summary";
 
 /**
- * The three Set up steps, from facts the server already has.
+ * The three setup steps, from facts the server already has.
  *
  * An owner who is not good with technology gets one page with three numbered
  * steps, each with a plain sentence and one button. A step is done only when

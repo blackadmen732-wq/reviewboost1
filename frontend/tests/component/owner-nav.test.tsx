@@ -25,7 +25,7 @@ import { BottomNav } from "@/features/dashboard/bottom-nav";
 import { DesktopSidebar } from "@/features/dashboard/desktop-sidebar";
 
 describe("owner chrome", () => {
-  it("mobile is four tabs: Home, Feedback, Texts, Set up", () => {
+  it("mobile is four tabs: Home, Feedback, Texts, Tags", () => {
     render(<BottomNav unreadCount={2} />);
 
     const nav = screen.getByRole("navigation", { name: "Main" });
@@ -41,7 +41,7 @@ describe("owner chrome", () => {
       "Home",
       "Feedback",
       "Texts",
-      "Set up",
+      "Tags",
     ]);
     // Short on the phone, and the link is named by what it shows.
     expect(screen.getByRole("link", { name: "Texts" })).toHaveAttribute("href", "/text-requests");
@@ -52,7 +52,7 @@ describe("owner chrome", () => {
     expect(screen.queryByText("Praise")).not.toBeInTheDocument();
   });
 
-  it("desktop sidebar is Home, Feedback, Text Requests, Set up, Settings", () => {
+  it("desktop sidebar is Home, Feedback, Text Requests, Tags, Settings", () => {
     render(<DesktopSidebar unreadCount={2} businessName="Oak & Vine" />);
 
     const aside = screen.getByRole("complementary", { name: "Main" });
@@ -65,7 +65,7 @@ describe("owner chrome", () => {
     // The sidebar has room for the full name.
     expect(screen.getByText("Text Requests")).toBeVisible();
     expect(screen.queryByText("Texts")).not.toBeInTheDocument();
-    expect(screen.getByText("Set up")).toBeVisible();
+    expect(screen.getByText("Tags")).toBeVisible();
     expect(screen.getByText("Settings")).toBeVisible();
     expect(screen.getByText("Oak & Vine")).toBeVisible();
     expect(screen.getByLabelText("2 unread")).toBeVisible();

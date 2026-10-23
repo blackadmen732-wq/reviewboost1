@@ -325,7 +325,7 @@ export function TextRequestComposer({
               href="/stands"
               className="mt-2 inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4"
             >
-              Go to Set up
+              Go to Tags
             </Link>
           </InlineNotice>
         ) : (

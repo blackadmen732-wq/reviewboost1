@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 
 /**
- * Set up while its data is in flight.
+ * Tags while its data is in flight.
  *
  * The title, the steps card and the "Your Tags" heading are drawn for real
  * where they will stay (SetupSteps, TagsList). Only what depends on data is a
@@ -13,8 +13,8 @@ import { OwnerShell } from "@/features/dashboard/owner-shell";
 export default function SetupLoading() {
   return (
     <OwnerShell>
-      <PageHeader title="Set up" description="Your customer page and your Tags, one step at a time." />
-      <div role="status" aria-busy="true" aria-label="Loading Set up">
+      <PageHeader title="Tags" description="Your Tags and the customer page they open." />
+      <div role="status" aria-busy="true" aria-label="Loading Tags">
         <section className="mb-10">
           <Skeleton className="mb-3 h-5 w-24" />
           <ol className="divide-y divide-border overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">

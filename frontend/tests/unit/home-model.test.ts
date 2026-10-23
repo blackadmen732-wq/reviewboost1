@@ -347,7 +347,7 @@ describe("only active Tags count as ready", () => {
 
 /**
  * The Customer Page photo is optional, so it is not one of the steps: Home
- * shows Set up's own three (setup-model) and, while the published page has
+ * shows the Tags page's own three (setup-model) and, while the published page has
  * no photo, one quiet link to the editor. It never takes the black button,
  * and is left out when the photo state could not be read.
  */
@@ -375,8 +375,8 @@ describe("customer page photo", () => {
   });
 });
 
-describe("Home's setup list is Set up's", () => {
-  it("counts the same three steps the Set up page does", () => {
+describe("Home's setup list is the Tags page's", () => {
+  it("counts the same three steps the Tags page does", () => {
     const model = deriveHomeModel({ counts: emptyCounts, stands: [programmedStand], hasLocation: true });
     expect(model.setup?.map((step) => [step.key, step.done])).toEqual([
       ["page", true],

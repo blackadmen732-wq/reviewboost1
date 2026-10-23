@@ -6,7 +6,7 @@ import { OwnerShell } from "@/features/dashboard/owner-shell";
 export default function CustomerPageLoading() {
   return (
     <OwnerShell>
-      <BackLink href="/stands">Set up</BackLink>
+      <BackLink href="/stands">Tags</BackLink>
       <header className="mb-6">
         <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
           Customer page

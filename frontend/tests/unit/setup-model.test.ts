@@ -20,7 +20,7 @@ const base: SetupInput = {
   canManage: true,
 };
 
-describe("Set up steps", () => {
+describe("setup steps", () => {
   it("starts at step 1 with the Google link when it is missing", () => {
     const steps = deriveSetupSteps(base);
     expect(currentStep(steps)).toBe("page");

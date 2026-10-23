@@ -5,7 +5,7 @@ import { OwnerShell } from "@/features/dashboard/owner-shell";
 /**
  * One Tag while it loads.
  *
- * Mirrors TagDetail: the way back to Set up (real), the Tag's name and status
+ * Mirrors TagDetail: the way back to Tags (real), the Tag's name and status
  * line, the code card with its square QR area and two buttons, and the NFC
  * section with its heading, line and button. The square keeps the card's
  * height, so the page does not grow when the code arrives.
@@ -13,7 +13,7 @@ import { OwnerShell } from "@/features/dashboard/owner-shell";
 export default function TagLoading() {
   return (
     <OwnerShell>
-      <BackLink href="/stands">Set up</BackLink>
+      <BackLink href="/stands">Tags</BackLink>
       <h1 className="sr-only">Tag</h1>
       <div className="flex flex-col gap-8" role="status" aria-busy="true" aria-label="Loading Tag">
         <header>
