@@ -42,6 +42,18 @@ async function tapStar(
 }
 
 describe("one-tap customer flow", () => {
+  it("says which business is asking, above the question", async () => {
+    // With no photo the hero is plain white, and nothing else on the rating
+    // screen named the business: a customer scanning a code on a counter was
+    // asked "How was your visit?" by a page that never said whose it was.
+    await openRating();
+
+    const name = document.querySelector<HTMLElement>("[data-business-name]");
+    expect(name).toHaveTextContent("Mario’s Pizza");
+    const heading = screen.getByRole("heading", { name: customerMessages.en.ratingHeading });
+    expect(name?.compareDocumentPosition(heading)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it("sends every rating 1–5 to a byte-identical handoff and the same destination", async () => {
     const handoffMarkup: string[] = [];
 

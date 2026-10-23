@@ -672,6 +672,7 @@ export function CustomerPageEditor({
           <CustomerVisitView
             heroUrl={heroUrl}
             transform={DEFAULT_HERO_TRANSFORM}
+            businessName={businessName}
             heading={previewMessages.ratingHeading}
             support={previewMessages.ratingSupport}
             footerLine={previewMessages.footerPromise}

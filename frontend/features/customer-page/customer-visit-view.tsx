@@ -55,6 +55,12 @@ const visitCapsFont = localFont({
 export interface CustomerVisitViewProps {
   heroUrl: string | null;
   transform: HeroTransform;
+  /**
+   * Whose page this is. A customer who scans a code on a counter should not
+   * have to trust a blank white page that never says which business is
+   * asking — with no photo, nothing else on the screen names it.
+   */
+  businessName?: string | null;
   heading: string;
   support: string;
   footerLine: string;
@@ -65,6 +71,7 @@ export interface CustomerVisitViewProps {
 export function CustomerVisitView({
   heroUrl,
   transform,
+  businessName,
   heading,
   support,
   footerLine,
@@ -92,6 +99,11 @@ export function CustomerVisitView({
       <section className="visit-card" data-rating-card>
         {heading ? (
           <div className="visit-card__copy">
+            {businessName ? (
+              <p className="visit-business" data-business-name>
+                {businessName}
+              </p>
+            ) : null}
             <h1 className="visit-heading" data-screen-heading tabIndex={-1}>
               {heading}
             </h1>

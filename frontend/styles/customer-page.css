@@ -247,6 +247,22 @@ html:has(.customer-live) {
   text-align: center;
 }
 
+/* Whose page this is, above the question. Quiet, one line: it identifies,
+   the heading asks. */
+.visit-business {
+  margin: 0 0 var(--visit-business-gap, 1.6cqi);
+  padding-inline: 7cqi;
+  overflow: hidden;
+  color: #3d3d3d;
+  font-family: var(--font-visit-heading), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 4.1cqi;
+  font-weight: 560;
+  letter-spacing: -0.005em;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .visit-heading {
   margin: 0;
   color: #0a0a0a;

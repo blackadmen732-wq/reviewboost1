@@ -395,6 +395,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     <div ref={contentRef} className="customer-live">
       <CustomerVisitView
         heroUrl={context.page?.heroUrl ?? null}
+        businessName={context.business.name}
         // One deterministic crop, shared by the owner preview and this page.
         // Main's Customer Page contract stores no per-owner hero transform, and
         // a preview-only control that the customer never sees would be a lie

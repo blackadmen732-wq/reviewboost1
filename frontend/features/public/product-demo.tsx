@@ -14,10 +14,12 @@ import {
 import { DEFAULT_HERO_TRANSFORM } from "@/lib/owner/hero-transform";
 import { cn } from "@/lib/utils/cn";
 
+// Placeholder names, not invented businesses: they show where the owner's
+// own name appears on the page their customers see.
 const EXAMPLES = [
-  { id: "pizza", label: "Pizza shop", photo: "/product/pizza-example.png" },
-  { id: "barber", label: "Barber", photo: "/product/barber-example.png" },
-  { id: "salon", label: "Salon", photo: "/product/salon-example.png" },
+  { id: "pizza", label: "Pizza shop", name: "Your Pizza Shop", photo: "/product/pizza-example.png" },
+  { id: "barber", label: "Barber", name: "Your Barbershop", photo: "/product/barber-example.png" },
+  { id: "salon", label: "Salon", name: "Your Salon", photo: "/product/salon-example.png" },
 ] as const;
 
 /** Real customer presentation, clearly labelled as an example. No fake activity. */
@@ -55,6 +57,7 @@ export function ProductDemo({ hero = false }: { hero?: boolean }) {
           <CustomerVisitView
             heroUrl={photo}
             transform={DEFAULT_HERO_TRANSFORM}
+            businessName={example.name}
             heading={messages.ratingHeading}
             support={messages.ratingSupport}
             footerLine={messages.footerPromise}
