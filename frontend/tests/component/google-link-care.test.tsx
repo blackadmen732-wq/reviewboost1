@@ -38,6 +38,15 @@ describe("GoogleLinkCare", () => {
     expect(screen.getByText(/CornerCafe/)).toBeInTheDocument();
   });
 
+  it("shows a working link as the review page, with the address on one quiet line", () => {
+    render(<GoogleLinkCare value={valid} locationId={LOCATION_ID} />);
+
+    expect(screen.getByText("Your Google review page")).toBeVisible();
+    const address = document.querySelector("[data-google-link-address]");
+    expect(address).toHaveTextContent(valid);
+    expect(address).toHaveAttribute("title", valid);
+  });
+
   it("names a missing link and does not offer Open", () => {
     render(<GoogleLinkCare value={null} locationId={LOCATION_ID} />);
 

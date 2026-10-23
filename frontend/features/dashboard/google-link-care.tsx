@@ -234,11 +234,27 @@ export function GoogleLinkCare({
         <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-muted">Google link</p>
-            <p
-              className={`break-words text-base font-medium ${googleLinkWorks(savedState) ? "text-ink" : "text-muted"}`}
-            >
-              {googleLinkDisplay(value)}
-            </p>
+            {googleLinkWorks(savedState) ? (
+              // A working link is a fact, not a string to read: five wrapped
+              // lines of placeid told the owner nothing. The address stays one
+              // line below, whole on hover and to screen readers.
+              <>
+                <p className="text-base font-medium text-ink">
+                  Your Google review page
+                </p>
+                <p
+                  className="mt-0.5 truncate text-xs text-muted"
+                  title={googleLinkDisplay(value)}
+                  data-google-link-address
+                >
+                  {googleLinkDisplay(value)}
+                </p>
+              </>
+            ) : (
+              <p className="break-words text-base font-medium text-muted">
+                {googleLinkDisplay(value)}
+              </p>
+            )}
             {savedState === "invalid" ? (
               <p role="alert" className="mt-2 text-sm text-danger">
                 {GOOGLE_LINK_INVALID}
