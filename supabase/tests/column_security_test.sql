@@ -260,9 +260,9 @@ select throws_ok(
 -- Member cannot promote a *different* account. This catches the lateral
 -- escalation which the existing self-promotion tests did not cover.
 select throws_ok(
-    $ select public.rpc_change_member_role(
+    $$ select public.rpc_change_member_role(
         'b0000000-0000-0000-0000-000000000004',
-        'admin'::public.member_role) $,
+        'admin'::public.member_role) $$,
     'P0001', null,
     'ordinary member cannot promote another member to admin');
 
