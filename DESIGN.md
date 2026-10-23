@@ -10,7 +10,7 @@ Contents: 1 the one rule · 2 app map · 3 colour · 4 type and motion · 5 layo
 
 ## 1. The one rule: always show where you are, what's happening, and what's next
 
-When you order an Uber, the app tells you where the car is, how long until it arrives, and the one thing you can do right now. The Domino's tracker does the same for a pizza: Order placed → Prep → Bake → Out for delivery, with the current step lit up. Nobody has to read instructions.
+An Uber shows where the car is, when it arrives and the one thing you can do now. The Domino's tracker lights the current step: Order placed → Prep → Bake → Out for delivery. Nobody reads instructions.
 
 ReviewBoost works the same way. **Every screen answers three questions, in this order, at the top:**
 
@@ -156,7 +156,7 @@ Headings use `text-wrap: balance`; paragraphs use `text-wrap: pretty`.
 
 **Depth.**
 - Cards are flat with hairline borders and no shadows.
-- The only shadow on a control is the filled button's glossy edge (`--shadow-button`: a light top edge, a dark bottom edge and a 1–2px drop). It gets a slightly stronger version on hover.
+- The only control shadow is the filled button's glossy edge (`--shadow-button`: light top, dark bottom, 1–2px drop), a little stronger on hover.
 - Popovers and sheets use `--shadow-float`.
 
 **Motion.**
@@ -307,18 +307,18 @@ Each screen follows the same pattern: what it's for, its status line, its one ne
 - **What it's for:** a quick daily check, not an analytics wall.
 - **Status:** "All good" or "Needs you", followed by today's count ("3 ratings today").
 - **Next action:** the first thing that needs attention, in this order:
-  1. Google link missing → "Add Google link"
-  2. No Tag → "Create a Tag"
-  3. Tag not programmed → "Program a tag" or "Print your code"
-  4. Tag needs rewriting → "Program a tag"
-  5. Unread ratings → "Read feedback"
+  1. Tags off (no plan, cancelled, suspended) or a failed payment → "Choose a plan" / "Update payment" (owner only)
+  2. Unread ratings → "Read feedback", saying how many are 3★ or lower
+  3. No Tag → "Create a Tag"
+  4. Google link missing → "Add Google link"
+  5. Tag not programmed or needs rewriting → "Program a tag" or "Print your code"
 - **Content:**
   - An attention card when something needs the owner.
   - "This week", comparing ratings this week with last week, in plain numbers.
   - Recent ratings, the newest three.
   - A link to Set up while setup isn't finished.
 - **States:**
-  - *New owner, no ratings:* a short setup path pointing to Set up.
+  - *New owner, no ratings:* Set up's three steps, small, with "Open Set up".
   - *Active:* the content above.
   - *Google link is a listing, not a review link:* a warning card with "Fix link".
   - *Error:* "Home didn't load." with [Try again].
@@ -342,7 +342,7 @@ This is the one place an owner programs anything.
 - **Next action:**
   - Not programmed: "Program Tag" on Android with NFC, otherwise "Print code".
   - Live: "Print code" as a secondary action.
-- **Program sheet:** a full-screen dialog showing "Hold the top of your phone on the Tag", then "Writing…", then "Done. Your Tag is locked." The failure message is "Didn't write. Hold still and try again."
+- **Program sheet:** full screen: "Program your Tag" → "Hold near your Tag" → "Tag ready". A failure says why, e.g. "Couldn’t program this Tag".
 - **Other actions:** rename, rotate the code (inside "Advanced", with confirmation), and retire.
 
 ### 7.4 Customer page editor `/customer-page`
@@ -361,11 +361,10 @@ This is the one place an owner programs anything.
 - **Status:** "4 unread" or "All caught up".
 - **Next action:** open the newest unread rating.
 - **Content:**
-  - Tabs: **Ratings** and **Insights**.
-  - Filters: stars and Read/Sorted.
-  - Each row shows stars, the time ("2 min ago"), which Tag it came from, and Read/Sorted.
+  - Tabs: **Needs you** (unread, or 3★ or lower and not sorted), **Everything**, **Insights**.
+  - Each row shows stars, the time ("2 min ago"), the Tag when there are several, and Read/Sorted.
   - Insights shows a real rating trend and distribution. Missing days appear as gaps, and a small-sample warning shows when there's too little data.
-- **One rating `/feedback/[id]`:** the stars, time and Tag, with "Mark as sorted". The rating is never labelled as a Google review: we know a customer was **sent to** Google, not that they posted.
+- **One rating `/feedback/[id]`:** stars, time and Tag; opening it marks it read; "Mark as sorted" is black for 3★ or lower. Never labelled a Google review: we know a customer was **sent to** Google, not that they posted.
 - **Empty:**
   - "Nothing yet. Ratings show up here after customers tap or scan your Tag." with [Go to Set up].
   - "No ratings match this filter." with [Clear filter].
@@ -574,7 +573,7 @@ For every screen that changes:
 |---|---|---|
 | 1 | Warm-white palette, glossy button, dark mode | ✅ PR #82 |
 | 2 | Set up page with 3 steps and "Show me how" | ✅ PR #82 |
-| 3 | Selected tab in ink, never-dead buttons, loading keeps its label, empty states with actions, unsaved-changes warning | ✅ PR #82 |
+| 3 | Ink selected tab, never-dead buttons, labelled loading, empty states with actions, unsaved-changes warning | ✅ PR #82 |
 | 4 | Google Sheets + CSV import, list removal | ✅ PR #79 (Google keys 👤) |
 | 5 | Connections directory with official logos | ✅ PR #79 (logo files 👤) |
 | 6 | Sign-in screen: labelled Google / Apple / Email + Sign in with Apple | 🔨 |
