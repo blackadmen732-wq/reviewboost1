@@ -272,16 +272,29 @@ describe("the trend line", () => {
     return summarizeInsights(periods, rowsFor(periods, { buckets: days }), false);
   }
 
-  it("draws 30 days day by day when most days have ratings", () => {
-    const days = Array.from({ length: 30 }, (_, index) => (index % 3 === 2 ? [] : [5, 4]));
+  it("draws 30 days day by day when most days have ratings and there are about five a day", () => {
+    const days = Array.from({ length: 30 }, (_, index) => (index % 3 === 2 ? [] : [5, 4, 5, 4, 5, 4, 5, 4]));
     const insights = daily(days);
     expect(insights.trendUnit).toBe("day");
     expect(insights.trend).toHaveLength(30);
     expect(insights.trend[0]).toMatchObject({ startDate: "2026-08-25", endDate: "2026-08-25" });
   });
 
+  it("draws a month of a rating or two a day by week, where one customer cannot swing the line", () => {
+    // Every day rated, so coverage alone would draw it daily: 5, 3, 5, 3…
+    const days = Array.from({ length: 30 }, (_, index) => (index % 2 === 0 ? [5] : [3, 3]));
+    const insights = daily(days);
+    expect(insights.trendUnit).toBe("week");
+    expect(insights.trend).toHaveLength(5);
+    // Each whole week holds both kinds of day, so its average sits between them.
+    for (const point of insights.trend.slice(1)) {
+      expect(point.average).toBeGreaterThanOrEqual(3.5);
+      expect(point.average).toBeLessThanOrEqual(3.8);
+    }
+  });
+
   it("keeps a day nobody rated as a gap, never a zero and never an interpolation", () => {
-    const days = Array.from({ length: 30 }, () => [4]);
+    const days = Array.from({ length: 30 }, () => [4, 4, 4, 4, 4, 4]);
     days[10] = [];
     days[11] = [5];
     const insights = daily(days);
@@ -329,7 +342,7 @@ describe("the trend line", () => {
   });
 
   it("counts plotted points only where somebody rated", () => {
-    const days = Array.from({ length: 30 }, (_, index) => (index < 20 ? [4] : []));
+    const days = Array.from({ length: 30 }, (_, index) => (index < 20 ? [4, 4, 4, 4, 4, 4, 4, 4] : []));
     expect(plottedPoints(daily(days).trend)).toBe(20);
   });
 

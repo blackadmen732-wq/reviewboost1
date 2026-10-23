@@ -51,6 +51,15 @@ export type TrendUnit = "day" | "week";
 export const DAILY_COVERAGE = 0.5;
 
 /**
+ * ...and only when there are about this many ratings a day. A daily average of
+ * one or two ratings swings between 3 and 5 stars from one customer to the
+ * next: drawn as a line it looks like a crisis and is noise. Weekly points of
+ * the same ratings show the trend; past five a day, a day holds enough to
+ * stand on its own. Each point's count is still one tap away either way.
+ */
+export const DAILY_VOLUME = 5;
+
+/**
  * How far apart two averages, as shown, must be before the screen says
  * "Improving" or "Declining". A display rule chosen so that the words never
  * outrun the numbers next to them — NOT a test of statistical significance,
@@ -284,8 +293,13 @@ export function summarizeInsights(
     };
   });
 
-  const coverage = fetched.filter((point) => point.total > 0).length / Math.max(fetched.length, 1);
-  const byWeek = periods.unit === "day" && periods.range === 30 && coverage < DAILY_COVERAGE;
+  const days = Math.max(fetched.length, 1);
+  const coverage = fetched.filter((point) => point.total > 0).length / days;
+  const perDay = fetched.reduce((sum, point) => sum + point.total, 0) / days;
+  const byWeek =
+    periods.unit === "day" &&
+    periods.range === 30 &&
+    (coverage < DAILY_COVERAGE || perDay < DAILY_VOLUME);
   const trendUnit: TrendUnit = byWeek ? "week" : periods.unit;
   const trend: TrendPoint[] = (byWeek ? weeksFromDays(fetched) : fetched).map((point) => ({
     startDate: point.startDate,

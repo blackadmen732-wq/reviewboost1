@@ -52,20 +52,29 @@ function build(
 }
 
 /**
- * A realistic month, day by day: 84 ratings on 29 of 30 days (day 10 had
- * none), averaging 4.27 (shown 4.3), against 71 averaging 4.0.
+ * A quiet month: 84 ratings on 29 of 30 days (day 10 had none), averaging
+ * 4.27 (shown 4.3). Three a day is too few to draw day by day.
  */
-const MONTH: number[][] = Array.from({ length: 30 }, (_, day) => {
+const QUIET_MONTH: number[][] = Array.from({ length: 30 }, (_, day) => {
   if (day === 10) return [];
   if (day === 20) return [5, 4, 1];
   if (day === 5 || day === 15 || day === 25) return [4, 4];
   return [5, 4, 4];
 });
 
+/**
+ * A busy month, day by day: the same days three times over, 252 ratings,
+ * still averaging 4.27 (shown 4.3), against 71 averaging 4.0.
+ */
+const MONTH: number[][] = QUIET_MONTH.map((day) => [...day, ...day, ...day]);
+
 const FULL = {
   previous: [...times(61, 4), ...times(5, 5), ...times(5, 3)],
   buckets: MONTH,
 };
+
+/** The same comparison over the quiet month: what most small businesses see. */
+const QUIET = { ...FULL, buckets: QUIET_MONTH };
 
 function renderView(insights: ReturnType<typeof build>, locations = ONE_PLACE, locationId: string | null = null) {
   return render(<InsightsView insights={insights} locations={locations} locationId={locationId} />);
@@ -116,11 +125,11 @@ describe("10 or more ratings", () => {
 
   it("leads with the average and the ratings it rests on", () => {
     renderView(full);
-    expect(full.current.total).toBe(84);
+    expect(full.current.total).toBe(252);
     const summary = screen.getByRole("region", { name: "Customer experience" });
     expect(within(summary).getByText("4.3")).toBeVisible();
     expect(within(summary).getByText("/ 5")).toBeVisible();
-    expect(screen.getByText("84 ratings · Aug 25 – Sep 23")).toBeVisible();
+    expect(screen.getByText("252 ratings · Aug 25 – Sep 23")).toBeVisible();
   });
 
   it("compares with the previous period and names its exact days", () => {
@@ -146,6 +155,12 @@ describe("10 or more ratings", () => {
     expect(container.querySelectorAll('[data-testid="trend-area"]')).toHaveLength(2);
     // A clean month line: only the latest point carries a dot until one is chosen.
     expect(container.querySelectorAll('[data-testid="trend-point"]')).toHaveLength(1);
+  });
+
+  it("draws a quiet month by week, so one customer cannot swing the line", () => {
+    renderView(build(QUIET));
+    expect(screen.getByRole("img", { name: /average rating by week, aug 25 – sep 23/i })).toBeVisible();
+    expect(screen.getByText("Up 0.3 on the previous 30 days · Each point is one week")).toBeVisible();
   });
 
   it("dates the axis a week apart, counted back from yesterday", () => {
@@ -187,7 +202,7 @@ describe("10 or more ratings", () => {
     const tooltip = () => screen.getByTestId("trend-tooltip");
     expect(tooltip()).toHaveTextContent("Sep 23");
     expect(tooltip()).toHaveTextContent("4.3 average");
-    expect(tooltip()).toHaveTextContent("3 ratings");
+    expect(tooltip()).toHaveTextContent("9 ratings");
     fireEvent.keyDown(chart, { key: "Home" });
     expect(tooltip()).toHaveTextContent("Aug 25");
     for (let step = 0; step < 10; step += 1) fireEvent.keyDown(chart, { key: "ArrowRight" });
@@ -227,7 +242,7 @@ describe("10 or more ratings", () => {
   });
 
   it("opens the ratings behind each star row in Everything, same days and place", () => {
-    renderView(full, TWO_PLACES, "loc-coral");
+    renderView(build(QUIET), TWO_PLACES, "loc-coral");
     const link = screen.getByRole("link", { name: /^1 star: 1 rating\. Show them\.$/ });
     const url = new URL(link.getAttribute("href")!, "https://reviewboost.fit");
     expect(url.pathname).toBe("/feedback");
@@ -383,7 +398,7 @@ describe("Home's one line", () => {
   ];
 
   it("summarises a full month and points to Insights", () => {
-    const line = insightsHomeLine(build(FULL));
+    const line = insightsHomeLine(build(QUIET));
     expect(line).toBe("4.3 average · 84 ratings · Improving");
     render(
       <OwnerHome
@@ -402,7 +417,7 @@ describe("Home's one line", () => {
   });
 
   it("leaves the direction out when there was nothing to compare with", () => {
-    expect(insightsHomeLine(build({ ...FULL, previous: [] }))).toBe("4.3 average · 84 ratings");
+    expect(insightsHomeLine(build({ ...QUIET, previous: [] }))).toBe("4.3 average · 84 ratings");
   });
 
   it("says nothing on a thin month", () => {
