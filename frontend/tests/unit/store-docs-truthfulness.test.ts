@@ -160,3 +160,33 @@ describe("the App Store listing describes this product", () => {
     expect(submission).not.toMatch(/Programme NFC/);
   });
 });
+
+describe("the App Review instructions can be followed in the app that ships", () => {
+  const reviewDocs = ["docs/app-store/SUBMISSION.md", "docs/mobile/APP_STORE_METADATA.md"].map(doc);
+
+  it("never asks the reviewer to send a text from the iPhone app", () => {
+    // The iPhone Text Requests tab lists requests and texts left. It has no
+    // composer, so "enter a phone number and tap Send" is a step a reviewer
+    // cannot do, which reads as an incomplete submission (guideline 2.1).
+    for (const text of reviewDocs) {
+      expect(text).not.toMatch(/Text Requests screen, enter a phone number/i);
+    }
+  });
+
+  it("uses the words the NFC screen actually shows", () => {
+    for (const text of reviewDocs) {
+      expect(text).not.toMatch(/Hold Near Reader/);
+      expect(text).not.toMatch(/green check and "Done"/);
+    }
+  });
+
+  it("does not depend on inviting a team member, which the product cannot do", () => {
+    for (const text of reviewDocs) {
+      expect(text).not.toMatch(/invite a fictional team member/i);
+    }
+  });
+
+  it("gives the review sign-in as a code, because there are no passwords", () => {
+    expect(doc("docs/app-store/SUBMISSION.md")).toMatch(/REVIEW_SIGN_IN_CODE/);
+  });
+});

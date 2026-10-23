@@ -51,7 +51,7 @@ export default function SelectOrgScreen() {
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
             <Text style={styles.greeting}>Welcome back, {name}</Text>
-            <Text style={styles.subtitle}>Select an organization</Text>
+            <Text style={styles.subtitle}>Choose your business</Text>
           </View>
           <Tappable
             style={styles.logoutButton}
@@ -102,7 +102,7 @@ export default function SelectOrgScreen() {
           ) : (
             <View>
               <Text style={styles.empty}>
-                No organizations found for this account
+                No business on this account yet
               </Text>
               {/* Someone with no business must still be able to delete their
                   account in the app (launch gap L1, Apple 5.1.1(v)). */}

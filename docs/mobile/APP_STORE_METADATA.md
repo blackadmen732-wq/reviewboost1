@@ -193,9 +193,11 @@ Do this only after the production migration is live. The app's routes need it (a
 4. Create some feedback the honest way: open the demo Tag's customer page on a phone and
    rate it about five times with a mix of stars. Customers only pick stars; there is
    nothing for them to type.
-5. Create a **second, non-owner account** for the deletion check: invite a fictional team
-   member to the demo business, sign in as them once, and keep its email and emailed code
-   handy. App Review may ask to see that a team member can delete their own account.
+5. Create a **second account with no business** for the deletion check: sign in once with a
+   different fictional address and stop at "Name your business". ReviewBoost has no way to
+   invite a team member, so this is the non-owner case App Review can reach. On iPhone that
+   account opens on "No business on this account yet" with "Delete my account", which deletes that
+   sign-in on its own. Keep its email handy.
 6. On a TestFlight build, sign in with the email and code and confirm every tab loads.
 7. After the review, rotate the code, or unset both variables if no review is pending.
 
@@ -212,7 +214,7 @@ WHO THIS APP IS FOR
 ReviewBoost is a free companion app for businesses that already use ReviewBoost. Customers never install it: they tap a ReviewBoost Tag (an NFC tag with a printed QR code) at the business, give a star rating in their phone's browser, and are offered the business's public review page. This app lets the business owner keep up with those ratings and program the Tags.
 
 SIGNING IN
-Sign-in normally uses a six-digit code sent by email. Enter the demo email on the first screen, tap Continue, then type the demo code from the Sign-In Information section where the emailed code would go. That signs in to a demo business with fictional data only. If an organization list appears, choose "Harbor Street Coffee (Demo)".
+Sign-in normally uses a six-digit code sent by email. Enter the demo email on the first screen, tap Continue, then type the demo code from the Sign-In Information section where the emailed code would go. That signs in to a demo business with fictional data only. If "Choose your business" appears, choose "Harbor Street Coffee (Demo)".
 
 WHAT TO LOOK AT
 - Feed: ratings as they arrive.

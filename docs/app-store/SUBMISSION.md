@@ -102,9 +102,9 @@ google reviews,review booster,NFC review,qr review,small business,customer revie
 
 | Field | Value |
 |---|---|
-| Email | TODO |
-| Password | TODO |
-| Notes | See "App Review notes" below |
+| User name | The value of `REVIEW_SIGN_IN_EMAIL` |
+| Password | The value of `REVIEW_SIGN_IN_CODE` (six digits). The app has no passwords: the reviewer types this where the emailed code normally goes |
+| Notes | See "App Review notes" below. `docs/mobile/APP_STORE_METADATA.md` has the full setup and the notes to paste |
 
 ### App Review notes
 
@@ -115,7 +115,7 @@ download is required.
 
 TO TEST THE CORE FLOW
 1. Sign in with the demo credentials above.
-2. Open any Tag from the Tags tab, then tap "Preview customer page".
+2. Open any Tag from the Tags tab, then tap "Open customer page".
 3. Tap any star — you will be sent to the configured Google review URL.
    (The demo account points to a real but publicly known Google My Business
    listing — this is intentional so reviewers can see the destination.)
@@ -123,20 +123,20 @@ TO TEST THE CORE FLOW
 TO TEST NFC (requires iPhone 7+ with iOS 14+)
 1. On the Tags tab, tap the Tag you want to program.
 2. Tap "Program NFC" and hold a blank NTAG213 or NTAG215 tag to the top of
-   the device when the screen says "Hold Near Reader".
-3. A green check and "Done" means the tag carries the review URL. Tap it with
+   the device when the screen says "Hold near your Tag".
+3. A green check and "Tag ready" means the tag carries the review URL. Tap it with
    any NFC-capable phone to verify.
    NFC tags are not required to use the app — this feature is opt-in, and the
    app is fully usable with printed QR codes alone.
 
-TO TEST TEXT REQUESTS
-1. From the Text Requests screen, enter a phone number you control and tap Send.
-2. You will receive an SMS with a link to the review page.
-   (The demo account has a small SMS credit balance for review purposes.)
+TEXT REQUESTS
+The Text Requests tab shows texts left and recent requests. Requests are
+scheduled from the web app, not this one, and the demo business has sending
+turned off, so no text is sent during review.
 
 BILLING
-The demo account is on an active paid plan. No card is required during the
-App Review session.
+Nothing is bought in this app. The demo business's plan is set up for the
+review period on the web; no card is needed during the App Review session.
 
 BACKGROUND OPERATION
 The app does not run in the background and does not use background app refresh,
