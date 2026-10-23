@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { BackLink } from "@/components/ui/back-link";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { CustomerPageEditor } from "@/features/customer-page/customer-page-editor";
 import {
@@ -9,7 +10,7 @@ import {
 } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Customer Page",
+  title: "Customer page",
   robots: { index: false, follow: false },
 };
 
@@ -28,6 +29,7 @@ export default async function CustomerPagePage() {
 
   return (
     <OwnerShell unreadCount={counts.unread} businessName={organization.name}>
+      <BackLink href="/stands">Set up</BackLink>
       {/* Tighter than the shared PageHeader: title, description, photo,
           preview and Publish read as one workflow on a phone. */}
       <header className="mb-6">

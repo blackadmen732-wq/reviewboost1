@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
+import { EditorSkeleton } from "@/features/customer-page/editor-skeleton";
 import { PhoneFrame } from "@/features/customer-page/phone-frame";
 import { VisitStars } from "@/features/customer-page/visit-stars";
 import Link from "next/link";
@@ -468,13 +469,7 @@ export function CustomerPageEditor({
     !draftSaving &&
     !pendingPublication;
 
-  if (!loaded) {
-    return (
-      <p role="status" className="py-8 text-sm text-muted">
-        Loading your customer page…
-      </p>
-    );
-  }
+  if (!loaded) return <EditorSkeleton />;
   if (loadError) {
     return (
       <div className="max-w-md rounded-[var(--radius-card)] border border-border bg-surface p-5">
@@ -622,7 +617,7 @@ export function CustomerPageEditor({
                 Published
               </>
             ) : (
-              "Publish"
+              "Publish page"
             )}
           </Button>
           <p className="mt-2 text-center text-xs text-muted lg:text-left">
@@ -686,6 +681,7 @@ export function CustomerPageEditor({
           size="editor"
         >
           <CustomerVisitView
+            headingAs="p"
             heroUrl={heroUrl}
             transform={DEFAULT_HERO_TRANSFORM}
             businessName={businessName}

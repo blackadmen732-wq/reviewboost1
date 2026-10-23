@@ -490,7 +490,7 @@ describe("Customer page recovery and publication state", () => {
     );
     expect(screen.queryByText("Customer page published")).toBeNull();
     expect(screen.getByText("Preview · not published yet")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Publish page" })).toBeEnabled();
   });
 });
 
@@ -523,7 +523,7 @@ describe("Customer Page saved-photo recovery", () => {
     render(<CustomerPageEditor businessName="Test business" />);
     await screen.findByRole("button", { name: "Add photo" });
     expect(document.querySelector("[data-hero-layer] img")).toBeNull();
-    expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Publish page" })).toBeEnabled();
   });
 
   it("saves removal as null, preserves other fields, and keeps it removed after reopening", async () => {
@@ -560,7 +560,7 @@ describe("Customer Page saved-photo recovery", () => {
     await screen.findByRole("button", { name: "Remove photo" });
     fireEvent.click(screen.getByRole("button", { name: "Remove photo" }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "Publish page" })).toBeEnabled(),
     );
     expect(draft).toEqual({
       heroAssetId: null,
@@ -723,8 +723,8 @@ describe("Customer Page saved-photo recovery", () => {
       }),
     );
     render(<CustomerPageEditor businessName="Test business" />);
-    await screen.findByRole("button", { name: "Publish" });
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await screen.findByRole("button", { name: "Publish page" });
+    fireEvent.click(screen.getByRole("button", { name: "Publish page" }));
     await screen.findByText("Customer page published");
     expect(posts).toBe(1);
     expect(screen.getByRole("button", { name: "Published" })).toBeDisabled();
@@ -748,10 +748,10 @@ describe("Customer Page saved-photo recovery", () => {
       }),
     );
     render(<CustomerPageEditor businessName="Test business" />);
-    await screen.findByRole("button", { name: "Publish" });
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await screen.findByRole("button", { name: "Publish page" });
+    fireEvent.click(screen.getByRole("button", { name: "Publish page" }));
     await screen.findByRole("button", { name: "Check published page" });
-    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Publish page" })).toBeDisabled();
     readable = true;
     fireEvent.click(
       screen.getByRole("button", { name: "Check published page" }),

@@ -66,6 +66,12 @@ export interface CustomerVisitViewProps {
   footerLine: string;
   children: ReactNode;
   language?: ReactNode;
+  /**
+   * The question is the page's heading on /q. Drawn inside another page — the
+   * owner's preview, the homepage demo — it must not be a second h1 there; it
+   * looks identical either way (.visit-heading sets every property).
+   */
+  headingAs?: "h1" | "p";
 }
 
 export function CustomerVisitView({
@@ -77,6 +83,7 @@ export function CustomerVisitView({
   footerLine,
   children,
   language,
+  headingAs: Heading = "h1",
 }: CustomerVisitViewProps) {
   const crop = clampHeroTransform(transform);
 
@@ -104,9 +111,9 @@ export function CustomerVisitView({
                 {businessName}
               </p>
             ) : null}
-            <h1 className="visit-heading" data-screen-heading tabIndex={-1}>
+            <Heading className="visit-heading" data-screen-heading tabIndex={-1}>
               {heading}
-            </h1>
+            </Heading>
             {support ? <p className="visit-support">{support}</p> : null}
           </div>
         ) : null}

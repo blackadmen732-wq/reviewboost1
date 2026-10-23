@@ -60,9 +60,9 @@ export function PublicHome() {
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <div>
-                  <h2 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
+                  <h3 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
                     {step.title}
-                  </h2>
+                  </h3>
                   <p className="mt-2 max-w-[36ch] text-base leading-relaxed text-muted">
                     {step.body}
                   </p>
@@ -205,7 +205,7 @@ export function PublicHome() {
           <div className="mt-8 divide-y divide-border border-y border-border">
             {FAQ.map((entry) => (
               <details key={entry.question} className="group py-4">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-medium text-ink [&::-webkit-details-marker]:hidden">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 text-base font-medium text-ink [&::-webkit-details-marker]:hidden">
                   {entry.question}
                   <span
                     aria-hidden="true"
