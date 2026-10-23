@@ -364,6 +364,96 @@ describe("what each event does", () => {
     expect(call?.args["p_stripe_price_id"]).toBe("price_growth_test");
   });
 
+  it("reads the new plan's period line, not the proration that comes first", async () => {
+    // The renewal after Starter → Growth. Line 0 is the credit for unused
+    // Starter time, dated to the period that just ended. Reading it minted
+    // Starter's allowance, already expired, for a business paying for Growth.
+    rpcResults.set("rpc_billing_apply_invoice_paid", { data: "granted", error: null });
+    const { applyStripeEvent } = await import("@/lib/server/billing-service");
+
+    await applyStripeEvent({
+      id: "evt_inv_upgrade",
+      type: "invoice.paid",
+      created: Math.floor(Date.now() / 1000),
+      data: {
+        object: {
+          id: "in_upgrade",
+          customer: "cus_test1",
+          amount_paid: 9100,
+          lines: {
+            data: [
+              {
+                parent: {
+                  type: "subscription_item_details",
+                  subscription_item_details: { proration: true },
+                },
+                pricing: { type: "price_details", price_details: { price: "price_starter_test" } },
+                period: { start: 1_700_500_000, end: 1_702_592_000 },
+              },
+              {
+                parent: {
+                  type: "subscription_item_details",
+                  subscription_item_details: { proration: true },
+                },
+                pricing: { type: "price_details", price_details: { price: "price_growth_test" } },
+                period: { start: 1_700_500_000, end: 1_702_592_000 },
+              },
+              {
+                parent: {
+                  type: "subscription_item_details",
+                  subscription_item_details: { proration: false },
+                },
+                pricing: { type: "price_details", price_details: { price: "price_growth_test" } },
+                period: { start: 1_702_592_000, end: 1_705_270_400 },
+              },
+            ],
+          },
+        },
+      },
+    } as never);
+
+    const call = rpcCalls.find(({ name }) => name === "rpc_billing_apply_invoice_paid");
+    expect(call?.args["p_stripe_price_id"]).toBe("price_growth_test");
+    expect(call?.args["p_period_start"]).toBe(new Date(1_702_592_000 * 1000).toISOString());
+    expect(call?.args["p_period_end"]).toBe(new Date(1_705_270_400 * 1000).toISOString());
+  });
+
+  it("mints nothing from an invoice that is only prorations", async () => {
+    rpcResults.set("rpc_billing_apply_invoice_paid", { data: "no_plan", error: null });
+    const { applyStripeEvent } = await import("@/lib/server/billing-service");
+
+    await applyStripeEvent({
+      id: "evt_inv_proration_only",
+      type: "invoice.paid",
+      created: Math.floor(Date.now() / 1000),
+      data: {
+        object: {
+          id: "in_proration_only",
+          customer: "cus_test1",
+          amount_paid: 1500,
+          lines: {
+            data: [
+              {
+                parent: {
+                  type: "subscription_item_details",
+                  subscription_item_details: { proration: true },
+                },
+                pricing: { type: "price_details", price_details: { price: "price_growth_test" } },
+                period: { start: 1_700_500_000, end: 1_702_592_000 },
+              },
+            ],
+          },
+        },
+      },
+    } as never);
+
+    const call = rpcCalls.find(({ name }) => name === "rpc_billing_apply_invoice_paid");
+    // No period line: no price and no period, which the database answers
+    // with `no_plan` rather than a grant.
+    expect(call?.args["p_stripe_price_id"]).toBeNull();
+    expect(call?.args["p_period_end"]).toBeNull();
+  });
+
   it("mints nothing on a failed payment", async () => {
     const { applyStripeEvent } = await import("@/lib/server/billing-service");
     const outcome = await applyStripeEvent({

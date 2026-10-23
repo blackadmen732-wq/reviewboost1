@@ -65,8 +65,57 @@ function subscriptionFields(subscription: Stripe.Subscription): {
   };
 }
 
+/** The parts of an invoice line this file reads, across API versions. */
+interface InvoiceLineShape {
+  parent?: {
+    type?: string;
+    subscription_item_details?: { proration?: boolean } | null;
+    invoice_item_details?: { proration?: boolean } | null;
+  } | null;
+  /** Before `parent`: "subscription" or "invoiceitem". */
+  type?: string;
+  /** Before `parent`. */
+  proration?: boolean;
+  pricing?: { price_details?: { price?: string | { id?: string } } };
+  price?: { id?: string } | string;
+  plan?: { id?: string };
+  period?: { start?: number; end?: number };
+}
+
+function isProration(line: InvoiceLineShape): boolean {
+  return Boolean(
+    line.parent?.subscription_item_details?.proration ??
+      line.parent?.invoice_item_details?.proration ??
+      line.proration,
+  );
+}
+
+function isSubscriptionLine(line: InvoiceLineShape): boolean {
+  if (line.parent?.type) return line.parent.type === "subscription_item_details";
+  if (line.type) return line.type === "subscription";
+  return true;
+}
+
 /**
- * The price an invoice was for.
+ * The line that pays for the coming period.
+ *
+ * Not simply the first line. After a plan change, the renewal invoice opens
+ * with the proration lines — "unused time on Starter" first — and only then
+ * the new plan's period. Reading line 0 there mints the old plan's allowance,
+ * dated to a period that has already ended, so a business that upgraded pays
+ * for Growth and receives texts that expire on arrival.
+ *
+ * An invoice made only of prorations (an upgrade invoiced immediately) has no
+ * such line. It mints nothing; the new plan's allowance arrives with the next
+ * period's invoice, as every other allowance does.
+ */
+function periodLine(invoice: Stripe.Invoice): InvoiceLineShape | undefined {
+  const lines = (invoice.lines?.data ?? []) as unknown as InvoiceLineShape[];
+  return lines.find((line) => isSubscriptionLine(line) && !isProration(line));
+}
+
+/**
+ * The price a period line was for.
  *
  * Stripe moved this. Through the 2025 API versions a line item carried
  * `price`; from `2026-08-26.dahlia` it carries `pricing.price_details.price`,
@@ -76,14 +125,7 @@ function subscriptionFields(subscription: Stripe.Subscription): {
  * anywhere. Both shapes are read, newest first, and a subscription line's own
  * price is the last resort.
  */
-function invoicePriceId(invoice: Stripe.Invoice): string | null {
-  const line = invoice.lines?.data?.[0] as
-    | {
-        pricing?: { price_details?: { price?: string | { id?: string } } };
-        price?: { id?: string } | string;
-        plan?: { id?: string };
-      }
-    | undefined;
+function linePriceId(line: InvoiceLineShape | undefined): string | null {
   if (!line) return null;
 
   const fromPricing = line.pricing?.price_details?.price;
@@ -347,14 +389,14 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
       const orgId = await orgForCustomer(customerIdOf(invoice.customer));
       if (!orgId) return "unknown_customer";
 
-      const line = invoice.lines?.data?.[0];
+      const line = periodLine(invoice);
 
       // THE ONLY THING THAT MINTS MONTHLY SMS. Not checkout, not subscription
       // creation: a paid invoice for a billing period, once, expiring at the
       // end of the period it paid for.
       // The price, not a plan name: the database maps it, and an unknown
       // price fails the event rather than minting anyone's allowance.
-      const priceId = invoicePriceId(invoice);
+      const priceId = linePriceId(line);
       const { error } = await service.rpc("rpc_billing_apply_invoice_paid", {
         p_org_id: orgId,
         p_invoice_id: invoice.id,
