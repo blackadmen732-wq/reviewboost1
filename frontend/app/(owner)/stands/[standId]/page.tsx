@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/ui/back-link";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { TagDetail } from "@/features/tags/tag-detail";
 import { permissionsFor } from "@/lib/owner/permissions";
-import { getStand, requireOwner } from "@/lib/server/owner-data";
+import { serviceNotice } from "@/lib/owner/service-state";
+import { getServiceState, getStand, getUnreadCount, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
   title: "Tag",
@@ -24,23 +25,27 @@ export default async function TagDetailPage({
   const { standId } = await params;
   const { organization } = await requireOwner(`/stands/${standId}`);
   if (!UUID.test(standId)) notFound();
-  const stand = await getStand(organization.orgId, standId);
+  const [stand, service, unread] = await Promise.all([
+    getStand(organization.orgId, standId),
+    getServiceState(organization.orgId),
+    getUnreadCount(organization.orgId),
+  ]);
   if (!stand) notFound();
+  const can = permissionsFor(organization.role);
+  const billing = serviceNotice(service);
 
   return (
-    <OwnerShell businessName={organization.name}>
-      <p className="mb-4">
-        <Link
-          href="/stands"
-          className="text-sm font-medium text-muted underline-offset-4 hover:text-ink hover:underline"
-        >
-          Set up
-        </Link>
-      </p>
+    <OwnerShell unreadCount={unread} businessName={organization.name}>
+      <BackLink href="/stands">Set up</BackLink>
       <TagDetail
         organizationId={organization.orgId}
         stand={stand}
-        canManage={permissionsFor(organization.role).manageTags}
+        canManage={can.manageTags}
+        closedNotice={
+          billing?.kind === "plan"
+            ? { title: billing.title, action: can.manageBilling ? billing.action : null }
+            : null
+        }
       />
     </OwnerShell>
   );

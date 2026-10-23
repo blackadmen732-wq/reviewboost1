@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 
+import { tagLabels } from "@/features/dashboard/feedback-list";
 import { OwnerHome } from "@/features/dashboard/owner-home";
 import { deriveHomeModel } from "@/features/dashboard/home-model";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
@@ -11,6 +12,7 @@ import { insightsHomeLine } from "@/lib/owner/insights";
 import {
   getFeedbackInsights,
   getOwnerCounts,
+  getServiceState,
   hasPublishedCustomerPhoto,
   listLocations,
   listReviews,
@@ -34,7 +36,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const { organization } = await requireOwner("/home");
 
-  const [counts, stands, locations, unread, hasCustomerPhoto, insights] = await Promise.all([
+  const [counts, stands, locations, unread, hasCustomerPhoto, insights, service] = await Promise.all([
     getOwnerCounts(organization.orgId, organization.timezone),
     listStands(organization.orgId),
     listLocations(organization.orgId),
@@ -45,14 +47,19 @@ export default async function HomePage() {
     }),
     hasPublishedCustomerPhoto(organization.orgId),
     getFeedbackInsights(organization.orgId, organization.timezone, { range: 30 }),
+    getServiceState(organization.orgId),
   ]);
+  const can = permissionsFor(organization.role);
+  const tagLabel = tagLabels(stands);
 
   const model = deriveHomeModel({
     counts,
     stands,
     hasLocation: locations.length > 0,
-    canManage: permissionsFor(organization.role).manageTags,
+    canManage: can.manageTags,
     hasCustomerPhoto,
+    service,
+    canManageBilling: can.manageBilling,
   });
 
   return (
@@ -71,6 +78,7 @@ export default async function HomePage() {
           isRead: item.isRead,
           isResolved: item.isResolved,
           noteCount: item.noteCount,
+          tagLabel: tagLabel(item.standId),
         }))}
       />
     </OwnerShell>

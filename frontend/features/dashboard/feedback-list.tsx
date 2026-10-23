@@ -17,6 +17,20 @@ export interface FeedbackItem {
   isRead: boolean;
   isResolved: boolean;
   noteCount: number;
+  /** The Tag it came from, when the business has more than one. */
+  tagLabel?: string | null;
+}
+
+/**
+ * Which Tag a row came from, only when there is more than one to tell apart.
+ * With a single Tag the same name on every row is noise.
+ */
+export function tagLabels(
+  stands: ReadonlyArray<{ standId: string; label: string }>,
+): (standId: string) => string | null {
+  if (stands.length < 2) return () => null;
+  const labels = new Map(stands.map((stand) => [stand.standId, stand.label]));
+  return (standId) => labels.get(standId) ?? null;
 }
 
 export function FeedbackList({ items }: { items: FeedbackItem[] }) {
@@ -42,12 +56,18 @@ export function FeedbackList({ items }: { items: FeedbackItem[] }) {
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2.5">
-                <Stars rating={item.rating} size="md" />
+                <Stars rating={item.rating} size="md" className="shrink-0" />
 
                 {item.isResolved ? (
                   <span className="inline-flex items-center gap-1 text-sm text-muted">
                     <Check className="size-3.5" strokeWidth={2.5} aria-hidden="true" />
                     Sorted
+                  </span>
+                ) : null}
+
+                {item.tagLabel ? (
+                  <span className="min-w-0 truncate text-sm text-muted" data-row-tag>
+                    {item.tagLabel}
                   </span>
                 ) : null}
 

@@ -7,6 +7,7 @@ import {
   tagProgramPhaseLabel,
   summarizeTags,
   tagStatusLine,
+  unreadBody,
   type HomeCounts,
   type HomeStand,
 } from "@/features/dashboard/home-model";
@@ -345,39 +346,53 @@ describe("only active Tags count as ready", () => {
 });
 
 /**
- * The Customer Page photo is an optional setup step. It links to the editor
- * while undone, never takes the green button, and is left out when it could
- * not be read rather than shown wrong.
+ * The Customer Page photo is optional, so it is not one of the steps: Home
+ * shows Set up's own three (setup-model) and, while the published page has
+ * no photo, one quiet link to the editor. It never takes the black button,
+ * and is left out when the photo state could not be read.
  */
-describe("customer page photo step", () => {
+describe("customer page photo", () => {
   const base = { counts: emptyCounts, stands: [liveStand], hasLocation: true };
-  const photoStep = (model: ReturnType<typeof deriveHomeModel>) =>
-    model.setup?.find((step) => step.key === "photo");
 
-  it("links to the editor until a photo is published", () => {
+  it("is a quiet link, never a step or the black button, until a photo is published", () => {
     const model = deriveHomeModel({ ...base, hasCustomerPhoto: false });
-    expect(photoStep(model)).toMatchObject({ done: false, href: "/customer-page" });
-    // The one green button stays on the required path.
+    expect(model.photoNudge).toBe(true);
+    expect(model.setup?.map((step) => step.key)).toEqual(["page", "tag", "test"]);
     expect(model.primary?.href).not.toBe("/customer-page");
   });
 
-  it("is done, with no link, once a photo is live", () => {
-    expect(photoStep(deriveHomeModel({ ...base, hasCustomerPhoto: true }))).toEqual({
-      key: "photo",
-      title: "Add your photo to the customer page",
-      done: true,
-    });
+  it("goes away once a photo is live", () => {
+    expect(deriveHomeModel({ ...base, hasCustomerPhoto: true }).photoNudge).toBe(false);
   });
 
-  it("offers no link to someone the editor would refuse", () => {
-    const step = photoStep(deriveHomeModel({ ...base, hasCustomerPhoto: false, canManage: false }));
-    expect(step?.done).toBe(false);
-    expect(step?.href).toBeUndefined();
+  it("is not offered to someone the editor would refuse", () => {
+    expect(deriveHomeModel({ ...base, hasCustomerPhoto: false, canManage: false }).photoNudge).toBe(false);
   });
 
   it("is left out when the photo state could not be read", () => {
-    expect(photoStep(deriveHomeModel({ ...base, hasCustomerPhoto: null }))).toBeUndefined();
-    expect(photoStep(deriveHomeModel(base))).toBeUndefined();
+    expect(deriveHomeModel({ ...base, hasCustomerPhoto: null }).photoNudge).toBe(false);
+    expect(deriveHomeModel(base).photoNudge).toBe(false);
+  });
+});
+
+describe("Home's setup list is Set up's", () => {
+  it("counts the same three steps the Set up page does", () => {
+    const model = deriveHomeModel({ counts: emptyCounts, stands: [programmedStand], hasLocation: true });
+    expect(model.setup?.map((step) => [step.key, step.done])).toEqual([
+      ["page", true],
+      ["tag", true],
+      ["test", false],
+    ]);
+  });
+
+  it("tells a business whose Tags are off to choose a plan before testing", () => {
+    const model = deriveHomeModel({
+      counts: emptyCounts,
+      stands: [programmedStand],
+      hasLocation: true,
+      service: "no-plan",
+    });
+    expect(model.setup?.find((step) => step.key === "test")?.body).toMatch(/Choose a plan first/);
   });
 });
 
@@ -390,7 +405,7 @@ describe("a legacy Google link (a listing or short link saved before review link
     });
     expect(model.attentions.some((item) => item.kind === "google")).toBe(false);
     expect(model.primary?.label).not.toBe("Add Google link");
-    expect(model.setup?.find((step) => step.key === "google")?.done).toBe(true);
+    expect(model.setup?.find((step) => step.key === "page")?.done).toBe(true);
   });
 
   it("asks for the upgrade, saying it still works and that Tags stay the same", () => {
@@ -422,5 +437,121 @@ describe("a legacy Google link (a listing or short link saved before review link
       hasLocation: true,
     });
     expect(model.attentions.some((item) => item.kind === "google-upgrade")).toBe(false);
+  });
+});
+
+/**
+ * Setting up and serving customers are separate (migration 20260915001400).
+ * A business with no plan, a cancelled one or a suspended one has Tags that
+ * show "This review link isn't active" to everyone who scans them, so that is
+ * the first thing Home says, ahead of everything else.
+ */
+describe("Tags that are switched off", () => {
+  const ready = { counts: { ...emptyCounts, activeStands: 1 }, stands: [programmedStand], hasLocation: true };
+
+  it("leads Home with the plan, and gives the owner the button to fix it", () => {
+    const model = deriveHomeModel({ ...ready, service: "no-plan", canManageBilling: true });
+    expect(model.attentions[0]).toMatchObject({ kind: "plan", title: "Your Tag is off until you choose a plan" });
+    expect(model.attentions[0]?.body).toContain("This review link isn’t active");
+    expect(model.primary).toEqual({ label: "Choose a plan", href: "/settings/billing" });
+  });
+
+  it("is named ahead of unread ratings on a busy Home", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, recentCount: 9, unread: 3, activeStands: 1 },
+      stands: [programmedStand],
+      hasLocation: true,
+      service: "cancelled",
+      canManageBilling: true,
+    });
+    expect(model.attentions.map((item) => item.kind).slice(0, 2)).toEqual(["plan", "unread"]);
+    expect(model.primary?.label).toBe("Choose a plan");
+  });
+
+  it("tells someone who cannot change the plan, without a button they would be refused", () => {
+    const model = deriveHomeModel({ ...ready, service: "suspended", canManageBilling: false });
+    expect(model.attentions[0]?.title).toBe("Your Tags are switched off");
+    expect(model.primary?.href).not.toBe("/settings/billing");
+  });
+
+  it("asks for a new card when a payment failed, saying the Tags still work", () => {
+    const model = deriveHomeModel({ ...ready, service: "past-due", canManageBilling: true });
+    expect(model.attentions[0]).toMatchObject({ kind: "payment", body: "Your Tags still work. Update your card to keep it that way." });
+    expect(model.primary).toEqual({ label: "Update payment", href: "/settings/billing" });
+  });
+
+  it("says nothing about billing when the Tags are open, or when the state could not be read", () => {
+    for (const service of ["serving", "trial", "unknown"] as const) {
+      const model = deriveHomeModel({ ...ready, service, canManageBilling: true });
+      expect(model.attentions.some((item) => item.kind === "plan" || item.kind === "payment")).toBe(false);
+    }
+  });
+});
+
+describe("new ratings, in numbers", () => {
+  it("says how many are 3 stars or fewer, so a complaint is not read as praise", () => {
+    expect(unreadBody(4, 2)).toBe("2 are 3 stars or fewer. See them before the next rush.");
+    expect(unreadBody(4, 1)).toBe("1 is 3 stars or fewer. See them before the next rush.");
+    expect(unreadBody(3, 3)).toBe("All 3 are 3 stars or fewer. See them before the next rush.");
+    expect(unreadBody(1, 1)).toBe("It’s 3 stars or fewer. See it before the next rush.");
+  });
+
+  it("calls good news good news", () => {
+    expect(unreadBody(4, 0)).toBe("All 4 or 5 stars. Have a look when you get a minute.");
+    expect(unreadBody(1, 0)).toBe("A 4 or 5-star rating. Have a look when you get a minute.");
+  });
+
+  it("falls back to the plain line when the split is not known", () => {
+    expect(unreadBody(2, undefined)).toBe("See them before the next rush.");
+  });
+});
+
+describe("a low rating that has been read but not sorted", () => {
+  const active = { ...emptyCounts, recentCount: 6, activeStands: 1 };
+
+  it("still needs the owner on Home, as it does in Feedback's Needs you", () => {
+    const model = deriveHomeModel({ counts: { ...active, unread: 0, openLow: 2 }, stands: [programmedStand], hasLocation: true });
+    expect(model.attentions[0]).toMatchObject({ kind: "unsorted", title: "2 low ratings aren’t sorted yet" });
+    expect(model.primary).toEqual({ label: "Read feedback", href: "/feedback" });
+  });
+
+  it("gives way to unread ratings, which already say how many are low", () => {
+    const model = deriveHomeModel({ counts: { ...active, unread: 1, unreadLow: 1, openLow: 3 }, stands: [programmedStand], hasLocation: true });
+    expect(model.attentions.map((item) => item.kind)).toContain("unread");
+    expect(model.attentions.map((item) => item.kind)).not.toContain("unsorted");
+  });
+
+  it("leaves Home calm once every low rating is sorted", () => {
+    const model = deriveHomeModel({ counts: { ...active, unread: 0, openLow: 0 }, stands: [programmedStand], hasLocation: true });
+    expect(model.attentions).toEqual([]);
+    expect(model.primary).toBeNull();
+  });
+});
+
+describe("a business that has never had a plan, still setting up", () => {
+  it("finishes setting up first, with the plan said under the steps", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, hasGoogleLink: false, activeStands: 1 },
+      stands: [liveStand],
+      hasLocation: true,
+      service: "no-plan",
+      canManageBilling: true,
+    });
+    expect(model.attentions[0]?.kind).toBe("google");
+    expect(model.primary).toEqual({ label: "Add Google link", href: "/settings" });
+    expect(model.planNote).toEqual({ title: "Your Tag is off until you choose a plan", href: "/settings/billing" });
+  });
+
+  it("is asked for the plan once setup is done", () => {
+    const model = deriveHomeModel({
+      counts: { ...emptyCounts, activeStands: 1 },
+      stands: [liveStand],
+      hasLocation: true,
+      service: "no-plan",
+      canManageBilling: true,
+    });
+    expect(model.attentions[0]?.kind).toBe("plan");
+    expect(model.primary?.label).toBe("Choose a plan");
+    expect(model.planNote).toBeNull();
   });
 });

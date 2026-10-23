@@ -14,7 +14,7 @@ export default function SetupLoading() {
   return (
     <OwnerShell>
       <PageHeader title="Set up" description="Your customer page and your Tags, one step at a time." />
-      <div aria-busy="true" aria-label="Loading Set up">
+      <div role="status" aria-busy="true" aria-label="Loading Set up">
         <section className="mb-10">
           <Skeleton className="mb-3 h-5 w-24" />
           <ol className="divide-y divide-border overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">

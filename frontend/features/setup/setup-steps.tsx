@@ -22,12 +22,53 @@ export function SetupSteps({
   const next = currentStep(steps);
   const doneCount = steps.filter((step) => step.done).length;
 
+  // Finished, the steps fold into one line. Three done steps with three
+  // buttons pushed the Tags themselves, the thing an owner now comes here
+  // for, below the first screen. "Show me how" is still a tap away.
+  if (doneCount === steps.length) {
+    return (
+      <details className="group/done mb-10 rounded-[var(--radius-card)] border border-border bg-surface" data-setup-done>
+        <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-[var(--radius-card)] px-4 py-3 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] [&::-webkit-details-marker]:hidden">
+          <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-text">
+            <Check className="size-4" strokeWidth={2.5} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-semibold text-ink">All set. Everything is working.</span>
+            <span className="block text-sm text-muted group-open/done:hidden">Show the {steps.length} setup steps</span>
+            <span className="hidden text-sm text-muted group-open/done:block">Hide the setup steps</span>
+          </span>
+          <ChevronDown className="size-5 shrink-0 text-muted transition-transform group-open/done:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+        </summary>
+        <div className="border-t border-border">
+          <StepList steps={steps} next={next} createTag={createTag} />
+        </div>
+      </details>
+    );
+  }
+
   return (
     <section aria-labelledby="setup-steps-heading" className="mb-10">
       <h2 id="setup-steps-heading" className="mb-3 text-sm font-medium text-muted">
-        {doneCount === steps.length ? "All set. Everything is working." : `${doneCount} of ${steps.length} done`}
+        {`${doneCount} of ${steps.length} done`}
       </h2>
-      <ol className="divide-y divide-border overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">
+      <div className="overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">
+        <StepList steps={steps} next={next} createTag={createTag} />
+      </div>
+    </section>
+  );
+}
+
+function StepList({
+  steps,
+  next,
+  createTag,
+}: {
+  steps: readonly SetupStepView[];
+  next: SetupStepView["key"] | null;
+  createTag?: ReactNode;
+}) {
+  return (
+      <ol className="divide-y divide-border">
         {steps.map((step) => {
           const isNext = step.key === next;
           return (
@@ -83,6 +124,5 @@ export function SetupSteps({
           );
         })}
       </ol>
-    </section>
   );
 }

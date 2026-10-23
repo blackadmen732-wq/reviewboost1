@@ -11,7 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function HomeLoading() {
   return (
     <OwnerShell>
-      <div aria-busy="true" aria-label="Loading Home">
+      <h1 className="sr-only">Home</h1>
+      <div role="status" aria-busy="true" aria-label="Loading Home">
         <header className="mb-8">
           <Skeleton className="h-7 w-44" />
         </header>

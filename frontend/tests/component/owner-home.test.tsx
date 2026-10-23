@@ -147,7 +147,9 @@ describe("OwnerHome", () => {
     expect(
       await screen.findByRole("link", { name: /Preview customer page/ }),
     ).toBeVisible();
-    expect(screen.getAllByRole("link")).toHaveLength(2);
+    // Besides those two, only the quiet way to the full steps.
+    expect(screen.getByRole("link", { name: /Open Set up/ })).toHaveAttribute("href", "/stands");
+    expect(screen.getAllByRole("link")).toHaveLength(3);
   });
 
   it("ready empty waits honestly", () => {

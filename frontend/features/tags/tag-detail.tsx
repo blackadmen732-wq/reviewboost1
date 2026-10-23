@@ -1,11 +1,13 @@
 "use client";
 
 import { Download, MoreHorizontal, Printer, Smartphone } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import { AlertDialog } from "@/components/ui/dialog";
+import { InlineNotice } from "@/components/ui/inline-notice";
 import { notify } from "@/components/ui/toast";
 import { ProgramTagSheet } from "@/features/tags/program-tag-sheet";
 import {
@@ -31,6 +33,13 @@ export const ROTATE_WARNING =
 export const ROTATE_NOT_NEEDED =
   "You don’t need a new code to change your Google link, your Customer Page or this Tag’s place — those reach the Tag on its next tap. Only do this if the code was copied or you want the old one to stop working.";
 
+/** Why the code on this Tag opens nothing for customers right now, if it doesn't. */
+export interface ClosedNotice {
+  title: string;
+  /** Only for someone who may change the plan. */
+  action: { label: string; href: string } | null;
+}
+
 /**
  * A Tag. Everything on the managed view — loading the code, printing, saving,
  * programming NFC, making a new code — goes through routes that only an owner
@@ -41,15 +50,52 @@ export function TagDetail({
   stand,
   canManage,
   organizationId,
+  closedNotice = null,
 }: {
   stand: Stand;
   canManage: boolean;
   organizationId?: string;
+  closedNotice?: ClosedNotice | null;
 }) {
-  return canManage ? (
-    <ManagedTagDetail stand={stand} organizationId={organizationId} />
-  ) : (
-    <ReadOnlyTagDetail stand={stand} />
+  return (
+    <>
+      {closedNotice ? (
+        <div className="mb-6 max-w-[28rem]" data-tag-closed>
+          <InlineNotice kind="error" title={closedNotice.title}>
+            <p>This code won’t open your customer page until then. You can still print it.</p>
+            {closedNotice.action ? (
+              <Link
+                href={closedNotice.action.href}
+                className="mt-2 inline-flex min-h-11 items-center font-semibold text-ink underline underline-offset-4 hover:no-underline"
+              >
+                {closedNotice.action.label}
+              </Link>
+            ) : null}
+          </InlineNotice>
+        </div>
+      ) : null}
+      {canManage ? (
+        <ManagedTagDetail stand={stand} organizationId={organizationId} />
+      ) : (
+        <ReadOnlyTagDetail stand={stand} />
+      )}
+    </>
+  );
+}
+
+const noSubscription = () => () => {};
+
+/**
+ * Whether this browser can write NFC at all. Web NFC is Chrome on Android
+ * only; on an iPhone or a computer the sheet could only ever end on "This
+ * phone can't program Tags", so the page says so before the tap instead.
+ * Unknown (null) while rendering on the server.
+ */
+function useNfcCapable(): boolean | null {
+  return useSyncExternalStore(
+    noSubscription,
+    () => "NDEFReader" in window,
+    () => null,
   );
 }
 
@@ -93,6 +139,13 @@ function ManagedTagDetail({
   const status = tagReadiness(
     justProgrammedAt ? { ...stand, nfcProvisionedAt: justProgrammedAt } : stand,
   );
+  const menuId = useId();
+  const nfcCapable = useNfcCapable();
+  const needsNfc = status === "needs-nfc" || status === "both";
+  // One filled button: the thing this Tag still needs that this device can
+  // do. A ready Tag needs nothing, so both actions are quiet.
+  const primary: "nfc" | "print" | null =
+    needsNfc && nfcCapable === true ? "nfc" : status === "ready" ? null : "print";
 
   async function rotate() {
     setBusy(true);
@@ -150,8 +203,9 @@ function ManagedTagDetail({
           </div>
           <button
             type="button"
-            className="inline-flex size-11 items-center justify-center rounded-[var(--radius-control)] text-ink hover:bg-quiet"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] text-ink transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
             aria-expanded={more}
+            aria-controls={menuId}
             aria-label="More"
             onClick={() => setMore((value) => !value)}
           >
@@ -159,15 +213,15 @@ function ManagedTagDetail({
           </button>
         </div>
         {more ? (
-          <div className="mt-3 flex flex-col gap-2 rounded-[var(--radius-card)] border border-border bg-surface p-3">
-            <Button
-              variant="secondary"
-              disabled={qr.status !== "ready"}
-              onClick={() => window.print()}
-            >
-              <Printer className="size-5" aria-hidden="true" />
-              Print
-            </Button>
+          // Print is already the page's own button; this holds only what has
+          // no other home.
+          <div
+            id={menuId}
+            className="mt-3 flex max-w-[28rem] flex-col gap-2 rounded-[var(--radius-card)] border border-border bg-surface p-3"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setMore(false);
+            }}
+          >
             <Button
               variant="secondary"
               disabled={qr.status !== "ready" || qr.downloading}
@@ -199,8 +253,8 @@ function ManagedTagDetail({
         />
         <div className="mt-5 flex flex-col gap-3">
           <Button
-            variant="action"
-            size="lg"
+            variant={primary === "print" ? "action" : "secondary"}
+            size={primary === "print" ? "lg" : "default"}
             disabled={qr.status !== "ready"}
             onClick={() => window.print()}
           >
@@ -211,11 +265,26 @@ function ManagedTagDetail({
         </div>
       </section>
 
-      <section className="max-w-[28rem]">
-        <Button variant="action" size="lg" onClick={() => setProgram(true)}>
+      <section className="max-w-[28rem]" aria-labelledby="nfc-heading" data-nfc-section>
+        <h2 id="nfc-heading" className="text-base font-semibold text-ink">
+          NFC
+        </h2>
+        <p className="mt-1 text-base leading-relaxed text-muted">{nfcLine(status)}</p>
+        <Button
+          variant={primary === "nfc" ? "action" : "secondary"}
+          size={primary === "nfc" ? "lg" : "default"}
+          className="mt-4"
+          onClick={() => setProgram(true)}
+        >
           <Smartphone className="size-5" aria-hidden="true" />
-          Program NFC
+          {status === "both" ? "Program NFC again" : "Program NFC"}
         </Button>
+        {nfcCapable === false ? (
+          <p className="mt-2 text-sm leading-relaxed text-muted" data-nfc-unsupported>
+            This browser can’t write NFC. Use Chrome on an Android phone, or the
+            ReviewBoost iPhone app. The printed code works either way.
+          </p>
+        ) : null}
       </section>
 
       <ProgramTagSheet
@@ -260,6 +329,13 @@ function ManagedTagDetail({
       />
     </div>
   );
+}
+
+/** What the chip holds, in one sentence. */
+function nfcLine(status: ReturnType<typeof tagReadiness>): string {
+  if (status === "both") return "The code changed, so the chip still opens the old link. Program it again.";
+  if (status === "needs-nfc") return "Not programmed yet. Write your link to the Tag’s chip and a phone tap opens your page.";
+  return "Programmed. A phone tap opens your customer page.";
 }
 
 /**

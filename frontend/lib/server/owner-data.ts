@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
 import { tryDecrypt } from "@/lib/server/crypto";
-import { locationLimit, tagLimit } from "@/lib/server/entitlements";
+import { effectiveStatus, locationLimit, tagLimit, type EntitlementStatus } from "@/lib/server/entitlements";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { isGoogleReviewWritingUrl, isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
 import {
@@ -17,6 +17,7 @@ import {
   type InsightRow,
 } from "@/lib/owner/insights";
 import { logger } from "@/lib/server/logger";
+import { serviceKind, type ServiceKind } from "@/lib/owner/service-state";
 import { supabaseServer } from "@/lib/supabase/server";
 import { localDay, startOfLocalDay, startOfLocalMonth, startOfLocalWeek } from "@/lib/utils/local-day";
 
@@ -226,6 +227,8 @@ export interface Review {
   isResolved: boolean;
   resolvedAt: string | null;
   noteCount: number;
+  /** The Tag it came from. A business with more than one Tag is told which. */
+  standId: string;
 }
 
 /**
@@ -249,6 +252,13 @@ export async function listReviews(
     unreadOnly?: boolean | undefined;
     withNotesOnly?: boolean | undefined;
     openOnly?: boolean | undefined;
+    /**
+     * Feedback's "Needs you": not sorted, and either unread or three stars or
+     * fewer. A 5-star an owner has already read is not waiting on anything,
+     * and making them "sort" praise to clear it turned the list into chores.
+     * A low rating stays until somebody marks it sorted.
+     */
+    needsAttention?: boolean | undefined;
     /** One of the organization's own locations; the caller validates it. */
     locationId?: string | undefined;
     /** Inclusive start and exclusive end instants, from local calendar days. */
@@ -261,7 +271,7 @@ export async function listReviews(
 
   let query = supabase
     .from("customer_responses")
-    .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at, stand_id")
     .eq("org_id", orgId)
     .order("submitted_at", { ascending: false })
     .order("id", { ascending: false })
@@ -277,6 +287,7 @@ export async function listReviews(
   if (options.unreadOnly) query = query.is("read_at", null);
   if (options.withNotesOnly) query = query.not("note_encrypted", "is", null);
   if (options.openOnly) query = query.is("resolved_at", null);
+  if (options.needsAttention) query = query.is("resolved_at", null).or("read_at.is.null,rating.lte.3");
   if (options.locationId) query = query.eq("location_id", options.locationId);
   if (options.submittedFrom) query = query.gte("submitted_at", options.submittedFrom);
   if (options.submittedBefore) query = query.lt("submitted_at", options.submittedBefore);
@@ -317,6 +328,7 @@ export async function listReviews(
       isResolved: row.resolved_at !== null,
       resolvedAt: (row.resolved_at as string | null) ?? null,
       noteCount: noteCounts.get(row.id as string) ?? 0,
+      standId: row.stand_id as string,
     }),
     "submitted_at",
   );
@@ -408,7 +420,7 @@ export async function getReview(
 
   const { data, error } = await supabase
     .from("customer_responses")
-    .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at, stand_id")
     .eq("org_id", orgId)
     .eq("id", responseId)
     .maybeSingle();
@@ -428,6 +440,7 @@ export async function getReview(
       isResolved: data.resolved_at !== null,
       resolvedAt: (data.resolved_at as string | null) ?? null,
       noteCount: actions.length,
+      standId: data.stand_id as string,
     },
     actions,
   };
@@ -829,6 +842,10 @@ export interface OwnerCounts {
   ratingsThisWeek: number;
   ratingsLastWeek: number;
   unread: number;
+  /** Of `unread`, how many are three stars or fewer. */
+  unreadLow: number;
+  /** Three stars or fewer and not sorted, read or not. */
+  openLow: number;
   unmatchedPraise: number;
   activeStands: number;
   recentCount: number;
@@ -855,7 +872,7 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
   // subtraction put the boundary at 23:00 or 01:00 on the wrong day.
   const priorWeekStart = localDay(timezone, -13).start;
 
-  const [today, thisWeek, lastWeek, unread, praise, stands, locations, recent] = await Promise.all([
+  const [today, thisWeek, lastWeek, unread, unreadLow, openLow, praise, stands, locations, recent] = await Promise.all([
     supabase
       .from("customer_responses")
       .select("id", { count: "exact", head: true })
@@ -882,6 +899,23 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
       .eq("org_id", orgId)
       .is("read_at", null)
       .is("resolved_at", null),
+    // The part of that which is three stars or fewer, so Home can say how
+    // many of the new ratings are the ones worth reading first.
+    supabase
+      .from("customer_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("read_at", null)
+      .is("resolved_at", null)
+      .lte("rating", 3),
+    // Three stars or fewer, read or not, that nobody has marked sorted: what
+    // Feedback's "Needs you" keeps after it has been read.
+    supabase
+      .from("customer_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("resolved_at", null)
+      .lte("rating", 3),
     supabase
       .from("praise_safe_view")
       .select("id", { count: "exact", head: true })
@@ -904,6 +938,8 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
   if (thisWeek.error) dataFailure("owner_counts.week", thisWeek.error);
   if (lastWeek.error) dataFailure("owner_counts.last_week", lastWeek.error);
   if (unread.error) dataFailure("owner_counts.unread", unread.error);
+  if (unreadLow.error) dataFailure("owner_counts.unread_low", unreadLow.error);
+  if (openLow.error) dataFailure("owner_counts.open_low", openLow.error);
   if (praise.error) dataFailure("owner_counts.praise", praise.error);
   if (stands.error) dataFailure("owner_counts.stands", stands.error);
   if (recent.error) dataFailure("owner_counts.recent", recent.error);
@@ -914,6 +950,8 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
     ratingsThisWeek: thisWeek.count ?? 0,
     ratingsLastWeek: lastWeek.count ?? 0,
     unread: unread.count ?? 0,
+    unreadLow: unreadLow.count ?? 0,
+    openLow: openLow.count ?? 0,
     unmatchedPraise: praise.count ?? 0,
     activeStands: stands.count ?? 0,
     recentCount: (recent.data ?? []).length,
@@ -921,6 +959,46 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
     // that send nobody to Google, and Home has to say so.
     ...ownerGoogleLinkFlagsForAll(locations.map((location) => location.destination?.url ?? null)),
   };
+});
+
+/**
+ * The Feedback badge, for screens that need nothing else from getOwnerCounts.
+ * The same predicate as its `unread`: unread and not yet sorted.
+ */
+export const getUnreadCount = cache(async (orgId: string): Promise<number> => {
+  const supabase = await supabaseServer();
+  const { count, error } = await supabase
+    .from("customer_responses")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .is("read_at", null)
+    .is("resolved_at", null);
+  if (error) dataFailure("owner_unread_count", error);
+  return count ?? 0;
+});
+
+/**
+ * Whether this business's Tags are open to customers right now.
+ *
+ * Read from the same entitlement row the database's door check reads, with the
+ * same trial clock (`effectiveStatus`). A failed read is "unknown", and the
+ * screens then say nothing about billing rather than guess: the Billing page
+ * is where an unreadable plan is reported.
+ */
+export const getServiceState = cache(async (orgId: string): Promise<ServiceKind> => {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("entitlement_snapshots")
+    .select("plan_id, status, trial_ends_at")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error) {
+    logger.warn("owner.service_state_read_failed", { orgId, error });
+    return "unknown";
+  }
+  if (!data) return "unknown";
+  const row = data as { plan_id: string | null; status: EntitlementStatus; trial_ends_at: string | null };
+  return serviceKind(effectiveStatus(row.status, row.trial_ends_at), row.plan_id);
 });
 
 // ------------------------------------------------------------ customers ----

@@ -115,7 +115,24 @@ function EmptyHome({ model, seenDone }: { model: HomeModel; seenDone: readonly s
 
       <PrimaryAction primary={model.primary} />
 
-      {model.setup ? <SetupSteps steps={model.setup} seenDone={seenDone} /> : null}
+      {model.setup ? <SetupSteps steps={model.setup} seenDone={seenDone} photoNudge={model.photoNudge} /> : null}
+
+      {model.planNote ? (
+        <p className="mt-6 flex flex-wrap items-center gap-x-3 text-base text-ink" data-plan-note>
+          <span className="inline-flex items-center gap-2">
+            <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-star" />
+            {model.planNote.title}.
+          </span>
+          {model.planNote.href ? (
+            <Link
+              href={model.planNote.href}
+              className="inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4 hover:no-underline"
+            >
+              Choose a plan
+            </Link>
+          ) : null}
+        </p>
+      ) : null}
 
       {model.showPreview && model.previewStandId ? (
         <PreviewCustomerPage standId={model.previewStandId} />
@@ -125,14 +142,21 @@ function EmptyHome({ model, seenDone }: { model: HomeModel; seenDone: readonly s
 }
 
 /**
- * Where the business is in getting set up. Plain rows, not cards: a tick and
- * a line for what is done, and the current step in ink. The action for the
- * current step is the green button above, so there is still only one.
+ * Where the business is in getting set up: Set up's own three steps, small.
+ * Plain rows, not cards: a tick for what is done and the current step in ink.
+ * The action for the current step is the button above, so there is still
+ * only one; the steps themselves, with "Show me how", live on Set up.
  */
-function SetupSteps({ steps, seenDone }: { steps: SetupStep[]; seenDone: readonly string[] | null }) {
-  // The photo is optional and has its own link, so "the step you are on" —
-  // the one the green button above is for — skips it.
-  const current = steps.findIndex((step) => !step.done && step.key !== "photo");
+function SetupSteps({
+  steps,
+  seenDone,
+  photoNudge,
+}: {
+  steps: SetupStep[];
+  seenDone: readonly string[] | null;
+  photoNudge: boolean;
+}) {
+  const current = steps.findIndex((step) => !step.done);
   const doneCount = steps.filter((step) => step.done).length;
   // Done since this browser last looked: the tick draws once, and the step
   // that is now current takes its ink just after. Nothing else moves.
@@ -146,7 +170,7 @@ function SetupSteps({ steps, seenDone }: { steps: SetupStep[]; seenDone: readonl
           Getting set up
         </h2>
         <p className="text-sm tabular-nums text-muted">
-          {doneCount} of {steps.length}
+          {doneCount} of {steps.length} done
         </p>
       </div>
       <SetupSeen done={steps.filter((step) => step.done).map((step) => step.key)} />
@@ -168,7 +192,7 @@ function SetupSteps({ steps, seenDone }: { steps: SetupStep[]; seenDone: readonl
                   "grid size-7 shrink-0 place-items-center rounded-full text-[0.8125rem] font-semibold tabular-nums",
                   step.done && "bg-brand-soft text-brand-text",
                   !step.done && isCurrent && "bg-ink text-canvas",
-                  !step.done && !isCurrent && "border border-border text-muted",
+                  !step.done && !isCurrent && "border border-[color:var(--rb-border-strong)] text-muted",
                   drawn && "animate-step-done",
                   !step.done && isCurrent && advanced && "animate-step-current",
                 )}
@@ -183,36 +207,43 @@ function SetupSteps({ steps, seenDone }: { steps: SetupStep[]; seenDone: readonl
                     <Check className="size-4" strokeWidth={3} />
                   )
                 ) : (
-                  index + 1
+                  step.number
                 )}
               </span>
-              {step.href ? (
-                // Optional, so it never takes the green button: the row itself
-                // goes to the Customer Page editor while it is undone.
-                <Link
-                  href={step.href}
-                  className="-my-3 flex min-h-14 flex-1 items-center justify-between gap-3 py-3 text-base text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-                >
-                  {step.title}
-                  <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-muted" />
-                </Link>
-              ) : (
-                <span
-                  className={cn(
-                    "text-base",
-                    step.done && "text-muted decoration-border",
-                    !step.done && isCurrent && "font-semibold text-ink",
-                    !step.done && !isCurrent && "text-muted",
-                  )}
-                >
-                  {step.title}
-                  {step.done ? <span className="sr-only"> — done</span> : null}
-                </span>
-              )}
+              <span
+                className={cn(
+                  "text-base",
+                  step.done && "text-muted",
+                  !step.done && isCurrent && "font-semibold text-ink",
+                  !step.done && !isCurrent && "text-muted",
+                )}
+              >
+                {step.title}
+                {step.done ? <span className="sr-only"> — done</span> : null}
+              </span>
             </li>
           );
         })}
       </ol>
+      <div className="mt-3 flex flex-wrap gap-x-6">
+        <Link
+          href="/stands"
+          className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+        >
+          Open Set up
+          <ChevronRight aria-hidden="true" className="size-4 text-muted" />
+        </Link>
+        {photoNudge ? (
+          // Optional, so it is a quiet link and never the button above.
+          <Link
+            href="/customer-page"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-muted underline-offset-4 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+            data-photo-nudge
+          >
+            Add your photo to the customer page
+          </Link>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -270,8 +301,8 @@ function ActiveHome({
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-medium text-muted">Last 30 days</span>
               <span className="block text-base text-ink">{insightsLine}</span>
+              <span className="sr-only"> · View insights</span>
             </span>
-            <span className="shrink-0 text-sm font-medium text-brand-text">View insights</span>
             <ChevronRight
               aria-hidden="true"
               className="size-5 shrink-0 text-muted transition-transform duration-150 group-hover:translate-x-0.5"

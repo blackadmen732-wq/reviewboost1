@@ -1,4 +1,4 @@
-import { summarizeTags, type HomeStand } from "@/features/dashboard/home-model";
+import { summarizeTags, type HomeStand } from "@/lib/owner/tag-summary";
 
 /**
  * The three Set up steps, from facts the server already has.
@@ -29,6 +29,12 @@ export interface SetupInput {
   stands: HomeStand[];
   hasAnyRating: boolean;
   canManage: boolean;
+  /**
+   * Whether the Tags open for customers. A test scan of a closed Tag shows
+   * "This review link isn't active", so step 3 says to choose a plan first.
+   * Absent means open.
+   */
+  serving?: boolean;
 }
 
 export function deriveSetupSteps(input: SetupInput): SetupStepView[] {
@@ -90,7 +96,9 @@ export function deriveSetupSteps(input: SetupInput): SetupStepView[] {
       title: "Test it",
       body: input.hasAnyRating
         ? "It works. Ratings show up in Feedback."
-        : "Tap your Tag or scan the code with your own phone, then tap a star. It will show up in Feedback.",
+        : input.serving === false
+          ? "Choose a plan first. Until then your Tag shows “This review link isn’t active” to anyone who scans it, you included."
+          : "Tap your Tag or scan the code with your own phone, then tap a star. It will show up in Feedback.",
       done: input.hasAnyRating,
       action: input.hasAnyRating ? { label: "Open Feedback", href: "/feedback" } : null,
       howTo: [

@@ -5,13 +5,20 @@
  * Fake counts never enter this model.
  */
 
+import { serviceNotice, tagsServeCustomers, type ServiceKind } from "@/lib/owner/service-state";
+import { summarizeTags, type HomeStand, type TagStatus } from "@/lib/owner/tag-summary";
 import { tagNeedsRewrite } from "@/lib/owner/tag-readiness";
+import { deriveSetupSteps, type SetupStepView } from "@/features/setup/setup-model";
 
 import { GOOGLE_LINK_INVALID } from "@/features/dashboard/google-link-copy";
 
 export interface HomeCounts {
   ratingsToday: number;
   unread: number;
+  /** Of `unread`, how many are three stars or fewer. Absent in older callers. */
+  unreadLow?: number;
+  /** Three stars or fewer and not yet sorted, read or not. */
+  openLow?: number;
   activeStands: number;
   recentCount: number;
   hasGoogleLink: boolean;
@@ -22,20 +29,15 @@ export interface HomeCounts {
   ratingsLastWeek?: number;
 }
 
-export interface HomeStand {
-  standId: string;
-  label: string;
-  status: string;
-  nfcProvisionedAt: string | null;
-  tokenRotatedAt: string | null;
-}
-
 export type HomeKind = "empty" | "active";
 
 export type AttentionKind =
+  | "plan"
+  | "payment"
   | "google"
   | "google-upgrade"
   | "unread"
+  | "unsorted"
   | "tag-missing"
   | "tag-unprogrammed"
   | "tag-rewrite";
@@ -47,42 +49,42 @@ export interface Attention {
 }
 
 export interface HomePrimary {
-  label: "Create a Tag" | "Print your code" | "Add Google link" | "Program a tag" | "Read feedback";
-  href: "/stands" | "/onboarding" | "/feedback" | "/settings";
+  label:
+    | "Create a Tag"
+    | "Print your code"
+    | "Add Google link"
+    | "Program a tag"
+    | "Read feedback"
+    | "Choose a plan"
+    | "Update payment"
+    | "Open Billing";
+  href: "/stands" | "/onboarding" | "/feedback" | "/settings" | "/settings/billing";
 }
 
 export type TagProgramPhase = "not-programmed" | "programmed" | "needs-reprogramming";
 
-export interface TagStatus {
-  total: number;
-  live: number;
-  programmed: number;
-  needsRewrite: number;
-}
-
 /**
- * The new-owner path, from real state only. Each step is done when the data
- * says so — nothing is ticked because a button was pressed. Printing a code is
- * not recorded anywhere, so step three completes on NFC or, like the rest,
- * when the first rating arrives and Home stops showing setup at all.
+ * The new-owner path on Home is Set up's own three steps (setup-model), drawn
+ * small. Home used to keep a five-step list of its own, so the same business
+ * read "1 of 5" on Home and "0 of 3 done" on Set up at the same moment.
  */
-export type SetupStepKey = "tag" | "google" | "photo" | "print" | "first-rating";
-
-export interface SetupStep {
-  key: SetupStepKey;
-  title: string;
-  done: boolean;
-  /**
-   * Where to do it, for a step that is optional and so never takes the one
-   * green button. Only the photo step has one, and only while it is undone.
-   */
-  href?: "/customer-page";
-}
+export type SetupStep = SetupStepView;
+export type SetupStepKey = SetupStepView["key"];
 
 export interface HomeModel {
   kind: HomeKind;
   /** Only for a Home with no ratings yet. */
   setup: SetupStep[] | null;
+  /**
+   * The photo is optional, so it is not a step: a quiet link under them while
+   * the published page has none, for someone who may edit it.
+   */
+  photoNudge: boolean;
+  /**
+   * The plan, while it waits behind unfinished setup: said under the steps
+   * rather than over them, with a link for the owner.
+   */
+  planNote: { title: string; href: "/settings/billing" | null } | null;
   attentions: Attention[];
   primary: HomePrimary | null;
   showPreview: boolean;
@@ -95,7 +97,8 @@ export function isHomeEmpty(counts: Pick<HomeCounts, "recentCount" | "ratingsTod
   return counts.recentCount === 0 && counts.ratingsToday === 0;
 }
 
-export { tagNeedsRewrite };
+export { tagNeedsRewrite, summarizeTags };
+export type { HomeStand, TagStatus };
 
 export function tagProgramPhase(stand: HomeStand): TagProgramPhase {
   if (tagNeedsRewrite(stand)) return "needs-reprogramming";
@@ -109,31 +112,14 @@ export function tagProgramPhaseLabel(phase: TagProgramPhase): string {
   return "Programmed";
 }
 
-/**
- * Only an active Tag is doing anything for the business.
- *
- * programmed and needsRewrite deliberately count active Tags alone. A retired
- * Tag whose code has moved on is not work anybody should be nagged about, and
- * counting a paused one as programmed made setup look finished while nothing on
- * the counter actually worked. `total` stays every Tag, because the list still
- * shows them.
- */
-export function summarizeTags(stands: HomeStand[]): TagStatus {
-  const active = stands.filter((stand) => stand.status === "active");
-  return {
-    total: stands.length,
-    live: active.length,
-    programmed: active.filter((stand) => stand.nfcProvisionedAt !== null).length,
-    needsRewrite: active.filter(tagNeedsRewrite).length,
-  };
-}
-
 export function deriveHomeModel({
   counts,
   stands,
   hasLocation,
   canManage = true,
   hasCustomerPhoto = null,
+  service = "unknown",
+  canManageBilling = false,
 }: {
   counts: HomeCounts;
   stands: HomeStand[];
@@ -150,6 +136,14 @@ export function deriveHomeModel({
    * reading feedback is the one action every role has.
    */
   canManage?: boolean;
+  /**
+   * Whether the Tags open for customers (lib/owner/service-state). A closed
+   * door outranks everything: nothing else on Home matters while every scan
+   * says "This review link isn't active".
+   */
+  service?: ServiceKind;
+  /** Owner only: the Billing API refuses everyone else. */
+  canManageBilling?: boolean;
 }): HomeModel {
   const kind: HomeKind = isHomeEmpty(counts) ? "empty" : "active";
   const tags = summarizeTags(stands);
@@ -166,14 +160,33 @@ export function deriveHomeModel({
 
   const attentions: Attention[] = [];
 
-  // Returning work first so unread is the headline when there is any.
+  // Billing first: a closed door makes every other line on Home moot, and a
+  // failed card is the one thing that will close it if nobody acts. The one
+  // exception is a business that has never had a plan and is still setting
+  // up: it is meant to finish setting up, see its page, and then be asked for
+  // a card (migration 20260915001400), so the plan waits behind the setup
+  // steps, still said, until they are done.
+  const billing = serviceNotice(service);
+  const planFirst = billing !== null && (service !== "no-plan" || (hasStand && counts.hasGoogleLink));
+  if (billing && planFirst) attentions.push({ kind: billing.kind, title: billing.title, body: billing.body });
+
+  // Returning work next so unread is the headline when there is any.
   if (counts.unread > 0) {
     attentions.push({
       kind: "unread",
       // Ratings, not "messages": the customer page collects a star and nothing
       // else, and Home must not promise words that are not there.
       title: counts.unread === 1 ? "1 new rating" : `${counts.unread} new ratings`,
-      body: counts.unread === 1 ? "See it before the next rush." : "See them before the next rush.",
+      body: unreadBody(counts.unread, counts.unreadLow),
+    });
+  } else if ((counts.openLow ?? 0) > 0) {
+    // Read, but not dealt with: Feedback's "Needs you" still holds them, so
+    // Home must not say "Nothing needs you" over the top of them.
+    const open = counts.openLow ?? 0;
+    attentions.push({
+      kind: "unsorted",
+      title: open === 1 ? "1 low rating isn’t sorted yet" : `${open} low ratings aren’t sorted yet`,
+      body: "Mark each one sorted once you’ve dealt with it.",
     });
   }
 
@@ -213,6 +226,8 @@ export function deriveHomeModel({
     });
   }
 
+  if (billing && !planFirst) attentions.push({ kind: billing.kind, title: billing.title, body: billing.body });
+
   // Working, so it never blocks setup or takes the one green button; it is a
   // note that a better link exists, listed after everything that
   // actually stops a Tag working. Tags are untouched either way.
@@ -225,7 +240,7 @@ export function deriveHomeModel({
   }
 
   let primary: HomePrimary | null;
-  if (counts.unread > 0 && kind === "active") {
+  if ((counts.unread > 0 || (counts.openLow ?? 0) > 0) && kind === "active") {
     primary = { label: "Read feedback", href: "/feedback" };
   } else if (!hasStand) {
     primary = { label: "Create a Tag", href: createHref };
@@ -246,29 +261,28 @@ export function deriveHomeModel({
     primary = null;
   }
 
+  // Only the owner can change the plan, so only the owner gets the button;
+  // anyone else still reads why the Tags are off.
+  if (billing && planFirst && canManageBilling) primary = { ...billing.action };
+
   const setup: SetupStep[] | null =
     kind === "empty"
-      ? [
-          { key: "tag", title: "Create your first Tag", done: hasStand },
-          { key: "google", title: "Add your Google review link", done: counts.hasGoogleLink },
-          ...(hasCustomerPhoto === null
-            ? []
-            : [
-                {
-                  key: "photo" as const,
-                  title: "Add your photo to the customer page",
-                  done: hasCustomerPhoto,
-                  ...(!hasCustomerPhoto && canManage ? { href: "/customer-page" as const } : {}),
-                },
-              ]),
-          { key: "print", title: "Print the code or program NFC", done: tags.programmed > 0 },
-          { key: "first-rating", title: "Get your first rating", done: false },
-        ]
+      ? deriveSetupSteps({
+          hasGoogleLink: counts.hasGoogleLink,
+          hasCustomerPhoto,
+          hasLocation,
+          stands,
+          hasAnyRating: false,
+          canManage,
+          serving: tagsServeCustomers(service),
+        })
       : null;
 
   return {
     kind,
     setup,
+    photoNudge: kind === "empty" && hasCustomerPhoto === false && canManage,
+    planNote: billing && !planFirst ? { title: billing.title, href: canManageBilling ? billing.action.href : null } : null,
     attentions,
     primary,
     showPreview: hasStand && canManage,
@@ -276,6 +290,20 @@ export function deriveHomeModel({
     tagStatus: tags,
     headline: ratingsHeadline(counts),
   };
+}
+
+/**
+ * Which of the new ratings to read first, in numbers. "4 new ratings" alone
+ * reads the same for four 5-stars as for four complaints.
+ */
+export function unreadBody(unread: number, low: number | undefined): string {
+  const rush = unread === 1 ? "See it before the next rush." : "See them before the next rush.";
+  if (low === undefined) return rush;
+  const later = "Have a look when you get a minute.";
+  if (low === 0) return unread === 1 ? `A 4 or 5-star rating. ${later}` : `All 4 or 5 stars. ${later}`;
+  if (unread === 1) return `It’s 3 stars or fewer. ${rush}`;
+  if (low === unread) return `All ${unread} are 3 stars or fewer. ${rush}`;
+  return `${low} ${low === 1 ? "is" : "are"} 3 stars or fewer. ${rush}`;
 }
 
 export function ratingsHeadline(counts: Pick<HomeCounts, "ratingsThisWeek" | "ratingsLastWeek">): string | null {
