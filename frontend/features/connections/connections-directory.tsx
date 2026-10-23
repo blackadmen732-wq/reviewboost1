@@ -32,13 +32,27 @@ const TONE: Record<string, string> = {
 };
 
 /**
- * The Connections directory. Connected apps first, then the ones that can be
- * connected, then what is coming. A card only ever offers what works here:
- * "Coming soon" and "Planned" cards open a description, never a sign-in.
+ * Search and the kind filters earn their place only once there is something to
+ * search through. Below this, they are more controls than there are apps.
+ */
+export const SEARCH_FROM = 9;
+
+/**
+ * The Connections directory. What is in use first, then what can be added,
+ * then what is coming. A card only ever offers what works here: a "Coming
+ * soon" card opens a description, never a sign-in.
+ *
+ * A list (a Google Sheet, a CSV file) is read once and keeps no access, so it
+ * is "added", not "connected": calling it connected tells an owner it keeps
+ * itself up to date, and it does not.
+ *
+ * Planned apps are a line of names, not a wall of cards: an owner looking for
+ * something to use should not have to read past four things they cannot.
  */
 export function ConnectionsDirectory({ providers, categoryLabels }: ConnectionsDirectoryProps) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
+  const searchable = providers.length >= SEARCH_FROM;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -49,44 +63,48 @@ export function ConnectionsDirectory({ providers, categoryLabels }: ConnectionsD
     );
   }, [providers, query, category]);
 
+  const isList = (p: DirectoryProvider) => p.connectionState === "list_added";
   const groups: Array<{ title: string; items: DirectoryProvider[] }> = [
-    { title: "Connected", items: filtered.filter((p) => p.connectionState) },
+    { title: "Connected", items: filtered.filter((p) => p.connectionState && !isList(p)) },
+    { title: "Lists you’ve added", items: filtered.filter(isList) },
     { title: "Available", items: filtered.filter((p) => !p.connectionState && p.availability === "available") },
     { title: "Coming soon", items: filtered.filter((p) => !p.connectionState && p.availability === "in_setup") },
-    { title: "Planned", items: filtered.filter((p) => !p.connectionState && p.availability === "planned") },
   ];
+  const planned = filtered.filter((p) => !p.connectionState && p.availability === "planned");
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3">
-        <label className="relative block">
-          <span className="sr-only">Search apps</span>
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted" aria-hidden="true" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search apps"
-            className="min-h-12 w-full rounded-[var(--radius-control)] border border-border bg-surface pl-12 pr-4 text-base text-ink placeholder:text-muted focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-          />
-        </label>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by kind">
-          {[null, ...Object.keys(categoryLabels)].map((key) => (
-            <button
-              key={key ?? "all"}
-              type="button"
-              aria-pressed={category === key}
-              onClick={() => setCategory(key)}
-              className={cn(
-                "min-h-10 rounded-full border px-4 text-sm font-medium transition-colors",
-                category === key ? "border-brand bg-brand-soft text-brand-text" : "border-border bg-surface text-ink hover:bg-quiet",
-              )}
-            >
-              {key ? categoryLabels[key] : "All"}
-            </button>
-          ))}
+      {searchable ? (
+        <div className="flex flex-col gap-3">
+          <label className="relative block">
+            <span className="sr-only">Search apps</span>
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted" aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search apps"
+              className="min-h-12 w-full rounded-[var(--radius-control)] border border-border bg-surface pl-12 pr-4 text-base text-ink placeholder:text-muted focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+            />
+          </label>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by kind">
+            {[null, ...Object.keys(categoryLabels)].map((key) => (
+              <button
+                key={key ?? "all"}
+                type="button"
+                aria-pressed={category === key}
+                onClick={() => setCategory(key)}
+                className={cn(
+                  "min-h-10 rounded-full border px-4 text-sm font-medium transition-colors",
+                  category === key ? "border-brand bg-brand-soft text-brand-text" : "border-border bg-surface text-ink hover:bg-quiet",
+                )}
+              >
+                {key ? categoryLabels[key] : "All"}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {filtered.length === 0 ? <p className="text-base text-muted">No apps match that search.</p> : null}
 
@@ -146,6 +164,33 @@ export function ConnectionsDirectory({ providers, categoryLabels }: ConnectionsD
           </section>
         ),
       )}
+
+      {planned.length > 0 ? (
+        <section className="flex flex-col gap-2" data-planned-apps>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Planned</h2>
+          <p className="text-sm leading-relaxed text-muted">
+            {planned.map((provider, index) => (
+              <span key={provider.id}>
+                {index > 0 ? ", " : null}
+                <Link
+                  href={`/settings/connections/${provider.id}`}
+                  className="font-medium text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+                >
+                  {provider.displayName}
+                </Link>
+              </span>
+            ))}
+            . Use one of these?{" "}
+            <Link
+              href="/support"
+              className="font-medium text-brand-text underline underline-offset-4 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+            >
+              Tell us which
+            </Link>
+            , and it moves up the list.
+          </p>
+        </section>
+      ) : null}
     </div>
   );
 }
