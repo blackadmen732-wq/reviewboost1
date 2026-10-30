@@ -8,7 +8,7 @@ import {
   type EntitlementStatus,
   PLANS,
   type PlanId,
-  TRIAL_DAYS,
+  trialDaysFor,
 } from "@/lib/server/entitlements";
 import { planIdForPrice, publicFrontendUrl, stripePriceId } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
@@ -27,8 +27,10 @@ import { serviceRoleClient } from "@/lib/server/supabase";
  *
  * WHAT A TRIAL IS
  * ---------------
- * Seven days, no charge, a card required up front, and a paid plan chosen
- * before it starts. One location, one Tag, and no SMS at all. There is no
+ * Starter only. Seven days, no charge, a card required up front. One
+ * location, one Tag, and no SMS at all. Growth and Pro have no trial: checkout
+ * charges the first month immediately, and the paid invoice is what makes the
+ * plan active and mints its texts. There is no
  * permanent free plan and no "we'll figure out the plan later" state — a trial
  * without a chosen plan is a subscription nobody knows how to renew.
  */
@@ -63,8 +65,57 @@ function subscriptionFields(subscription: Stripe.Subscription): {
   };
 }
 
+/** The parts of an invoice line this file reads, across API versions. */
+interface InvoiceLineShape {
+  parent?: {
+    type?: string;
+    subscription_item_details?: { proration?: boolean } | null;
+    invoice_item_details?: { proration?: boolean } | null;
+  } | null;
+  /** Before `parent`: "subscription" or "invoiceitem". */
+  type?: string;
+  /** Before `parent`. */
+  proration?: boolean;
+  pricing?: { price_details?: { price?: string | { id?: string } } };
+  price?: { id?: string } | string;
+  plan?: { id?: string };
+  period?: { start?: number; end?: number };
+}
+
+function isProration(line: InvoiceLineShape): boolean {
+  return Boolean(
+    line.parent?.subscription_item_details?.proration ??
+      line.parent?.invoice_item_details?.proration ??
+      line.proration,
+  );
+}
+
+function isSubscriptionLine(line: InvoiceLineShape): boolean {
+  if (line.parent?.type) return line.parent.type === "subscription_item_details";
+  if (line.type) return line.type === "subscription";
+  return true;
+}
+
 /**
- * The price an invoice was for.
+ * The line that pays for the coming period.
+ *
+ * Not simply the first line. After a plan change, the renewal invoice opens
+ * with the proration lines — "unused time on Starter" first — and only then
+ * the new plan's period. Reading line 0 there mints the old plan's allowance,
+ * dated to a period that has already ended, so a business that upgraded pays
+ * for Growth and receives texts that expire on arrival.
+ *
+ * An invoice made only of prorations (an upgrade invoiced immediately) has no
+ * such line. It mints nothing; the new plan's allowance arrives with the next
+ * period's invoice, as every other allowance does.
+ */
+function periodLine(invoice: Stripe.Invoice): InvoiceLineShape | undefined {
+  const lines = (invoice.lines?.data ?? []) as unknown as InvoiceLineShape[];
+  return lines.find((line) => isSubscriptionLine(line) && !isProration(line));
+}
+
+/**
+ * The price a period line was for.
  *
  * Stripe moved this. Through the 2025 API versions a line item carried
  * `price`; from `2026-08-26.dahlia` it carries `pricing.price_details.price`,
@@ -74,14 +125,7 @@ function subscriptionFields(subscription: Stripe.Subscription): {
  * anywhere. Both shapes are read, newest first, and a subscription line's own
  * price is the last resort.
  */
-function invoicePriceId(invoice: Stripe.Invoice): string | null {
-  const line = invoice.lines?.data?.[0] as
-    | {
-        pricing?: { price_details?: { price?: string | { id?: string } } };
-        price?: { id?: string } | string;
-        plan?: { id?: string };
-      }
-    | undefined;
+function linePriceId(line: InvoiceLineShape | undefined): string | null {
   if (!line) return null;
 
   const fromPricing = line.pricing?.price_details?.price;
@@ -109,6 +153,46 @@ async function orgForCustomer(customerId: string | null): Promise<string | null>
 
   if (error) throw error;
   return typeof data === "string" ? data : null;
+}
+
+/**
+ * What went wrong, in words an operator reading the inbox can act on. A
+ * Supabase RPC error is a plain object, not an `Error`, so `String(error)`
+ * records "[object Object]" for every database failure — including the
+ * `unknown_price` that tells someone exactly which row to add.
+ */
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const { message, code, details } = error as { message?: unknown; code?: unknown; details?: unknown };
+    const parts = [message, code ? `(${String(code)})` : null, details]
+      .filter((part) => typeof part === "string" && part.length > 0);
+    if (parts.length > 0) return parts.join(" ");
+  }
+  return String(error);
+}
+
+/**
+ * An event for a price the database does not map, or whose plan the two
+ * sides disagree on, is an operator problem, not a transient one: it will
+ * fail on every retry until someone edits `billing_plan_prices` or the
+ * deployment's STRIPE_PRICE_* variables. Logged at error level with a stable
+ * event name so an alert can key on it.
+ */
+function reportUnknownPrice(
+  error: { message?: string },
+  event: Stripe.Event,
+  priceId: string | null,
+): void {
+  const message = error.message ?? "";
+  if (message.includes("unknown_price") || message.includes("plan_price_mismatch")) {
+    logger.error("billing.price_unmapped", {
+      eventId: event.id,
+      type: event.type,
+      priceId,
+      reason: message.includes("unknown_price") ? "unknown_price" : "plan_price_mismatch",
+    });
+  }
 }
 
 // ------------------------------------------------------------- checkout ----
@@ -153,16 +237,21 @@ export async function createCheckoutSession(
   const customerId = await ensureStripeCustomer(orgId, requestId);
   const origin = publicFrontendUrl();
 
+  // A business that has subscribed before does not get a second trial by
+  // cancelling and checking out again.
+  const trialDays = existing ? 0 : trialDaysFor(planId);
+
   const session = await stripe.checkout.sessions.create(
     {
       mode: "subscription",
       customer: customerId,
       line_items: [{ price, quantity: 1 }],
-      // A card is required before the trial starts. A trial that can be taken
-      // without one is a free plan with a timer.
+      // A card is always required: before Starter's trial starts, and to pay
+      // Growth and Pro today. A trial without one is a free plan with a timer.
       payment_method_collection: "always",
       subscription_data: {
-        trial_period_days: TRIAL_DAYS,
+        // Only Starter has a trial. Omitting the field charges immediately.
+        ...(trialDays > 0 ? { trial_period_days: trialDays } : {}),
         metadata: { org_id: orgId, plan_id: planId },
       },
       client_reference_id: orgId,
@@ -185,15 +274,13 @@ export async function createCheckoutSession(
 export async function ensureStripeCustomer(orgId: string, requestId: string): Promise<string> {
   const service = serviceRoleClient();
 
-  const { data: existing, error } = await service
-    .from("billing_customers")
-    .select("stripe_customer_id")
-    .eq("org_id", orgId)
-    .maybeSingle();
+  const { data: existing, error } = await service.rpc("rpc_billing_customer_for_org", {
+    p_org_id: orgId,
+  });
 
   if (error) throw error;
 
-  const found = (existing as { stripe_customer_id?: string } | null)?.stripe_customer_id;
+  const found = typeof existing === "string" && existing.length > 0 ? existing : null;
   if (found) return found;
 
   const customer = await stripeClient().customers.create(
@@ -236,6 +323,9 @@ export type EventOutcome =
   | "ignored"
   | "unknown_customer";
 
+/** Stripe statuses after which a subscription can never bill again. */
+const ENDED_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set(["canceled", "incomplete_expired"]);
+
 /**
  * Apply one Stripe event.
  *
@@ -253,12 +343,25 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
     case "customer.subscription.deleted": {
       const subscription = event.data.object as Stripe.Subscription;
       const orgId = await orgForCustomer(customerIdOf(subscription.customer));
-      if (!orgId) return "unknown_customer";
+      if (!orgId) {
+        // A subscription that has ended, for a customer we no longer hold, is
+        // what deleting an account produces: the route cancels in Stripe, the
+        // cascade removes `billing_customers`, and Stripe's
+        // `customer.subscription.deleted` arrives a moment later. There is
+        // nothing left to apply. Leaving it unprocessed kept health at 503 for
+        // good — Stripe is answered 200 and never retries it — and the release
+        // gate with it. A live subscription we cannot place is still left
+        // visible, because that one is money nobody is accounting for.
+        return ENDED_SUBSCRIPTION_STATUSES.has(subscription.status) ? "ignored" : "unknown_customer";
+      }
 
       const fields = subscriptionFields(subscription);
-      const planId =
-        planIdForPrice(fields.priceId) ??
-        ((subscription.metadata?.["plan_id"] as PlanId | undefined) ?? null);
+      // The price decides the plan, and the database owns that mapping
+      // (`billing_plan_prices`). This deployment's own reading of the price
+      // is sent only as a cross-check: if the two disagree the event fails
+      // loudly instead of either one being believed. Subscription metadata is
+      // never consulted — it is a free-text field nobody pays for.
+      const planId = planIdForPrice(fields.priceId);
 
       const { data, error } = await service.rpc("rpc_billing_apply_subscription", {
         p_org_id: orgId,
@@ -274,7 +377,10 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
         p_event_created: eventCreated,
       });
 
-      if (error) throw error;
+      if (error) {
+        reportUnknownPrice(error, event, fields.priceId);
+        throw error;
+      }
       return data === "stale" ? "stale" : "applied";
     }
 
@@ -283,21 +389,27 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
       const orgId = await orgForCustomer(customerIdOf(invoice.customer));
       if (!orgId) return "unknown_customer";
 
-      const line = invoice.lines?.data?.[0];
+      const line = periodLine(invoice);
 
       // THE ONLY THING THAT MINTS MONTHLY SMS. Not checkout, not subscription
       // creation: a paid invoice for a billing period, once, expiring at the
       // end of the period it paid for.
+      // The price, not a plan name: the database maps it, and an unknown
+      // price fails the event rather than minting anyone's allowance.
+      const priceId = linePriceId(line);
       const { error } = await service.rpc("rpc_billing_apply_invoice_paid", {
         p_org_id: orgId,
         p_invoice_id: invoice.id,
-        p_plan_id: planIdForPrice(invoicePriceId(invoice)),
+        p_stripe_price_id: priceId,
         p_period_start: unixToIso(line?.period?.start),
         p_period_end: unixToIso(line?.period?.end),
         p_amount_paid: invoice.amount_paid ?? 0,
       });
 
-      if (error) throw error;
+      if (error) {
+        reportUnknownPrice(error, event, priceId);
+        throw error;
+      }
       return "applied";
     }
 
@@ -340,22 +452,32 @@ export async function receiveStripeWebhook(
 
   try {
     const outcome = await applyStripeEvent(event);
-    if (outcome !== "unknown_customer") {
-      await service.rpc("rpc_stripe_event_complete", { p_event_id: event.id });
-    } else {
-      // Left unprocessed on purpose: an event whose customer we cannot place
-      // is visible in the inbox for someone to look at, not silently dropped.
-      await service.rpc("rpc_stripe_event_fail", {
-        p_event_id: event.id,
-        p_error: "no organization for this Stripe customer",
-      });
+    if (outcome === "unknown_customer") {
+      // A newly created Stripe customer may arrive before its organization
+      // link is visible. Keep the inbox unprocessed AND return a retryable
+      // HTTP 500: a successful 200 would stop Stripe from redelivering it.
+      throw new Error("no organization for this Stripe customer");
     }
+
+    const { error: completeError } = await service.rpc("rpc_stripe_event_complete", {
+      p_event_id: event.id,
+    });
+    // Stripe may retry if we couldn't persist the completion marker. The
+    // subscription and invoice handlers are idempotent, so this is safe.
+    if (completeError) throw completeError;
+
     return { outcome };
   } catch (error) {
-    await service.rpc("rpc_stripe_event_fail", {
+    const { error: failError } = await service.rpc("rpc_stripe_event_fail", {
       p_event_id: event.id,
-      p_error: error instanceof Error ? error.message : String(error),
+      p_error: describeError(error),
     });
+    if (failError) {
+      logger.error("billing.webhook_failure_record_failed", {
+        eventId: event.id,
+        reason: describeError(failError),
+      });
+    }
     throw error;
   }
 }
@@ -383,11 +505,18 @@ export async function readBillingState(
       .select("plan_id, status, cancel_at_period_end, trial_ends_at, current_period_end")
       .eq("org_id", orgId)
       .maybeSingle(),
-    serviceRoleClient().rpc("rpc_sms_balance", { p_org_id: orgId }),
+    // As the signed-in owner, so the function's own membership check applies.
+    context.db.rpc("rpc_sms_balance", { p_org_id: orgId }),
   ]);
 
   if (entitlement.error) {
     logger.error("billing.state_failed", { requestId, orgId, error: entitlement.error });
+    throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
+  }
+
+  if (balance.error) {
+    // A failed balance lookup must not masquerade as "zero SMS credits".
+    logger.error("billing.balance_failed", { requestId, orgId, error: balance.error });
     throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
   }
 

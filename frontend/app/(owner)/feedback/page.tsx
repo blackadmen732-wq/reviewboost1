@@ -1,117 +1,159 @@
 import type { Metadata } from "next";
-import { MessageSquare } from "lucide-react";
 import Link from "next/link";
 
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { AppShell } from "@/features/dashboard/app-shell";
-import { FeedbackList } from "@/features/dashboard/feedback-list";
-import { getOwnerCounts, listReviews, requireOwner } from "@/lib/server/owner-data";
-import { cn } from "@/lib/utils/cn";
+import { PageHeader } from "@/components/ui/page-header";
+import { FeedbackList, tagLabels } from "@/features/dashboard/feedback-list";
+import { FeedbackTabs } from "@/features/dashboard/feedback-tabs";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
+import {
+  filterInstants,
+  formatDateRange,
+  hasFeedbackFilters,
+  parseFeedbackFilters,
+  type FeedbackFilters,
+} from "@/lib/owner/insights";
+import { getOwnerCounts, listLocations, listReviews, listStands, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Feedback — ReviewBoost",
+  title: "Feedback",
   robots: { index: false, follow: false },
 };
 
 export const dynamic = "force-dynamic";
 
 /**
- * The private messages customers left, newest first.
+ * The inbox: Needs you, and Everything.
  *
- * FEEDBACK VS REVIEWS
- * -------------------
- * Two screens on purpose. Feedback is the *inbox* — things that may need doing,
- * with unread state and an action attached. Reviews is the *record* — every
- * rating, browsable, with nothing to do.
+ * Needs you is what is waiting on the business: anything unread, and any
+ * rating of three stars or fewer that nobody has marked sorted. A 5-star that
+ * has been read leaves it by itself; it used to stay until someone "sorted"
+ * praise, which made clearing the list a chore and hid the complaints in it.
  *
- * Collapsing them would mean either burying complaints in a list of 5s, or
- * pretending a silent 5 is an unread task. An owner between customers needs the
- * first list short and true.
- *
- * Notes are decrypted on the server and never logged. The rating appears here
- * because this is the private workspace — the one place an owner is meant to see
- * it. Team Praise deliberately does not.
+ * Everything can arrive filtered from Insights — one star value, one place,
+ * the same days the breakdown counted — so an owner who taps "2 stars: 6
+ * ratings" sees those six. The filter is read from the URL and trusted in no
+ * part: see parseFeedbackFilters.
  */
 export default async function FeedbackPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string }>;
+  searchParams: Promise<{ show?: string; rating?: string; location?: string; from?: string; to?: string }>;
 }) {
   const { organization } = await requireOwner("/feedback");
 
-  const { show } = await searchParams;
-  const showAll = show === "all";
+  const params = await searchParams;
+  const showAll = params.show === "all";
 
-  const [{ items }, counts] = await Promise.all([
-    listReviews(organization.orgId, { limit: 50, ...(showAll ? {} : { openOnly: true }) }),
+  const locations = showAll ? await listLocations(organization.orgId) : [];
+  const filters = showAll
+    ? parseFeedbackFilters(params, locations.map((location) => location.locationId))
+    : null;
+  const filtered = filters !== null && hasFeedbackFilters(filters);
+  const span = filters ? filterInstants(organization.timezone, filters) : null;
+
+  const [{ items, hasMore }, counts, stands] = await Promise.all([
+    listReviews(organization.orgId, {
+      limit: 50,
+      ...(showAll ? {} : { needsAttention: true }),
+      ...(filters?.rating ? { rating: filters.rating } : {}),
+      ...(filters?.locationId ? { locationId: filters.locationId } : {}),
+      ...(span ? { submittedFrom: span.from, submittedBefore: span.before } : {}),
+    }),
     getOwnerCounts(organization.orgId, organization.timezone),
+    listStands(organization.orgId),
   ]);
+  const tagLabel = tagLabels(stands);
 
   return (
-    <AppShell unreadCount={counts.unread}>
-      <h1 className="mb-2 text-2xl font-semibold tracking-[-0.02em] text-ink">Feedback</h1>
-      <p className="mb-5 text-base text-muted">Ratings and messages from your customers.</p>
+    <OwnerShell unreadCount={counts.unread} businessName={organization.name}>
+      <PageHeader title="Feedback" description="Ratings from your customers." />
 
-      <div className="mb-5 flex gap-2" role="group" aria-label="Filter feedback">
-        <FilterTab href="/feedback" label="Needs you" active={!showAll} />
-        <FilterTab href="/feedback?show=all" label="Everything" active={showAll} />
-      </div>
+      <FeedbackTabs active={showAll ? "everything" : "needs-you"} />
+
+      {filtered && filters ? (
+        <FilterSummary
+          filters={filters}
+          locationName={locations.find((location) => location.locationId === filters.locationId)?.name ?? null}
+        />
+      ) : null}
 
       {items.length === 0 ? (
-        showAll ? (
+        filtered ? (
           <EmptyState
-            icon={MessageSquare}
-            title="Nothing yet"
-            // Explains the cause, not just the absence.
-            description="When a customer scans your code and writes something, it shows up here."
+            title="No ratings match this filter."
+            description="Clear the filter to see every rating."
+            action={
+              <Button asChild variant="secondary" size="sm">
+                <Link href="/feedback?show=all">Clear filter</Link>
+              </Button>
+            }
+          />
+        ) : showAll ? (
+          <EmptyState
+            title="Nothing yet."
+            description="Ratings show up here after customers tap or scan your Tag."
+            action={
+              <Button asChild variant="secondary" size="sm">
+                <Link href="/stands">Go to Tags</Link>
+              </Button>
+            }
           />
         ) : (
-          // A genuinely different state, and a good one. "Nothing needs you" is
-          // an answer worth giving, not an empty screen to apologise for.
           <EmptyState
-            icon={MessageSquare}
-            title="All caught up"
-            description="Nothing is waiting on you. Anything already sorted is under Everything."
+            title="All caught up."
+            description="Nothing is waiting on you. Every rating, sorted or read, is under Everything."
           />
         )
       ) : (
-        <FeedbackList
-          items={items.map((item) => ({
-            id: item.responseId,
-            rating: item.rating,
-            note: item.note,
-            submittedAt: item.submittedAt,
-            isRead: item.isRead,
-            isResolved: item.isResolved,
-            noteCount: item.noteCount,
-          }))}
-        />
+        <>
+          <FeedbackList
+            items={items.map((item) => ({
+              id: item.responseId,
+              rating: item.rating,
+              note: item.note,
+              submittedAt: item.submittedAt,
+              isRead: item.isRead,
+              isResolved: item.isResolved,
+              noteCount: item.noteCount,
+              tagLabel: tagLabel(item.standId),
+            }))}
+          />
+          {hasMore ? (
+            <p className="mt-4 text-sm text-muted">Showing the 50 most recent.</p>
+          ) : null}
+        </>
       )}
-    </AppShell>
+    </OwnerShell>
   );
 }
 
-/**
- * Two tabs, not a dropdown.
- *
- * Both options are visible without a tap, which is the whole point for someone
- * who will not go hunting inside a menu to discover that a second view exists.
- */
-function FilterTab({ href, label, active }: { href: string; label: string; active: boolean }) {
+/** What the list is filtered to, in words, and the way out of the filter. */
+function FilterSummary({
+  filters,
+  locationName,
+}: {
+  filters: FeedbackFilters;
+  locationName: string | null;
+}) {
+  const parts: string[] = [];
+  if (filters.rating) parts.push(`${filters.rating} ${filters.rating === 1 ? "star" : "stars"}`);
+  if (locationName) parts.push(locationName);
+  if (filters.from && filters.to) parts.push(formatDateRange(filters.from, filters.to));
+
   return (
-    <Link
-      href={href}
-      aria-current={active ? "true" : undefined}
-      className={cn(
-        "inline-flex min-h-11 items-center rounded-full px-4 text-sm font-medium",
-        "transition-colors duration-150",
-        "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
-        active
-          ? "bg-brand-soft text-brand-text"
-          : "border border-border bg-surface text-muted hover:text-ink",
-      )}
-    >
-      {label}
-    </Link>
+    <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1">
+      <p className="text-base text-ink">
+        <span className="text-muted">Showing </span>
+        {parts.join(" · ")}
+      </p>
+      <Link
+        href="/feedback?show=all"
+        className="inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline-offset-4 hover:underline"
+      >
+        Clear filter
+      </Link>
+    </div>
   );
 }

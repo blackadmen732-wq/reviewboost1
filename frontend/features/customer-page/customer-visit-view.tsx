@@ -1,0 +1,168 @@
+"use client";
+
+import localFont from "next/font/local";
+import type { ReactNode } from "react";
+
+import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
+import {
+  clampHeroTransform,
+  heroTransformStyle,
+  type HeroTransform,
+} from "@/lib/owner/hero-transform";
+
+/**
+ * The customer page. Owner preview and live /q render this same tree.
+ * Positioning in the phone frame is this view — not a mock, not a later check.
+ *
+ * SoT v1.9 / v1.10: Mario’s Pizza — rich hero, fixed white card, five stars,
+ * ReviewBoost footer. No location. Same crop the customer sees.
+ *
+ * The hero has no drag or pinch controls in V1. It carried a single-pointer
+ * drag and a wheel handler that read as pinch-to-zoom without being it, and the
+ * Customer Page contract stores no per-owner transform — so whatever the owner
+ * dragged to was never sent anywhere and the customer received the default crop
+ * regardless. One deterministic crop, shared by this preview and /q/{token}, is
+ * the honest version. Real crop controls need the transform persisted first.
+ */
+
+/**
+ * The heading and "Powered by" face of the approved reference. Measured
+ * against it pixel for pixel, Inter Tight overlaps the reference heading at 0.80
+ * (Geist, the app face, peaks at 0.34 — it cannot reach the reference's
+ * height at the reference's width). Bundled, latin subset, SIL OFL 1.1 — see
+ * lib/fonts/InterTight-OFL.txt.
+ */
+const visitHeadingFont = localFont({
+  src: "../../lib/fonts/InterTight-latin-variable.woff2",
+  variable: "--font-visit-heading",
+  weight: "100 900",
+  display: "swap",
+});
+
+/**
+ * The face of the reference's two tracked-caps lines, the instruction and the
+ * promise line. DM Sans overlaps them at 0.55 and 0.71 where Geist reaches
+ * 0.25 and 0.29 — its round O, C and G are what those lines are made of.
+ * Bundled, latin subset, SIL OFL 1.1 — see lib/fonts/DMSans-OFL.txt.
+ */
+const visitCapsFont = localFont({
+  src: "../../lib/fonts/DMSans-latin-variable.woff2",
+  variable: "--font-visit-caps",
+  weight: "100 1000",
+  display: "swap",
+});
+
+export interface CustomerVisitViewProps {
+  heroUrl: string | null;
+  transform: HeroTransform;
+  /**
+   * Whose page this is. A customer who scans a code on a counter should not
+   * have to trust a blank white page that never says which business is
+   * asking — with no photo, nothing else on the screen names it.
+   */
+  businessName?: string | null;
+  heading: string;
+  support: string;
+  footerLine: string;
+  children: ReactNode;
+  language?: ReactNode;
+  /**
+   * Drawn inside another page — the owner's preview, the homepage demo —
+   * rather than as the page itself. The question is then not a second h1
+   * there (it looks identical: .visit-heading sets every property), and the
+   * photo is not fetched first, because in a preview the phone around it is
+   * the larger thing on screen.
+   */
+  preview?: boolean;
+}
+
+export function CustomerVisitView({
+  heroUrl,
+  transform,
+  businessName,
+  heading,
+  support,
+  footerLine,
+  children,
+  language,
+  preview = false,
+}: CustomerVisitViewProps) {
+  const Heading = preview ? "p" : "h1";
+  const crop = clampHeroTransform(transform);
+
+  return (
+    <div
+      className={`visit-stage ${visitHeadingFont.variable} ${visitCapsFont.variable}`}
+      data-customer-visit
+      data-customer-canvas={CUSTOMER_CANVAS.aspectRatio}
+      data-card-fixed=""
+    >
+      <div className="visit-hero" data-hero-layer>
+        {heroUrl ? (
+          <HeroImage src={heroUrl} transform={heroTransformStyle(crop)} first={!preview} />
+        ) : (
+          <div className="visit-hero__empty" aria-hidden="true" data-hero-empty />
+        )}
+        {language ? <div className="visit-language">{language}</div> : null}
+      </div>
+
+      <section className="visit-card" data-rating-card>
+        {heading ? (
+          <div className="visit-card__copy">
+            {businessName ? (
+              <p className="visit-business" data-business-name>
+                {businessName}
+              </p>
+            ) : null}
+            <Heading className="visit-heading" data-screen-heading tabIndex={-1}>
+              {heading}
+            </Heading>
+            {support ? <p className="visit-support">{support}</p> : null}
+          </div>
+        ) : null}
+        <div className="visit-card__body">{children}</div>
+        <footer className="visit-footer">
+          {/* The approved reference: a small grey bolt, grey "Powered by",
+              and "ReviewBoost" in ink. This is a deliberate exception to the
+              one-mark brand rule — the Customer Page footer is the reference,
+              not the green R mark or the green "Boost" logotype. */}
+          <p className="visit-powered" data-powered-by>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-powered-bolt>
+              <path d="M13.14 1 4.9 13.76h5.97L10.02 23 19.1 9.36h-6.06L13.14 1Z" />
+            </svg>
+            <span>
+              Powered by <strong>ReviewBoost</strong>
+            </span>
+          </p>
+          <p className="visit-footer__line">{footerLine}</p>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+/**
+ * The business's artwork. The hero keeps its size on the dark field while the
+ * photo downloads, so nothing jumps and nothing flashes white.
+ *
+ * Shown the moment the browser has it. It used to sit at opacity 0 until React
+ * had hydrated and seen it load, so on a slow phone the customer looked at an
+ * empty dark box for as long as the JavaScript took, with the photo already
+ * downloaded. On the customer's own page it is the largest thing on the
+ * screen, so there it is fetched first.
+ */
+function HeroImage({ src, transform, first }: { src: string; transform: string; first: boolean }) {
+  return (
+    // Artwork origin is the owner's published/draft upload.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      draggable={false}
+      decoding="async"
+      fetchPriority={first ? "high" : "auto"}
+      className="visit-hero__image"
+      style={{ transform }}
+    />
+  );
+}

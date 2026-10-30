@@ -1,13 +1,28 @@
-import { View, Text, Pressable, StyleSheet, FlatList, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+} from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Tappable } from "@/components/tappable";
 import { useAuth } from "@/data/auth-context";
 import { colors, radii, fonts } from "@/theme";
 import type { Organization } from "@/data/types";
 
 export default function SelectOrgScreen() {
-  const { organizations, selectOrg, name, logout, orgLoading, orgError } = useAuth();
+  const {
+    organizations,
+    selectOrg,
+    name,
+    logout,
+    orgLoading,
+    orgError,
+    refreshOrganizations,
+  } = useAuth();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
@@ -36,9 +51,9 @@ export default function SelectOrgScreen() {
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
             <Text style={styles.greeting}>Welcome back, {name}</Text>
-            <Text style={styles.subtitle}>Select an organization</Text>
+            <Text style={styles.subtitle}>Choose your business</Text>
           </View>
-          <Pressable
+          <Tappable
             style={styles.logoutButton}
             onPress={handleLogout}
             disabled={loggingOut}
@@ -47,7 +62,7 @@ export default function SelectOrgScreen() {
             <Text style={styles.logoutText}>
               {loggingOut ? "Signing out…" : "Sign out"}
             </Text>
-          </Pressable>
+          </Tappable>
         </View>
         {logoutError && <Text style={styles.errorText}>{logoutError}</Text>}
       </View>
@@ -55,23 +70,52 @@ export default function SelectOrgScreen() {
         data={organizations}
         keyExtractor={(item) => item.orgId}
         renderItem={({ item }: { item: Organization }) => (
-          <Pressable
+          <Tappable
+            kind="row"
             style={styles.card}
             onPress={() => handleSelect(item.orgId)}
             accessibilityRole="button"
           >
             <Text style={styles.orgName}>{item.name}</Text>
             <Text style={styles.role}>{item.role}</Text>
-          </Pressable>
+          </Tappable>
         )}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           orgLoading ? (
-            <ActivityIndicator size="large" color={colors.brand} style={styles.spinner} />
+            <ActivityIndicator
+              size="large"
+              color={colors.brand}
+              style={styles.spinner}
+            />
           ) : orgError ? (
-            <Text style={styles.errorText}>{orgError}</Text>
+            <View>
+              <Text style={styles.errorText}>{orgError}</Text>
+              <Tappable
+                kind="row"
+                onPress={() => void refreshOrganizations()}
+                accessibilityRole="button"
+              >
+                <Text style={styles.logoutText}>Try again</Text>
+              </Tappable>
+            </View>
           ) : (
-            <Text style={styles.empty}>No organizations found for this account</Text>
+            <View>
+              <Text style={styles.empty}>
+                No business on this account yet
+              </Text>
+              {/* Someone with no business must still be able to delete their
+                  account in the app (launch gap L1, Apple 5.1.1(v)). */}
+              <Tappable
+                kind="row"
+                onPress={() => router.push("/delete-account")}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.logoutText, styles.deleteLink]}>
+                  Delete my account
+                </Text>
+              </Tappable>
+            </View>
           )
         }
       />
@@ -82,7 +126,11 @@ export default function SelectOrgScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
   headerText: { flex: 1 },
   greeting: { fontSize: 24, ...fonts.heading, color: colors.ink },
   subtitle: { fontSize: 15, color: colors.inkMuted, marginTop: 4 },
@@ -104,8 +152,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   orgName: { fontSize: 18, ...fonts.subheading, color: colors.ink },
-  role: { fontSize: 14, color: colors.inkMuted, marginTop: 2, textTransform: "capitalize" },
-  empty: { textAlign: "center", color: colors.inkFaint, marginTop: 40, fontSize: 15 },
-  errorText: { textAlign: "center", color: colors.danger, marginTop: 12, fontSize: 14 },
+  role: {
+    fontSize: 14,
+    color: colors.inkMuted,
+    marginTop: 2,
+    textTransform: "capitalize",
+  },
+  empty: {
+    textAlign: "center",
+    color: colors.inkFaint,
+    marginTop: 40,
+    fontSize: 15,
+  },
+  errorText: {
+    textAlign: "center",
+    color: colors.danger,
+    marginTop: 12,
+    fontSize: 14,
+  },
   spinner: { marginTop: 40 },
+  deleteLink: { textAlign: "center", marginTop: 24, textDecorationLine: "underline" },
 });

@@ -103,10 +103,14 @@ describe("the owner surfaces show real state", () => {
     }
   });
 
-  it("names the physical thing Tags in the navigation", () => {
+  it("names the fourth tab Tags, the same as the iPhone app", () => {
     const nav = source("features/dashboard/nav-items.ts");
     expect(nav).toMatch(/label: "Tags"/);
     expect(nav).toMatch(/label: "Text Requests"/);
+    // One product, one word: the web bar and the native tab bar agree.
+    const native = source("../apps/mobile/app/(tabs)/_layout.tsx");
+    expect(native).toMatch(/title: "Tags"/);
+    expect(nav).not.toMatch(/label: "Set up"/);
   });
 
   it("gives Home and Feedback one definition of unread", () => {
@@ -139,5 +143,40 @@ describe("the owner surfaces show real state", () => {
       expect(ownerPages(), `${page} should exist`).toContain(page);
       expect(body, page).not.toMatch(/createClient|\.from\(|\.rpc\(/);
     }
+  });
+});
+
+/**
+ * The unread badge and the unread list have to mean the same thing.
+ *
+ * The count queried `read_at is null` with no resolved filter while both Home
+ * and Feedback listed unread *and* unresolved, so a rating a teammate had
+ * already resolved still read as "1 message needs you" above an empty list.
+ */
+describe("unread means the same thing everywhere", () => {
+  it("counts unread and unresolved, as the lists do", () => {
+    const data = code("lib/server/owner-data.ts");
+    // Scoped to getOwnerCounts: `listReviews` also matches on read_at, and it
+    // applies the unresolved predicate through its own `openOnly` option.
+    const counts = data.slice(data.indexOf("export const getOwnerCounts"));
+    const unreadIndex = counts.indexOf('.is("read_at", null)');
+    expect(unreadIndex).toBeGreaterThan(-1);
+
+    const unreadQuery = counts.slice(unreadIndex, unreadIndex + 120);
+    expect(unreadQuery).toContain('.is("resolved_at", null)');
+  });
+
+  it("lists Home's unread rows without a note filter", () => {
+    // A silent 1-star is exactly the unread an owner most needs to see, and it
+    // has no note — filtering by one hid it from the list while still counting
+    // it in the badge.
+    const home = code("app/(owner)/home/page.tsx");
+    expect(home).toContain("unreadOnly: true");
+    expect(home).not.toContain("withNotesOnly");
+  });
+
+  it("lists Feedback without a note filter either", () => {
+    const feedback = code("app/(owner)/feedback/page.tsx");
+    expect(feedback).not.toContain("withNotesOnly");
   });
 });

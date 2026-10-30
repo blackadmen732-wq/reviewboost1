@@ -10,7 +10,7 @@ Everything App Review needs. Fill in the blanks marked **TODO** before submittin
 |---|---|
 | **App name** | ReviewBoost |
 | **Subtitle** | Get more Google reviews |
-| **Bundle identifier** | `fit.reviewboost.app` |
+| **Bundle identifier** | `fit.reviewboost.app` (must match `ios.bundleIdentifier` in `apps/mobile/app.json`; create the App Store Connect record with exactly this ID) |
 | **SKU** | `reviewboost-ios-v1` |
 | **Primary language** | English (U.S.) |
 | **Category** | Business |
@@ -40,7 +40,7 @@ No sign-up. No form. No friction.
 FOR THE BUSINESS
 
 - One dashboard to see every rating as it comes in
-- Ratings and written feedback from customers, visible only to you
+- Every rating as it arrives, visible only to you
 - Text Requests: send a review reminder to a phone number with one tap
 - Multiple Tags and locations on paid plans
 - Works as a web app on any device, installs to the home screen like a native app
@@ -53,13 +53,17 @@ hardware required — QR codes work on every smartphone too.
 
 PRIVACY
 
-We never ask customers for their name, phone number, or email. Ratings are
-anonymous. Customer feedback is encrypted at rest — only you can read it.
+We never ask customers for their name, phone number, or email. A rating is
+one tap and nothing else — there is no message box, so there is nothing to
+attribute to anyone. Notes your own team writes on a rating are encrypted at
+rest; only your business can read them.
 
 PLANS
 
-Monthly plans unlock customer-facing Tags and SMS sending. Cancel any time;
-your data stays until you delete it.
+$49, $79 or $129 a month depending on how many locations and Tags you need.
+Starter comes with a seven-day free trial: a card is required to start it and
+nothing is charged until it ends. Growth and Pro are charged when you subscribe. Subscriptions are managed on the web at
+reviewboost.fit — this app shows your plan and what is left of it.
 
 ---
 Requires an internet connection for setup and to receive ratings in real time.
@@ -83,9 +87,10 @@ google reviews,review booster,NFC review,qr review,small business,customer revie
 
 | Field | Value |
 |---|---|
-| **Support URL** | `https://reviewboost.app/support` — TODO: create redirect or page |
-| **Marketing URL** | `https://reviewboost.app` |
-| **Privacy policy URL** | `https://reviewboost.app/privacy` |
+| **Support URL** | `https://reviewboost.fit/support` — live (`frontend/app/support/page.tsx`) |
+| **Marketing URL** | `https://reviewboost.fit` |
+| **Privacy policy URL** | `https://reviewboost.fit/privacy` — live |
+| **Account deletion URL** | `https://reviewboost.fit/delete-account` — live, and reachable signed out |
 
 ---
 
@@ -97,9 +102,9 @@ google reviews,review booster,NFC review,qr review,small business,customer revie
 
 | Field | Value |
 |---|---|
-| Email | TODO |
-| Password | TODO |
-| Notes | See "App Review notes" below |
+| User name | The value of `REVIEW_SIGN_IN_EMAIL` |
+| Password | The value of `REVIEW_SIGN_IN_CODE` (six digits). The app has no passwords: the reviewer types this where the emailed code normally goes |
+| Notes | See "App Review notes" below. `docs/mobile/APP_STORE_METADATA.md` has the full setup and the notes to paste |
 
 ### App Review notes
 
@@ -110,27 +115,28 @@ download is required.
 
 TO TEST THE CORE FLOW
 1. Sign in with the demo credentials above.
-2. From the Tags screen, tap "See what customers see" on any Tag.
+2. Open any Tag from the Tags tab, then tap "Open customer page".
 3. Tap any star — you will be sent to the configured Google review URL.
    (The demo account points to a real but publicly known Google My Business
    listing — this is intentional so reviewers can see the destination.)
 
 TO TEST NFC (requires iPhone 7+ with iOS 14+)
-1. On the Tags screen, tap the Tag you want to programme.
-2. Tap "Programme NFC tag" and hold a blank NTAG213 or NTAG215 tag to the
-   top of the device.
-3. The tag will be programmed with the review URL. Tap it with any NFC-capable
-   phone to verify.
-   NFC tags are not required to use the app — this feature is opt-in.
+1. On the Tags tab, tap the Tag you want to program.
+2. Tap "Program NFC" and hold a blank NTAG213 or NTAG215 tag to the top of
+   the device when the screen says "Hold near your Tag".
+3. A green check and "Tag ready" means the tag carries the review URL. Tap it with
+   any NFC-capable phone to verify.
+   NFC tags are not required to use the app — this feature is opt-in, and the
+   app is fully usable with printed QR codes alone.
 
-TO TEST TEXT REQUESTS
-1. From the Text Requests screen, enter a phone number you control and tap Send.
-2. You will receive an SMS with a link to the review page.
-   (The demo account has a small SMS credit balance for review purposes.)
+TEXT REQUESTS
+The Text Requests tab shows texts left and recent requests. Requests are
+scheduled from the web app, not this one, and the demo business has sending
+turned off, so no text is sent during review.
 
 BILLING
-The demo account is on an active paid plan. No card is required during the
-App Review session.
+Nothing is bought in this app. The demo business's plan is set up for the
+review period on the web; no card is needed during the App Review session.
 
 BACKGROUND OPERATION
 The app does not run in the background and does not use background app refresh,
@@ -162,26 +168,91 @@ background fetch, or push notifications.
 
 ## Privacy details (App Store data collection)
 
+These are a legal declaration, not marketing, so each row below is what the
+code does. The previous version declared "Product interaction — Analytics" and
+"User ID — analytics"; there is no analytics SDK in this app or on the web —
+not Firebase, Sentry, Amplitude, Segment, PostHog or Mixpanel — so both were
+untrue. Declaring collection that does not happen is still a false label, and
+it is the kind App Review checks by looking at the binary.
+
 ### Data linked to identity
 
 | Data type | Collected | Use |
 |---|---|---|
 | Email address | Yes | Account, app functionality |
 | Name | Yes (business name only) | App functionality |
-| Phone number | Yes — uploaded by owner for Text Requests | App functionality |
-| Payment info | No — handled by Stripe, not collected by us | — |
-| User ID | Yes | App functionality, analytics |
+| Phone number | Yes — uploaded by the owner for Text Requests | App functionality |
+| Payment info | No — Stripe handles cards; we never see a card number | — |
+| User ID | Yes | App functionality only. Not used for analytics or tracking. |
 
 ### Data not linked to identity
 
 | Data type | Collected | Use |
 |---|---|---|
-| Product interaction | Yes | Analytics |
+| Product interaction | No | — |
 | Crash data | No | — |
+| Diagnostics | No | — |
+
+### Tracking
+
+None. No data is used to track across apps or websites, there is no advertising
+identifier, and `NSUserTrackingUsageDescription` is deliberately absent — an ATT
+prompt for an app that tracks nothing is its own kind of dishonesty.
 
 ### Data not collected
 
-Customer ratings are anonymous. No customer name, phone, or email is collected.
+Customer ratings are anonymous. No customer name, phone, or email is collected
+at any point in the customer flow.
+
+---
+
+## Account deletion (Guideline 5.1.1(v))
+
+Required for any app that lets someone create an account, and checked by App
+Review rather than taken on trust.
+
+**Where it is:** Account tab → Delete account. Nothing is hidden behind a
+support email, and it is reachable in three taps from launch.
+
+**What it does:** asks the owner to type their business name, then deletes the
+organization and everything in it — Tags, ratings, phone numbers, team
+memberships — and cancels the Stripe subscription first. The sign-in itself is
+removed too, unless the person owns another business on ReviewBoost. It is
+immediate: no queue, no waiting period, no approval step.
+
+**What survives, and why:** invoices already issued, because both parties are
+required to keep records of money that has moved. This is stated on the public
+page rather than implying Stripe forgets too.
+
+**Public URL, for the listing field:** `https://reviewboost.fit/delete-account`
+— reachable without signing in, which matters because the person who most needs
+it is often the person who has already lost access.
+
+**For the reviewer:** the demo account can be used to walk up to the
+confirmation step safely. Typing anything other than the exact business name
+leaves the button disabled and the account untouched.
+
+---
+
+## Payments and Guideline 3.1
+
+ReviewBoost is a business service billed on the web through Stripe. The iOS app
+contains **no purchase mechanism and no link to one** — no in-app purchase, no
+checkout, no "upgrade" button, and no external URL that leads to a payment
+page. The Account tab reads the current plan and the remaining message
+allowance; it does not sell anything.
+
+This is the posture 3.1.3(b) requires of an app whose subscription is acquired
+elsewhere: showing what someone already bought is permitted, directing them to
+buy is not. Two strings were changed to hold that line — "Buy more" on the Text
+Requests screen and a "cancel your plan" instruction on the deletion screen
+both told someone to do something this app cannot do, and each now states the
+fact without pointing anywhere.
+
+If App Review asks for IAP, the argument is that this is a multiplatform
+business service whose value is the physical Tags and the web dashboard, not
+digital content consumed in the app. Have that conversation before adding a
+purchase button, not after.
 
 ---
 
@@ -192,6 +263,28 @@ Customer ratings are anonymous. No customer name, phone, or email is collected.
 | NFC (`NFCReaderUsageDescription`) | "ReviewBoost uses NFC to programme your physical review tags." |
 
 No other system permissions are requested. No camera, microphone, location, contacts, or notifications.
+
+---
+
+## App icon
+
+App Store Connect has no icon upload: the App Store icon is read from the
+submitted build. The build's icon is `apps/mobile/assets/icon.png`
+(`"icon"` in `app.json`), which Expo prebuild copies unchanged into
+`ios/ReviewBoost/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png`.
+
+| Check | Result |
+|---|---|
+| Size | 1024 × 1024 |
+| Alpha | None (RGB PNG) |
+| Corners | Square; iOS applies the mask |
+| Generated from | `Branding/Mark.svg` by `scripts/brand/generate-brand-assets.mjs` |
+| Verified in prebuild output | `docs/mobile/icon-previews/store-assets-qa.png` (`scripts/brand/render-store-qa.py`) |
+| Reference copy (review notes, press) | `store-assets/app-store/app-icon-1024.png`, pixel-identical to the build icon |
+
+To change the icon, change `Branding/Mark.svg`, rerun the generator, and ship
+a new build. Replacing a PNG by hand is caught by
+`frontend/tests/unit/brand-assets.test.ts`.
 
 ---
 
@@ -237,7 +330,7 @@ Known limitations in this build:
 - SMS sending requires a real Twilio account — the demo account has limited credits
 - Billing flows through Stripe test mode; no real charges will occur
 
-Please report any issues to help@reviewboost.app — we read every message.
+Please report any issues to help@reviewboost.fit — we read every message.
 ```
 
 ### TestFlight groups
@@ -259,7 +352,7 @@ Tap, scan, or text — your customers leave a review on Google in seconds.
 No download required for them.
 
 This is our first App Store release. We'd love your feedback:
-help@reviewboost.app
+help@reviewboost.fit
 ```
 
 ---
@@ -274,7 +367,12 @@ help@reviewboost.app
 - [ ] `.p8` APNs key uploaded to App Store Connect (not in git)
 - [ ] Demo account created in production Supabase
 - [ ] Screenshots captured and uploaded
-- [ ] Privacy policy live at `https://reviewboost.app/privacy`
+- [ ] App Store Connect record uses bundle ID `fit.reviewboost.app`
+- [ ] Build's App Store icon checked on the TestFlight build's product page (source: `apps/mobile/assets/icon.png`)
+- [ ] Privacy policy live at `https://reviewboost.fit/privacy`
+- [ ] Account deletion URL live at `https://reviewboost.fit/delete-account`
+- [ ] Deletion verified end to end on a throwaway account, on device
+- [ ] Privacy labels match the tables above — no analytics declared
 - [ ] Support URL live
 - [ ] App Review notes filled in above with real demo credentials
 - [ ] Age rating questionnaire completed in App Store Connect

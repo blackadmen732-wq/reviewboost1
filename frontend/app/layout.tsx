@@ -3,18 +3,49 @@ import { GeistSans } from "geist/font/sans";
 import type { ReactNode } from "react";
 
 import { Providers } from "@/components/providers";
+import { SITE_URL } from "@/lib/site";
 import { PwaRegister } from "@/components/pwa-register";
 import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
+import "@/styles/customer-page.css";
+import "@/styles/public-product.css";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
+
+const DESCRIPTION =
+  "A code on the counter. The same Google review opportunity for every customer.";
 
 export const metadata: Metadata = {
+  // Every relative URL in metadata — canonicals, social images — resolves
+  // against this. Without it Next builds them relative, which means a social
+  // card with no image and a canonical tag that says nothing.
+  metadataBase: new URL(SITE_URL),
   // A template, so every page reads "Home — ReviewBoost" without each one
   // repeating the brand.
   title: { default: "ReviewBoost", template: "%s — ReviewBoost" },
-  description: "Collect honest reviews for your local business.",
+  description: DESCRIPTION,
   applicationName: "ReviewBoost",
-  // Next serves app/icon.tsx and app/apple-icon.tsx automatically; these point
-  // at the exported files so a manifest or a third party has something stable.
+  // One origin. reviewboost.app is retired, and two origins serving the same
+  // pages is how a small site competes with itself for its own name.
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: "ReviewBoost",
+    title: "ReviewBoost",
+    description: DESCRIPTION,
+    url: "/",
+    locale: "en_US",
+    // The approved mark on the brand tile. Not a screenshot of the product:
+    // a shrunk dashboard is unreadable at the size a link preview renders.
+    images: [{ url: "/brand/og.png", width: 1200, height: 630, alt: "ReviewBoost" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ReviewBoost",
+    description: DESCRIPTION,
+    images: ["/brand/og.png"],
+  },
+  // These point at the exported brand files so a manifest or a third party has
+  // something stable to read.
   icons: {
     icon: [{ url: "/brand/icon-32.png", sizes: "32x32", type: "image/png" }],
     apple: [{ url: "/brand/icon-180.png", sizes: "180x180", type: "image/png" }],
@@ -44,8 +75,8 @@ export const viewport: Viewport = {
   // flash white before the first paint — the thing that most makes a PWA feel
   // like a browser rather than an app.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F8F5F0" },
-    { media: "(prefers-color-scheme: dark)", color: "#14120F" },
+    { media: "(prefers-color-scheme: light)", color: "#FCFCFB" },
+    { media: "(prefers-color-scheme: dark)", color: "#191918" },
   ],
 
 };
@@ -63,7 +94,10 @@ export default function RootLayout({
           means the first frame is already cream — no device-specific assets to
           maintain, and no white flash in a demo.
         */}
-        <style>{`html{background-color:#F8F5F0}@media (prefers-color-scheme:dark){html{background-color:#14120F}}`}</style>
+        <style>{`html{background-color:#FCFCFB}@media (prefers-color-scheme:dark){html{background-color:#191918}}html[data-theme=light]{background-color:#FCFCFB}html[data-theme=dark]{background-color:#191918}`}</style>
+        {/* The owner's Light/Dark choice from Settings, applied before the
+            first paint so a dark choice never flashes light. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className={GeistSans.className}>
         <Providers>{children}</Providers>

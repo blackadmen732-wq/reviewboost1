@@ -33,6 +33,67 @@ function isProduction(): boolean {
 }
 
 /**
+ * Which deployment this is — not which build.
+ *
+ * `NODE_ENV=production` is true for every Vercel Preview as well as for the
+ * deployment paying customers use, so it cannot be what decides whether fake
+ * SMS or a development key fallback is acceptable. The tier is:
+ *
+ *   APP_ENV, if set: production | staging | preview | development | test
+ *   else VERCEL_ENV:  production | preview | development
+ *   else a production build on an unknown host: production (the strict one)
+ *   else development.
+ *
+ * APP_ENV may narrow Vercel's production to `staging` (a staging project's
+ * production target), but may never relax it to preview, development or
+ * test: a stray variable must not switch the paying-customer deployment
+ * into a mode that fakes SMS.
+ */
+export type DeploymentTier = "production" | "staging" | "preview" | "development" | "test";
+
+const TIERS: readonly DeploymentTier[] = ["production", "staging", "preview", "development", "test"];
+
+export function deploymentTier(): DeploymentTier {
+  const vercel = process.env.VERCEL_ENV?.trim().toLowerCase();
+  const explicit = process.env.APP_ENV?.trim().toLowerCase();
+
+  if (explicit) {
+    if (!(TIERS as readonly string[]).includes(explicit)) {
+      throw new ConfigError(`APP_ENV must be one of ${TIERS.join(", ")}.`);
+    }
+    if (vercel === "production" && explicit !== "production" && explicit !== "staging") {
+      throw new ConfigError(
+        `APP_ENV=${explicit} is not allowed on a Vercel production deployment. ` +
+          "Only production or staging may run there.",
+      );
+    }
+    return explicit as DeploymentTier;
+  }
+
+  if (vercel === "production") return "production";
+  if (vercel === "preview") return "preview";
+  if (vercel === "development") return "development";
+  if (process.env.NODE_ENV === "test") return "test";
+  if (isProduction()) return "production";
+  return "development";
+}
+
+/** Real customers, real money, real messages. */
+export function isPaidProductionTier(): boolean {
+  return deploymentTier() === "production";
+}
+
+function decode32(name: string, raw: string): Buffer {
+  const key = Buffer.from(raw, "base64");
+  if (key.length !== 32) {
+    throw new ConfigError(
+      `${name} must be a base64-encoded 32-byte key. Generate one with: openssl rand -base64 32`,
+    );
+  }
+  return key;
+}
+
+/**
  * The origin printed into every QR code and written to every NFC tag.
  *
  * Validated rather than trusted, and required in production. A stand is a
@@ -145,19 +206,32 @@ export function encryptionKey(): Buffer {
  * those. Sharing one key would mean rotating it after a note-key exposure
  * invalidated every printed QR code in the field.
  *
- * Falls back to the encryption key so existing deployments keep working, and
- * so a fresh install needs one fewer secret. Set it explicitly before printing
- * stands for a paying customer.
+ * Outside production it falls back to the encryption key so a fresh local
+ * install needs one fewer secret. In production it must be set, and must not
+ * be the encryption key: a Tag printed against the fallback is tied to the
+ * wrong key for as long as it sits on a table. A deployment that already
+ * issued Tags under the fallback moves off it with an ordinary rotation —
+ * TOKEN_DIGEST_KEY_PREVIOUS = the old (encryption) key, a new
+ * TOKEN_DIGEST_KEY, and TOKEN_DIGEST_KEY_VERSION incremented — see
+ * docs/backend/LAUNCH_GATE.md.
  */
 export function tokenDigestKey(): Buffer {
   const raw = process.env.TOKEN_DIGEST_KEY?.trim();
-  if (!raw) return encryptionKey();
 
-  const key = Buffer.from(raw, "base64");
-  if (key.length !== 32) {
+  if (!raw) {
+    if (isPaidProductionTier()) {
+      throw new ConfigError(
+        "TOKEN_DIGEST_KEY is required in production. It must be an independent 32-byte key, " +
+          "not a fallback to CUSTOMER_NOTE_ENCRYPTION_KEY.",
+      );
+    }
+    return encryptionKey();
+  }
+
+  const key = decode32("TOKEN_DIGEST_KEY", raw);
+  if (isPaidProductionTier() && key.equals(encryptionKey())) {
     throw new ConfigError(
-      "TOKEN_DIGEST_KEY must be a base64-encoded 32-byte key. " +
-        "Generate one with: openssl rand -base64 32",
+      "TOKEN_DIGEST_KEY must differ from CUSTOMER_NOTE_ENCRYPTION_KEY in production.",
     );
   }
   return key;
@@ -190,7 +264,14 @@ export function previousTokenDigestKey(): Buffer | null {
  */
 export function tokenDigestKeyVersion(): number {
   const raw = process.env.TOKEN_DIGEST_KEY_VERSION?.trim();
-  if (!raw) return 1;
+  if (!raw) {
+    // In production the version is part of the key's identity: a rotation
+    // that forgets to set it looks current and never migrates a Tag.
+    if (isPaidProductionTier()) {
+      throw new ConfigError("TOKEN_DIGEST_KEY_VERSION is required in production.");
+    }
+    return 1;
+  }
 
   const version = Number(raw);
   if (!Number.isInteger(version) || version < 1 || version > 32767) {
@@ -215,7 +296,23 @@ export function tokenDigestKeyVersion(): number {
  * refuses, because the business believes it is subscribed.
  */
 export function stripeSecretKey(): string {
-  return read("STRIPE_SECRET_KEY");
+  const key = read("STRIPE_SECRET_KEY");
+  const live = /^(sk|rk)_live_/.test(key);
+  const test = /^(sk|rk)_test_/.test(key);
+
+  // The readiness gate also checks this, but it must hold on the actual
+  // payment path even if someone bypasses the gate or removes monitoring.
+  if (!live && !test) {
+    throw new ConfigError("STRIPE_SECRET_KEY must be a Stripe secret or restricted key.");
+  }
+  if (isPaidProductionTier() && !live) {
+    throw new ConfigError("STRIPE_SECRET_KEY must use live mode in production.");
+  }
+  if (!isPaidProductionTier() && !test) {
+    throw new ConfigError("STRIPE_SECRET_KEY must use test mode outside production.");
+  }
+
+  return key;
 }
 
 /**

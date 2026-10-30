@@ -42,6 +42,12 @@ export interface CustomerPageContent {
 export interface CustomerPageState {
   draft: CustomerPageContent;
   published: (CustomerPageContent & { logoUrl?: string | null; heroUrl?: string | null }) | null;
+  /**
+   * The draft's photo, so the owner previews what Publish will put live —
+   * not the photo that is live now. Null when the draft has none, or its
+   * upload never finished.
+   */
+  draftHeroUrl: string | null;
   publishedVersion: number;
   publishedAt: string | null;
 }
@@ -107,7 +113,7 @@ export async function readCustomerPage(
   if (!data) {
     // No row yet is not an error: a business that has never opened the editor
     // has an empty draft and nothing published.
-    return { draft: {}, published: null, publishedVersion: 0, publishedAt: null };
+    return { draft: {}, published: null, draftHeroUrl: null, publishedVersion: 0, publishedAt: null };
   }
 
   const row = data as {
@@ -117,9 +123,28 @@ export async function readCustomerPage(
     published_at: string | null;
   };
 
+  const draft = row.draft ?? {};
+
+  // Read as the caller, so RLS keeps this to their own organization's assets;
+  // `ready` is the same bar publish uses, so the preview never shows a photo
+  // that Publish would then refuse.
+  let draftHeroUrl: string | null = null;
+  if (draft.heroAssetId) {
+    const { data: asset, error: assetError } = await context.db
+      .from("customer_page_assets")
+      .select("public_url")
+      .eq("id", draft.heroAssetId)
+      .eq("org_id", orgId)
+      .eq("status", "ready")
+      .maybeSingle();
+    if (assetError) failure("read_draft_asset", assetError, requestId);
+    draftHeroUrl = (asset as { public_url?: string | null } | null)?.public_url ?? null;
+  }
+
   return {
-    draft: row.draft ?? {},
+    draft,
     published: row.published ?? null,
+    draftHeroUrl,
     publishedVersion: row.published_version,
     publishedAt: row.published_at,
   };

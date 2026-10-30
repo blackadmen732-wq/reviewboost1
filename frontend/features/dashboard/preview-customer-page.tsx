@@ -1,39 +1,92 @@
 "use client";
 
-import Link from "next/link";
-import { Smartphone } from "lucide-react";
+import { useEffect, useState } from "react";
 
-export function PreviewCustomerPage({ standId }: { standId?: string | null } = {}) {
-  const handlePreviewQr = async () => {
-    if (!standId) return;
-    try {
-      const res = await fetch(`/api/v1/review-stands/${standId}/qr?format=json`);
-      if (res.ok) {
-        const { data } = (await res.json()) as { data: { url?: string } };
-        if (data.url) window.open(data.url, "_blank", "noopener");
+import { buttonVariants } from "@/components/ui/button";
+import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
+
+/** Resolve the owner's link before the click, so a normal link opens on mobile. */
+export function PreviewCustomerPage({
+  standId,
+  variant = "link",
+}: {
+  standId: string;
+  variant?: "link" | "button";
+}) {
+  const [result, setResult] = useState<{
+    standId: string;
+    url?: string;
+    error?: string;
+  } | null>(null);
+  const url = result?.standId === standId ? result.url : null;
+  const error = result?.standId === standId ? result.error : null;
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await ownerFetch(
+          `/api/v1/review-stands/${standId}/qr?format=json`,
+          { signal: controller.signal },
+        );
+        if (!response.ok) throw new Error("preview_failed");
+        const { data } = (await response.json()) as {
+          data?: { standUrl?: string };
+        };
+        if (!data?.standUrl) throw new Error("preview_missing");
+        if (!controller.signal.aborted)
+          setResult({ standId, url: data.standUrl });
+      } catch (caught) {
+        if (!controller.signal.aborted)
+          setResult({
+            standId,
+            error:
+              caught instanceof SessionExpiredError
+                ? caught.message
+                : "Could not load the customer page link. Try again.",
+          });
       }
-    } catch {
-      // ignore
-    }
-  };
+    })();
+    return () => controller.abort();
+  }, [standId, attempt]);
 
+  const linkClass =
+    variant === "button"
+      ? buttonVariants({ variant: "secondary", size: "lg" })
+      : "inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]";
   return (
-    <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-      <Link
-        href="/customer-page"
-        className="inline-flex h-10 items-center gap-2 rounded-lg border border-[color:var(--rb-border)] bg-white px-4 text-sm font-medium text-[#1a1712] hover:bg-[#faf9f7]"
-      >
-        <Smartphone className="size-4" aria-hidden="true" />
-        Edit customer page
-      </Link>
-      {standId && (
-        <button
-          type="button"
-          onClick={() => void handlePreviewQr()}
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-[color:var(--rb-border)] bg-white px-4 text-sm font-medium text-[#1a1712] hover:bg-[#faf9f7]"
+    <div className="mt-3">
+      {url ? (
+        <a
+          className={linkClass}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
         >
-          Preview customer view
-        </button>
+          Preview customer page{" "}
+          <span className="sr-only">(opens in a new tab)</span>
+        </a>
+      ) : error ? (
+        <>
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+          <button
+            type="button"
+            className={linkClass}
+            onClick={() => {
+              setResult(null);
+              setAttempt((value) => value + 1);
+            }}
+          >
+            Try again
+          </button>
+        </>
+      ) : (
+        <p role="status" className="text-sm text-muted">
+          Preparing preview…
+        </p>
       )}
     </div>
   );

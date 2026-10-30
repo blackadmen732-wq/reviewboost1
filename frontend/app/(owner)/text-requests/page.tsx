@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 
-import { AppShell } from "@/features/dashboard/app-shell";
+import { PageHeader } from "@/components/ui/page-header";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { TextRequestComposer } from "@/features/dashboard/text-request-composer";
+import { permissionsFor } from "@/lib/owner/permissions";
 import { listStands, requireOwner } from "@/lib/server/owner-data";
-import { readSmsBalance, listRecentTextRequests } from "@/lib/server/owner-data";
+import { listTextableCustomers, type TextableCustomer } from "@/lib/server/customers/textable";
+import { logger } from "@/lib/server/logger";
+import { supabaseServer } from "@/lib/supabase/server";
+import { getUnreadCount, readSmsBalance, listRecentTextRequests } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Text Requests — ReviewBoost",
+  title: "Text Requests",
   robots: { index: false, follow: false },
 };
 
@@ -26,22 +31,34 @@ export const dynamic = "force-dynamic";
 export default async function TextRequestsPage() {
   const { organization } = await requireOwner("/text-requests");
 
-  const [balance, stands, recent] = await Promise.all([
+  const [balance, stands, recent, unread] = await Promise.all([
     readSmsBalance(organization.orgId),
     listStands(organization.orgId),
     listRecentTextRequests(organization.orgId),
+    getUnreadCount(organization.orgId),
   ]);
 
   const sendable = stands.filter((stand) => stand.status === "active");
 
+  // Customers brought in through Connections, for the picker. Owners and
+  // admins only (the same people who may send). A failed read is passed on as
+  // null so the page can say so, not shown as "no customers".
+  let customers: TextableCustomer[] | null = [];
+  if (organization.role === "owner" || organization.role === "admin") {
+    try {
+      customers = await listTextableCustomers(await supabaseServer(), organization.orgId, "page:text-requests");
+    } catch (error) {
+      logger.warn("text_requests.customers_unavailable", { error: String(error) });
+      customers = null;
+    }
+  }
+
   return (
-    <AppShell businessName={organization.name}>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Text Requests</h1>
-        <p className="mt-1 text-base text-muted">
-          Send a customer the link to your Tag. One message, one review request.
-        </p>
-      </div>
+    <OwnerShell unreadCount={unread} businessName={organization.name}>
+      <PageHeader
+        title="Text Requests"
+        description="Send a customer the link to your Tag. One message, one review request."
+      />
 
       <TextRequestComposer
         balance={balance}
@@ -51,7 +68,9 @@ export default async function TextRequestsPage() {
           locationName: stand.locationName,
         }))}
         recent={recent}
+        canSendRequests={permissionsFor(organization.role).sendTextRequests}
+        customers={customers}
       />
-    </AppShell>
+    </OwnerShell>
   );
 }

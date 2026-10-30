@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { notify } from "@/components/ui/toast";
+import { withWriteDeadline } from "@/lib/api/read-deadline";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils/cn";
 
@@ -42,6 +43,8 @@ interface EditableRowProps {
    * location: the API will not guess which place an owner meant.
    */
   context?: Record<string, string>;
+  /** Shown as text with no Change control, for a role the API would refuse. */
+  readOnly?: boolean;
 }
 
 export function EditableRow({
@@ -54,7 +57,10 @@ export function EditableRow({
   warnWhenEmpty = false,
   type = "text",
   context,
+  readOnly = false,
 }: EditableRowProps) {
+  // Two places each have a name row, so the field alone is not a unique id.
+  const inputId = `setting-${field}${context?.["locationId"] ? `-${context["locationId"]}` : ""}`;
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
@@ -66,50 +72,60 @@ export function EditableRow({
     setBusy(true);
     setError(null);
 
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
+    try {
+      const {
+        data: { session },
+      } = await supabaseBrowser().auth.getSession();
 
-    if (!session) {
-      setBusy(false);
-      notify.error("Please sign in again", "Your session expired.");
-      return;
-    }
+      if (!session) {
+        notify.error("Please sign in again", "Your session expired.");
+        return;
+      }
 
-    const response = await fetch("/api/v1/settings", {
-      method: "PATCH",
-      headers: {
-        "content-type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ ...context, [field]: draft.trim() }),
-    });
-
-    setBusy(false);
-
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as {
-        error?: { message?: string; details?: Array<{ message?: string }> };
-      } | null;
-
-      // The server's field message is more specific than anything generic we
-      // could invent here — "That does not look like a Google review link"
-      // tells someone what to do; "Could not save" does not.
-      setError(
-        payload?.error?.details?.[0]?.message ??
-          payload?.error?.message ??
-          "Could not save that. Please try again.",
+      const response = await withWriteDeadline(
+        async (signal) =>
+          await fetch("/api/v1/settings", {
+            signal,
+            method: "PATCH",
+            headers: {
+              "content-type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ ...context, [field]: draft.trim() }),
+          }),
       );
-      return;
-    }
 
-    setEditing(false);
-    setJustSaved(true);
-    // Long enough to be seen by someone who looked away, short enough not to
-    // become permanent furniture.
-    setTimeout(() => setJustSaved(false), 4000);
-    router.refresh();
-    notify.success("Saved", `${label} updated.`);
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: { message?: string; details?: Array<{ message?: string }> };
+        } | null;
+
+        // The server's field message is more specific than anything generic we
+        // could invent here — "That does not look like a Google review link"
+        // tells someone what to do; "Could not save" does not.
+        setError(
+          payload?.error?.details?.[0]?.message ??
+            payload?.error?.message ??
+            "Could not save that. Please try again.",
+        );
+        return;
+      }
+
+      setEditing(false);
+      setJustSaved(true);
+      // Long enough to be seen by someone who looked away, short enough not to
+      // become permanent furniture.
+      setTimeout(() => setJustSaved(false), 4000);
+      router.refresh();
+      notify.success("Saved", `${label} updated.`);
+    } catch {
+      setError(
+        "Could not confirm saving. Your change is still here; check the current value before trying again.",
+      );
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (!editing) {
@@ -124,7 +140,7 @@ export function EditableRow({
           <p
             className={cn(
               "break-words text-base font-medium",
-              isEmpty && warnWhenEmpty ? "text-[color:var(--rb-warning)]" : "text-ink",
+              isEmpty && warnWhenEmpty ? "text-muted" : "text-ink",
             )}
           >
             {value || emptyText}
@@ -138,30 +154,32 @@ export function EditableRow({
           ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setDraft(value ?? "");
-            setError(null);
-            setEditing(true);
-          }}
-          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-brand-text transition-colors hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-        >
-          <Pencil className="size-4" aria-hidden="true" />
-          Change
-        </button>
+        {readOnly ? null : (
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(value ?? "");
+              setError(null);
+              setEditing(true);
+            }}
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-brand-text transition-colors hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+          >
+            <Pencil className="size-4" aria-hidden="true" />
+            Change<span className="sr-only"> {label}</span>
+          </button>
+        )}
       </div>
     );
   }
 
   return (
     <div className="rounded-[var(--radius-card)] border border-brand bg-surface p-4">
-      <label className="block text-sm font-medium text-muted" htmlFor={`setting-${field}`}>
+      <label className="block text-sm font-medium text-muted" htmlFor={inputId}>
         {label}
       </label>
 
       <Input
-        id={`setting-${field}`}
+        id={inputId}
         className="mt-1.5"
         type={type === "url" ? "url" : "text"}
         inputMode={type === "url" ? "url" : "text"}
@@ -170,12 +188,16 @@ export function EditableRow({
         invalid={error !== null}
         placeholder={placeholder ?? ""}
         onChange={(event) => setDraft(event.target.value)}
-        aria-describedby={error ? `setting-${field}-error` : undefined}
+        aria-describedby={error ? `${inputId}-error` : undefined}
         autoFocus
       />
 
       {error ? (
-        <p id={`setting-${field}-error`} role="alert" className="mt-2 text-sm text-danger">
+        <p
+          id={`${inputId}-error`}
+          role="alert"
+          className="mt-2 text-sm text-danger"
+        >
           {error}
         </p>
       ) : help ? (
@@ -183,7 +205,12 @@ export function EditableRow({
       ) : null}
 
       <div className="mt-3 flex gap-2">
-        <Button loading={busy} loadingLabel="Saving…" onClick={() => void save()}>
+        <Button
+          variant="action"
+          loading={busy}
+          loadingLabel="Saving…"
+          onClick={() => void save()}
+        >
           Save
         </Button>
         <Button
@@ -217,7 +244,7 @@ export function GoogleLinkHelp() {
       href="https://support.google.com/business/answer/7035772"
       target="_blank"
       rel="noreferrer noopener"
-      className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-brand-text underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+      className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-text underline underline-offset-4 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
     >
       Where do I find this?
       <ExternalLink className="size-3.5" aria-hidden="true" />

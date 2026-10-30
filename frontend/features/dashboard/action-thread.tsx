@@ -2,13 +2,12 @@
 
 import { Lock, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { notify } from "@/components/ui/toast";
 import type { ActionNote } from "@/lib/server/owner-data";
-import { supabaseBrowser } from "@/lib/supabase/browser";
+import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
 import { relativeDay } from "@/lib/utils/relative-day";
 
 /**
@@ -45,42 +44,91 @@ export function ActionThread({
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const canSubmit = body.trim().length > 0 && !busy;
+  const [error, setError] = useState<string | null>(null);
+  const [uncertain, setUncertain] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const intent = useRef<{ text: string; ids: Set<string> } | null>(null);
+  const previousActions = useRef(actions);
+  useEffect(() => {
+    if (!uncertain || !checking || actions === previousActions.current) return;
+    const saved =
+      intent.current &&
+      actions.some(
+        (action) =>
+          action.body === intent.current?.text &&
+          !intent.current.ids.has(action.noteId),
+      );
+    if (saved) {
+      setBody("");
+      setError(null);
+    } else
+      setError(
+        "The refreshed thread does not show this note. Your text is still here; you can try saving again.",
+      );
+    setUncertain(false);
+    setChecking(false);
+    intent.current = null;
+  }, [actions, checking, uncertain]);
+  useEffect(() => {
+    if (!checking) return;
+    const timer = setTimeout(() => {
+      setChecking(false);
+      setError(
+        "Could not check the thread. Your text is still here. Try checking again before saving.",
+      );
+    }, 20_000);
+    return () => clearTimeout(timer);
+  }, [checking]);
+  const canSubmit = body.trim().length > 0 && !busy && !uncertain;
 
   async function add() {
+    // Never a dead button: an empty note says what is missing.
+    if (body.trim().length === 0 && !busy && !uncertain) {
+      setError("Write what you did first, then save it.");
+      return;
+    }
     if (!canSubmit) return;
     setBusy(true);
-
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
-
-    if (!session) {
+    setError(null);
+    let submitted = false;
+    try {
+      intent.current = {
+        text: body.trim(),
+        ids: new Set(actions.map((action) => action.noteId)),
+      };
+      submitted = true;
+      const response = await ownerFetch(
+        `/api/v1/customer-responses/${responseId}/notes`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: body.trim() }),
+        },
+      );
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        if (response.status >= 500) setUncertain(true);
+        setError(
+          payload?.error?.message ??
+            "Could not save that. Your text is still here.",
+        );
+        return;
+      }
+      setBody("");
+      intent.current = null;
+      router.refresh();
+    } catch (caught) {
+      setUncertain(submitted && !(caught instanceof SessionExpiredError));
+      setError(
+        caught instanceof SessionExpiredError
+          ? caught.message
+          : "Could not confirm saving. Your text is still here. Check the saved notes before sending it again.",
+      );
+    } finally {
       setBusy(false);
-      notify.error("Please sign in again", "Your session expired.");
-      return;
     }
-
-    const response = await fetch(`/api/v1/customer-responses/${responseId}/notes`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ body: body.trim() }),
-    });
-
-    setBusy(false);
-
-    if (!response.ok) {
-      // The text stays in the box. Losing what someone just typed because of a
-      // dropped connection is the fastest way to lose their trust in the app.
-      notify.error("Could not save that", "Your note is still here — try again.");
-      return;
-    }
-
-    setBody("");
-    router.refresh();
   }
 
   return (
@@ -96,20 +144,17 @@ export function ActionThread({
       </p>
 
       {actions.length > 0 ? (
-        <ol className="mb-4 flex flex-col gap-3">
+        <ol className="mb-6 divide-y divide-border border-y border-border">
           {actions.map((action) => (
-            <li
-              key={action.noteId}
-              className="rounded-[var(--radius-card)] border border-border bg-surface p-4"
-            >
+            <li key={action.noteId} className="py-4">
               <div className="mb-1.5 flex items-center gap-2">
-                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-text">
-                  {action.authorName.slice(0, 1).toUpperCase()}
-                </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
                   {action.authorName}
                 </span>
-                <time dateTime={action.createdAt} className="shrink-0 text-sm text-muted">
+                <time
+                  dateTime={action.createdAt}
+                  className="shrink-0 text-sm text-muted"
+                >
                   {relativeDay(action.createdAt)}
                 </time>
               </div>
@@ -121,17 +166,48 @@ export function ActionThread({
         </ol>
       ) : null}
 
+      {error ? (
+        <p role="alert" className="mb-3 text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
+      {uncertain ? (
+        <Button
+          variant="secondary"
+          className="mb-3"
+          loading={checking}
+          loadingLabel="Checking…"
+          onClick={() => {
+            previousActions.current = actions;
+            setChecking(true);
+            router.refresh();
+          }}
+        >
+          Check saved notes
+        </Button>
+      ) : null}
       <Textarea
         value={body}
-        onChange={(event) => setBody(event.target.value)}
+        onChange={(event) => {
+          setBody(event.target.value);
+          if (error && !uncertain) setError(null);
+        }}
         disabled={busy}
         rows={3}
         maxLength={2000}
         aria-label="Write what you did about this"
-        placeholder="Called them back and said sorry…"
+        placeholder="Checked with the team and agreed what to change…"
       />
 
-      <Button className="mt-3" disabled={!canSubmit} loading={busy} loadingLabel="Saving…" onClick={() => void add()}>
+      {/* Secondary: "Mark as sorted" above is this screen's one black button. */}
+      <Button
+        variant="secondary"
+        className="mt-3 sm:w-auto"
+        disabled={uncertain}
+        loading={busy}
+        loadingLabel="Saving…"
+        onClick={() => void add()}
+      >
         <Send className="size-5" aria-hidden="true" />
         Save note
       </Button>

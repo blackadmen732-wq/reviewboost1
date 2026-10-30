@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { CustomerFlow } from "@/features/customer-flow/customer-flow";
 
 export const metadata: Metadata = {
-  title: "Share feedback | ReviewBoost",
+  title: "Share feedback",
   robots: {
     index: false,
     follow: false,

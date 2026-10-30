@@ -9,7 +9,11 @@ import { supportedLocales, type Locale } from "@/lib/i18n/config";
 import type { CustomerMessages } from "@/lib/i18n/customer-messages";
 
 interface CustomerBlockingStateProps {
-  kind: "unavailable" | "error";
+  /**
+   * Why the page cannot show. "offline" is the phone; "error" is us, so it
+   * must not tell a customer with full signal to check their connection.
+   */
+  kind: "unavailable" | "offline" | "error";
   locale: Locale;
   messages: CustomerMessages;
   onLocaleChange: (locale: Locale) => void;
@@ -45,7 +49,11 @@ export function CustomerBlockingState({
               : messages.loadErrorHeading}
           </h1>
           <p className="customer-support">
-            {unavailable ? messages.unavailableBody : messages.loadErrorBody}
+            {unavailable
+              ? messages.unavailableBody
+              : kind === "offline"
+                ? messages.loadErrorBody
+                : messages.serverErrorBody}
           </p>
         </div>
         {!unavailable && onRetry ? (

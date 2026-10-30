@@ -16,138 +16,200 @@
   --color-brand-soft: var(--rb-brand-soft);
   --color-brand-text: var(--rb-brand-text);
   --color-on-brand: var(--rb-on-brand);
+  --color-action: var(--rb-action);
+  --color-action-hover: var(--rb-action-hover);
+  --color-action-pressed: var(--rb-action-pressed);
+  --color-on-action: var(--rb-on-action);
   --color-star: var(--rb-star);
+  --color-star-soft: var(--rb-star-soft);
   --color-danger: var(--rb-danger);
+  --color-danger-soft: var(--rb-danger-soft);
+  --color-warning: var(--rb-warning);
+  --color-warning-soft: var(--rb-warning-soft);
   --color-info: var(--rb-info);
+  --color-info-soft: var(--rb-info-soft);
+  --color-focus: var(--rb-focus);
   --font-sans: var(--font-geist-sans);
 }
 
 :root {
   color-scheme: light dark;
-  --rb-canvas: #f8f5f0;
+  /* Warm-white palette, 2026-10-18: the owner picked Claude's warm white
+     (#FCFCFB) over the cream and the cooled grey-green. Neutrals carry no tint
+     to fight the green. Filled buttons are near-black so the product stops
+     reading as Trustpilot's green-and-forest; brand green is identity and good
+     news only, never a white-label button. Cards separate by hairlines, not
+     fills: canvas and white are 1.02:1 apart on purpose. */
+  --rb-canvas: #fcfcfb;
   --rb-surface: #ffffff;
-  --rb-quiet: #f2efe9;
-  --rb-ink: #1a1712;
-  --rb-muted: #5c5349;
-  --rb-border: #e8e1d7;
-  --rb-border-strong: #cfc5b6;
+  --rb-quiet: #edece8;
+  --rb-ink: #1a1a19;
+  --rb-muted: #6b6b67;
+  --rb-border: #e2e2e1;
+  --rb-border-strong: #8f8f8a;
   --rb-brand: #00a86b;
   --rb-brand-hover: #009a61;
   --rb-brand-active: #008f5b;
-  --rb-brand-soft: #e5f6ef;
-  /* Brand green as *text* is only 2.83:1 on cream. This darker green is
-     4.96:1, so links and inline emphasis stay readable. */
-  --rb-brand-text: #007a4d;
-  /* Dark ink on brand green is 6.13:1. White would be 3.08:1 — large text
-     only — so primary buttons never use white labels. */
+  --rb-brand-soft: #e3f5ec;
+  --rb-brand-text: #00754a;
   --rb-on-brand: #0d2118;
-  /* Deliberately deeper than the #F2A900 in the brand sheet. That gold is
-     2.01:1 on white — below the 3:1 floor for a meaningful graphic — and the
-     star rating is the single most important thing on the screen, read on a
-     phone in daylight. This is 3.42:1 on white, 3.14:1 on cream, and still
-     unmistakably gold. Unfilled stars stay outline-only, so filled versus
-     unfilled is a shape difference and never colour alone. */
-  --rb-star: #bf7d00;
-  --rb-warning: #9a6417;
+  --rb-action: #1a1a19;
+  --rb-action-hover: #333331;
+  --rb-action-pressed: #000000;
+  --rb-on-action: #ffffff;
+  --rb-star: #b97d0c;
+  --rb-star-soft: #fff7e5;
+  --rb-warning: #9a6415;
+  --rb-warning-soft: #fff6e7;
+  --rb-info-soft: #eaf2fb;
+  --rb-raised: #ffffff;
   --rb-danger: #b33a3a;
-  --rb-danger-soft: #faeaea;
-  --rb-info: #356d8c;
-  --rb-focus-soft: rgb(0 168 107 / 28%);
-  --radius-control: 14px;
-  --radius-card: 20px;
-  --shadow-control: 0 1px 2px rgb(38 32 24 / 4%);
-  --shadow-button:
-    0 2px 0 rgb(0 74 47 / 22%), 0 8px 18px -10px rgb(0 168 107 / 70%);
-  --shadow-button-hover:
-    0 2px 0 rgb(0 62 39 / 26%), 0 12px 24px -12px rgb(0 168 107 / 76%);
-  --shadow-card:
-    0 1px 2px rgb(38 32 24 / 3%), 0 18px 50px -28px rgb(38 32 24 / 20%);
-  --shadow-float: 0 -12px 36px -28px rgb(38 32 24 / 28%);
+  --rb-danger-soft: #fce8e8;
+  --rb-info: #2663a0;
+  --rb-focus: #005fcc;
+  --rb-focus-soft: rgb(0 95 204 / 28%);
+  --radius-control: 12px;
+  --radius-card: 16px;
+  --rb-space-1: 4px;
+  --rb-space-2: 8px;
+  --rb-space-3: 12px;
+  --rb-space-4: 16px;
+  --rb-space-5: 24px;
+  --rb-space-6: 32px;
+  --rb-space-7: 40px;
+  --rb-space-8: 48px;
+  --rb-space-9: 64px;
+  --rb-space-10: 80px;
+  --rb-space-11: 96px;
+  --rb-space-12: 120px;
+  --rb-space-13: 144px;
+  --rb-text-caption: 0.75rem;
+  --rb-text-small: 0.875rem;
+  --rb-text-body: 1rem;
+  --rb-text-title: 1.5rem;
+  --rb-text-display: 1.75rem;
+  --rb-row: 56px;
+  --rb-content: 800px;
+  --rb-motion-fast: 150ms;
+  --rb-motion-page: 180ms;
+  --rb-logo-clearspace: 0.25;
+  --shadow-control: 0 1px 0 rgb(23 26 24 / 4%);
+  --shadow-button: inset 0 1px 0 rgb(255 255 255 / 16%), inset 0 -1px 0 rgb(0 0 0 / 20%), 0 1px 2px rgb(0 0 0 / 12%);
+  --shadow-button-hover: inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 -1px 0 rgb(0 0 0 / 24%), 0 2px 4px rgb(0 0 0 / 14%);
+  --shadow-card: none;
+  --shadow-float: 0 -1px 0 rgb(23 26 24 / 8%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --rb-canvas: #14120f;
-    --rb-surface: #1c1915;
-    --rb-quiet: #262119;
-    --rb-ink: #f7f4ee;
-    --rb-muted: #b5aea2;
-    --rb-border: #332e26;
-    --rb-border-strong: #4f483c;
+    --rb-canvas: #191918;
+    --rb-surface: #212120;
+    --rb-quiet: #2c2c2a;
+    --rb-ink: #f5f5f3;
+    --rb-muted: #a8a8a2;
+    --rb-border: #3a3a37;
+    --rb-border-strong: #75756f;
     --rb-brand: #00a86b;
     --rb-brand-hover: #17c07f;
     --rb-brand-active: #21cf8c;
-    --rb-brand-soft: #123b2c;
-    --rb-brand-text: #4fd69b;
-    --rb-on-brand: #06231a;
-    --rb-star: #f7b928;
-    --rb-danger: #f08a8a;
+    --rb-brand-soft: #143729;
+    --rb-brand-text: #45cf99;
+    --rb-on-brand: #071b13;
+    --rb-action: #f5f5f3;
+    --rb-action-hover: #ffffff;
+    --rb-action-pressed: #e2e2df;
+    --rb-on-action: #1a1a19;
+    --rb-star: #f2b94b;
+    --rb-star-soft: #3a2e14;
+    --rb-danger: #ff8f8f;
     --rb-danger-soft: #452323;
-    --rb-info: #8bc2df;
-    --rb-focus-soft: rgb(0 168 107 / 34%);
-    --shadow-control: 0 1px 2px rgb(0 0 0 / 24%);
-    --shadow-button:
-      0 2px 0 rgb(0 0 0 / 32%), 0 10px 22px -12px rgb(0 168 107 / 66%);
-    --shadow-button-hover:
-      0 2px 0 rgb(0 0 0 / 38%), 0 14px 28px -14px rgb(0 168 107 / 72%);
-    --shadow-card:
-      0 1px 2px rgb(0 0 0 / 30%), 0 24px 64px -30px rgb(0 0 0 / 85%);
-    --shadow-float: 0 -12px 36px -26px rgb(0 0 0 / 85%);
+    --rb-info: #78b5f4;
+    --rb-info-soft: #1b2a3a;
+    --rb-warning: #f0b45a;
+    --rb-warning-soft: #3a2a12;
+    --rb-raised: #262624;
+    --rb-focus: #7ab8ff;
+    --rb-focus-soft: rgb(77 142 255 / 34%);
+    --shadow-control: 0 1px 0 rgb(0 0 0 / 40%);
+    --shadow-button: 0 1px 0 rgb(0 0 0 / 40%);
+    --shadow-button-hover: 0 1px 0 rgb(0 0 0 / 50%);
+    --shadow-card: none;
+    --shadow-float: 0 -1px 0 rgb(0 0 0 / 50%);
   }
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --rb-canvas: #f8f5f0;
-  --rb-surface: #fff;
-  --rb-quiet: #f2efe9;
-  --rb-ink: #111;
-  --rb-muted: #555;
-  --rb-border: #e8e1d7;
-  --rb-border-strong: #cfc5b6;
+  --rb-canvas: #fcfcfb;
+  --rb-surface: #ffffff;
+  --rb-quiet: #edece8;
+  --rb-ink: #1a1a19;
+  --rb-muted: #6b6b67;
+  --rb-border: #e2e2e1;
+  --rb-border-strong: #8f8f8a;
   --rb-brand: #00a86b;
   --rb-brand-hover: #009a61;
   --rb-brand-active: #008f5b;
-  --rb-brand-soft: #e5f6ef;
-  /* Brand green as *text* is only 2.83:1 on cream. This darker green is
-     4.96:1, so links and inline emphasis stay readable. */
-  --rb-brand-text: #007a4d;
-  /* Dark ink on brand green is 6.13:1. White would be 3.08:1 — large text
-     only — so primary buttons never use white labels. */
+  --rb-brand-soft: #e3f5ec;
+  --rb-brand-text: #00754a;
   --rb-on-brand: #0d2118;
-  /* Deliberately deeper than the #F2A900 in the brand sheet. That gold is
-     2.01:1 on white — below the 3:1 floor for a meaningful graphic — and the
-     star rating is the single most important thing on the screen, read on a
-     phone in daylight. This is 3.42:1 on white, 3.14:1 on cream, and still
-     unmistakably gold. Unfilled stars stay outline-only, so filled versus
-     unfilled is a shape difference and never colour alone. */
-  --rb-star: #bf7d00;
+  --rb-action: #1a1a19;
+  --rb-action-hover: #333331;
+  --rb-action-pressed: #000000;
+  --rb-on-action: #ffffff;
+  --rb-star: #b97d0c;
+  --rb-star-soft: #fff7e5;
   --rb-danger: #b33a3a;
-  --rb-danger-soft: #faeaea;
-  --rb-info: #356d8c;
-  --rb-focus-soft: rgb(0 168 107 / 28%);
+  --rb-danger-soft: #fce8e8;
+  --rb-info: #2663a0;
+  --rb-info-soft: #eaf2fb;
+  --rb-warning: #9a6415;
+  --rb-warning-soft: #fff6e7;
+  --rb-raised: #ffffff;
+  --rb-focus: #005fcc;
+  --rb-focus-soft: rgb(0 95 204 / 28%);
+  /* A light choice on a phone set to dark must not keep dark shadows. */
+  --shadow-control: 0 1px 0 rgb(23 26 24 / 4%);
+  --shadow-button: inset 0 1px 0 rgb(255 255 255 / 16%), inset 0 -1px 0 rgb(0 0 0 / 20%), 0 1px 2px rgb(0 0 0 / 12%);
+  --shadow-button-hover: inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 -1px 0 rgb(0 0 0 / 24%), 0 2px 4px rgb(0 0 0 / 14%);
+  --shadow-float: 0 -1px 0 rgb(23 26 24 / 8%);
 }
 :root[data-theme="dark"],
 .dark {
   color-scheme: dark;
-  --rb-canvas: #14120f;
-  --rb-surface: #1c1915;
-  --rb-quiet: #262119;
-  --rb-ink: #f7f4ee;
-  --rb-muted: #b5aea2;
-  --rb-border: #332e26;
-  --rb-border-strong: #4f483c;
+  --rb-canvas: #191918;
+  --rb-surface: #212120;
+  --rb-quiet: #2c2c2a;
+  --rb-ink: #f5f5f3;
+  --rb-muted: #a8a8a2;
+  --rb-border: #3a3a37;
+  --rb-border-strong: #75756f;
   --rb-brand: #00a86b;
   --rb-brand-hover: #17c07f;
   --rb-brand-active: #21cf8c;
-  --rb-brand-soft: #123b2c;
-  --rb-brand-text: #4fd69b;
-  --rb-on-brand: #06231a;
-  --rb-star: #f7b928;
-  --rb-danger: #f08a8a;
+  --rb-brand-soft: #143729;
+  --rb-brand-text: #45cf99;
+  --rb-on-brand: #071b13;
+  --rb-action: #f5f5f3;
+  --rb-action-hover: #ffffff;
+  --rb-action-pressed: #e2e2df;
+  --rb-on-action: #1a1a19;
+  --rb-star: #f2b94b;
+  --rb-star-soft: #3a2e14;
+  --rb-danger: #ff8f8f;
   --rb-danger-soft: #452323;
-  --rb-info: #8bc2df;
-  --rb-focus-soft: rgb(0 168 107 / 34%);
+  --rb-info: #78b5f4;
+  --rb-info-soft: #1b2a3a;
+  --rb-warning: #f0b45a;
+  --rb-warning-soft: #3a2a12;
+  --rb-raised: #262624;
+  --rb-focus: #7ab8ff;
+  --rb-focus-soft: rgb(77 142 255 / 34%);
+  /* And a dark choice on a phone set to light must not keep light ones. */
+  --shadow-control: 0 1px 0 rgb(0 0 0 / 40%);
+  --shadow-button: 0 1px 0 rgb(0 0 0 / 40%);
+  --shadow-button-hover: 0 1px 0 rgb(0 0 0 / 50%);
+  --shadow-float: 0 -1px 0 rgb(0 0 0 / 50%);
 }
 
 /* These are resets, so they belong in Tailwind's base layer.
@@ -198,6 +260,24 @@
   }
   a {
     color: inherit;
+  }
+  /* No double-tap zoom delay on anything tappable. */
+  button,
+  a,
+  [role="button"],
+  input,
+  select,
+  label {
+    touch-action: manipulation;
+  }
+  /* Headlines break evenly; paragraphs avoid a lone last word. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
   }
   ::selection {
     background: var(--rb-brand-soft);
@@ -253,6 +333,9 @@
   font-size: 0.9375rem;
   line-height: 1.45;
 }
+/* In the components layer so a skeleton's own rounded-* class (a round step
+   number, a 12px button) wins over this default, as on the real element. */
+@layer components {
 .skeleton {
   display: block;
   border-radius: 9px;
@@ -264,6 +347,7 @@
   );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.45s ease-in-out infinite;
+}
 }
 @keyframes skeleton-shimmer {
   to {
@@ -401,6 +485,13 @@ textarea {
 }
 
 
+/* Set for one frame while the theme changes: see theme-control.tsx. */
+[data-theme-switching] *,
+[data-theme-switching] *::before,
+[data-theme-switching] *::after {
+  transition: none !important;
+}
+
 /* Screen entrance. Short enough to feel instant, long enough to register that
    one screen replaced another — which is the difference between an app and a
    set of linked documents. */
@@ -415,6 +506,83 @@ textarea {
   }
 }
 
+/* Something that appears in place — a readout, a confirmation. Opacity only:
+   it is already where it belongs. */
+@keyframes rb-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.animate-fade-in {
+  animation: rb-fade-in 120ms ease-out both;
+}
+
+/* A setup step finished since the last visit: the circle takes its colour,
+   then the tick draws once. The step that is now current takes its ink just
+   after. Once per step, ever; never on a first visit. */
+@keyframes step-done {
+  from {
+    background-color: transparent;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes check-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes step-current {
+  from {
+    background-color: transparent;
+    color: var(--rb-muted);
+    box-shadow: inset 0 0 0 1px var(--rb-border);
+  }
+}
+
+.animate-step-done {
+  animation: step-done 180ms ease-out both;
+}
+
+.animate-check-draw {
+  stroke-dasharray: 1;
+  animation: check-draw 220ms ease-out 120ms both;
+}
+
+.animate-step-current {
+  animation: step-current 200ms ease-out 300ms both;
+}
+
+/* A row that has just arrived in a list: settles into place. */
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.animate-row-in {
+  animation: row-in 200ms ease-out both;
+}
+
+/* A code replaced by a new one: fades up from the dimmed old one. */
+@keyframes qr-in {
+  from {
+    opacity: 0.3;
+  }
+}
+
+.animate-qr-in {
+  animation: qr-in 240ms ease-out both;
+}
+
 .animate-page-enter {
-  animation: page-enter 180ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  /* Release the animated transform after entry so fixed page actions use
+     the viewport, not this wrapper, as their containing block. */
+  animation: page-enter 180ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
 }

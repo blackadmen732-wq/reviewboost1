@@ -1,79 +1,132 @@
 import type { Metadata } from "next";
-import { QrCode } from "lucide-react";
+import Link from "next/link";
 
-import { EmptyState } from "@/components/ui/empty-state";
-import { AppShell } from "@/features/dashboard/app-shell";
-import { StandCard } from "@/features/dashboard/stand-card";
+import { InlineNotice } from "@/components/ui/inline-notice";
+import { PageHeader } from "@/components/ui/page-header";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { AddStandButton } from "@/features/dashboard/add-stand-button";
-import { listStands, listLocations, requireOwner } from "@/lib/server/owner-data";
+import { isHomeEmpty } from "@/features/dashboard/home-model";
+import { deriveSetupSteps } from "@/features/setup/setup-model";
+import { SetupSteps } from "@/features/setup/setup-steps";
+import { TagsList } from "@/features/tags/tags-list";
+import { ownerOrAdmin, permissionsFor } from "@/lib/owner/permissions";
+import { serviceNotice, tagsServeCustomers, type ServiceKind } from "@/lib/owner/service-state";
+import { getEntitlementSnapshot } from "@/lib/server/entitlements-service";
+import {
+  getOwnerCounts,
+  getServiceState,
+  hasPublishedCustomerPhoto,
+  listLocations,
+  listStands,
+  requireOwner,
+} from "@/lib/server/owner-data";
+import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Your codes — ReviewBoost",
+  title: "Tags",
   robots: { index: false, follow: false },
 };
 
 export const dynamic = "force-dynamic";
 
-export default async function StandsPage() {
-  const { organization } = await requireOwner("/stands");
-  const [stands, locations] = await Promise.all([
+/**
+ * Tags: the one place an owner programs anything. Three steps (customer
+ * page, Tag, test), then the Tags themselves. Home, Feedback and Texts never
+ * ask the owner to configure something; this page does, one step at a time.
+ *
+ * The route stays /stands so existing links and Tag pages keep working.
+ */
+export default async function SetupPage() {
+  const { user, organization } = await requireOwner("/stands");
+  const supabase = await supabaseServer();
+  const [stands, locations, entitlements, counts, hasCustomerPhoto, service] = await Promise.all([
     listStands(organization.orgId),
     listLocations(organization.orgId),
+    getEntitlementSnapshot({ userId: user.id, db: supabase }, organization.orgId),
+    getOwnerCounts(organization.orgId, organization.timezone),
+    hasPublishedCustomerPhoto(organization.orgId),
+    getServiceState(organization.orgId),
   ]);
+  const can = permissionsFor(organization.role);
+  const billing = serviceNotice(service);
+  // Creating a Tag is owner/admin at the API. A member or viewer sees the
+  // steps and the list, and no button that would come back 403.
+  const canManage = can.manageTags;
+  const canCreate = canManage && locations.length > 0 && entitlements.canCreateTag;
+  const addButton = canCreate ? (
+    <AddStandButton locations={locations.map((l) => ({ locationId: l.locationId, name: l.name }))} />
+  ) : null;
 
-  const locationMap = new Map(locations.map((l) => [l.locationId, l.name]));
-  const grouped = new Map<string, typeof stands>();
-  for (const stand of stands) {
-    const key = stand.locationId;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(stand);
-  }
+  const steps = deriveSetupSteps({
+    hasGoogleLink: counts.hasGoogleLink,
+    hasCustomerPhoto,
+    hasLocation: locations.length > 0,
+    stands,
+    hasAnyRating: !isHomeEmpty(counts),
+    canManage,
+    serving: tagsServeCustomers(service),
+  });
 
   return (
-    <AppShell>
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Your codes</h1>
-          <p className="mt-1 text-base text-muted">Put these where customers pay.</p>
-        </div>
-        {locations.length > 0 && (
-          <AddStandButton locations={locations.map((l) => ({ locationId: l.locationId, name: l.name }))} />
-        )}
-      </div>
+    <OwnerShell unreadCount={counts.unread} businessName={organization.name}>
+      <PageHeader title="Tags" description="Your Tags and the customer page they open." />
 
-      {stands.length === 0 ? (
-        <EmptyState
-          icon={QrCode}
-          title="No codes yet"
-          description="Finish setting up and your first code appears here."
-        />
-      ) : (
-        <div className="flex flex-col gap-8">
-          {[...grouped.entries()].map(([locationId, locationStands]) => (
-            <div key={locationId}>
-              {grouped.size > 1 && (
-                <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
-                  {locationMap.get(locationId) ?? "Unknown location"}
-                </h2>
-              )}
-              <div className="flex flex-col gap-5">
-                {locationStands.map((stand) => (
-                  <StandCard
-                    key={stand.standId}
-                    standId={stand.standId}
-                    label={stand.label}
-                    standType={stand.standType}
-                    status={stand.status}
-                    tokenPrefix={stand.tokenPrefix}
-                    tokenRotatedAt={stand.tokenRotatedAt}
-                    nfcProvisionedAt={stand.nfcProvisionedAt}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+      {billing ? (
+        <div className="mb-8 max-w-[36rem]" data-service-notice={service}>
+          <InlineNotice kind={service === "no-plan" ? "info" : "error"} title={billing.title}>
+            <p>{billing.body}</p>
+            {can.manageBilling ? (
+              <Link
+                href={billing.action.href}
+                className="mt-2 inline-flex min-h-11 items-center font-semibold text-ink underline underline-offset-4 hover:no-underline"
+              >
+                {billing.action.label}
+              </Link>
+            ) : (
+              <p className="mt-1 text-muted">Only the account owner can change the plan.</p>
+            )}
+          </InlineNotice>
         </div>
-      )}
-    </AppShell>
+      ) : null}
+
+      <SetupSteps steps={steps} createTag={addButton} />
+
+      <section aria-labelledby="tags-heading">
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <h2 id="tags-heading" className="text-sm font-medium text-muted">
+            Your Tags
+          </h2>
+          {stands.length > 0 ? addButton : null}
+        </div>
+
+        {canManage && !entitlements.canCreateTag && locations.length > 0 ? (
+          <p className="mb-4 text-base text-ink" data-tag-limit>
+            {tagLimitLine(service, entitlements.status, entitlements.tagLimit)}
+          </p>
+        ) : null}
+
+        {stands.length === 0 ? (
+          <p className="text-base text-muted">
+            {canManage ? "No tags yet. Create a Tag, print the code, and put it on the counter. Step 2 walks you through it." : ownerOrAdmin("create a Tag")}
+          </p>
+        ) : (
+          <TagsList stands={stands} />
+        )}
+      </section>
+    </OwnerShell>
   );
+}
+
+/**
+ * Why there is no "Create a Tag" button, in words that match the plan the
+ * business actually has. It said "This plan includes 1 Tags" to businesses
+ * that had no plan at all.
+ */
+function tagLimitLine(service: ServiceKind, status: string, limit: number): string {
+  if (status === "cancelled" || service === "cancelled") return "This plan is cancelled. Your Tags are still here.";
+  if (service === "no-plan") return "You can set up one Tag before choosing a plan.";
+  if (service === "past-due" || limit === 0) return "New Tags can be added once the payment goes through.";
+  const tags = `${limit} ${limit === 1 ? "Tag" : "Tags"}`;
+  if (service === "trial") return `Your trial includes ${tags}. You’re using it.`;
+  return `Your plan includes ${tags}. You’re at the limit.`;
 }

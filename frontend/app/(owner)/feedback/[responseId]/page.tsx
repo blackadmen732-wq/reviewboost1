@@ -1,34 +1,22 @@
 import type { Metadata } from "next";
-import { ArrowLeft, Check } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/ui/back-link";
 import { Stars } from "@/components/ui/stars";
 import { ActionThread } from "@/features/dashboard/action-thread";
-import { AppShell } from "@/features/dashboard/app-shell";
+import { MarkReadOnOpen } from "@/features/dashboard/mark-read-on-open";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { ResolveButton } from "@/features/dashboard/resolve-button";
-import { getReview, requireOwner } from "@/lib/server/owner-data";
+import { getReview, getUnreadCount, listStands, requireOwner } from "@/lib/server/owner-data";
 import { relativeDay } from "@/lib/utils/relative-day";
 
 export const metadata: Metadata = {
-  title: "Feedback — ReviewBoost",
+  title: "Feedback",
   robots: { index: false, follow: false },
 };
 
 export const dynamic = "force-dynamic";
 
-/**
- * One piece of feedback, and what was done about it.
- *
- * The list can show what a customer said; it cannot show a conversation. So
- * anything with history gets its own screen, where the customer's words sit at
- * the top and everything the business did sits underneath in order.
- *
- * A real URL rather than a modal, deliberately. An owner dealing with a
- * complaint often wants to send it to someone — "look at this one" — and a modal
- * has no address to send. It also means the phone's back gesture does the
- * obvious thing.
- */
 export default async function FeedbackDetailPage({
   params,
 }: {
@@ -37,58 +25,79 @@ export default async function FeedbackDetailPage({
   const { responseId } = await params;
   const { organization } = await requireOwner(`/feedback/${responseId}`);
 
-  const found = await getReview(organization.orgId, responseId);
+  const [found, tags, unread] = await Promise.all([
+    getReview(organization.orgId, responseId),
+    listStands(organization.orgId),
+    getUnreadCount(organization.orgId),
+  ]);
 
-  // getReview returns null for "does not exist" and "another business's" alike,
-  // because RLS makes them indistinguishable. Telling them apart would confirm
-  // that somebody else's feedback exists.
   if (!found) notFound();
 
   const { review, actions } = found;
+  const tag = tags.find((item) => item.standId === review.standId) ?? null;
+  const submitted = new Date(review.submittedAt);
+  const clock = submitted.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: organization.timezone,
+  });
+  const full = submitted.toLocaleString("en-US", {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: organization.timezone,
+  });
+  // Where it came from, so "the patio" and "the counter" can be told apart.
+  const from = [tag?.label, tags.length > 1 ? tag?.locationName : null].filter(Boolean).join(" · ");
+  // A low rating is the one that may need doing something about; praise can
+  // still be marked sorted, quietly.
+  const needsAction = review.rating <= 3 && !review.isResolved;
 
   return (
-    <AppShell>
-      <Link
-        href="/feedback"
-        className="mb-5 inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] pr-3 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-      >
-        <ArrowLeft className="size-5" aria-hidden="true" />
-        All feedback
-      </Link>
+    <OwnerShell unreadCount={unread} businessName={organization.name}>
+      {review.isRead ? null : <MarkReadOnOpen responseId={review.responseId} />}
+      <BackLink href="/feedback">Feedback</BackLink>
 
-      <article className="rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <Stars rating={review.rating} size="md" />
-          <time dateTime={review.submittedAt} className="shrink-0 text-sm text-muted">
-            {relativeDay(review.submittedAt)}
-          </time>
-        </div>
+      <article className="max-w-[36rem]">
+        <header className="mb-5">
+          <h1 className="text-ink">
+            <Stars rating={review.rating} size="lg" />
+          </h1>
+          <p className="mt-3 text-base text-muted">
+            <time dateTime={review.submittedAt} title={full}>
+              {relativeDay(review.submittedAt)} at {clock}
+            </time>
+            {from ? <> · {from}</> : null}
+          </p>
+        </header>
 
         {review.note ? (
-          // The customer's own words, at the largest size on the screen. They
-          // are the reason this page exists.
-          <p className="whitespace-pre-wrap text-lg leading-relaxed text-ink">{review.note}</p>
+          <p className="whitespace-pre-wrap text-lg leading-relaxed text-ink">
+            {review.note}
+          </p>
         ) : (
-          <p className="text-base italic text-muted">
-            They gave a rating without writing anything.
+          <p className="text-base text-muted">
+            A rating with no message.
           </p>
         )}
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-border py-4">
+          {review.isResolved || needsAction ? (
+            <p
+              key={String(review.isResolved)}
+              className="animate-fade-in text-sm text-muted"
+            >
+              {review.isResolved ? "Sorted" : "Not sorted yet"}
+            </p>
+          ) : null}
+          <ResolveButton
+            responseId={review.responseId}
+            isResolved={review.isResolved}
+            quiet={!needsAction}
+          />
+        </div>
       </article>
 
-      <div className="mt-5 flex items-center justify-between gap-3">
-        {review.isResolved ? (
-          <span className="inline-flex items-center gap-2 rounded-full bg-brand-soft px-3 py-1.5 text-sm font-medium text-brand-text">
-            <Check className="size-4" strokeWidth={3} aria-hidden="true" />
-            Sorted
-          </span>
-        ) : (
-          <span className="text-sm text-muted">Not sorted yet</span>
-        )}
-
-        <ResolveButton responseId={review.responseId} isResolved={review.isResolved} />
-      </div>
-
       <ActionThread responseId={review.responseId} actions={actions} />
-    </AppShell>
+    </OwnerShell>
   );
 }

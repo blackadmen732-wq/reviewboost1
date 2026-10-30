@@ -54,8 +54,14 @@ function BalanceCard({
         </Text>
       ) : null}
       {!view.canSend ? (
+        /* "Buy more" was a dead end: there is nothing in this app to buy with,
+           and App Store 3.1.3(f) is why there is not — a free companion to a
+           paid web service must not point at the place to buy it.
+           So this states the fact and stops, rather than instructing a step
+           that cannot be taken from here. */
         <Text style={styles.balanceNote}>
-          You have no messages left. Buy more, or wait for your next billing date.
+          You have no messages left. Your next included messages arrive on your
+          billing date.
         </Text>
       ) : null}
     </View>

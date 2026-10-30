@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 
-import { AppShell } from "@/features/dashboard/app-shell";
+import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { BillingPanel } from "@/features/dashboard/billing-panel";
-import { readOwnerBilling, requireOwner } from "@/lib/server/owner-data";
+import { billingForPlan, parsePlanChoice } from "@/lib/owner/plan-choice";
+import { permissionsFor } from "@/lib/owner/permissions";
+import { BackLink } from "@/components/ui/back-link";
+import { getUnreadCount, readOwnerBilling, requireOwner } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
-  title: "Billing — ReviewBoost",
+  title: "Billing",
   robots: { index: false, follow: false },
 };
 
@@ -19,18 +22,35 @@ export const dynamic = "force-dynamic";
  * card — because a page that fills those in when the data is missing is a page
  * that tells a business it is subscribed when it is not.
  */
-export default async function BillingPage() {
-  const { organization } = await requireOwner("/settings/billing");
-  const billing = await readOwnerBilling(organization.orgId);
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plan?: string }>;
+}) {
+  const selectedPlan = parsePlanChoice((await searchParams).plan);
+  const { organization } = await requireOwner(billingForPlan(selectedPlan));
+  const [billing, unread] = await Promise.all([
+    readOwnerBilling(organization.orgId),
+    getUnreadCount(organization.orgId),
+  ]);
 
   return (
-    <AppShell businessName={organization.name}>
+    <OwnerShell unreadCount={unread} businessName={organization.name}>
+      <BackLink href="/settings">Settings</BackLink>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Billing</h1>
-        <p className="mt-1 text-base text-muted">Your plan, and what it includes.</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">
+          Billing
+        </h1>
+        <p className="mt-1 text-base text-muted">
+          Your plan, what it includes, and what you are using.
+        </p>
       </div>
 
-      <BillingPanel billing={billing} />
-    </AppShell>
+      <BillingPanel
+        selectedPlan={selectedPlan}
+        billing={billing}
+        canManage={permissionsFor(organization.role).manageBilling}
+      />
+    </OwnerShell>
   );
 }

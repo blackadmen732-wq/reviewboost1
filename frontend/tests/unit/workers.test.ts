@@ -96,7 +96,10 @@ describe("maintenance", () => {
     const response = await GET(requestWith("platform-cron-secret") as never);
 
     expect(response.status).toBe(200);
-    expect(rpcCalls).toEqual([
+    // The run is bracketed by heartbeats (see scheduler-health.test.ts).
+    expect(rpcCalls[0]).toBe("rpc_worker_heartbeat");
+    expect(rpcCalls.at(-1)).toBe("rpc_worker_heartbeat");
+    expect(rpcCalls.filter((name) => name !== "rpc_worker_heartbeat")).toEqual([
       "rpc_sms_reconcile_aged_unknowns",
       "rpc_sms_release_dead_letters",
       "rpc_sms_quota_expire",

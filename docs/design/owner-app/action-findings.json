@@ -1,0 +1,17 @@
+[
+  {
+    "step": "NFC",
+    "focusInsideAtOpen": false,
+    "escapeCloses": false
+  },
+  {
+    "step": "photo draft",
+    "uploadedPhotoSurvivesRefresh": false,
+    "removePhotoAvailable": false
+  },
+  {
+    "step": "internal note",
+    "pageErrors": 1,
+    "stuckSaving": true
+  }
+]

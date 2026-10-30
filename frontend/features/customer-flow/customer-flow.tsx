@@ -12,9 +12,10 @@ import {
 } from "react";
 
 import { CustomerBlockingState } from "@/features/customer-flow/customer-blocking-state";
-import { CustomerFrame } from "@/features/customer-flow/customer-frame";
-import { CustomerHeader } from "@/features/customer-flow/customer-header";
+import { LanguageSelector } from "@/features/customer-flow/language-selector";
 import { CustomerLoading } from "@/features/customer-flow/customer-loading";
+import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
+import { DEFAULT_HERO_TRANSFORM } from "@/lib/owner/hero-transform";
 import {
   customerFlowReducer,
   type CustomerFlowState,
@@ -25,7 +26,6 @@ import {
   safeInitialCustomerState,
   saveCustomerDraft,
 } from "@/features/customer-flow/recovery-storage";
-import { CustomerPageBranding } from "@/features/customer-flow/customer-page-branding";
 import { HandoffScreen } from "@/features/customer-flow/screens/handoff-screen";
 import { RatingScreen } from "@/features/customer-flow/screens/rating-screen";
 import {
@@ -378,7 +378,9 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
           kind={
             isUnavailableReviewLink(contextQuery.error)
               ? "unavailable"
-              : "error"
+              : isOfflineError(contextQuery.error)
+                ? "offline"
+                : "error"
           }
           locale={state.locale}
           messages={messages}
@@ -392,20 +394,27 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   const context = contextQuery.data;
 
   return (
-    <CustomerFrame poweredBy={messages.poweredBy}>
-      <CustomerHeader
-        context={context}
-        locale={state.locale}
-        messages={messages}
-        onLocaleChange={changeLocale}
-      />
-      <div ref={contentRef}>
-        {state.screen === "rating" ? (
-          <CustomerPageBranding
-            page={context.page}
-            businessName={context.business.name}
+    <div ref={contentRef} className="customer-live">
+      <CustomerVisitView
+        heroUrl={context.page?.heroUrl ?? null}
+        businessName={context.business.name}
+        // One deterministic crop, shared by the owner preview and this page.
+        // Main's Customer Page contract stores no per-owner hero transform, and
+        // a preview-only control that the customer never sees would be a lie
+        // about what the business published.
+        transform={DEFAULT_HERO_TRANSFORM}
+        heading={state.screen === "rating" ? messages.ratingHeading : ""}
+        support={state.screen === "rating" ? messages.ratingSupport : ""}
+        footerLine={messages.footerPromise}
+        language={
+          <LanguageSelector
+            locale={state.locale}
+            supported={context.supportedLocales}
+            messages={messages}
+            onChange={changeLocale}
           />
-        ) : null}
+        }
+      >
         <LazyMotion features={domAnimation} strict>
           <m.div key={state.screen} {...motionProps}>
             {state.screen === "rating" ? (
@@ -413,6 +422,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
                 messages={messages}
                 rating={state.rating}
                 status={state.feedbackStatus}
+                embedInVisit
                 onRate={handleRate}
                 onRetry={handleRetry}
               />
@@ -425,7 +435,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
             )}
           </m.div>
         </LazyMotion>
-      </div>
-    </CustomerFrame>
+      </CustomerVisitView>
+    </div>
   );
 }

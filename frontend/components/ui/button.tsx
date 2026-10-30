@@ -17,10 +17,16 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          // Dark ink on brand green, never white. White on #00A86B is 3.08:1 —
-          // large-text only — so a white label on a normal-size button fails
-          // AA. The token flips with the theme; the hardcoded value did not.
-          "border-brand bg-brand text-on-brand shadow-[var(--shadow-button)] hover:border-brand-hover hover:bg-brand-hover hover:shadow-[var(--shadow-button-hover)] active:bg-brand-active",
+          // Customer flow still uses this variant. Brand green cannot carry a
+          // white label (3.08:1). Owner CTAs use `action` instead.
+          "border-brand bg-brand text-on-brand shadow-[var(--shadow-button)] hover:border-brand-hover hover:bg-brand-hover hover:shadow-[var(--shadow-button-hover)] active:bg-brand-active disabled:border-border disabled:bg-quiet disabled:text-muted disabled:shadow-none disabled:opacity-100",
+        action:
+          // Disabled is neutral grey, not faded green: a washed-out green
+          // reads as broken, grey reads as "not yet".
+          // The action colour: near-black #1A1A19 with a white label (17:1)
+          // in light mode, near-white with a dark label in dark mode. Brand
+          // green (#00A86B) is never used here.
+          "border-action bg-action text-on-action shadow-[var(--shadow-button)] hover:border-action-hover hover:bg-action-hover hover:shadow-[var(--shadow-button-hover)] active:bg-action-pressed focus-visible:ring-[color:var(--rb-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:border-border disabled:bg-quiet disabled:text-muted disabled:shadow-none disabled:opacity-100",
         secondary:
           "border-border bg-surface text-ink shadow-[var(--shadow-control)] hover:border-[color:var(--rb-border-strong)] hover:bg-quiet",
         outline:
@@ -32,7 +38,7 @@ export const buttonVariants = cva(
       size: {
         sm: "min-h-11 px-4 text-sm",
         default: "min-h-14 text-base",
-        lg: "min-h-16 rounded-[16px] px-6 text-[1.0625rem]",
+        lg: "min-h-16 rounded-[var(--radius-control)] px-6 text-[1.0625rem]",
         icon: "h-12 min-h-12 w-12 px-0",
       },
     },
@@ -82,7 +88,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               className="size-5 animate-spin motion-reduce:animate-none"
               aria-hidden="true"
             />
-            <span>{loadingLabel ?? "Loading…"}</span>
+            {/* Keep saying what is happening: the given label ("Sending…"),
+                otherwise the button's own words, never a generic "Loading". */}
+            {loadingLabel ? <span>{loadingLabel}</span> : children}
           </>
         ) : (
           children

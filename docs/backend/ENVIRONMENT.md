@@ -27,7 +27,21 @@ That file is gitignored; never commit real values.
 
 | Variable | Required | Description |
 |---|---|---|
-| `PUBLIC_FRONTEND_URL` | yes (production) | Origin used in QR codes and NFC tags (`{PUBLIC_FRONTEND_URL}/q/{token}`). Production refuses to start without it. In production this MUST be `https://reviewboost.fit` — never `http://localhost:3000` or a `*.vercel.app` preview URL, because a stand printed against the wrong origin cannot be recalled. Use `http://localhost:3000` only in development. |
+| `PUBLIC_FRONTEND_URL` | yes (production and preview) | Origin used in QR codes and NFC tags (`{PUBLIC_FRONTEND_URL}/q/{token}`). Production refuses to start without it. In production this MUST be `https://reviewboost.fit` — never `http://localhost:3000` or a `*.vercel.app` preview URL, because a stand printed against the wrong origin cannot be recalled. Use `http://localhost:3000` only in development. Vercel previews also run with `NODE_ENV=production`, so the Preview environment needs its own HTTPS value (per branch in Vercel, or a fixed preview domain), used with Preview's separate Supabase project below; without it every preview answers `/login` with a 500. |
+
+## Connections
+
+| Variable | Required | Description |
+|---|---|---|
+| `INTEGRATION_CREDENTIAL_KEY` | to connect an app | base64, 32 bytes. Encrypts provider tokens at rest, separate from `CUSTOMER_NOTE_ENCRYPTION_KEY`. Generate with `openssl rand -base64 32`. Without it nothing can be connected. |
+| `INTEGRATION_CREDENTIAL_KEY_VERSION` | no | Integer, default `1`. Increment when rotating the key. |
+| `INTEGRATION_CREDENTIAL_KEY_PREVIOUS` | no | The key being rotated away from, during a rotation only. |
+| `INTEGRATIONS_FAKE_PROVIDER` | no | `enabled` lists the pretend "Test provider" for trying Connections. Ignored in production (`VERCEL_ENV=production`, or `NODE_ENV=production` off Vercel). |
+| `FAKE_PROVIDER_WEBHOOK_KEY` | no | Signs and verifies the test provider's webhooks. Unset, every test webhook is rejected. |
+
+The Connections worker (`/api/v1/internal/integrations/process`) uses the same
+`SMS_WORKER_SECRET` / `CRON_SECRET` guard as the SMS dispatcher. It is not on a
+schedule yet.
 
 ## Development-only
 
