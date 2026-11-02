@@ -37,6 +37,11 @@ vi.mock("@supabase/supabase-js", () => ({
 
 vi.mock("@/lib/server/supabase", () => ({
   serviceRoleClient: () => ({
+    // Sign in with Apple's stored token, taken back to revoke it. None here.
+    rpc: (name: string) => {
+      events.push({ kind: "service-rpc", name });
+      return Promise.resolve({ data: [], error: null });
+    },
     auth: {
       admin: {
         deleteUser: (id: string) => {
@@ -92,6 +97,13 @@ describe("deleting your own account", () => {
     expect(order).toContain("rpc_prepare_my_account_deletion");
     expect(order).not.toContain("rpc_my_account_deletion_blockers");
     expect(order.indexOf("rpc_prepare_my_account_deletion")).toBeLessThan(order.indexOf("deleteUser"));
+  });
+
+  it("revokes Sign in with Apple before the login is removed", async () => {
+    await call("POST", { confirmation: "delete" });
+    const order = events.map((event) => event.name);
+    expect(order).toContain("rpc_apple_sign_in_token_take");
+    expect(order.indexOf("rpc_apple_sign_in_token_take")).toBeLessThan(order.indexOf("deleteUser"));
   });
 
   it("refuses an extra field such as a user id", async () => {

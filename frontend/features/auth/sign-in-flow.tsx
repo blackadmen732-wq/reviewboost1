@@ -6,8 +6,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CodeInput } from "@/components/ui/code-input";
 import { InlineNotice } from "@/components/ui/inline-notice";
+import { SocialSignIn } from "@/features/auth/social-sign-in";
+import type { SignInProvider } from "@/lib/auth/sign-in-providers";
 import { Input } from "@/components/ui/input";
-import { supabaseBrowser } from "@/lib/supabase/browser";
+import { loadSupabaseBrowser, warmSupabaseBrowser } from "@/lib/supabase/lazy-browser";
 
 /**
  * Sign in, in two taps and no password.
@@ -23,17 +25,27 @@ const RESEND_SECONDS = 30;
 export function SignInFlow({
   next,
   intent = "signin",
+  providers = [],
+  initialError = null,
 }: {
   next: string;
   intent?: "signin" | "start";
+  /** "Continue with …" buttons under the email form (lib/auth/sign-in-providers). */
+  providers?: readonly SignInProvider[];
+  /** A message from a sign-in that came back unfinished (/auth/callback). */
+  initialError?: string | null;
 }) {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [resetToken, setResetToken] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const emailField = useRef<HTMLInputElement>(null);
+
+  // Supabase is only needed once a button is pressed; fetch it while the
+  // owner is typing rather than before the page can show.
+  useEffect(() => warmSupabaseBrowser(), []);
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
@@ -49,7 +61,7 @@ export function SignInFlow({
     setError(null);
 
     try {
-      const { error: sendError } = await supabaseBrowser().auth.signInWithOtp({
+      const { error: sendError } = await (await loadSupabaseBrowser()).auth.signInWithOtp({
         email: address,
         options: { shouldCreateUser: true },
       });
@@ -90,7 +102,7 @@ export function SignInFlow({
       setError(null);
 
       try {
-        const { error: verifyError } = await supabaseBrowser().auth.verifyOtp({
+        const { error: verifyError } = await (await loadSupabaseBrowser()).auth.verifyOtp({
           email,
           token: code,
           type: "email",
@@ -229,6 +241,8 @@ export function SignInFlow({
       >
         Continue
       </Button>
+
+      <SocialSignIn next={next} providers={providers} />
 
       <p className="text-sm leading-relaxed text-muted">
         By continuing you agree to our{" "}

@@ -36,6 +36,10 @@ const IMPORTERS: Record<string, string> = {
   // set, one server-chosen account, rate limited per client and overall,
   // constant-time compare; mints a one-time magic-link token hash only.
   "lib/server/review-sign-in.ts": "rate-limit RPC and Auth Admin generateLink for the one review account",
+  // Sign in with Apple (App Store 5.1.1(v)): keeps the encrypted refresh token
+  // and takes it back at deletion to revoke it. The table is service-only;
+  // rpc_apple_sign_in_token_store / _take are its only doors.
+  "lib/server/apple-sign-in.ts": "Apple token store/take RPCs, for revocation when a login is deleted",
   "app/api/v1/account/deletion/route.ts": "Auth Admin deleteUser, billing refs lookup",
   // Deleting your own login (launch gap L1): deleteUser for the session's own
   // id only, after rpc_my_account_deletion_blockers (read as the caller) is empty.

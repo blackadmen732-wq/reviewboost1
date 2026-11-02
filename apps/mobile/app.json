@@ -11,6 +11,7 @@
     "ios": {
       "bundleIdentifier": "fit.reviewboost.app",
       "supportsTablet": false,
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NFCReaderUsageDescription": "ReviewBoost uses NFC to write your business's review link to your ReviewBoost Tags and to check what a Tag already holds before changing it.",
         "ITSAppUsesNonExemptEncryption": false,
@@ -103,7 +104,9 @@
         }
       ],
       "expo-system-ui",
-      "./plugins/with-production-info-plist"
+      "./plugins/with-production-info-plist",
+      "expo-web-browser",
+      "expo-apple-authentication"
     ]
   }
 }

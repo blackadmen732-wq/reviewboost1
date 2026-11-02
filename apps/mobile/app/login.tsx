@@ -7,12 +7,21 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from "react-native";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Tappable } from "@/components/tappable";
 import { BrandLockup } from "@/components/brand-lockup";
 import { useAuth } from "@/data/auth-context";
+import {
+  availableSocialProviders,
+  signInWithApple,
+  signInWithGoogle,
+  type SocialProvider,
+  type SocialResult,
+} from "@/data/social-sign-in";
 import { colors, radii, fonts } from "@/theme";
 
 const RESEND_SECONDS = 30;
@@ -31,6 +40,34 @@ export default function LoginScreen() {
   // The back link sits under the status bar / Dynamic Island on every
   // iPhone, rather than at a fixed 64pt that only fits some of them.
   const insets = useSafeAreaInsets();
+  const [providers, setProviders] = useState<SocialProvider[]>([]);
+  const [socialBusy, setSocialBusy] = useState<SocialProvider | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void availableSocialProviders().then((list) => {
+      if (live) setProviders(list);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const handleSocial = async (provider: SocialProvider) => {
+    if (socialBusy || submitting) return;
+    setError(null);
+    setSocialBusy(provider);
+    let result: SocialResult;
+    try {
+      result = provider === "apple" ? await signInWithApple() : await signInWithGoogle();
+    } catch {
+      result = { kind: "failed", message: "That sign-in didn't finish. Try again, or use your email." };
+    } finally {
+      setSocialBusy(null);
+    }
+    if (result.kind === "signedIn") router.replace("/select-org");
+    else if (result.kind === "failed") setError(result.message);
+  };
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
@@ -249,6 +286,51 @@ export default function LoginScreen() {
             <Text style={styles.buttonText}>Continue</Text>
           )}
         </Tappable>
+
+        {providers.length > 0 ? (
+          <View style={styles.social}>
+            <View style={styles.divider} accessible={false}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {providers.includes("google") ? (
+              <Tappable
+                style={[styles.googleButton, socialBusy !== null && styles.buttonDisabled]}
+                onPress={() => void handleSocial("google")}
+                disabled={socialBusy !== null}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Google"
+              >
+                {socialBusy === "google" ? (
+                  <ActivityIndicator color={colors.ink} />
+                ) : (
+                  <>
+                    <Image
+                      source={require("../assets/google-g.png")}
+                      style={styles.googleLogo}
+                      accessibilityIgnoresInvertColors
+                    />
+                    <Text style={styles.googleText}>Continue with Google</Text>
+                  </>
+                )}
+              </Tappable>
+            ) : null}
+
+            {providers.includes("apple") ? (
+              // Apple's own button: required styling for Sign in with Apple
+              // (Guideline 4.8, HIG), the same height as the other buttons.
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE}
+                cornerRadius={radii.control}
+                style={[styles.appleButton, socialBusy !== null && styles.buttonDisabled]}
+                onPress={() => void handleSocial("apple")}
+              />
+            ) : null}
+          </View>
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );
@@ -309,6 +391,26 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: colors.onBrand, fontSize: 16, ...fonts.subheading },
   resendButton: { alignItems: "center", marginTop: 20, padding: 8 },
+  social: { marginTop: 20, gap: 12 },
+  divider: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 4 },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.borderLight },
+  dividerText: { fontSize: 14, color: colors.inkMuted },
+  // Google's light button: white, #747775 outline, the four-colour G.
+  googleButton: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderRadius: radii.control,
+    borderWidth: 1,
+    borderColor: "#747775",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+  },
+  googleLogo: { width: 20, height: 20 },
+  googleText: { color: "#1F1F1F", fontSize: 16, ...fonts.subheading },
+  appleButton: { width: "100%", height: 52 },
   resendText: { fontSize: 15, color: colors.brandText },
   resendDisabled: { color: colors.inkFaint },
 });

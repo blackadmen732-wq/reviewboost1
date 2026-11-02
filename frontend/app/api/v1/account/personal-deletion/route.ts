@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
+import { revokeAppleSignIn } from "@/lib/server/apple-sign-in";
 import { type AuthenticatedContext, requireUser } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
@@ -88,6 +89,10 @@ export async function POST(request: NextRequest): Promise<Response> {
         details: blockers.map((blocker) => ({ field: "business", message: blocker.name })),
       });
     }
+
+    // Apple requires a Sign in with Apple authorization to be revoked when the
+    // account is deleted. Done before the login goes; never blocks deletion.
+    await revokeAppleSignIn(context.userId, requestId);
 
     const { error } = await serviceRoleClient().auth.admin.deleteUser(context.userId);
     if (error) {

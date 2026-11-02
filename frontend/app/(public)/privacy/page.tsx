@@ -25,6 +25,7 @@ const SUPPORT_EMAIL = "help@reviewboost.fit";
 export default function PrivacyPage() {
   return (
     <PublicArticle
+      breadcrumb="/privacy"
       title="Privacy Policy"
       lede={`Last updated ${LAST_UPDATED}.`}
     >
@@ -38,6 +39,11 @@ export default function PrivacyPage() {
       <p>When you create an account we collect:</p>
       <ul>
         <li>Your email address (used to sign in and contact you)</li>
+        <li>
+          If you choose Continue with Google or Continue with Apple, only the email
+          address they share with us (Apple&apos;s &ldquo;Hide My Email&rdquo; address works).
+          We do not ask for your name, contacts or anything else from either account.
+        </li>
         <li>Your business name and location name</li>
         <li>Your Google review link (the URL you supply)</li>
         <li>Billing data processed by Stripe — we never see your full card number</li>

@@ -30,6 +30,24 @@ That file is gitignored; never commit real values.
 | `PUBLIC_FRONTEND_URL` | yes (production and preview) | Origin used in QR codes and NFC tags (`{PUBLIC_FRONTEND_URL}/q/{token}`). Production refuses to start without it. In production this MUST be `https://reviewboost.fit` — never `http://localhost:3000` or a `*.vercel.app` preview URL, because a stand printed against the wrong origin cannot be recalled. Use `http://localhost:3000` only in development. Vercel previews also run with `NODE_ENV=production`, so the Preview environment needs its own HTTPS value (per branch in Vercel, or a fixed preview domain), used with Preview's separate Supabase project below; without it every preview answers `/login` with a 500. |
 | `GOOGLE_SITE_VERIFICATION` | no (production only) | The `content` value of Google Search Console's HTML-tag verification for `https://reviewboost.fit/` (only the code, not the whole `<meta>` tag). Read at build time, so redeploy after setting it. Unset prints no tag. |
 
+## Sign in with Google and Apple
+
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_AUTH_PROVIDERS` | no | Comma list of "Continue with …" buttons on `/login`: `google,apple`. Empty shows email only. List a provider only after it is on in Supabase. Google is never shown without Apple (App Store Guideline 4.8). |
+| `APPLE_TEAM_ID` | with Apple | Apple Developer team ID. |
+| `APPLE_SIGN_IN_KEY_ID` | with Apple | Key ID of a "Sign in with Apple" key. |
+| `APPLE_SIGN_IN_PRIVATE_KEY` | with Apple | That key's `.p8` contents (`\n` escapes allowed). Server-only. Lets account deletion revoke Sign in with Apple, which Apple requires (`lib/server/apple-sign-in.ts`). |
+| `APPLE_BUNDLE_ID` | no | iPhone app client ID, default `fit.reviewboost.app`. |
+| `APPLE_SERVICES_ID` | with web Apple | The website's Services ID, used to revoke tokens from web sign-ins. |
+
+Switching them on, in order:
+
+1. **Google.** Google Cloud console → APIs & Services → Credentials: on the existing "ReviewBoost web" OAuth client, add the redirect URI `https://<project>.supabase.co/auth/v1/callback`. In Supabase → Authentication → Providers → Google, paste the client ID and secret.
+2. **Apple.** Apple Developer → Identifiers: turn on Sign in with Apple for `fit.reviewboost.app`; create a Services ID (for example `fit.reviewboost.web`) with return URL `https://<project>.supabase.co/auth/v1/callback`; create a key with Sign in with Apple. In Supabase → Providers → Apple: Client IDs `fit.reviewboost.web,fit.reviewboost.app` and the secret generated from that key.
+3. **Supabase → Authentication → URL Configuration → Redirect URLs:** add `https://reviewboost.fit/auth/callback` and `reviewboost://auth/callback`.
+4. **Vercel (Production):** set the Apple variables above and `NEXT_PUBLIC_AUTH_PROVIDERS=google,apple`, then redeploy. **EAS:** set `EXPO_PUBLIC_AUTH_PROVIDERS=apple,google` and build a new iPhone app (the Sign in with Apple capability needs a new build).
+
 ## Connections
 
 | Variable | Required | Description |

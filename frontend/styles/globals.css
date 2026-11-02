@@ -57,6 +57,14 @@
   --rb-action-hover: #333331;
   --rb-action-pressed: #000000;
   --rb-on-action: #ffffff;
+  /* Sign in with Apple / Google buttons: the providers' own approved styles
+     (Apple white-outline / white; Google light / dark). Not brand tokens. */
+  --rb-signin-apple-bg: #ffffff;
+  --rb-signin-apple-fg: #000000;
+  --rb-signin-apple-border: #000000;
+  --rb-signin-google-bg: #ffffff;
+  --rb-signin-google-fg: #1f1f1f;
+  --rb-signin-google-border: #747775;
   --rb-star: #b97d0c;
   --rb-star-soft: #fff7e5;
   --rb-warning: #9a6415;
@@ -90,6 +98,7 @@
   --rb-text-display: 1.75rem;
   --rb-row: 56px;
   --rb-content: 800px;
+  --rb-content-wide: 1040px;
   --rb-motion-fast: 150ms;
   --rb-motion-page: 180ms;
   --rb-logo-clearspace: 0.25;
@@ -119,6 +128,12 @@
     --rb-action-hover: #ffffff;
     --rb-action-pressed: #e2e2df;
     --rb-on-action: #1a1a19;
+    --rb-signin-apple-bg: #ffffff;
+    --rb-signin-apple-fg: #000000;
+    --rb-signin-apple-border: #ffffff;
+    --rb-signin-google-bg: #131314;
+    --rb-signin-google-fg: #e3e3e3;
+    --rb-signin-google-border: #8e918f;
     --rb-star: #f2b94b;
     --rb-star-soft: #3a2e14;
     --rb-danger: #ff8f8f;
@@ -157,6 +172,12 @@
   --rb-action-hover: #333331;
   --rb-action-pressed: #000000;
   --rb-on-action: #ffffff;
+  --rb-signin-apple-bg: #ffffff;
+  --rb-signin-apple-fg: #000000;
+  --rb-signin-apple-border: #000000;
+  --rb-signin-google-bg: #ffffff;
+  --rb-signin-google-fg: #1f1f1f;
+  --rb-signin-google-border: #747775;
   --rb-star: #b97d0c;
   --rb-star-soft: #fff7e5;
   --rb-danger: #b33a3a;
@@ -194,6 +215,12 @@
   --rb-action-hover: #ffffff;
   --rb-action-pressed: #e2e2df;
   --rb-on-action: #1a1a19;
+  --rb-signin-apple-bg: #ffffff;
+  --rb-signin-apple-fg: #000000;
+  --rb-signin-apple-border: #ffffff;
+  --rb-signin-google-bg: #131314;
+  --rb-signin-google-fg: #e3e3e3;
+  --rb-signin-google-border: #8e918f;
   --rb-star: #f2b94b;
   --rb-star-soft: #3a2e14;
   --rb-danger: #ff8f8f;

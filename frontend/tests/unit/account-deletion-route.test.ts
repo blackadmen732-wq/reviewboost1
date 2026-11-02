@@ -298,6 +298,20 @@ describe("the login itself", () => {
     expect(body.data.signInRemoved).toBe(true);
   });
 
+  it("revokes Sign in with Apple before the login is removed", async () => {
+    remainingMemberships = [];
+
+    await post({ confirmation: "Doomed Diner" });
+
+    // Apple's rule: a deleted account's Apple authorization is revoked. The
+    // token is taken while the login still exists, so it cannot be orphaned.
+    const order = names();
+    expect(order).toContain("service-rpc:rpc_apple_sign_in_token_take");
+    expect(order.indexOf("service-rpc:rpc_apple_sign_in_token_take")).toBeLessThan(
+      order.indexOf("auth-admin:deleteUser"),
+    );
+  });
+
   it("survives when the person still owns another business", async () => {
     remainingMemberships = [{ org_id: "22222222-2222-2222-2222-222222222222" }];
 

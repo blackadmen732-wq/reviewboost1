@@ -355,8 +355,9 @@ Verification still needed on the archive: Xcode → Organizer → *Generate Priv
 | iPhone layouts | NEEDS EXTERNAL ACTION | Source reviewed; must be checked on TestFlight on small, standard and Pro Max iPhones |
 | iPad decision | PASS | iPhone only (`supportsTablet: false`) |
 | NFC | NEEDS EXTERNAL ACTION | Entitlement and string correct; real-device matrix in `APP_STORE_METADATA.md` §9 not run |
-| Login | NEEDS EXTERNAL ACTION | Code reviewed and unit-tested (throttling, reviewer fallback); live OTP delivery untested from here |
-| Account deletion | BLOCKED | Owners only; §6 needs your decision and a migration |
+| Login | NEEDS EXTERNAL ACTION | Email code, Sign in with Apple and Google (4.8: Google only with Apple), unit-tested; providers to switch on in Supabase and EAS; live sign-in untested from here |
+| Sign in with Apple revoke | NEEDS EXTERNAL ACTION | Built and unit-tested (code exchange, encrypted storage, revoke before delete); needs the Apple key env vars in Vercel |
+| Account deletion | PASS | Anyone can delete their own login in the app (personal deletion, migration 20261018000100); owners delete their business |
 | Privacy policy | NEEDS EXTERNAL ACTION | In-app link added; page updated in the repo; live URL could not be fetched from this sandbox |
 | App Privacy labels | NEEDS EXTERNAL ACTION | Answers in §5 to enter in App Store Connect |
 | Privacy manifest | NEEDS EXTERNAL ACTION | Declared; confirm with Xcode's privacy report on the archive |

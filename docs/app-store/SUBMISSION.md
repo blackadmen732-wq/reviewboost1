@@ -232,6 +232,34 @@ it is often the person who has already lost access.
 confirmation step safely. Typing anything other than the exact business name
 leaves the button disabled and the account untouched.
 
+**Sign in with Apple is revoked on deletion.** Apple requires apps offering
+Sign in with Apple to revoke the person's tokens when the account is deleted.
+At sign-in the app sends Apple's one-time authorization code to the server,
+which keeps the refresh token encrypted (`apple_sign_in_tokens`, service role
+only); deletion presents it to `https://appleid.apple.com/auth/revoke` before
+the login is removed (`frontend/lib/server/apple-sign-in.ts`). A failed revoke
+is logged and never blocks the deletion.
+
+---
+
+## Sign in with Apple (Guideline 4.8)
+
+The sign-in screen offers the emailed code, **Continue with Apple** and
+**Continue with Google**. Guideline 4.8 requires an equivalent privacy-focused
+option wherever a third-party sign-in such as Google is offered; Sign in with
+Apple is that option, and the code enforces it: Google never shows unless Apple
+does on the same device (`apps/mobile/data/social-sign-in.ts`).
+
+- Apple's own `AppleAuthenticationButton` (white-outline style), the same height
+  as the other buttons, as the HIG requires.
+- Only the email scope is requested; the name is never asked for. A hidden
+  "Hide My Email" relay address works like any other email.
+- Capability: `usesAppleSignIn: true` in `app.json`; enable Sign in with Apple
+  on the App ID before building.
+- Both buttons are off until switched on (`EXPO_PUBLIC_AUTH_PROVIDERS`), so a
+  build never shows a button Supabase would refuse. Setup steps:
+  `docs/backend/ENVIRONMENT.md` → Sign in with Google and Apple.
+
 ---
 
 ## Payments and Guideline 3.1
@@ -366,6 +394,8 @@ help@reviewboost.fit
 - [ ] Twilio credentials set in Vercel environment (not in git)
 - [ ] `.p8` APNs key uploaded to App Store Connect (not in git)
 - [ ] Demo account created in production Supabase
+- [ ] Sign in with Apple on for the App ID; Apple and Google on in Supabase; `EXPO_PUBLIC_AUTH_PROVIDERS=apple,google` in EAS
+- [ ] Apple key env vars set in Vercel, and a test account deleted to confirm the Apple revoke logs `apple.revoked`
 - [ ] Screenshots captured and uploaded
 - [ ] App Store Connect record uses bundle ID `fit.reviewboost.app`
 - [ ] Build's App Store icon checked on the TestFlight build's product page (source: `apps/mobile/assets/icon.png`)

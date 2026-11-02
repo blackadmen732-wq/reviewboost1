@@ -4,6 +4,7 @@ import { z } from "zod";
 import { type AuthenticatedContext, requireOrganizationContext } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
+import { revokeAppleSignIn } from "@/lib/server/apple-sign-in";
 import { logger } from "@/lib/server/logger";
 import { stripeClient } from "@/lib/server/stripe";
 import { serviceRoleClient } from "@/lib/server/supabase";
@@ -228,6 +229,10 @@ async function removeSignInIfLastAccount(
   }
 
   if (Array.isArray(data) && data.length > 0) return false;
+
+  // Apple requires a Sign in with Apple authorization to be revoked when the
+  // account is deleted. Done before the login goes; never blocks deletion.
+  await revokeAppleSignIn(context.userId, requestId);
 
   const { error: deleteError } = await serviceRoleClient().auth.admin.deleteUser(context.userId);
 
