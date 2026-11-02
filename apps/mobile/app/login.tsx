@@ -295,6 +295,18 @@ export default function LoginScreen() {
               <View style={styles.dividerLine} />
             </View>
 
+            {providers.includes("apple") ? (
+              // Apple's own button, first and in solid black: Apple's required
+              // styling (Guideline 4.8, HIG), the same height as the others.
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={radii.control}
+                style={[styles.appleButton, socialBusy !== null && styles.buttonDisabled]}
+                onPress={() => void handleSocial("apple")}
+              />
+            ) : null}
+
             {providers.includes("google") ? (
               <Tappable
                 style={[styles.googleButton, socialBusy !== null && styles.buttonDisabled]}
@@ -318,17 +330,6 @@ export default function LoginScreen() {
               </Tappable>
             ) : null}
 
-            {providers.includes("apple") ? (
-              // Apple's own button: required styling for Sign in with Apple
-              // (Guideline 4.8, HIG), the same height as the other buttons.
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE}
-                cornerRadius={radii.control}
-                style={[styles.appleButton, socialBusy !== null && styles.buttonDisabled]}
-                onPress={() => void handleSocial("apple")}
-              />
-            ) : null}
           </View>
         ) : null}
       </View>

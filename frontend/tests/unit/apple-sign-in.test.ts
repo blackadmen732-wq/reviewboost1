@@ -61,8 +61,8 @@ describe("which sign-in buttons show", () => {
     expect(parseSignInProviders(undefined)).toEqual([]);
     expect(parseSignInProviders("")).toEqual([]);
     expect(parseSignInProviders("apple")).toEqual(["apple"]);
-    expect(parseSignInProviders(" Apple , GOOGLE ")).toEqual(["google", "apple"]);
-    expect(parseSignInProviders("google,apple,facebook")).toEqual(["google", "apple"]);
+    expect(parseSignInProviders(" Apple , GOOGLE ")).toEqual(["apple", "google"]);
+    expect(parseSignInProviders("google,apple,facebook")).toEqual(["apple", "google"]);
   });
 
   it("never shows Google without Apple (App Store Guideline 4.8)", async () => {

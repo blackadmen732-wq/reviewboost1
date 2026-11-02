@@ -14,7 +14,8 @@
 
 export type SignInProvider = "google" | "apple";
 
-const KNOWN: readonly SignInProvider[] = ["google", "apple"];
+// Apple first, as Apple asks and as the iPhone app shows it.
+const KNOWN: readonly SignInProvider[] = ["apple", "google"];
 
 export function parseSignInProviders(raw: string | undefined | null): SignInProvider[] {
   const listed = new Set(

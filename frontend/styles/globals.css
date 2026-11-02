@@ -59,8 +59,8 @@
   --rb-on-action: #ffffff;
   /* Sign in with Apple / Google buttons: the providers' own approved styles
      (Apple white-outline / white; Google light / dark). Not brand tokens. */
-  --rb-signin-apple-bg: #ffffff;
-  --rb-signin-apple-fg: #000000;
+  --rb-signin-apple-bg: #000000;
+  --rb-signin-apple-fg: #ffffff;
   --rb-signin-apple-border: #000000;
   --rb-signin-google-bg: #ffffff;
   --rb-signin-google-fg: #1f1f1f;
@@ -172,8 +172,8 @@
   --rb-action-hover: #333331;
   --rb-action-pressed: #000000;
   --rb-on-action: #ffffff;
-  --rb-signin-apple-bg: #ffffff;
-  --rb-signin-apple-fg: #000000;
+  --rb-signin-apple-bg: #000000;
+  --rb-signin-apple-fg: #ffffff;
   --rb-signin-apple-border: #000000;
   --rb-signin-google-bg: #ffffff;
   --rb-signin-google-fg: #1f1f1f;
