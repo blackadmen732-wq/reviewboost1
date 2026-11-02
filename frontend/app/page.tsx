@@ -4,13 +4,15 @@ import { redirect } from "next/navigation";
 import { PublicHome } from "@/features/public/public-home";
 import { PUBLIC_HERO } from "@/features/public/public-copy";
 import { supabaseServer } from "@/lib/supabase/server";
+import { publicPageMetadata, SITE_JSON_LD } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: { absolute: "ReviewBoost" },
+export const metadata: Metadata = publicPageMetadata({
+  path: "/",
+  title: "ReviewBoost",
   description: PUBLIC_HERO.lede,
-};
+});
 
 /**
  * The front door.
@@ -47,7 +49,15 @@ export default async function RootPage() {
   }
 
   if (!signedIn) {
-    return <PublicHome />;
+    return (
+      <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: SITE_JSON_LD }}
+        />
+        <PublicHome />
+      </>
+    );
   }
 
   redirect(hasMembership ? "/home" : "/onboarding");

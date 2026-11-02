@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PublicShell } from "@/features/public/public-shell";
+import { publicPageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
+  path: "/support",
   title: "Support",
   description: "Help with Tags, NFC, your Google link, billing and your account.",
-};
+});
 
 /**
  * Help for the things that actually go wrong.

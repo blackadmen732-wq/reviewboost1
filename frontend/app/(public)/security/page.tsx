@@ -3,11 +3,13 @@ import Link from "next/link";
 
 import { SECURITY } from "@/features/public/public-copy";
 import { PublicArticle } from "@/features/public/public-article";
+import { publicPageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
+  path: "/security",
   title: "Security",
   description: "Owner pages need a signed-in session. Customer pages stay anonymous.",
-};
+});
 
 /**
  * Every claim here points at something in the codebase.

@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PublicArticle } from "@/features/public/public-article";
+import { publicPageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
+  path: "/terms",
   title: "Terms",
   description: "The agreement between ReviewBoost and the businesses that use it.",
-};
+});
 
 const LAST_UPDATED = "16 September 2026";
 const SUPPORT_EMAIL = "help@reviewboost.fit";

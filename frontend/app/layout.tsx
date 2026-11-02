@@ -3,7 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import type { ReactNode } from "react";
 
 import { Providers } from "@/components/providers";
-import { SITE_URL } from "@/lib/site";
+import { SHARED_OPEN_GRAPH, SHARED_TWITTER, SITE_NAME, SITE_URL } from "@/lib/site";
 import { PwaRegister } from "@/components/pwa-register";
 import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
@@ -24,26 +24,12 @@ export const metadata: Metadata = {
   title: { default: "ReviewBoost", template: "%s — ReviewBoost" },
   description: DESCRIPTION,
   applicationName: "ReviewBoost",
-  // One origin. reviewboost.app is retired, and two origins serving the same
-  // pages is how a small site competes with itself for its own name.
-  alternates: { canonical: "/" },
-  openGraph: {
-    type: "website",
-    siteName: "ReviewBoost",
-    title: "ReviewBoost",
-    description: DESCRIPTION,
-    url: "/",
-    locale: "en_US",
-    // The approved mark on the brand tile. Not a screenshot of the product:
-    // a shrunk dashboard is unreadable at the size a link preview renders.
-    images: [{ url: "/brand/og.png", width: 1200, height: 630, alt: "ReviewBoost" }],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "ReviewBoost",
-    description: DESCRIPTION,
-    images: ["/brand/og.png"],
-  },
+  // No canonical or og:url here. Anything set in the root layout is inherited
+  // by every route, so a canonical of "/" told search engines that /pricing,
+  // /terms and the rest were copies of the homepage. Each public page declares
+  // its own through publicPageMetadata() in lib/site.ts; noindex pages need none.
+  openGraph: { ...SHARED_OPEN_GRAPH, title: SITE_NAME, description: DESCRIPTION },
+  twitter: { ...SHARED_TWITTER, title: SITE_NAME, description: DESCRIPTION },
   // These point at the exported brand files so a manifest or a third party has
   // something stable to read.
   icons: {

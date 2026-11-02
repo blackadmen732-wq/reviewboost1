@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { PUBLIC_ROUTES } from "@/lib/site";
+import { absoluteUrl, PUBLIC_ROUTES } from "@/lib/site";
 
 /**
  * Public pages may be indexed. Owner, auth, and customer tokens may not.
@@ -29,5 +29,7 @@ export default function robots(): MetadataRoute.Robots {
         "/api/",
       ],
     },
+    // Tells crawlers where the sitemap is without waiting for them to guess.
+    sitemap: absoluteUrl("/sitemap.xml"),
   };
 }

@@ -3,12 +3,14 @@ import type { Metadata } from "next";
 import { PRICING } from "@/features/public/public-copy";
 import { PricingSection } from "@/features/public/pricing-table";
 import { PublicShell } from "@/features/public/public-shell";
+import { publicPageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
+  path: "/pricing",
   title: "Pricing",
   description:
     "$49, $79 or $129 a month. Starter starts with seven days free, card required; Growth and Pro are charged when you subscribe.",
-};
+});
 
 /**
  * The pricing page: shared plan comparison first, then how we charge.

@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 import { PRODUCT, START_HREF } from "@/features/public/public-copy";
 import { PublicArticle } from "@/features/public/public-article";
 import { ProductDemo } from "@/features/public/product-demo";
+import { publicPageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
+  path: "/product",
   title: "Product",
   description:
     "A Tag is a printed code or a programmed NFC tag. Same customer page either way.",
-};
+});
 
 export default function ProductPage() {
   return (

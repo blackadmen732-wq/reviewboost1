@@ -4,12 +4,14 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { INTEGRITY, START_HREF } from "@/features/public/public-copy";
 import { PublicArticle } from "@/features/public/public-article";
+import { publicPageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
+  path: "/integrity",
   title: "Integrity",
   description:
     "Every customer who rates one through five stars is offered the same chance to leave a Google review.",
-};
+});
 
 export default function IntegrityPage() {
   return (

@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PublicArticle } from "@/features/public/public-article";
+import { publicPageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
+  path: "/delete-account",
   title: "Delete your account",
   description:
     "How to delete your ReviewBoost account and what happens to your Tags, ratings and subscription.",
-};
+});
 
 /**
  * The account-deletion resource, reachable without signing in.

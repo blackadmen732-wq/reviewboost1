@@ -5,7 +5,15 @@ import { describe, expect, it } from "vitest";
 
 import robots from "@/app/robots";
 import sitemap from "@/app/sitemap";
-import { absoluteUrl, PUBLIC_ROUTES, SITE_URL } from "@/lib/site";
+import {
+  absoluteUrl,
+  PUBLIC_ROUTES,
+  publicPageMetadata,
+  SHARED_OPEN_GRAPH,
+  SHARED_TWITTER,
+  SITE_JSON_LD,
+  SITE_URL,
+} from "@/lib/site";
 
 /**
  * Search engines see whatever the metadata says, and it is the part of a site
@@ -116,14 +124,73 @@ describe("social cards and canonicals resolve", () => {
     expect(layout).toContain("SITE_URL");
   });
 
-  it("declares a canonical, an Open Graph card and a Twitter card", () => {
-    expect(layout).toContain("alternates");
+  it("declares an Open Graph card and a Twitter card for every page", () => {
     expect(layout).toContain("openGraph");
-    expect(layout).toContain("summary_large_image");
+    expect(layout).toContain("SHARED_OPEN_GRAPH");
+    expect(SHARED_TWITTER.card).toBe("summary_large_image");
+  });
+
+  it("sets no site-wide canonical or og:url in the root layout", () => {
+    // Inherited by every route: a canonical of "/" there told search engines
+    // that /pricing, /terms and the rest were copies of the homepage.
+    const metadataBlock = layout.slice(
+      layout.indexOf("export const metadata"),
+      layout.indexOf("export const viewport"),
+    );
+    expect(metadataBlock).not.toMatch(/canonical\s*:/);
+    expect(metadataBlock).not.toMatch(/\burl\s*:\s*["']\/["']/);
+  });
+
+  it("gives every public page its own canonical and card URL", () => {
+    const fileFor = (route: string) =>
+      route === "/"
+        ? "app/page.tsx"
+        : route === "/support"
+          ? "app/support/page.tsx"
+          : `app/(public)${route}/page.tsx`;
+
+    for (const route of PUBLIC_ROUTES) {
+      const source = readFileSync(join(ROOT, fileFor(route)), "utf8");
+      expect(source, `${route} must use publicPageMetadata`).toContain("publicPageMetadata(");
+      expect(source, `${route} must declare its own path`).toContain(`path: "${route}"`);
+    }
+
+    const pricing = publicPageMetadata({ path: "/pricing", title: "Pricing", description: "d" });
+    expect(pricing.alternates?.canonical).toBe("/pricing");
+    expect((pricing.openGraph as { url?: string }).url).toBe("/pricing");
+    expect(pricing.openGraph?.title).toBe("Pricing — ReviewBoost");
+    // A page's openGraph replaces the layout's whole object, so the image has
+    // to travel with it or the card loses its picture.
+    expect(pricing.openGraph?.images).toEqual(SHARED_OPEN_GRAPH.images);
+
+    const home = publicPageMetadata({ path: "/", title: "ReviewBoost", description: "d" });
+    expect(home.alternates?.canonical).toBe("/");
+    expect(home.title).toEqual({ absolute: "ReviewBoost" });
+  });
+
+  it("points crawlers at the sitemap from robots.txt", () => {
+    expect(robots().sitemap).toBe(absoluteUrl("/sitemap.xml"));
+  });
+
+  it("describes the organisation in structured data, and nothing it cannot keep true", () => {
+    const data = JSON.parse(SITE_JSON_LD) as { "@graph": Array<Record<string, unknown>> };
+    const types = data["@graph"].map((node) => node["@type"]);
+    expect(types).toEqual(["Organization", "WebSite"]);
+    expect(SITE_JSON_LD).not.toMatch(/aggregateRating|"review"|"offers"/);
+    expect(readFileSync(join(ROOT, "app/page.tsx"), "utf8")).toContain("application/ld+json");
+  });
+
+  it("publishes an llms.txt that links only to indexable pages", () => {
+    const llms = readFileSync(join(ROOT, "public/llms.txt"), "utf8");
+    const links = [...llms.matchAll(/\((https:\/\/reviewboost\.fit[^)]*)\)/g)].map((m) => m[1]);
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(PUBLIC_ROUTES.map((route) => absoluteUrl(route))).toContain(link);
+    }
   });
 
   it("points at a social image that is actually in the repository", () => {
-    expect(layout).toContain("/brand/og.png");
+    expect(SHARED_OPEN_GRAPH.images[0]!.url).toBe("/brand/og.png");
     expect(() => readFileSync(join(ROOT, "public/brand/og.png"))).not.toThrow();
   });
 
