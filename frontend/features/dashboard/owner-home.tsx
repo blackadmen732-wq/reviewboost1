@@ -1,4 +1,4 @@
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, Star } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -12,13 +12,14 @@ import {
 } from "@/features/dashboard/home-model";
 import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page";
 import { SetupSeen } from "@/features/dashboard/setup-seen";
+import type { InsightsHomeSummary } from "@/lib/owner/insights";
 import { cn } from "@/lib/utils/cn";
 
 /**
  * Owner Home. One question: do I need to do anything?
  *
  * The answer is the biggest thing on the screen. Everything else — the week's
- * number, unread rows, Tags — is quieter and underneath, in the same order
+ * numbers, unread rows, Tags — is quieter and underneath, in the same order
  * every time so a glance between customers finds it where it was yesterday.
  *
  * A business with no ratings yet gets its setup as a short checklist built
@@ -29,7 +30,7 @@ export function OwnerHome({
   businessName,
   model,
   unreadItems,
-  insightsLine = null,
+  insights = null,
   seenDone = null,
 }: {
   businessName: string;
@@ -41,8 +42,8 @@ export function OwnerHome({
    * visit, where everything would be "new".
    */
   seenDone?: readonly string[] | null;
-  /** "4.3 average · 84 ratings · Improving", or null when there is not enough to say. */
-  insightsLine?: string | null;
+  /** The last 30 days, or null when there is not enough to say. */
+  insights?: InsightsHomeSummary | null;
 }) {
   return (
     <div className="flex flex-col">
@@ -55,7 +56,7 @@ export function OwnerHome({
       {model.kind === "empty" ? (
         <EmptyHome model={model} seenDone={seenDone} />
       ) : (
-        <ActiveHome model={model} unreadItems={unreadItems} insightsLine={insightsLine} />
+        <ActiveHome model={model} unreadItems={unreadItems} insights={insights} />
       )}
     </div>
   );
@@ -251,11 +252,11 @@ function SetupSteps({
 function ActiveHome({
   model,
   unreadItems,
-  insightsLine,
+  insights,
 }: {
   model: HomeModel;
   unreadItems: FeedbackItem[];
-  insightsLine: string | null;
+  insights: InsightsHomeSummary | null;
 }) {
   const [firstAttention, ...otherAttentions] = model.attentions;
 
@@ -284,30 +285,35 @@ function ActiveHome({
         {otherAttentions.length > 0 ? <AlsoNeeds attentions={otherAttentions} /> : null}
       </section>
 
-      {model.headline ? (
-        <section aria-label="This week">
-          <p className="text-lg font-semibold tracking-[-0.01em] text-ink">{model.headline}</p>
-        </section>
-      ) : null}
-
-      {/* One quiet line, never a chart: Home answers "does anything need me",
-          and this only points to where the longer answer lives. */}
-      {insightsLine ? (
-        <section>
-          <Link
-            href="/feedback/insights"
-            className="group -mx-2 flex min-h-14 items-center gap-3 rounded-[var(--radius-control)] px-2 transition-colors hover:bg-quiet active:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-muted">Last 30 days</span>
-              <span className="block text-base text-ink">{insightsLine}</span>
-              <span className="sr-only"> · View insights</span>
-            </span>
-            <ChevronRight
-              aria-hidden="true"
-              className="size-5 shrink-0 text-muted transition-transform duration-150 group-hover:translate-x-0.5"
+      {model.week || insights ? (
+        <section aria-label="Your numbers" className="grid max-w-[36rem] grid-cols-2 gap-3">
+          {model.week ? (
+            <NumberTile
+              href="/feedback?show=all"
+              label="This week"
+              value={String(model.week.count)}
+              unit={model.week.count === 1 ? "rating" : "ratings"}
+              note={model.week.change}
+              action="See all feedback"
+              testId="home-week"
             />
-          </Link>
+          ) : null}
+          {/* Numbers, never a chart: Home answers "does anything need me", and
+              this only points to where the longer answer lives. */}
+          {insights ? (
+            <NumberTile
+              href="/feedback/insights"
+              label="Last 30 days"
+              value={insights.average}
+              star
+              unit="average"
+              note={[`${insights.total} ${insights.total === 1 ? "rating" : "ratings"}`, insights.direction]
+                .filter(Boolean)
+                .join(" · ")}
+              action="View insights"
+              testId="home-month"
+            />
+          ) : null}
         </section>
       ) : null}
 
@@ -334,6 +340,54 @@ function ActiveHome({
         </Link>
       </section>
     </div>
+  );
+}
+
+/**
+ * One number an owner can read from arm's length: what it counts, the number
+ * big, the word for it, and one quiet line of context. The whole tile is the
+ * link, so a thumb finds it anywhere on it.
+ */
+function NumberTile({
+  href,
+  label,
+  value,
+  unit,
+  note,
+  star = false,
+  action,
+  testId,
+}: {
+  href: string;
+  label: string;
+  value: string;
+  unit: string;
+  note: string | null;
+  star?: boolean;
+  action: string;
+  testId: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex min-h-36 flex-col rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:bg-quiet active:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+      data-testid={testId}
+    >
+      <span className="flex items-center justify-between gap-2 text-sm font-medium text-muted">
+        {label}
+        <ChevronRight
+          aria-hidden="true"
+          className="size-4 shrink-0 transition-transform duration-150 group-hover:translate-x-0.5"
+        />
+      </span>
+      <span className="mt-3 flex items-center gap-1.5">
+        <span className="text-[2.5rem] font-semibold leading-none tracking-[-0.03em] tabular-nums text-ink">{value}</span>
+        {star ? <Star aria-hidden="true" className="size-7 fill-star text-star" strokeWidth={0} /> : null}
+      </span>
+      <span className="mt-1.5 text-base font-medium text-ink">{unit}</span>
+      {note ? <span className="mt-1 text-sm leading-snug text-muted">{note}</span> : null}
+      <span className="sr-only">. {action}</span>
+    </Link>
   );
 }
 

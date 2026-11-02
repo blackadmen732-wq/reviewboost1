@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 
+import { Breadcrumbs } from "@/features/public/breadcrumbs";
 import { PublicShell } from "@/features/public/public-shell";
+import type { PublicRoute } from "@/lib/site";
 
 export function PublicArticle({
   title,
@@ -10,6 +12,7 @@ export function PublicArticle({
   marketing = false,
   actions,
   currentPath,
+  breadcrumb,
 }: {
   title: string;
   lede?: string;
@@ -18,6 +21,8 @@ export function PublicArticle({
   marketing?: boolean;
   actions?: ReactNode;
   currentPath?: string;
+  /** The page's own route, for the "ReviewBoost / Page" trail. Indexable pages only. */
+  breadcrumb?: PublicRoute;
 }) {
   return (
     <PublicShell currentPath={currentPath}>
@@ -29,6 +34,7 @@ export function PublicArticle({
         }
       >
         <header className={marketing ? "public-article__intro" : undefined}>
+          {breadcrumb ? <Breadcrumbs path={breadcrumb} /> : null}
           <h1
             className={
               marketing
@@ -56,7 +62,7 @@ export function PublicArticle({
           className={
             marketing
               ? "public-article__body"
-              : "mt-10 flex flex-col gap-5 text-base leading-relaxed text-ink [&_h2]:mt-6 [&_h2]:text-base [&_h2]:font-semibold [&_p]:max-w-[42ch] [&_p]:text-muted"
+              : "mt-10 flex flex-col gap-5 text-base leading-relaxed text-ink [&_h2]:mt-6 [&_h2]:text-base [&_h2]:font-semibold [&_p]:max-w-[42ch] [&_p]:text-muted [&_ul]:flex [&_ul]:max-w-[42ch] [&_ul]:list-disc [&_ul]:flex-col [&_ul]:gap-2 [&_ul]:pl-5 [&_ul]:text-muted [&_li]:pl-1 [&_li]:marker:text-[color:var(--rb-border-strong)]"
           }
         >
           {children}

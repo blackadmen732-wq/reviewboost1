@@ -8,7 +8,7 @@ import { OwnerShell } from "@/features/dashboard/owner-shell";
 import { InstallPrompt } from "@/features/dashboard/install-prompt";
 import { parseSetupSeen, SETUP_SEEN_COOKIE } from "@/features/dashboard/setup-seen-cookie";
 import { permissionsFor } from "@/lib/owner/permissions";
-import { insightsHomeLine } from "@/lib/owner/insights";
+import { insightsHomeSummary } from "@/lib/owner/insights";
 import {
   getFeedbackInsights,
   getOwnerCounts,
@@ -68,7 +68,7 @@ export default async function HomePage() {
       <OwnerHome
         businessName={organization.name}
         model={model}
-        insightsLine={insightsHomeLine(insights)}
+        insights={insightsHomeSummary(insights)}
         seenDone={parseSetupSeen((await cookies()).get(SETUP_SEEN_COOKIE)?.value)}
         unreadItems={unread.items.map((item) => ({
           id: item.responseId,

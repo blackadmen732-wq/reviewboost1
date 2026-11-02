@@ -62,15 +62,22 @@ function checkoutTerms(
   return `Charged $${plan.price} when you subscribe. No trial.`;
 }
 
-function formatDate(value: string | null): string | null {
+/**
+ * A billing date in the business's own time zone. The server renders this
+ * page in UTC and the browser in the owner's zone, so without a fixed zone
+ * the two could print different days and React would report a mismatch.
+ */
+function formatDate(value: string | null, timeZone: string | undefined): string | null {
   if (!value) return null;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const options = { year: "numeric", month: "long", day: "numeric" } as const;
+  try {
+    return parsed.toLocaleDateString("en-US", { ...options, timeZone: timeZone ?? "UTC" });
+  } catch {
+    // An unknown zone name: a correct date in UTC beats no date at all.
+    return parsed.toLocaleDateString("en-US", { ...options, timeZone: "UTC" });
+  }
 }
 
 /**
@@ -80,13 +87,13 @@ function formatDate(value: string | null): string | null {
  * close a business's door, and telling an owner their Tags are dead when they
  * are not would send them to replace hardware that is fine.
  */
-function describe(billing: Billing): {
+function describe(billing: Billing, timeZone: string | undefined): {
   title: string;
   body: string;
   tone: "info" | "error";
 } {
-  const periodEnd = formatDate(billing.currentPeriodEnd);
-  const trialEnd = formatDate(billing.trialEndsAt);
+  const periodEnd = formatDate(billing.currentPeriodEnd, timeZone);
+  const trialEnd = formatDate(billing.trialEndsAt, timeZone);
 
   switch (billing.status) {
     case "trialing":
@@ -265,15 +272,18 @@ export function BillingPanel({
   billing,
   canManage,
   selectedPlan = null,
+  timeZone,
 }: {
   billing: Billing;
   canManage: boolean;
   selectedPlan?: PlanId | null;
+  /** The business's IANA time zone, so server and browser print the same day. */
+  timeZone?: string;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const state = describe(billing);
+  const state = describe(billing, timeZone);
   const badge = badgeFor(billing);
   // Anyone without a subscription behind them needs to start one. A trial
   // with no plan is a business that predates billing, not one that has paid.
@@ -339,7 +349,7 @@ export function BillingPanel({
   // main action at all.
   const recommended: PlanId | null =
     selectedPlan ?? (firstSubscription ? (PLANS.find((plan) => plan.trialDays > 0)?.id ?? null) : null);
-  const periodEnd = formatDate(billing.currentPeriodEnd);
+  const periodEnd = formatDate(billing.currentPeriodEnd, timeZone);
 
   // A real problem gets the red banner above everything; the card below then
   // only has to say which plan and offer the fix. Informational states say

@@ -47,12 +47,12 @@ export default async function ConnectionsPage() {
   }));
 
   return (
-    <OwnerShell unreadCount={unread} businessName={organization.name}>
+    <OwnerShell unreadCount={unread} businessName={organization.name} wide>
       <BackLink href="/settings">Settings</BackLink>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Connections</h1>
+        <h1 className="text-[1.75rem] font-semibold tracking-[-0.02em] text-ink">Connections</h1>
         <p className="mt-1 text-base text-muted">
-          Bring in customers from the apps you already use. Connecting an app never texts anyone.
+          Bring in customer names and phone numbers from the apps you already use. Connecting an app never texts anyone.
         </p>
       </div>
 

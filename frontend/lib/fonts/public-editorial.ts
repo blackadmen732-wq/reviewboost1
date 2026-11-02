@@ -3,10 +3,14 @@ import localFont from "next/font/local";
 /**
  * Public display typography; body/owner and customer fonts stay independent.
  *
- * Latin WOFF2 subsets of the upstream TTFs (see instrument-serif/README.md).
- * Both are preloaded because the homepage headline uses both, and they load at
- * high priority beside the hero image: 22 KB each instead of 37 KB of
- * compressed TTF, so the image the page is measured by arrives sooner.
+ * Latin WOFF2 subsets of the upstream TTFs (see instrument-serif/README.md):
+ * 22 KB each instead of 37 KB of compressed TTF.
+ *
+ * Not preloaded. The root 404 and error pages use the public shell, so a
+ * preload here was hoisted onto every route — the sign-in page, the owner app
+ * and the customer's rating page all downloaded a serif they never show. The
+ * public headline asks for it as it renders; `swap` keeps the text readable
+ * meanwhile and the fallback is metric-adjusted, so the headline does not jump.
  */
 export const publicEditorialFont = localFont({
   src: [
@@ -23,4 +27,5 @@ export const publicEditorialFont = localFont({
   ],
   variable: "--font-public-editorial",
   display: "swap",
+  preload: false,
 });

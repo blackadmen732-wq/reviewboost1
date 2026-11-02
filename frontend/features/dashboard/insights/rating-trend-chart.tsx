@@ -22,6 +22,49 @@ function oneDecimal(value: number): string {
   return (Math.round(value * 10) / 10).toFixed(1);
 }
 
+type PlotPoint = { index: number; x: number; y: number };
+
+/**
+ * A smooth line through every point that never bulges past them: the
+ * monotone cubic d3 calls curveMonotoneX (Steffen's method). Between two
+ * ratings the curve stays between their two values, so it shows no peak or
+ * dip the data does not have. Exported for tests.
+ */
+export function monotonePath(points: readonly PlotPoint[]): string {
+  const n = points.length;
+  if (n === 0) return "";
+  const first = points[0]!;
+  if (n === 1) return `M ${first.x} ${first.y}`;
+  if (n === 2) return `M ${first.x} ${first.y} L ${points[1]!.x} ${points[1]!.y}`;
+
+  const secant: number[] = [];
+  for (let i = 0; i < n - 1; i += 1) {
+    const h = points[i + 1]!.x - points[i]!.x;
+    secant.push(h ? (points[i + 1]!.y - points[i]!.y) / h : 0);
+  }
+
+  const tangent: number[] = new Array<number>(n).fill(0);
+  for (let i = 1; i < n - 1; i += 1) {
+    const h0 = points[i]!.x - points[i - 1]!.x;
+    const h1 = points[i + 1]!.x - points[i]!.x;
+    const s0 = secant[i - 1]!;
+    const s1 = secant[i]!;
+    const p = (s0 * h1 + s1 * h0) / (h0 + h1);
+    tangent[i] = (Math.sign(s0) + Math.sign(s1)) * Math.min(Math.abs(s0), Math.abs(s1), 0.5 * Math.abs(p)) || 0;
+  }
+  tangent[0] = (3 * secant[0]! - tangent[1]!) / 2;
+  tangent[n - 1] = (3 * secant[n - 2]! - tangent[n - 2]!) / 2;
+
+  let d = `M ${first.x} ${first.y}`;
+  for (let i = 0; i < n - 1; i += 1) {
+    const a = points[i]!;
+    const b = points[i + 1]!;
+    const third = (b.x - a.x) / 3;
+    d += ` C ${a.x + third} ${a.y + third * tangent[i]!} ${b.x - third} ${b.y - third * tangent[i + 1]!} ${b.x} ${b.y}`;
+  }
+  return d;
+}
+
 function ratingsWord(count: number): string {
   return `${count} ${count === 1 ? "rating" : "ratings"}`;
 }
@@ -45,8 +88,9 @@ function tickIndices(count: number, unit: "day" | "week"): number[] {
  * --------------
  * - Every point is a real day (or week) of ratings. A day nobody rated is a
  *   gap; the line never crosses it and nothing is interpolated.
- * - Segments are straight, joins softened only at the corner: no smoothing
- *   curve implying ratings that happened between measurements.
+ * - The line is a smooth curve through every point (monotone cubic): it never
+ *   rises above or dips below the two ratings it joins, so the smoothness
+ *   adds no peak or dip that did not happen.
  * - The top of the scale is always 5 and the bottom is 3, or lower when the
  *   data goes lower — always a whole-number rating with a labelled gridline at
  *   every whole number in between. A 0.2 change is at most a tenth of the
@@ -90,8 +134,8 @@ export function RatingTrendChart({
   const xOf = (index: number) => ((index + 0.5) / count) * 100;
 
   // Consecutive rated points join; a gap starts a new run.
-  const runs: Array<Array<{ index: number; x: number; y: number }>> = [];
-  let run: Array<{ index: number; x: number; y: number }> = [];
+  const runs: PlotPoint[][] = [];
+  let run: PlotPoint[] = [];
   points.forEach((point, index) => {
     if (point.average === null) {
       if (run.length > 0) runs.push(run);
@@ -144,6 +188,10 @@ export function RatingTrendChart({
   const before = lastIndex !== null && lastIndex > 0 ? points[lastIndex - 1]?.average ?? null : null;
   const labelBelow = last?.average != null && before !== null && before > last.average;
   const edge = (x: number) => (x > 80 ? "-translate-x-full" : x < 20 ? "translate-x-0" : "-translate-x-1/2");
+  // A date ("Oct 26") is short, so it stays centred under its point unless it
+  // would run off the plot. Pulling the last one in at 80% left it crowding
+  // the date before it.
+  const tickEdge = (x: number) => (x > 93 ? "-translate-x-full" : x < 7 ? "translate-x-0" : "-translate-x-1/2");
 
   return (
     <figure className="m-0">
@@ -200,15 +248,11 @@ export function RatingTrendChart({
                 blocks, so those go without. */}
             {runs.map((segment, index) =>
               segment.length >= areaRun ? (
-                <polygon
+                <path
                   key={`area-${index}`}
-                  points={[
-                    ...segment.map((point) => `${point.x},${point.y}`),
-                    `${segment.at(-1)!.x},${BOTTOM}`,
-                    `${segment[0]!.x},${BOTTOM}`,
-                  ].join(" ")}
+                  d={`${monotonePath(segment)} L ${segment.at(-1)!.x} ${BOTTOM} L ${segment[0]!.x} ${BOTTOM} Z`}
                   fill="var(--rb-ink)"
-                  fillOpacity="0.035"
+                  fillOpacity="0.05"
                   data-testid="trend-area"
                 />
               ) : null,
@@ -229,9 +273,9 @@ export function RatingTrendChart({
 
             {runs.map((segment, index) =>
               segment.length > 1 ? (
-                <polyline
+                <path
                   key={`line-${index}`}
-                  points={segment.map((point) => `${point.x},${point.y}`).join(" ")}
+                  d={monotonePath(segment)}
                   fill="none"
                   stroke="var(--rb-ink)"
                   strokeWidth="2.5"
@@ -304,7 +348,7 @@ export function RatingTrendChart({
           {tickIndices(count, unit).filter((index) => points[index]?.tick).map((index) => (
             <span
               key={index}
-              className={cn("absolute top-0 whitespace-nowrap", edge(xOf(index)))}
+              className={cn("absolute top-0 whitespace-nowrap tabular-nums", tickEdge(xOf(index)))}
               style={{ left: `${xOf(index)}%` }}
               data-testid="trend-tick"
             >

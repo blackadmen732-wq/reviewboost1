@@ -37,6 +37,11 @@ const visitHeadingFont = localFont({
   variable: "--font-visit-heading",
   weight: "100 900",
   display: "swap",
+  // Not preloaded: the bundler hoists every preload to the routes around it,
+  // so a preload here made the sign-in page and every owner page download
+  // the customer page's faces too. The page that shows them asks for them as
+  // it renders, and the fallback is metric-matched, so nothing jumps.
+  preload: false,
 });
 
 /**
@@ -50,6 +55,7 @@ const visitCapsFont = localFont({
   variable: "--font-visit-caps",
   weight: "100 1000",
   display: "swap",
+  preload: false,
 });
 
 export interface CustomerVisitViewProps {

@@ -210,7 +210,8 @@ export function TextRequestComposer({
       setPhone("");
       setCustomer(null);
       setPreview(null);
-      notify.success("Queued", "We will send it and show the result here.");
+      // The same word the row under Recent shows, so the two never disagree.
+      notify.success("Scheduled", "It goes out shortly. Its status shows under Recent.");
       router.refresh();
     } catch (caught) {
       // The notice above says what to do; the cause is only worth naming when
@@ -419,7 +420,7 @@ export function TextRequestComposer({
                   <input
                     type="radio"
                     name="text-request-template"
-                    className="mt-1 accent-action"
+                    className="mt-0.5 size-5 shrink-0 accent-action"
                     value={id}
                     checked={templateId === id}
                     onChange={() => {
@@ -452,13 +453,28 @@ export function TextRequestComposer({
                 >
                   What ••• {preview.recipientLastFour} will get
                 </h3>
-                <p className="whitespace-pre-wrap break-words text-base text-ink">
-                  {preview.body}
-                </p>
+                {/* As it lands on their phone: one grey message bubble, the
+                    exact text the server will send, link and all. */}
+                <div className="rounded-[20px] bg-quiet px-3 py-4" data-testid="text-preview-phone">
+                  <p className="mb-2 text-center text-xs font-medium text-muted">
+                    Text message
+                  </p>
+                  <p className="max-w-[88%] whitespace-pre-wrap break-words rounded-[18px] rounded-bl-[6px] border border-border bg-surface px-4 py-3 text-base leading-snug text-ink">
+                    {preview.body.split(/(https?:\/\/\S+)/).map((part, index) =>
+                      index % 2 === 1 ? (
+                        <span key={index} className="text-brand-text underline underline-offset-2">
+                          {part}
+                        </span>
+                      ) : (
+                        part
+                      ),
+                    )}
+                  </p>
+                </div>
                 <p className="text-sm text-muted">
                   Counts as {preview.segments}{" "}
                   {preview.segments === 1 ? "text" : "texts"}. You have{" "}
-                  {balance.total.toLocaleString()} left.
+                  {balance.total.toLocaleString("en-US")} left.
                 </p>
               </section>
             ) : null}
@@ -495,7 +511,7 @@ export function TextRequestComposer({
                       <input
                         type="radio"
                         name="consent-method"
-                        className="accent-action"
+                        className="size-5 shrink-0 accent-action"
                         value={id}
                         checked={consentMethod === id}
                         onChange={() => setConsentMethod(id)}
@@ -508,7 +524,7 @@ export function TextRequestComposer({
                   <input
                     type="checkbox"
                     disabled={busy}
-                    className="mt-1 accent-action"
+                    className="mt-0.5 size-5 shrink-0 accent-action"
                     checked={consentConfirmed}
                     onChange={(event) =>
                       setConsentConfirmed(event.target.checked)
@@ -546,7 +562,7 @@ export function TextRequestComposer({
                 <p>
                   This needs {preview.segments}{" "}
                   {preview.segments === 1 ? "text" : "texts"} and you have{" "}
-                  {balance.total.toLocaleString()} left.
+                  {balance.total.toLocaleString("en-US")} left.
                 </p>
                 <Link
                   href="/settings/billing"
@@ -633,7 +649,7 @@ function BalanceLine({
     <section aria-label="Texts left">
       <p className="flex items-baseline gap-2">
         <span className="text-[2rem] font-semibold leading-none tracking-[-0.03em] text-ink tabular-nums">
-          {balance.total.toLocaleString()}
+          {balance.total.toLocaleString("en-US")}
         </span>
         <span className="text-base text-muted">
           {balance.total === 1 ? "text left" : "texts left"}
@@ -646,8 +662,8 @@ function BalanceLine({
       ) : null}
       {balance.purchased > 0 ? (
         <p className="mt-2 text-sm text-muted">
-          {balance.monthly.toLocaleString()} from this month&apos;s plan, used
-          first · {balance.purchased.toLocaleString()} purchased, kept until
+          {balance.monthly.toLocaleString("en-US")} from this month&apos;s plan, used
+          first · {balance.purchased.toLocaleString("en-US")} purchased, kept until
           used
         </p>
       ) : null}

@@ -23,7 +23,7 @@ const SUPPORT_EMAIL = "help@reviewboost.fit";
  */
 export default function TermsPage() {
   return (
-    <PublicArticle title="Terms of Service" lede={`Last updated ${LAST_UPDATED}.`}>
+    <PublicArticle breadcrumb="/terms" title="Terms of Service" lede={`Last updated ${LAST_UPDATED}.`}>
       <p>
         These terms cover your use of ReviewBoost. By creating an account you agree to
         them. If you are accepting on behalf of a business, you confirm you are allowed to

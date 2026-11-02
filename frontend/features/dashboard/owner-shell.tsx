@@ -6,6 +6,7 @@ import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
 import { BottomNav } from "@/features/dashboard/bottom-nav";
 import { DesktopSidebar } from "@/features/dashboard/desktop-sidebar";
 import { PageTransition } from "@/features/dashboard/page-transition";
+import { cn } from "@/lib/utils/cn";
 
 /**
  * Owner chrome. Nav recedes; the work column dominates.
@@ -18,11 +19,17 @@ export function OwnerShell({
   children,
   unreadCount,
   businessName,
+  wide = false,
 }: {
   children: ReactNode;
   /** The Feedback badge. Absent on loading and error screens: the nav keeps the last one. */
   unreadCount?: number | undefined;
   businessName?: string | undefined;
+  /**
+   * A grid page (Connections) gets more width on a large screen, so its cards
+   * sit three across. Reading pages keep the narrow column.
+   */
+  wide?: boolean;
 }) {
   return (
     <div className="min-h-dvh bg-canvas">
@@ -49,7 +56,14 @@ export function OwnerShell({
             Settings
           </Link>
         </header>
-        <main id="owner-content" tabIndex={-1} className="mx-auto w-full max-w-[var(--rb-content)] px-5 pb-28 pt-6 lg:px-8 lg:pb-16 lg:pt-12">
+        <main
+          id="owner-content"
+          tabIndex={-1}
+          className={cn(
+            "mx-auto w-full px-5 pb-28 pt-6 lg:px-8 lg:pb-16 lg:pt-12",
+            wide ? "max-w-[var(--rb-content-wide)]" : "max-w-[var(--rb-content)]",
+          )}
+        >
           <PageTransition>{children}</PageTransition>
         </main>
       </div>

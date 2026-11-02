@@ -90,7 +90,7 @@ export interface HomeModel {
   showPreview: boolean;
   previewStandId: string | null;
   tagStatus: TagStatus;
-  headline: string | null;
+  week: WeekNumbers | null;
 }
 
 export function isHomeEmpty(counts: Pick<HomeCounts, "recentCount" | "ratingsToday">): boolean {
@@ -288,7 +288,7 @@ export function deriveHomeModel({
     showPreview: hasStand && canManage,
     previewStandId: previewStand?.standId ?? null,
     tagStatus: tags,
-    headline: ratingsHeadline(counts),
+    week: weekNumbers(counts),
   };
 }
 
@@ -306,18 +306,24 @@ export function unreadBody(unread: number, low: number | undefined): string {
   return `${low} ${low === 1 ? "is" : "are"} 3 stars or fewer. ${rush}`;
 }
 
-export function ratingsHeadline(counts: Pick<HomeCounts, "ratingsThisWeek" | "ratingsLastWeek">): string | null {
+/**
+ * This week's count, and how it compares, in words. "Down 1" made people ask
+ * "down 1 what?", so the comparison names last week every time.
+ */
+export interface WeekNumbers {
+  count: number;
+  /** "3 more than last week", "1 fewer than last week", "Same as last week". */
+  change: string | null;
+}
+
+export function weekNumbers(counts: Pick<HomeCounts, "ratingsThisWeek" | "ratingsLastWeek">): WeekNumbers | null {
   const thisWeek = counts.ratingsThisWeek;
   if (thisWeek == null) return null;
   const lastWeek = counts.ratingsLastWeek ?? 0;
-  const word = thisWeek === 1 ? "rating" : "ratings";
-  if (lastWeek === 0) {
-    return thisWeek === 0 ? null : `${thisWeek} ${word} this week`;
-  }
+  if (lastWeek === 0) return thisWeek === 0 ? null : { count: thisWeek, change: null };
   const delta = thisWeek - lastWeek;
-  if (delta === 0) return `${thisWeek} ${word} this week, same as last week`;
-  if (delta > 0) return `${thisWeek} ${word} this week, up ${delta}`;
-  return `${thisWeek} ${word} this week, down ${Math.abs(delta)}`;
+  if (delta === 0) return { count: thisWeek, change: "Same as last week" };
+  return { count: thisWeek, change: `${Math.abs(delta)} ${delta > 0 ? "more" : "fewer"} than last week` };
 }
 
 export function tagStatusLine(status: TagStatus): string {

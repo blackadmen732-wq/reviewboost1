@@ -19,6 +19,7 @@ export default function ProductPage() {
     <PublicArticle
       marketing
       currentPath="/product"
+      breadcrumb="/product"
       title="Tags"
       lede={PRODUCT.lede}
       media={<ProductDemo hero />}

@@ -9,12 +9,12 @@ import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { notify } from "@/components/ui/toast";
 import {
-  formatWhen,
   issueLabel,
   runLabel,
   runStatusLabel,
   stateLabel,
 } from "@/features/connections/connection-words";
+import { When } from "@/features/connections/when";
 import { connectionsApi, errorMessage } from "@/features/connections/connections-api";
 import type {
   ConnectionSummary,
@@ -142,7 +142,7 @@ function NotConnected({ provider }: { provider: ProviderView }) {
               <legend className="mb-2 text-base font-semibold text-ink">What should we read?</legend>
               {provider.workflows.map((item) => (
                 <label key={item.id} className="flex items-center gap-3 rounded-[var(--radius-control)] border border-border p-3">
-                  <input type="radio" name="workflow" value={item.id} checked={workflowId === item.id} onChange={() => setWorkflowId(item.id)} />
+                  <input type="radio" name="workflow" className="size-5 shrink-0 accent-action" value={item.id} checked={workflowId === item.id} onChange={() => setWorkflowId(item.id)} />
                   <span className="text-base text-ink">{item.label}</span>
                 </label>
               ))}
@@ -424,7 +424,7 @@ function Connected({ provider, connection, mappings, runs, issues }: ConnectionD
         </div>
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
           <dt className="text-muted">Last updated</dt>
-          <dd className="text-ink">{formatWhen(connection.lastSuccessAt)}</dd>
+          <dd className="text-ink"><When value={connection.lastSuccessAt} /></dd>
           <dt className="text-muted">Places</dt>
           <dd className="text-ink">{mappings.map((mapping) => mapping.externalLocationName ?? mapping.externalLocationId).join(", ") || "None"}</dd>
         </dl>
@@ -488,7 +488,7 @@ function Connected({ provider, connection, mappings, runs, issues }: ConnectionD
                   <span className="min-w-0">
                     <span className="block text-ink">{runLabel(run.kind)}</span>
                     <span className="block text-muted">
-                      {formatWhen(run.finishedAt ?? run.createdAt)} · {added} customers, {visits} visits
+                      <When value={run.finishedAt ?? run.createdAt} /> · {added} customers, {visits} visits
                     </span>
                   </span>
                   <span className="shrink-0 text-muted">{runStatusLabel(run.status)}</span>

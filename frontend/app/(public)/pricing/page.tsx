@@ -22,7 +22,7 @@ export const metadata: Metadata = publicPageMetadata({
 export default function PricingPage() {
   return (
     <PublicShell currentPath="/pricing">
-      <PricingSection as="h1" headline={PRICING.headline} lede={PRICING.lede} />
+      <PricingSection as="h1" breadcrumb headline={PRICING.headline} lede={PRICING.lede} />
 
       <section
         aria-labelledby="how-we-charge"

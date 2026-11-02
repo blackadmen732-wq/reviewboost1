@@ -51,7 +51,7 @@ export function PublicShell({
                 key={item.href}
                 href={item.href}
                 aria-current={currentPath === item.href ? "page" : undefined}
-                className="text-sm font-medium text-muted transition-colors duration-150 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-muted transition-colors duration-150 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
               >
                 {item.label}
               </Link>
@@ -61,7 +61,7 @@ export function PublicShell({
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href={SIGN_IN_HREF}
-              className="hidden text-sm font-medium text-muted transition-colors duration-150 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] sm:inline"
+              className="hidden min-h-11 items-center text-sm font-medium text-muted transition-colors duration-150 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] sm:inline-flex"
             >
               Sign in
             </Link>
@@ -101,12 +101,14 @@ export function PublicShell({
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-[1080px] flex-col gap-6 px-5 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <ReviewBoostLogo pose="full" size="footer" />
-          <nav className="flex flex-wrap gap-x-6 gap-y-3" aria-label="Legal">
+          {/* Each link is a full 44px row so a thumb never lands on the wrong
+              one; the rows sit flush, so the list is no taller to look at. */}
+          <nav className="flex flex-wrap gap-x-6" aria-label="Legal">
             {PUBLIC_FOOTER.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="text-sm text-muted transition-colors duration-150 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+                className="inline-flex min-h-11 items-center text-sm text-muted transition-colors duration-150 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
               >
                 {item.label}
               </Link>

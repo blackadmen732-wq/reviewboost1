@@ -52,6 +52,8 @@ export interface ProviderDefinition {
   displayName: string;
   /** Short mark for the card when there is no logo asset. */
   monogram: string;
+  /** The company's own site, shown as a plain link on the card (no scheme). */
+  website?: string;
   categories: readonly Category[];
   summary: string;
   dataRead: readonly string[];
@@ -65,6 +67,7 @@ const SQUARE: ProviderDefinition = {
   connectKind: "oauth",
   displayName: "Square",
   monogram: "Sq",
+  website: "squareup.com",
   categories: ["lists", "pos"],
   summary: "Bring customer names and phone numbers from your Square account.",
   dataRead: ["Customer names", "Customer phone numbers"],
@@ -117,12 +120,20 @@ const FAKE: ProviderDefinition = {
   ],
 };
 
-function planned(id: string, displayName: string, monogram: string, categories: Category[], summary: string): ProviderDefinition {
+function planned(
+  id: string,
+  displayName: string,
+  monogram: string,
+  website: string,
+  categories: Category[],
+  summary: string,
+): ProviderDefinition {
   return {
     id,
     connectKind: "oauth",
     displayName,
     monogram,
+    website,
     categories,
     summary,
     dataRead: [],
@@ -133,11 +144,18 @@ function planned(id: string, displayName: string, monogram: string, categories: 
 }
 
 const PLANNED: readonly ProviderDefinition[] = [
-  planned("vagaro", "Vagaro", "V", ["lists", "salon"], "Bring in your salon customer contacts."),
-  planned("toast", "Toast", "To", ["lists", "pos"], "Bring in restaurant customer contacts."),
-  planned("clover", "Clover", "Cl", ["lists", "pos"], "Bring in customer contacts from Clover."),
-  planned("mindbody", "Mindbody", "M", ["lists", "fitness"], "Bring in your studio customer contacts."),
-  planned("google_contacts", "Google Contacts", "GC", ["lists"], "Bring in customers saved in Google Contacts."),
+  planned("vagaro", "Vagaro", "V", "vagaro.com", ["lists", "salon"], "Bring in your salon customer contacts."),
+  planned("toast", "Toast", "To", "toasttab.com", ["lists", "pos"], "Bring in restaurant customer contacts."),
+  planned("clover", "Clover", "Cl", "clover.com", ["lists", "pos"], "Bring in customer contacts from Clover."),
+  planned("mindbody", "Mindbody", "M", "mindbodyonline.com", ["lists", "fitness"], "Bring in your studio customer contacts."),
+  planned(
+    "google_contacts",
+    "Google Contacts",
+    "GC",
+    "contacts.google.com",
+    ["lists"],
+    "Bring in customers saved in Google Contacts.",
+  ),
 ];
 
 /**
@@ -160,6 +178,7 @@ function googleSheets(): ProviderDefinition {
     connectKind: "list",
     displayName: "Google Sheets",
     monogram: "GS",
+    website: "sheets.google.com",
     categories: ["lists"],
     summary: "Bring in customers from a Google Sheet you already keep.",
     dataRead: ["Only the one sheet you pick", "Names and phone numbers in it"],

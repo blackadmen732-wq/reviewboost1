@@ -212,3 +212,60 @@ describe("social cards and canonicals resolve", () => {
     expect(layout).toContain("/brand/icon-32.png");
   });
 });
+
+describe("the favicon set", () => {
+  const layout = readFileSync(join(ROOT, "app/layout.tsx"), "utf8");
+
+  it("declares .ico, SVG, PNG and the iOS home-screen icon, and every file exists", () => {
+    for (const file of ["/favicon.ico", "/brand/icon.svg", "/brand/icon-16.png", "/brand/icon-32.png", "/brand/icon-192.png", "/brand/icon-180.png"]) {
+      expect(layout).toContain(file);
+      expect(() => readFileSync(join(ROOT, "public", file))).not.toThrow();
+    }
+  });
+
+  it("ships a real multi-size .ico, which browsers ask for before reading any tag", () => {
+    const ico = readFileSync(join(ROOT, "public/favicon.ico"));
+    expect(ico.readUInt16LE(2)).toBe(1); // an icon, not a cursor
+    expect(ico.readUInt16LE(4)).toBeGreaterThanOrEqual(2); // more than one size
+  });
+});
+
+describe("breadcrumbs", () => {
+  it("gives every inner public page a two-step trail, home first", async () => {
+    const { breadcrumbJsonLd, breadcrumbLabel } = await import("@/features/public/breadcrumbs");
+    const data = JSON.parse(breadcrumbJsonLd("/pricing")) as {
+      "@type": string;
+      itemListElement: Array<{ position: number; name: string; item: string }>;
+    };
+    expect(data["@type"]).toBe("BreadcrumbList");
+    expect(data.itemListElement.map((entry) => [entry.position, entry.name, entry.item])).toEqual([
+      [1, "ReviewBoost", absoluteUrl("/")],
+      [2, "Pricing", absoluteUrl("/pricing")],
+    ]);
+    expect(breadcrumbLabel("/delete-account")).toBe("Delete account");
+  });
+
+  it("is on every indexable page except the homepage", () => {
+    const pages: Record<string, string> = {
+      "/product": "app/(public)/product/page.tsx",
+      "/how-it-works": "app/(public)/how-it-works/page.tsx",
+      "/integrity": "app/(public)/integrity/page.tsx",
+      "/security": "app/(public)/security/page.tsx",
+      "/privacy": "app/(public)/privacy/page.tsx",
+      "/terms": "app/(public)/terms/page.tsx",
+      "/delete-account": "app/(public)/delete-account/page.tsx",
+      "/support": "app/support/page.tsx",
+    };
+    for (const [route, file] of Object.entries(pages)) {
+      const source = readFileSync(join(ROOT, file), "utf8");
+      expect(source.includes(`breadcrumb="${route}"`) || source.includes(`<Breadcrumbs path="${route}"`), file).toBe(true);
+    }
+    expect(readFileSync(join(ROOT, "app/(public)/pricing/page.tsx"), "utf8")).toContain("breadcrumb ");
+  });
+});
+
+describe("production build", () => {
+  it("never ships source maps to the browser", () => {
+    expect(readFileSync(join(ROOT, "next.config.ts"), "utf8")).toContain("productionBrowserSourceMaps: false");
+  });
+});

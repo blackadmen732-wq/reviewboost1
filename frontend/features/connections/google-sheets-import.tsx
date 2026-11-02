@@ -8,7 +8,7 @@ import { AlertDialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { notify } from "@/components/ui/toast";
-import { formatWhen } from "@/features/connections/connection-words";
+import { When } from "@/features/connections/when";
 import { connectionsApi, errorMessage } from "@/features/connections/connections-api";
 import {
   columnLabels,
@@ -384,13 +384,13 @@ function Review({
       <p className="mt-3 text-sm text-muted">
         {rows.length === 0
           ? "We didn't find anyone in that tab."
-          : `${rows.length.toLocaleString()} ${rows.length === 1 ? "row" : "rows"}, ${withPhone.toLocaleString()} with a phone number.`}
+          : `${rows.length.toLocaleString("en-US")} ${rows.length === 1 ? "row" : "rows"}, ${withPhone.toLocaleString("en-US")} with a phone number.`}
       </p>
 
       {tooMany ? (
         <div className="mt-4">
           <InlineNotice kind="error">
-            This tab has more than {MAX_SHEET_ROWS.toLocaleString()} people. Split it into smaller tabs and add them one at a time.
+            This tab has more than {MAX_SHEET_ROWS.toLocaleString("en-US")} people. Split it into smaller tabs and add them one at a time.
           </InlineNotice>
         </div>
       ) : null}
@@ -423,9 +423,9 @@ function Done({ source, title, result, onAnother }: { source: ListSource; title:
   }, [router]);
 
   const parts = [
-    result.created ? `${result.created.toLocaleString()} new` : null,
-    result.updated ? `${result.updated.toLocaleString()} updated` : null,
-    result.unchanged ? `${result.unchanged.toLocaleString()} already here` : null,
+    result.created ? `${result.created.toLocaleString("en-US")} new` : null,
+    result.updated ? `${result.updated.toLocaleString("en-US")} updated` : null,
+    result.unchanged ? `${result.unchanged.toLocaleString("en-US")} already here` : null,
   ].filter(Boolean);
 
   return (
@@ -437,7 +437,7 @@ function Done({ source, title, result, onAnother }: { source: ListSource; title:
       <p className="mt-1 text-base text-ink">{parts.length ? parts.join(" · ") : "Nobody new."}</p>
       {result.unusableCount > 0 ? (
         <div className="mt-4">
-          <InlineNotice title={`${result.unusableCount.toLocaleString()} ${result.unusableCount === 1 ? "row wasn't" : "rows weren't"} added`}>
+          <InlineNotice title={`${result.unusableCount.toLocaleString("en-US")} ${result.unusableCount === 1 ? "row wasn't" : "rows weren't"} added`}>
             {result.unusable.some((item) => item.reason === "invalid_phone")
               ? "The phone number couldn't be used (too short, too long, or not a real number), or there wasn't one. "
               : "There was no phone number. "}
@@ -493,8 +493,8 @@ function Lists({ lists }: { lists: readonly SheetListSummary[] }) {
             <div className="min-w-0 flex-1">
               <p className="truncate text-base font-medium text-ink">{list.label ?? "Customer list"}</p>
               <p className="text-sm text-muted">
-                {formatWhen(list.createdAt)} · {(list.created + list.updated + list.unchanged).toLocaleString()} people
-                {list.rowsUnusable ? ` · ${list.rowsUnusable.toLocaleString()} rows skipped` : ""}
+                <When value={list.createdAt} /> · {(list.created + list.updated + list.unchanged).toLocaleString("en-US")} people
+                {list.rowsUnusable ? ` · ${list.rowsUnusable.toLocaleString("en-US")} rows skipped` : ""}
               </p>
             </div>
             <Button variant="ghost" size="sm" className="w-auto shrink-0" onClick={() => setRemoving(list)}>

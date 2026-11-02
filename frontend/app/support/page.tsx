@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { Breadcrumbs } from "@/features/public/breadcrumbs";
 import { PublicShell } from "@/features/public/public-shell";
 import { publicPageMetadata } from "@/lib/site";
 
@@ -132,6 +133,7 @@ export default function SupportPage() {
   return (
     <PublicShell>
       <div className="mx-auto max-w-[44rem] px-5 py-16 sm:px-8 sm:py-20">
+        <Breadcrumbs path="/support" />
         <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-ink">Support</h1>
         <p className="mt-3 text-base leading-relaxed text-muted">
           Most problems are one of the things below. If yours is not, email{" "}
@@ -163,22 +165,22 @@ export default function SupportPage() {
           ))}
         </div>
 
-        <p className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+        <p className="mt-8 flex flex-wrap gap-x-6 text-sm">
           <Link
             href="/privacy"
-            className="font-medium text-muted underline-offset-4 hover:text-ink hover:underline"
+            className="inline-flex min-h-11 items-center font-medium text-muted underline-offset-4 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
           >
             Privacy
           </Link>
           <Link
             href="/terms"
-            className="font-medium text-muted underline-offset-4 hover:text-ink hover:underline"
+            className="inline-flex min-h-11 items-center font-medium text-muted underline-offset-4 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
           >
             Terms
           </Link>
           <Link
             href="/security"
-            className="font-medium text-muted underline-offset-4 hover:text-ink hover:underline"
+            className="inline-flex min-h-11 items-center font-medium text-muted underline-offset-4 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
           >
             Security
           </Link>

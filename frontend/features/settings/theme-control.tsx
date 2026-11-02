@@ -88,7 +88,8 @@ export function ThemeControl() {
             aria-checked={selected}
             onClick={() => applyChoice(option.value)}
             className={cn(
-              "min-h-11 min-w-[4.5rem] rounded-[9px] px-4 text-sm transition-[background-color,color,box-shadow] duration-150",
+              // Full width on a phone, where the group stretches across the card.
+              "min-h-11 min-w-[4.5rem] flex-1 rounded-[9px] px-4 text-sm transition-[background-color,color,box-shadow] duration-150 sm:flex-none",
               "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
               // Selected is a raised white segment in ink, like the phone's own
               // control. Green means "good" here and nothing else.

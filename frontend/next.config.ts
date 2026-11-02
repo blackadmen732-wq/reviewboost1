@@ -36,6 +36,9 @@ const nextConfig: NextConfig = {
     useTypeScriptCli: false,
   },
   poweredByHeader: false,
+  // Next's default, written down so nobody flips it for a debugging session
+  // and ships the original source to every visitor.
+  productionBrowserSourceMaps: false,
   reactStrictMode: true,
   async headers() {
     return [{ source: "/((?!api/).*)", headers: [...PAGE_SECURITY_HEADERS] }];

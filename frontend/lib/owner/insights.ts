@@ -476,13 +476,24 @@ export function ratingsCount(count: number): string {
  * direction appears only where a comparison was allowed. Home stays about what
  * needs doing; this is a pointer to Insights, not a second copy of it.
  */
-export function insightsHomeLine(
+/** The last 30 days as numbers, so Home can show the average big. */
+export interface InsightsHomeSummary {
+  /** One decimal, as Insights shows it: "4.1". */
+  average: string;
+  total: number;
+  /** "Improving", "About the same", "Declining", or null with nothing to compare. */
+  direction: string | null;
+}
+
+export function insightsHomeSummary(
   insights: Pick<FeedbackInsights, "state" | "current" | "comparison">,
-): string | null {
+): InsightsHomeSummary | null {
   if (insights.state !== "full" || insights.current.average === null) return null;
-  const parts = [`${formatAverage(insights.current.average)} average`, ratingsCount(insights.current.total)];
-  if (insights.comparison) parts.push(DIRECTION_LABEL[insights.comparison.direction]);
-  return parts.join(" · ");
+  return {
+    average: formatAverage(insights.current.average),
+    total: insights.current.total,
+    direction: insights.comparison ? DIRECTION_LABEL[insights.comparison.direction] : null,
+  };
 }
 
 /** What one trend point covers, in words: "day" or "week". */

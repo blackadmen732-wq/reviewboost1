@@ -74,9 +74,10 @@ html:has(.customer-live) {
   z-index: 2;
 }
 
+/* 44px: the smallest target a thumb hits reliably (Apple's own minimum). */
 .visit-language .language-selector,
 .visit-language .language-select {
-  min-height: 34px;
+  min-height: 44px;
   color: #fff;
   font-size: 0.8125rem;
 }
@@ -84,7 +85,7 @@ html:has(.customer-live) {
 /* Any artwork can sit behind the language control, including a white one, so
    it carries its own backing rather than trusting the photo for contrast. */
 .visit-language .language-selector {
-  min-height: 34px;
+  min-height: 44px;
   border-radius: 999px;
   background: rgb(10 12 11 / 48%);
 }

@@ -75,9 +75,30 @@ export function runStatusLabel(status: string): string {
   }
 }
 
-export function formatWhen(value: string | null): string {
+/**
+ * When something last happened, the way a person says it: "5 minutes ago"
+ * for the last few hours, then the date and time. In the viewer's own time
+ * zone, so it must run in the browser; `<When>` renders it after hydration.
+ */
+export function formatWhen(value: string | null, now: Date = new Date()): string {
   if (!value) return "Not yet";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Not yet";
+  const minutes = Math.floor((now.getTime() - date.getTime()) / 60_000);
+  if (minutes >= 0 && minutes < 1) return "Just now";
+  if (minutes >= 1 && minutes < 60) return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours >= 1 && hours < 6) return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
   return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+/**
+ * The same moment as a plain UTC date, identical on the server and in every
+ * browser. What the page shows before hydration, so the two never disagree.
+ */
+export function formatWhenStable(value: string | null): string {
+  if (!value) return "Not yet";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not yet";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }

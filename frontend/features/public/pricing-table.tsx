@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Breadcrumbs } from "@/features/public/breadcrumbs";
 import {
   EVERY_PLAN,
   PUBLIC_PLANS,
@@ -168,16 +169,20 @@ export function PricingSection({
   headline,
   lede,
   children,
+  breadcrumb = false,
 }: {
   as?: "h1" | "h2";
   headline: string;
   lede: string;
   children?: ReactNode;
+  /** The pricing page's own "ReviewBoost / Pricing" trail; never on the home page. */
+  breadcrumb?: boolean;
 }) {
   return (
     <section className="public-pricing border-y border-border">
       <div className="public-pricing__inner">
         <div className="public-pricing__intro">
+          {breadcrumb ? <Breadcrumbs path="/pricing" align="center" /> : null}
           <Heading className="public-display">{headline}</Heading>
           <p className="mx-auto mt-5 max-w-[40ch] text-lg leading-relaxed text-muted">
             {lede}

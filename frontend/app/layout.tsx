@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import type { ReactNode } from "react";
 
-import { Providers } from "@/components/providers";
 import {
   googleSiteVerification,
   SHARED_OPEN_GRAPH,
@@ -11,7 +10,6 @@ import {
   SITE_URL,
 } from "@/lib/site";
 import { PwaRegister } from "@/components/pwa-register";
-import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
 import "@/styles/customer-page.css";
 import "@/styles/public-product.css";
@@ -41,8 +39,17 @@ export const metadata: Metadata = {
   verification: googleSiteVerification(),
   // These point at the exported brand files so a manifest or a third party has
   // something stable to read.
+  // The full set: .ico for anything that asks for /favicon.ico, SVG for sharp
+  // tabs at any zoom, PNGs for the rest, and the 180px home-screen icon iOS
+  // uses for "Add to Home Screen".
   icons: {
-    icon: [{ url: "/brand/icon-32.png", sizes: "32x32", type: "image/png" }],
+    icon: [
+      { url: "/favicon.ico", sizes: "16x16 32x32 48x48" },
+      { url: "/brand/icon.svg", type: "image/svg+xml" },
+      { url: "/brand/icon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/brand/icon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
     apple: [{ url: "/brand/icon-180.png", sizes: "180x180", type: "image/png" }],
   },
   manifest: "/manifest.webmanifest",
@@ -95,8 +102,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className={GeistSans.className}>
-        <Providers>{children}</Providers>
-        <Toaster />
+        {/* Toasts and the data cache live in the route groups that use them
+            (owner and customer). The marketing pages need neither, and every
+            byte of script there is a byte a first visitor waits for. */}
+        {children}
         <PwaRegister />
       </body>
     </html>

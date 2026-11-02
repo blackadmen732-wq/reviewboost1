@@ -21,7 +21,7 @@ export const metadata: Metadata = publicPageMetadata({
  */
 export default function SecurityPage() {
   return (
-    <PublicArticle title={SECURITY.headline} lede={SECURITY.lede}>
+    <PublicArticle breadcrumb="/security" title={SECURITY.headline} lede={SECURITY.lede}>
       {/* The owner's answer first, in their words. The detail below is for
           whoever looks after their tech. */}
       <h2>In short</h2>

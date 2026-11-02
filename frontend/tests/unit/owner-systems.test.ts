@@ -10,7 +10,7 @@ import { lastUsedLabel, tagReadiness, tagReadinessLabel } from "@/lib/owner/tag-
 import { payloadContainsTenantIds } from "@/lib/owner/public-customer";
 import { NFC_SCENE_COPY } from "@/lib/owner/nfc-presentation";
 import { PROGRAM_PHASE_COPY } from "@/lib/owner/nfc-phases";
-import { ratingsHeadline } from "@/features/dashboard/home-model";
+import { weekNumbers } from "@/features/dashboard/home-model";
 
 function source(path: string): string {
   return readFileSync(join(process.cwd(), path), "utf8");
@@ -197,12 +197,19 @@ describe("Home muscle memory", () => {
   });
 });
 
-describe("Home headline", () => {
-  it("is one number and one arrow", () => {
-    expect(ratingsHeadline({ ratingsThisWeek: 12, ratingsLastWeek: 9 })).toBe(
-      "12 ratings this week, up 3",
-    );
-    expect(ratingsHeadline({ ratingsThisWeek: 1, ratingsLastWeek: 0 })).toBe("1 rating this week");
+describe("Home's week number", () => {
+  it("is one number, and says what it is compared with", () => {
+    expect(weekNumbers({ ratingsThisWeek: 12, ratingsLastWeek: 9 })).toEqual({
+      count: 12,
+      change: "3 more than last week",
+    });
+    expect(weekNumbers({ ratingsThisWeek: 9, ratingsLastWeek: 10 })).toEqual({
+      count: 9,
+      change: "1 fewer than last week",
+    });
+    expect(weekNumbers({ ratingsThisWeek: 4, ratingsLastWeek: 4 })?.change).toBe("Same as last week");
+    expect(weekNumbers({ ratingsThisWeek: 1, ratingsLastWeek: 0 })).toEqual({ count: 1, change: null });
+    expect(weekNumbers({ ratingsThisWeek: 0, ratingsLastWeek: 0 })).toBeNull();
   });
 });
 

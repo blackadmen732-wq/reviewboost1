@@ -27,6 +27,9 @@ export default function robots(): MetadataRoute.Robots {
         "/select-org",
         "/q/",
         "/api/",
+        // The sign-in return and the no-connection page are not destinations.
+        "/auth/",
+        "/offline",
       ],
     },
     // Tells crawlers where the sitemap is without waiting for them to guess.

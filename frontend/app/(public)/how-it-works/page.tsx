@@ -18,6 +18,7 @@ export default function HowItWorksPage() {
     <PublicArticle
       marketing
       currentPath="/how-it-works"
+      breadcrumb="/how-it-works"
       title="How it works"
       lede="From your counter to your Feedback, in three steps."
       actions={

@@ -70,10 +70,10 @@ export function PublicHome() {
               </li>
             ))}
           </ol>
-          <p className="mt-10">
+          <p className="mt-8">
             <Link
               href="/how-it-works"
-              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
+              className="inline-flex min-h-11 items-center text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
             >
               The whole path
             </Link>
@@ -141,10 +141,10 @@ export function PublicHome() {
           <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">
             {INTEGRITY.body}
           </p>
-          <p className="mt-10">
+          <p className="mt-8">
             <Link
               href="/integrity"
-              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
+              className="inline-flex min-h-11 items-center text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
             >
               Why this is the product
             </Link>
@@ -180,16 +180,16 @@ export function PublicHome() {
           <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">
             {PRIVACY.lede}
           </p>
-          <p className="mt-10 flex flex-wrap gap-x-6 gap-y-2">
+          <p className="mt-8 flex flex-wrap gap-x-6">
             <Link
               href="/security"
-              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
+              className="inline-flex min-h-11 items-center text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
             >
               Security
             </Link>
             <Link
               href="/privacy"
-              className="text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline"
+              className="inline-flex min-h-11 items-center text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
             >
               Privacy
             </Link>

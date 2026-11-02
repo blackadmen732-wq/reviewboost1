@@ -126,6 +126,7 @@ function firstRow<T>(data: unknown): T | undefined {
 /** The directory: every provider this environment knows, without anything secret. */
 export function providerDirectory(): Array<
   Pick<ProviderDefinition, "id" | "displayName" | "monogram" | "categories" | "summary" | "availability"> & {
+    website: string | null;
     workflows: Array<{ id: string; label: string }>;
   }
 > {
@@ -133,6 +134,7 @@ export function providerDirectory(): Array<
     id: provider.id,
     displayName: provider.displayName,
     monogram: provider.monogram,
+    website: provider.website ?? null,
     categories: provider.categories,
     summary: provider.summary,
     availability: provider.availability,

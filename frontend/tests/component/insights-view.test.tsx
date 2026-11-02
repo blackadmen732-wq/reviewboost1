@@ -11,7 +11,7 @@ import { OwnerHome } from "@/features/dashboard/owner-home";
 import { deriveHomeModel } from "@/features/dashboard/home-model";
 import {
   insightPeriods,
-  insightsHomeLine,
+  insightsHomeSummary,
   summarizeInsights,
   type InsightRange,
   type InsightRow,
@@ -385,7 +385,7 @@ describe("Feedback tabs", () => {
   });
 });
 
-describe("Home's one line", () => {
+describe("Home's month numbers", () => {
   const counts = {
     ratingsToday: 0,
     unread: 0,
@@ -397,31 +397,82 @@ describe("Home's one line", () => {
     { standId: "s1", label: "Front", status: "active", nfcProvisionedAt: "2026-09-01T00:00:00Z", tokenRotatedAt: null },
   ];
 
-  it("summarises a full month and points to Insights", () => {
-    const line = insightsHomeLine(build(QUIET));
-    expect(line).toBe("4.3 average · 84 ratings · Improving");
+  it("shows the average big and points to Insights", () => {
+    const summary = insightsHomeSummary(build(QUIET));
+    expect(summary).toEqual({ average: "4.3", total: 84, direction: "Improving" });
     render(
       <OwnerHome
         businessName="Mario's"
         model={deriveHomeModel({ counts, stands, hasLocation: true })}
         unreadItems={[]}
-        insightsLine={line}
+        insights={summary}
       />,
     );
     const link = screen.getByRole("link", { name: /View insights/ });
     expect(link).toHaveAttribute("href", "/feedback/insights");
     expect(link).toHaveTextContent("Last 30 days");
-    expect(link).toHaveTextContent("4.3 average · 84 ratings · Improving");
-    // A line, never a chart.
+    expect(link).toHaveTextContent("4.3");
+    expect(link).toHaveTextContent("average");
+    expect(link).toHaveTextContent("84 ratings · Improving");
+    // Numbers, never a chart.
     expect(screen.queryByRole("img", { name: /average rating/i })).toBeNull();
   });
 
   it("leaves the direction out when there was nothing to compare with", () => {
-    expect(insightsHomeLine(build({ ...QUIET, previous: [] }))).toBe("4.3 average · 84 ratings");
+    expect(insightsHomeSummary(build({ ...QUIET, previous: [] }))?.direction).toBeNull();
   });
 
   it("says nothing on a thin month", () => {
-    expect(insightsHomeLine(build({ buckets: [times(9, 5)] }))).toBeNull();
-    expect(insightsHomeLine(build({}))).toBeNull();
+    expect(insightsHomeSummary(build({ buckets: [times(9, 5)] }))).toBeNull();
+    expect(insightsHomeSummary(build({}))).toBeNull();
+  });
+});
+
+describe("the smooth trend line", () => {
+  // Sample a cubic Bézier path ("M x y C ... C ...") at many points.
+  function sample(d: string): Array<[number, number]> {
+    const numbers = d.replace(/[MC]/g, " ").trim().split(/\s+/).map(Number);
+    const out: Array<[number, number]> = [];
+    let x0 = numbers[0]!;
+    let y0 = numbers[1]!;
+    for (let i = 2; i + 5 < numbers.length + 1; i += 6) {
+      const [x1, y1, x2, y2, x3, y3] = numbers.slice(i, i + 6) as [number, number, number, number, number, number];
+      for (let t = 0; t <= 1; t += 0.05) {
+        const u = 1 - t;
+        out.push([
+          u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
+          u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3,
+        ]);
+      }
+      x0 = x3;
+      y0 = y3;
+    }
+    return out;
+  }
+
+  it("passes through every point and never goes past the two it joins", async () => {
+    const { monotonePath } = await import("@/features/dashboard/insights/rating-trend-chart");
+    const points = [
+      { index: 0, x: 10, y: 40 },
+      { index: 1, x: 30, y: 80 },
+      { index: 2, x: 50, y: 20 },
+      { index: 3, x: 70, y: 50 },
+      { index: 4, x: 90, y: 50 },
+    ];
+    const d = monotonePath(points);
+    for (const point of points) expect(d).toContain(`${point.x} ${point.y}`);
+
+    for (const [x, y] of sample(d)) {
+      const right = points.findIndex((point) => point.x >= x);
+      const a = points[Math.max(0, right - 1)]!;
+      const b = points[Math.max(0, right)]!;
+      expect(y).toBeGreaterThanOrEqual(Math.min(a.y, b.y) - 1e-9);
+      expect(y).toBeLessThanOrEqual(Math.max(a.y, b.y) + 1e-9);
+    }
+  });
+
+  it("draws a single straight segment between two points", async () => {
+    const { monotonePath } = await import("@/features/dashboard/insights/rating-trend-chart");
+    expect(monotonePath([{ index: 0, x: 10, y: 40 }, { index: 1, x: 90, y: 60 }])).toBe("M 10 40 L 90 60");
   });
 });

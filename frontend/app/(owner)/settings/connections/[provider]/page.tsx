@@ -18,10 +18,15 @@ import { BackLink } from "@/components/ui/back-link";
 import { getUnreadCount, listLocations, requireOwner } from "@/lib/server/owner-data";
 import { supabaseServer } from "@/lib/supabase/server";
 
-export const metadata: Metadata = {
-  title: "Connections",
-  robots: { index: false, follow: false },
-};
+/** "Square — Connections", so a tab or history entry says which app it is. */
+export async function generateMetadata({ params }: { params: Promise<{ provider: string }> }): Promise<Metadata> {
+  const { provider: providerId } = await params;
+  const provider = getProvider(providerId);
+  return {
+    title: provider ? `${provider.displayName} — Connections` : "Connections",
+    robots: { index: false, follow: false },
+  };
+}
 
 export const dynamic = "force-dynamic";
 

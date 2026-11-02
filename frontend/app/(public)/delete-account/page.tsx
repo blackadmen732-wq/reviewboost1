@@ -28,6 +28,7 @@ export const metadata: Metadata = publicPageMetadata({
 export default function DeleteAccountPage() {
   return (
     <PublicArticle
+      breadcrumb="/delete-account"
       title="Delete your account"
       lede="How to do it, what goes, and what happens to the Tags on your counter."
     >

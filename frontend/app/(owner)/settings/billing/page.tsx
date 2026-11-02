@@ -50,6 +50,7 @@ export default async function BillingPage({
         selectedPlan={selectedPlan}
         billing={billing}
         canManage={permissionsFor(organization.role).manageBilling}
+        timeZone={organization.timezone}
       />
     </OwnerShell>
   );

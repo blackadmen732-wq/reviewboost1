@@ -127,4 +127,19 @@ describe("BillingPanel", () => {
     expect(screen.getByText("5 of 8 Tags")).toBeVisible();
     expect(screen.getByText(/New Tags can be added once the payment goes through/)).toBeVisible();
   });
+  it("prints the next payment day in the business's time zone, the same on server and phone", () => {
+    // 03:00 UTC on the 23rd is still the evening of the 22nd in Los Angeles.
+    const billing = {
+      ...NEVER_SUBSCRIBED,
+      planId: "growth" as const,
+      status: "active" as const,
+      currentPeriodEnd: "2026-11-23T03:00:00Z",
+      smsBalance: { monthly: 500, purchased: 0, total: 500 },
+    };
+    const { unmount } = render(<BillingPanel billing={billing} canManage timeZone="America/Los_Angeles" />);
+    expect(screen.getAllByText(/November 22, 2026/).length).toBeGreaterThan(0);
+    unmount();
+    render(<BillingPanel billing={billing} canManage timeZone="Not/AZone" />);
+    expect(screen.getAllByText(/November 23, 2026/).length).toBeGreaterThan(0);
+  });
 });

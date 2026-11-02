@@ -17,6 +17,7 @@ export default function IntegrityPage() {
   return (
     <PublicArticle
       currentPath="/integrity"
+      breadcrumb="/integrity"
       title={INTEGRITY.headline}
       lede={INTEGRITY.lede}
     >
