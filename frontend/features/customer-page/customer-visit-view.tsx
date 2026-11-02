@@ -3,6 +3,7 @@
 import localFont from "next/font/local";
 import type { ReactNode } from "react";
 
+import { heroImageSources } from "@/lib/customer-page/hero-image";
 import { CUSTOMER_CANVAS } from "@/lib/owner/customer-canvas";
 import {
   clampHeroTransform,
@@ -158,11 +159,15 @@ export function CustomerVisitView({
  * screen, so there it is fetched first.
  */
 function HeroImage({ src, transform, first }: { src: string; transform: string; first: boolean }) {
+  // Phone-sized through the image optimizer, not the owner's original upload.
+  const sources = heroImageSources(src);
   return (
     // Artwork origin is the owner's published/draft upload.
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={src}
+      src={sources.src}
+      srcSet={sources.srcSet}
+      sizes={sources.sizes}
       alt=""
       draggable={false}
       decoding="async"

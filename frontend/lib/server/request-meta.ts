@@ -15,21 +15,29 @@ import type { RequestMeta } from "@/lib/server/customer-flow-service";
  * choose its own rate-limit bucket by sending the header itself.
  */
 export function requestMetaOf(request: Request, requestId: string): RequestMeta {
+  return requestMetaFromHeaders(request.headers, requestId);
+}
+
+/**
+ * The same, from a page's `headers()`: the customer page reads its context on
+ * the server, under the same rate limit and bot rules as the API.
+ */
+export function requestMetaFromHeaders(headers: Pick<Headers, "get">, requestId: string): RequestMeta {
   return {
-    address: clientAddress(request),
-    userAgent: request.headers.get("user-agent"),
+    address: clientAddress(headers),
+    userAgent: headers.get("user-agent"),
     requestId,
   };
 }
 
-function clientAddress(request: Request): string | null {
-  const forwarded = request.headers.get("x-forwarded-for");
+function clientAddress(headers: Pick<Headers, "get">): string | null {
+  const forwarded = headers.get("x-forwarded-for");
   if (forwarded) {
     const first = forwarded.split(",")[0]?.trim();
     if (first) return groupIpv6(first);
   }
 
-  const real = request.headers.get("x-real-ip");
+  const real = headers.get("x-real-ip");
   return real ? groupIpv6(real.trim()) : null;
 }
 

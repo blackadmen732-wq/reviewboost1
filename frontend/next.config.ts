@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import { heroImageRemotePattern } from "./lib/customer-page/hero-image";
+
 if (
   process.env.NODE_ENV === "production" &&
   process.env.NEXT_PUBLIC_USE_CUSTOMER_FIXTURES === "true"
@@ -39,6 +41,14 @@ const nextConfig: NextConfig = {
   // Next's default, written down so nobody flips it for a debugging session
   // and ships the original source to every visitor.
   productionBrowserSourceMaps: false,
+  // The customer page shows the owner's photo through the image optimizer,
+  // resized for phones, instead of the original upload (up to 5 MB). Only the
+  // public customer-page bucket of this project's Supabase may be read.
+  images: {
+    remotePatterns: [heroImageRemotePattern(process.env.NEXT_PUBLIC_SUPABASE_URL)].filter(
+      (pattern) => pattern !== null,
+    ),
+  },
   reactStrictMode: true,
   async headers() {
     return [{ source: "/((?!api/).*)", headers: [...PAGE_SECURITY_HEADERS] }];

@@ -7,6 +7,7 @@ import {
   useReducer,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 
 import { CustomerBlockingState } from "@/features/customer-flow/customer-blocking-state";
@@ -19,6 +20,7 @@ import {
   type CustomerFlowState,
 } from "@/features/customer-flow/customer-flow-state";
 import { navigateToDestination } from "@/features/customer-flow/destination-handoff";
+import { clearEarlyTapMarker, readEarlyTapMarker } from "@/features/customer-flow/early-tap";
 import {
   loadCustomerDraft,
   safeInitialCustomerState,
@@ -34,7 +36,10 @@ import {
   CustomerApiError,
   isUnavailableReviewLink,
 } from "@/lib/api/customer-api-error";
-import type { SubmitResponseRequest } from "@/lib/api/customer-flow-types";
+import type {
+  CustomerReviewContext,
+  SubmitResponseRequest,
+} from "@/lib/api/customer-flow-types";
 import { createIdempotencyKey } from "@/lib/api/idempotency";
 import {
   customerMessages,
@@ -45,6 +50,17 @@ import { requireValidatedDestination } from "@/lib/security/destination";
 
 interface CustomerFlowProps {
   token: string;
+  /** Read on the server, so the page is complete in its first response. */
+  initialContext?: CustomerReviewContext | null;
+  /** The server already knows this link is not active. */
+  initialUnavailable?: boolean;
+  /**
+   * The form a star submits natively before React is ready (early-tap.ts).
+   * Absent when there is no server context, such as development fixtures.
+   */
+  earlyForm?: { action: string; key: string } | null;
+  /** An early submit that failed: the star stays chosen, with Try again. */
+  failedRating?: RatingValue | null;
 }
 
 interface FeedbackAttempt {
@@ -54,6 +70,8 @@ interface FeedbackAttempt {
   sessionKey: string;
   responseKey: string;
 }
+
+const noSubscription = () => () => {};
 
 function isOfflineError(error: unknown): boolean {
   return (
@@ -70,6 +88,28 @@ function normalizedContextLocales(locales: readonly string[]): Locale[] {
   return supported.length ? supported : ["en"];
 }
 
+/** The one place a context becomes safe to render, from the server or the API alike. */
+function prepareContext(context: CustomerReviewContext) {
+  return {
+    ...context,
+    // Re-validated here, not trusted: this is the value the page is about
+    // to send a customer to.
+    destination: requireValidatedDestination(context.destination),
+    supportedLocales: normalizedContextLocales(context.supportedLocales),
+  };
+}
+
+function preparedOrNull(context: CustomerReviewContext | null | undefined) {
+  if (!context) return undefined;
+  try {
+    return prepareContext(context);
+  } catch {
+    // A destination that does not validate: let the browser ask the API, and
+    // show whatever that answer is, exactly as before.
+    return undefined;
+  }
+}
+
 /**
  * THE V1 CUSTOMER CONTRACT
  * ------------------------
@@ -83,11 +123,34 @@ function normalizedContextLocales(locales: readonly string[]): Locale[] {
  * confirm button. Anything added between the star and the destination is a
  * change to the product, not a change to this component.
  */
-export function CustomerFlow({ token }: CustomerFlowProps) {
-  const [state, dispatch] = useReducer(
-    customerFlowReducer,
-    undefined,
-    safeInitialCustomerState,
+export function CustomerFlow({
+  token,
+  initialContext = null,
+  initialUnavailable = false,
+  earlyForm = null,
+  failedRating = null,
+}: CustomerFlowProps) {
+  const [initialData] = useState(() => preparedOrNull(initialContext));
+  const [state, dispatch] = useReducer(customerFlowReducer, undefined, () => {
+    const start = safeInitialCustomerState();
+    // Open in the business's own language, so a Spanish page never flashes
+    // English first. A recovered draft still wins, below.
+    const locale = initialData?.supportedLocales.includes(initialData.defaultLocale)
+      ? initialData.defaultLocale
+      : start.locale;
+    return failedRating
+      ? { ...start, locale, rating: failedRating, feedbackStatus: "error" as const }
+      : { ...start, locale };
+  });
+  // This tab already rated through the early form (the back button brought
+  // the customer here): show the handoff, never a second rating form. Read in
+  // the browser only; the server and the first browser pass say "not yet".
+  const earlyDone = useSyncExternalStore(
+    noSubscription,
+    () =>
+      !failedRating &&
+      (Boolean(window.__rbEarly) || readEarlyTapMarker(window.location.pathname)),
+    () => false,
   );
   const [recoveryReady, setRecoveryReady] = useState(false);
   const hadRecoveredDraft = useRef(false);
@@ -103,18 +166,23 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     networkMode: "always",
     queryFn: async ({ signal }) => {
       const api = await getCustomerFlowApi();
-      const context = await api.getContext(token, { signal });
-      return {
-        ...context,
-        // Re-validated here, not trusted: this is the value the page is about
-        // to send a customer to.
-        destination: requireValidatedDestination(context.destination),
-        supportedLocales: normalizedContextLocales(context.supportedLocales),
-      };
+      return prepareContext(await api.getContext(token, { signal }));
     },
+    // What the server rendered is what the customer is looking at; reading it
+    // again would only race the tap.
+    initialData,
+    staleTime: Infinity,
+    enabled: !initialUnavailable,
     retry: (failureCount, error) =>
       !isUnavailableReviewLink(error) && failureCount < 1,
   });
+
+  // React owns the stars from here; the early-tap script steps aside.
+  useEffect(() => {
+    window.__rbFlowReady = true;
+    // The submit that marker stood for failed; this tab may rate again.
+    if (failedRating) clearEarlyTapMarker(window.location.pathname);
+  }, [failedRating]);
 
   const destinationUrl = contextQuery.data?.destination.url ?? null;
 
@@ -300,10 +368,12 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
 
   const handleRate = useCallback(
     (rating: RatingValue) => {
+      // Already on its way through the early form: one tap is one rating.
+      if (window.__rbEarly || earlyDone) return;
       dispatch({ type: "select-rating", rating });
       void submitFeedback(rating, { ...state, responseKey: null });
     },
-    [state, submitFeedback],
+    [earlyDone, state, submitFeedback],
   );
 
   const handleRetry = useCallback(() => {
@@ -352,16 +422,16 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     dispatch({ type: "change-locale", locale });
   }, []);
 
-  if (contextQuery.isPending) {
+  if (contextQuery.isPending && !initialUnavailable) {
     return <CustomerLoading messages={messages} />;
   }
 
-  if (contextQuery.isError) {
+  if (initialUnavailable || contextQuery.isError) {
     return (
       <div ref={contentRef}>
         <CustomerBlockingState
           kind={
-            isUnavailableReviewLink(contextQuery.error)
+            initialUnavailable || isUnavailableReviewLink(contextQuery.error)
               ? "unavailable"
               : isOfflineError(contextQuery.error)
                 ? "offline"
@@ -377,6 +447,8 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   }
 
   const context = contextQuery.data;
+  if (!context) return <CustomerLoading messages={messages} />;
+  const screen = earlyDone ? "handoff" : state.screen;
 
   return (
     <div ref={contentRef} className="customer-live">
@@ -388,8 +460,8 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
         // a preview-only control that the customer never sees would be a lie
         // about what the business published.
         transform={DEFAULT_HERO_TRANSFORM}
-        heading={state.screen === "rating" ? messages.ratingHeading : ""}
-        support={state.screen === "rating" ? messages.ratingSupport : ""}
+        heading={screen === "rating" ? messages.ratingHeading : ""}
+        support={screen === "rating" ? messages.ratingSupport : ""}
         footerLine={messages.footerPromise}
         language={
           <LanguageSelector
@@ -403,16 +475,39 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
         {/* A plain CSS fade between screens (customer-flow.css). It replaced
             the motion library, ~27 KB compressed for this one effect on the
             page that has to load fastest. */}
-        <div key={state.screen} className="customer-screen-enter">
-            {state.screen === "rating" ? (
-              <RatingScreen
-                messages={messages}
-                rating={state.rating}
-                status={state.feedbackStatus}
-                embedInVisit
-                onRate={handleRate}
-                onRetry={handleRetry}
-              />
+        <div key={screen} className="customer-screen-enter">
+            {screen === "rating" ? (
+              earlyForm ? (
+                // A real form, so a star works before the JavaScript has
+                // loaded (early-tap.ts). Once React is here it handles every
+                // tap itself, and this never submits.
+                <form
+                  method="post"
+                  action={earlyForm.action}
+                  data-early-submit=""
+                  onSubmit={(event) => event.preventDefault()}
+                >
+                  <input type="hidden" name="key" value={earlyForm.key} />
+                  <input type="hidden" name="locale" value={state.locale} />
+                  <RatingScreen
+                    messages={messages}
+                    rating={state.rating}
+                    status={state.feedbackStatus}
+                    embedInVisit
+                    onRate={handleRate}
+                    onRetry={handleRetry}
+                  />
+                </form>
+              ) : (
+                <RatingScreen
+                  messages={messages}
+                  rating={state.rating}
+                  status={state.feedbackStatus}
+                  embedInVisit
+                  onRate={handleRate}
+                  onRetry={handleRetry}
+                />
+              )
             ) : (
               <HandoffScreen
                 businessName={context.business.name}
