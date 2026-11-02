@@ -1,5 +1,11 @@
 # ReviewBoost Connections — design set
 
+**Updated product scope (2026-10-18):** Connections is now **contact import
+for Text Requests only**. See [Contact-first Connections](contacts-only.md).
+Historical payment/appointment sync designs below are reference material, not
+approval to request those permissions or enable those workflows. Square
+remains unavailable until customer-read OAuth and real imports work.
+
 **Status of this whole folder: PROPOSED.** Nothing here is built. Nothing here
 is approved until the owner signs off on the decisions listed below. The state
 labels are the ones `SYSTEM_CONTEXT.md` defines (APPROVED, PROPOSED,

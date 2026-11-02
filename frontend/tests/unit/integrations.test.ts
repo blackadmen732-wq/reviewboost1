@@ -98,8 +98,12 @@ describe("registry", () => {
   it("keeps Square as coming soon until its adapter lands", async () => {
     const { getConnectableProvider, getProvider } = await load();
     expect(getProvider("square")?.availability).toBe("in_setup");
+    expect(getProvider("square")?.workflows).toEqual([]);
+    expect(getProvider("square")?.dataRead).toEqual(["Customer names", "Customer phone numbers"]);
+    expect(getProvider("square")?.categories).toContain("lists");
     expect(getConnectableProvider("square")).toBeNull();
     expect(getConnectableProvider("vagaro")).toBeNull();
+    expect(getProvider("google_contacts")?.availability).toBe("planned");
     expect(getConnectableProvider("fake")?.id).toBe("fake");
   });
 });
