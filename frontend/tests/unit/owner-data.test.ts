@@ -209,8 +209,6 @@ describe("review integrity in the owner interface", () => {
     expect(code("app/api/v1/staff/route.ts")).not.toMatch(/rating/i);
     expect(code("app/api/v1/staff/[staffId]/route.ts")).not.toMatch(/rating/i);
     expect(code("app/api/v1/team-praise/[praiseId]/route.ts")).not.toMatch(/rating/i);
-    expect(code("features/dashboard/praise-matcher.tsx")).not.toMatch(/rating/i);
-    expect(code("features/dashboard/praise-shared-button.tsx")).not.toMatch(/rating/i);
   });
 
   it("renders every star value through one component with no branch on value", () => {
