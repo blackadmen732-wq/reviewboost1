@@ -77,6 +77,18 @@ export const SITE_JSON_LD = JSON.stringify({
 }).replace(/</g, "\\u003c");
 
 /**
+ * Google Search Console's HTML-tag ownership check, from the environment.
+ * Only the code is stored (the `content` of Google's meta tag); unset or blank
+ * means no tag, so previews and local builds never claim the property.
+ */
+export function googleSiteVerification(
+  code: string | undefined = process.env.GOOGLE_SITE_VERIFICATION,
+): Metadata["verification"] {
+  const value = code?.trim();
+  return value ? { google: value } : undefined;
+}
+
+/**
  * The parts of a social card every page shares. Kept here because Next merges
  * metadata shallowly: a page that sets `openGraph` replaces the layout's whole
  * object, so anything left out here would silently vanish from that page.

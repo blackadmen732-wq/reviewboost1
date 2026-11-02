@@ -3,7 +3,13 @@ import { GeistSans } from "geist/font/sans";
 import type { ReactNode } from "react";
 
 import { Providers } from "@/components/providers";
-import { SHARED_OPEN_GRAPH, SHARED_TWITTER, SITE_NAME, SITE_URL } from "@/lib/site";
+import {
+  googleSiteVerification,
+  SHARED_OPEN_GRAPH,
+  SHARED_TWITTER,
+  SITE_NAME,
+  SITE_URL,
+} from "@/lib/site";
 import { PwaRegister } from "@/components/pwa-register";
 import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
@@ -30,6 +36,9 @@ export const metadata: Metadata = {
   // its own through publicPageMetadata() in lib/site.ts; noindex pages need none.
   openGraph: { ...SHARED_OPEN_GRAPH, title: SITE_NAME, description: DESCRIPTION },
   twitter: { ...SHARED_TWITTER, title: SITE_NAME, description: DESCRIPTION },
+  // Google Search Console's HTML-tag ownership check. The code comes from the
+  // environment so verifying never needs a code change; unset prints nothing.
+  verification: googleSiteVerification(),
   // These point at the exported brand files so a manifest or a third party has
   // something stable to read.
   icons: {

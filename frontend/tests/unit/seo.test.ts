@@ -7,6 +7,7 @@ import robots from "@/app/robots";
 import sitemap from "@/app/sitemap";
 import {
   absoluteUrl,
+  googleSiteVerification,
   PUBLIC_ROUTES,
   publicPageMetadata,
   SHARED_OPEN_GRAPH,
@@ -166,6 +167,14 @@ describe("social cards and canonicals resolve", () => {
     const home = publicPageMetadata({ path: "/", title: "ReviewBoost", description: "d" });
     expect(home.alternates?.canonical).toBe("/");
     expect(home.title).toEqual({ absolute: "ReviewBoost" });
+  });
+
+  it("prints Google's verification tag only when the code is configured", () => {
+    expect(googleSiteVerification("abc123")).toEqual({ google: "abc123" });
+    expect(googleSiteVerification("  abc123  ")).toEqual({ google: "abc123" });
+    expect(googleSiteVerification(undefined)).toBeUndefined();
+    expect(googleSiteVerification("   ")).toBeUndefined();
+    expect(layout).toContain("verification: googleSiteVerification()");
   });
 
   it("points crawlers at the sitemap from robots.txt", () => {
