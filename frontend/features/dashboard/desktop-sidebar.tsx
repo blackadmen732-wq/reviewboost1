@@ -24,7 +24,7 @@ export function DesktopSidebar({
   return (
     <aside
       aria-label="Main"
-      className="fixed inset-y-0 left-0 z-40 hidden w-[220px] flex-col border-r border-border bg-sidebar lg:flex"
+      className="fixed inset-y-0 left-0 z-40 hidden w-[220px] flex-col border-r border-border bg-canvas lg:flex"
     >
       <div className="flex h-[72px] items-center px-3">
         <Link

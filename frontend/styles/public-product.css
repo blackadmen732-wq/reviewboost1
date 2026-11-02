@@ -81,12 +81,12 @@
 
 /* Public-site palette. Owner and live customer surfaces keep their own tokens. */
 .public-shell {
-  --rb-canvas: #ffffff;
+  --rb-canvas: #fcfcfb;
   --rb-surface: #ffffff;
-  --rb-quiet: #f0f0f0;
+  --rb-quiet: #edece8;
   --rb-ink: #1a1a19;
   --rb-muted: #6b6b67;
-  --rb-border: #e5e5e5;
+  --rb-border: #e2e2e1;
   --rb-action: #1a1a19;
   --rb-action-hover: #333331;
   --rb-action-pressed: #000000;

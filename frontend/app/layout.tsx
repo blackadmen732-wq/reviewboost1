@@ -70,7 +70,7 @@ export const viewport: Viewport = {
   // flash white before the first paint — the thing that most makes a PWA feel
   // like a browser rather than an app.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
+    { media: "(prefers-color-scheme: light)", color: "#FCFCFB" },
     { media: "(prefers-color-scheme: dark)", color: "#191918" },
   ],
 
@@ -89,7 +89,7 @@ export default function RootLayout({
           means the first frame is already cream — no device-specific assets to
           maintain, and no white flash in a demo.
         */}
-        <style>{`html{background-color:#FFFFFF}@media (prefers-color-scheme:dark){html{background-color:#191918}}html[data-theme=light]{background-color:#FFFFFF}html[data-theme=dark]{background-color:#191918}`}</style>
+        <style>{`html{background-color:#FCFCFB}@media (prefers-color-scheme:dark){html{background-color:#191918}}html[data-theme=light]{background-color:#FCFCFB}html[data-theme=dark]{background-color:#191918}`}</style>
         {/* The owner's Light/Dark choice from Settings, applied before the
             first paint so a dark choice never flashes light. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />

@@ -125,13 +125,13 @@ describe("brand migration", () => {
     expect(token("rb-brand", "light").toLowerCase()).toBe("#00a86b");
   });
 
-  it("locks the white light palette", () => {
-    expect(token("rb-canvas", "light").toLowerCase()).toBe("#ffffff");
+  it("locks the warm-white light palette", () => {
+    expect(token("rb-canvas", "light").toLowerCase()).toBe("#fcfcfb");
     expect(token("rb-surface", "light").toLowerCase()).toBe("#ffffff");
-    expect(token("rb-quiet", "light").toLowerCase()).toBe("#f0f0f0");
+    expect(token("rb-quiet", "light").toLowerCase()).toBe("#edece8");
     expect(token("rb-ink", "light").toLowerCase()).toBe("#1a1a19");
     expect(token("rb-muted", "light").toLowerCase()).toBe("#6b6b67");
-    expect(token("rb-border", "light").toLowerCase()).toBe("#e5e5e5");
+    expect(token("rb-border", "light").toLowerCase()).toBe("#e2e2e1");
     expect(token("rb-action", "light").toLowerCase()).toBe("#1a1a19");
     expect(token("rb-action-hover", "light").toLowerCase()).toBe("#333331");
     expect(token("rb-action-pressed", "light").toLowerCase()).toBe("#000000");

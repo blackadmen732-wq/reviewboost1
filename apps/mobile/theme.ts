@@ -1,7 +1,6 @@
 /**
  * The same palette as the web app (frontend/styles/globals.css, light mode),
- * chosen 18 October 2026 and moved to pure white on 1 November 2026 (the white
- * Claude's app uses): white canvas and surfaces, #E5E5E5 hairlines, near-black
+ * chosen 18 October 2026: warm white canvas, white surfaces, near-black
  * action buttons, brand green for identity and success only. DESIGN.md §3.
  * The launch screen's #005B3E field is separate and unchanged.
  */
@@ -16,9 +15,9 @@ export const colors = {
   actionPressed: "#000000",
   onAction: "#ffffff",
 
-  canvas: "#FFFFFF",
+  canvas: "#FCFCFB",
   surface: "#FFFFFF",
-  surfaceAlt: "#F0F0F0",
+  surfaceAlt: "#EDECE8",
 
   ink: "#1A1A19",
   inkMuted: "#6B6B67",
@@ -27,7 +26,7 @@ export const colors = {
   // surfaceAlt, the darkest surface it sits on.
   inkFaint: "#6B6B67",
 
-  border: "#E5E5E5",
+  border: "#E2E2E1",
   // The web's --rb-border-strong: outlines that must be seen (3.16:1).
   borderLight: "#8F8F8A",
 

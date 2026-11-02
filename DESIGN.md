@@ -69,7 +69,7 @@ The connecting threads:
 
 ## 3. Colour
 
-**White**, chosen by the owner on 1 November 2026: pure white like Claude's app, a #FAFAFA sidebar. Black does the actions. Green is the brand and means "good", nothing else.
+**Warm white**, chosen by the owner on 18 October 2026. The calm, near-white background is modelled on Claude's. Black does the actions. Green is the brand and means "good", nothing else.
 
 ### 3.1 Tokens
 
@@ -77,13 +77,13 @@ The real values live in `frontend/styles/globals.css` (app), `public-product.css
 
 | Token | Job | Light | Dark |
 |---|---|---|---|
-| `--rb-canvas` | Page background | `#FFFFFF` | `#191918` |
+| `--rb-canvas` | Page background | `#FCFCFB` | `#191918` |
 | `--rb-surface` | Cards, inputs, sheets | `#FFFFFF` | `#212120` |
 | `--rb-raised` | Menus, popovers | `#FFFFFF` | `#262624` |
-| `--rb-quiet` | Selected row, chip, hover fill | `#F0F0F0` | `#2C2C2A` |
+| `--rb-quiet` | Selected row, chip, hover fill | `#EDECE8` | `#2C2C2A` |
 | `--rb-ink` | Main text, icons | `#1A1A19` | `#F5F5F3` |
 | `--rb-muted` | Secondary text, captions | `#6B6B67` | `#A8A8A2` |
-| `--rb-border` | Hairlines between things | `#E5E5E5` | `#3A3A37` |
+| `--rb-border` | Hairlines between things | `#E2E2E1` | `#3A3A37` |
 | `--rb-border-strong` | Input outlines, empty stars, checkboxes | `#8F8F8A` | `#75756F` |
 | `--rb-action` | The one filled button | `#1A1A19` (hover `#333331`, pressed `#000000`) | `#F5F5F3` (hover `#FFFFFF`, pressed `#E2E2DF`) |
 | `--rb-on-action` | Label on the filled button | `#FFFFFF` | `#1A1A19` |
@@ -583,7 +583,7 @@ For every screen that changes:
 | 10 | Tapped / Rated steps on texts | 🔨 |
 | 11 | Square connection | 🔨 after 👤 Square developer app |
 | 12 | Google Sheets "keep in sync" | 🔨 after 👤 server OAuth secret |
-| 13 | iPhone app: same tokens in `theme.ts` (white, black actions) | ✅ PR #82 |
+| 13 | iPhone app: same tokens in `theme.ts` (warm white, black actions) | ✅ PR #82 |
 | 14 | Production database backup and migration reconciliation | 👤 |
 | 15 | Turn GitHub Actions back on (account setting) | 👤 |
 | 16 | Legal check on the low-rating flow | 👤 |
@@ -593,7 +593,7 @@ For every screen that changes:
 
 ## 16. Locked decisions and history
 
-- **Palette:** 1 Nov 2026 pure white; 18 Oct warm white replaced the earlier cream (`#F8F5F0`) and forest-green buttons. Black is the action; green is identity and success.
+- **Palette, 18 Oct 2026:** warm white replaced the earlier cream (`#F8F5F0`) and forest-green buttons. Black is the action; green is identity and success.
 - **Navigation:** four phone tabs, forever; the fourth is "Tags", as on iPhone. The route stays `/stands` so printed and existing links keep working. Insights is a tab inside Feedback. The old Reviews, Customers and Praise URLs redirect.
 - **Billing:** free iPhone app first; add Apple In-App Purchase only if App Review asks.
 - **Website:** the Veyra/Midday-style serif headline, the real Tag and phone proof, and the forest demo band.

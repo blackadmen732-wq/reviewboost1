@@ -5,7 +5,6 @@
 
 @theme inline {
   --color-canvas: var(--rb-canvas);
-  --color-sidebar: var(--rb-sidebar);
   --color-surface: var(--rb-surface);
   --color-quiet: var(--rb-quiet);
   --color-ink: var(--rb-ink);
@@ -35,21 +34,18 @@
 
 :root {
   color-scheme: light dark;
-  /* White palette, 2026-11-01: the owner asked for the white Claude's app
-     uses: pure white (#FFFFFF) for the page, #FAFAFA for the sidebar, #E5E5E5
-     hairlines (replacing 2026-10-18's warm white #FCFCFB, which replaced the
-     cream). Neutrals carry no tint
+  /* Warm-white palette, 2026-10-18: the owner picked Claude's warm white
+     (#FCFCFB) over the cream and the cooled grey-green. Neutrals carry no tint
      to fight the green. Filled buttons are near-black so the product stops
      reading as Trustpilot's green-and-forest; brand green is identity and good
      news only, never a white-label button. Cards separate by hairlines, not
      fills: canvas and white are 1.02:1 apart on purpose. */
-  --rb-canvas: #ffffff;
-  --rb-sidebar: #fafafa;
+  --rb-canvas: #fcfcfb;
   --rb-surface: #ffffff;
-  --rb-quiet: #f0f0f0;
+  --rb-quiet: #edece8;
   --rb-ink: #1a1a19;
   --rb-muted: #6b6b67;
-  --rb-border: #e5e5e5;
+  --rb-border: #e2e2e1;
   --rb-border-strong: #8f8f8a;
   --rb-brand: #00a86b;
   --rb-brand-hover: #009a61;
@@ -107,7 +103,6 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --rb-canvas: #191918;
-    --rb-sidebar: #191918;
     --rb-surface: #212120;
     --rb-quiet: #2c2c2a;
     --rb-ink: #f5f5f3;
@@ -145,13 +140,12 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --rb-canvas: #ffffff;
-  --rb-sidebar: #fafafa;
+  --rb-canvas: #fcfcfb;
   --rb-surface: #ffffff;
-  --rb-quiet: #f0f0f0;
+  --rb-quiet: #edece8;
   --rb-ink: #1a1a19;
   --rb-muted: #6b6b67;
-  --rb-border: #e5e5e5;
+  --rb-border: #e2e2e1;
   --rb-border-strong: #8f8f8a;
   --rb-brand: #00a86b;
   --rb-brand-hover: #009a61;
@@ -184,7 +178,6 @@
 .dark {
   color-scheme: dark;
   --rb-canvas: #191918;
-  --rb-sidebar: #191918;
   --rb-surface: #212120;
   --rb-quiet: #2c2c2a;
   --rb-ink: #f5f5f3;
