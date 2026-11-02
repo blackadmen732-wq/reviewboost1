@@ -38,7 +38,9 @@ const HERO_TITLE_LINES = ["Hear how", "the visit went."] as const;
 export const PUBLIC_HERO = {
   title: HERO_TITLE_LINES.join(" "),
   titleLines: HERO_TITLE_LINES,
-  lede: "Customers tap or scan your Tag, leave a private rating, and get your Google link. You see every rating in Feedback.",
+  // Says "Google review" because that is what owners search for and buy. It
+  // promises the ask, never the outcome: every customer gets the link.
+  lede: "Every customer gets your Google review link with one tap on your Tag. You see how each visit went in Feedback.",
   primary: { href: START_HREF, label: "Get started" },
 } as const;
 

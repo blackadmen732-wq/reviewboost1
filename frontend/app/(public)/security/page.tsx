@@ -22,6 +22,35 @@ export const metadata: Metadata = publicPageMetadata({
 export default function SecurityPage() {
   return (
     <PublicArticle title={SECURITY.headline} lede={SECURITY.lede}>
+      {/* The owner's answer first, in their words. The detail below is for
+          whoever looks after their tech. */}
+      <h2>In short</h2>
+      <ul className="flex max-w-[42ch] flex-col gap-3 text-muted">
+        <li>
+          <strong className="font-semibold text-ink">What we keep.</strong> Your
+          email, your business name and Google link, the customer phone numbers
+          you add for Texts, and the star each customer taps. Customers give us
+          no name, number or email.
+        </li>
+        <li>
+          <strong className="font-semibold text-ink">Who sees it.</strong> Only
+          people signed in to your business. Another business cannot see your
+          ratings, Tags or numbers.
+        </li>
+        <li>
+          <strong className="font-semibold text-ink">Payments.</strong> Stripe
+          handles your card. We never see the number.
+        </li>
+        <li>
+          <strong className="font-semibold text-ink">Leaving.</strong> You can
+          delete your account at any time.{" "}
+          <Link href="/delete-account" className="text-ink underline underline-offset-2">
+            How deleting works
+          </Link>
+          .
+        </li>
+      </ul>
+
       <h2>Owner access</h2>
       <p>
         Home, Feedback, Text Requests, Tags and Settings all require a signed-in

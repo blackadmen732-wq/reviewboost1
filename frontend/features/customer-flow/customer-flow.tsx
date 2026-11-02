@@ -1,11 +1,9 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { LazyMotion, domAnimation, m, useReducedMotion } from "motion/react";
 import {
   useCallback,
   useEffect,
-  useMemo,
   useReducer,
   useRef,
   useState,
@@ -98,7 +96,6 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   const destinationInFlight = useRef(false);
   const handoffPending = useRef(false);
   const contentRef = useRef<HTMLDivElement>(null);
-  const prefersReducedMotion = useReducedMotion();
   const messages = customerMessages[state.locale];
 
   const contextQuery = useQuery({
@@ -355,18 +352,6 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     dispatch({ type: "change-locale", locale });
   }, []);
 
-  const motionProps = useMemo(
-    () => ({
-      initial: { opacity: 0.96, y: prefersReducedMotion ? 0 : 6 },
-      animate: { opacity: 1, y: 0 },
-      transition: {
-        duration: prefersReducedMotion ? 0.1 : 0.22,
-        ease: "easeOut" as const,
-      },
-    }),
-    [prefersReducedMotion],
-  );
-
   if (contextQuery.isPending) {
     return <CustomerLoading messages={messages} />;
   }
@@ -415,8 +400,10 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
           />
         }
       >
-        <LazyMotion features={domAnimation} strict>
-          <m.div key={state.screen} {...motionProps}>
+        {/* A plain CSS fade between screens (customer-flow.css). It replaced
+            the motion library, ~27 KB compressed for this one effect on the
+            page that has to load fastest. */}
+        <div key={state.screen} className="customer-screen-enter">
             {state.screen === "rating" ? (
               <RatingScreen
                 messages={messages}
@@ -433,8 +420,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
                 messages={messages}
               />
             )}
-          </m.div>
-        </LazyMotion>
+        </div>
       </CustomerVisitView>
     </div>
   );

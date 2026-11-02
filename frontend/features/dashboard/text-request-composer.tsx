@@ -63,7 +63,14 @@ interface TextRequestComposerProps {
    * rather than shown as an empty list.
    */
   customers?: readonly PickerCustomer[] | null;
+  /**
+   * The plan's state, so an empty balance can say why. A trial includes no
+   * texts, and "0 texts left" alone read like a broken page.
+   */
+  planStatus?: PlanStatus;
 }
+
+type PlanStatus = "trialing" | "active" | "past_due" | "cancelled" | "suspended" | null;
 
 interface Eligibility {
   allowed: boolean;
@@ -105,6 +112,7 @@ export function TextRequestComposer({
   recent,
   canSendRequests,
   customers = [],
+  planStatus,
 }: TextRequestComposerProps) {
   const router = useRouter();
   const hasCustomers = customers !== null && customers.length > 0;
@@ -288,7 +296,7 @@ export function TextRequestComposer({
         </InlineNotice>
       ) : null}
       <div>
-        <BalanceLine balance={balance} />
+        <BalanceLine balance={balance} planStatus={planStatus} />
         {balance.total === 0 ? (
           <p className="mt-2 max-w-[48ch] text-sm leading-relaxed text-muted">
             You can preview a request now. Sending needs available texts and the
@@ -603,7 +611,24 @@ export function TextRequestComposer({
   );
 }
 
-function BalanceLine({ balance }: { balance: Balance }) {
+function BalanceLine({
+  balance,
+  planStatus,
+}: {
+  balance: Balance;
+  planStatus?: PlanStatus | undefined;
+}) {
+  // Why the balance is empty, when the plan explains it. A used-up paid plan
+  // keeps the plain count; the allowance link below covers it.
+  const emptyReason =
+    balance.total > 0
+      ? null
+      : planStatus === "trialing"
+        ? "Your free trial doesn't include texts. They start when your paid plan does."
+        : planStatus === null
+          ? "Texts come with a paid plan."
+          : null;
+
   return (
     <section aria-label="Texts left">
       <p className="flex items-baseline gap-2">
@@ -614,6 +639,11 @@ function BalanceLine({ balance }: { balance: Balance }) {
           {balance.total === 1 ? "text left" : "texts left"}
         </span>
       </p>
+      {emptyReason ? (
+        <p className="mt-2 text-sm text-muted" data-empty-balance-reason>
+          {emptyReason}
+        </p>
+      ) : null}
       {balance.purchased > 0 ? (
         <p className="mt-2 text-sm text-muted">
           {balance.monthly.toLocaleString()} from this month&apos;s plan, used

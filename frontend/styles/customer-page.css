@@ -1081,11 +1081,12 @@ html:has(.customer-live) {
 }
 
 /* The sheet already keeps its action in view; a sticky bar with the old card's
-   negative margins sat on top of the ReviewBoost footer. */
+   negative margins sat on top of the ReviewBoost footer. Side padding matches
+   the business name above (7cqi), so the button no longer runs edge to edge. */
 .visit-card .customer-action-bar {
   position: static;
   margin: 16px 0 0;
-  padding: 0;
+  padding: 0 7cqi;
   border: 0;
   background: transparent;
   box-shadow: none;

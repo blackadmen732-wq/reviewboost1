@@ -8,7 +8,7 @@ import { listStands, requireOwner } from "@/lib/server/owner-data";
 import { listTextableCustomers, type TextableCustomer } from "@/lib/server/customers/textable";
 import { logger } from "@/lib/server/logger";
 import { supabaseServer } from "@/lib/supabase/server";
-import { getUnreadCount, readSmsBalance, listRecentTextRequests } from "@/lib/server/owner-data";
+import { getUnreadCount, readOwnerBilling, listRecentTextRequests } from "@/lib/server/owner-data";
 
 export const metadata: Metadata = {
   title: "Text Requests",
@@ -31,8 +31,10 @@ export const dynamic = "force-dynamic";
 export default async function TextRequestsPage() {
   const { organization } = await requireOwner("/text-requests");
 
-  const [balance, stands, recent, unread] = await Promise.all([
-    readSmsBalance(organization.orgId),
+  const [billing, stands, recent, unread] = await Promise.all([
+    // The plan as well as the balance, so an empty balance on a trial can say
+    // why instead of showing a bare "0 texts left".
+    readOwnerBilling(organization.orgId),
     listStands(organization.orgId),
     listRecentTextRequests(organization.orgId),
     getUnreadCount(organization.orgId),
@@ -61,7 +63,8 @@ export default async function TextRequestsPage() {
       />
 
       <TextRequestComposer
-        balance={balance}
+        balance={billing.smsBalance}
+        planStatus={billing.status}
         tags={sendable.map((stand) => ({
           standId: stand.standId,
           label: stand.label,

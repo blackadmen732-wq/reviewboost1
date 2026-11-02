@@ -497,3 +497,34 @@
     border: 1px solid CanvasText;
   }
 }
+
+/* Screen change on the customer page: a short fade and a 6px rise, so one
+   screen visibly replaces the other. Plain CSS instead of an animation library;
+   with reduced motion it is a quick fade with no movement. */
+.customer-screen-enter {
+  animation: customer-screen-enter 220ms ease-out both;
+}
+@keyframes customer-screen-enter {
+  from {
+    opacity: 0.96;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .customer-screen-enter {
+    animation-name: customer-screen-fade;
+    animation-duration: 100ms;
+  }
+}
+@keyframes customer-screen-fade {
+  from {
+    opacity: 0.96;
+  }
+  to {
+    opacity: 1;
+  }
+}
