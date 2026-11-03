@@ -19,6 +19,12 @@ export interface CustomerFlowState {
   sessionId: string | null;
   responseId: string | null;
   sessionKey: string | null;
+  /**
+   * The language the session was started in. The session now starts when the
+   * page opens, before the customer may switch language, and a retry with the
+   * same key must send the same body or the server calls it a conflict.
+   */
+  sessionLocale: Locale | null;
   responseKey: string | null;
   destinationKey: string | null;
   destinationPending: boolean;
@@ -32,6 +38,7 @@ export const initialCustomerFlowState: CustomerFlowState = {
   sessionId: null,
   responseId: null,
   sessionKey: null,
+  sessionLocale: null,
   responseKey: null,
   destinationKey: null,
   destinationPending: false,
@@ -43,7 +50,8 @@ export type CustomerFlowAction =
   | { type: "restore"; state: CustomerFlowState }
   | { type: "select-rating"; rating: RatingValue }
   | { type: "change-locale"; locale: Locale }
-  | { type: "feedback-started"; sessionKey: string; responseKey: string }
+  | { type: "session-opening"; sessionKey: string; sessionLocale: Locale }
+  | { type: "feedback-started"; sessionKey: string; sessionLocale: Locale; responseKey: string }
   | { type: "session-ready"; sessionId: string }
   | { type: "feedback-offline" }
   | { type: "feedback-failed" }
@@ -71,10 +79,19 @@ export function customerFlowReducer(
       };
     case "change-locale":
       return { ...state, locale: action.locale };
+    case "session-opening":
+      // Once chosen, the key and its language never change: a reload or a
+      // retry is the same session, not a second open.
+      return {
+        ...state,
+        sessionKey: state.sessionKey ?? action.sessionKey,
+        sessionLocale: state.sessionLocale ?? action.sessionLocale,
+      };
     case "feedback-started":
       return {
         ...state,
         sessionKey: action.sessionKey,
+        sessionLocale: action.sessionLocale,
         responseKey: action.responseKey,
         feedbackStatus: "submitting",
       };

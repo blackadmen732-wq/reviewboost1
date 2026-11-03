@@ -98,6 +98,37 @@ describe("one-tap customer flow", () => {
     expect(operations.filter((operation) => operation === "response")).toHaveLength(1);
   });
 
+  it("starts the session as the page opens, so the star only has the rating left to save", async () => {
+    // One round trip fewer between the star and Google, and an open the
+    // owner can count as a tap even when nobody rates.
+    const operations = () => window.__RB_FIXTURE_CALLS__?.map(({ operation }) => operation) ?? [];
+    const user = await openRating();
+    await waitFor(() => expect(operations()).toContain("session"));
+    expect(operations()).not.toContain("response");
+
+    await tapStar(user, 5);
+    expect(operations().filter((operation) => operation === "session")).toHaveLength(1);
+    expect(operations().filter((operation) => operation === "response")).toHaveLength(1);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(FIXTURE_DESTINATION));
+  });
+
+  it("does not count a tab nobody is looking at until it is shown", async () => {
+    const sessions = () =>
+      window.__RB_FIXTURE_CALLS__?.filter(({ operation }) => operation === "session") ?? [];
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    try {
+      await openRating();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(sessions()).toHaveLength(0);
+
+      visibility.mockReturnValue("visible");
+      document.dispatchEvent(new Event("visibilitychange"));
+      await waitFor(() => expect(sessions()).toHaveLength(1));
+    } finally {
+      visibility.mockRestore();
+    }
+  });
+
   it("does not submit twice when a star is tapped twice", async () => {
     const user = await openRating();
     const star = screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[4] });

@@ -47,7 +47,8 @@ export interface HomeData {
     attentions: HomeAttention[];
     primary: { label: string; href: string } | null;
     tagStatus: { total: number; live: number; programmed: number; needsRewrite: number };
-    week: { count: number; change: string | null } | null;
+    /** `taps` is absent from an older server: show ratings, as before. */
+    week: { count: number; change: string | null; taps?: number | null } | null;
   };
   insights: { average: string; total: number; direction: string | null } | null;
   tagStatusLine: string;

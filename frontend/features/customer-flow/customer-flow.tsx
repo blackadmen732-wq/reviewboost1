@@ -65,9 +65,10 @@ interface CustomerFlowProps {
 
 interface FeedbackAttempt {
   rating: RatingValue;
-  locale: Locale;
   sessionId: string | null;
   sessionKey: string;
+  /** The language the session was (or will be) started in, not the page's now. */
+  sessionLocale: Locale;
   responseKey: string;
 }
 
@@ -158,6 +159,8 @@ export function CustomerFlow({
   const feedbackInFlight = useRef(false);
   const destinationInFlight = useRef(false);
   const handoffPending = useRef(false);
+  /** The session started as the page opened, while it is on its way. */
+  const openingSession = useRef<Promise<string | null> | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const messages = customerMessages[state.locale];
 
@@ -238,16 +241,66 @@ export function CustomerFlow({
     return () => window.cancelAnimationFrame(animationFrame);
   }, [contextQuery.isPending, contextQuery.status, state.screen]);
 
+  /*
+   * The session starts the moment the page opens, not at the star.
+   *
+   * Two reasons, both about the person at the counter. The star then has one
+   * thing left to do, save the rating, so the trip to Google is one round
+   * trip shorter. And an open is what "how many people tapped your Tag"
+   * counts: a page that waited for the star could only count ratings.
+   *
+   * Only for someone looking at the rating screen: not a tab that already
+   * rated (back from Google), not a prerendered or background tab (it starts
+   * when it is shown), and not while the early form is already submitting.
+   * A failure here costs nothing: the star starts the session itself, with the
+   * same key, exactly as it did before.
+   */
+  const canOpenSession =
+    recoveryReady &&
+    Boolean(contextQuery.data) &&
+    !earlyDone &&
+    state.screen === "rating" &&
+    state.sessionId === null;
+  const { sessionKey: openKey, sessionLocale: openLocale, locale: pageLocale } = state;
+  useEffect(() => {
+    if (!canOpenSession) return undefined;
+    function open() {
+      if (openingSession.current || window.__rbEarly) return;
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+      const sessionKey = openKey ?? createIdempotencyKey("session");
+      const sessionLocale = openLocale ?? pageLocale;
+      dispatch({ type: "session-opening", sessionKey, sessionLocale });
+      openingSession.current = getCustomerFlowApi()
+        .then((api) =>
+          api.createSession(token, { locale: sessionLocale }, { idempotencyKey: sessionKey }),
+        )
+        .then((session) => {
+          dispatch({ type: "session-ready", sessionId: session.sessionId });
+          return session.sessionId;
+        })
+        .catch(() => {
+          openingSession.current = null;
+          return null;
+        });
+    }
+    open();
+    document.addEventListener("visibilitychange", open);
+    return () => document.removeEventListener("visibilitychange", open);
+  }, [canOpenSession, openKey, openLocale, pageLocale, token]);
+
   const feedbackMutation = useMutation({
     networkMode: "always",
     mutationFn: async (attempt: FeedbackAttempt) => {
       const api = await getCustomerFlowApi();
-      let sessionId = attempt.sessionId;
+      // A star tapped while the opening session is still on its way waits for
+      // it rather than starting a second one.
+      let sessionId =
+        attempt.sessionId ?? (openingSession.current ? await openingSession.current : null);
 
       if (!sessionId) {
         const session = await api.createSession(
           token,
-          { locale: attempt.locale },
+          { locale: attempt.sessionLocale },
           { idempotencyKey: attempt.sessionKey },
         );
         sessionId = session.sessionId;
@@ -303,8 +356,9 @@ export function CustomerFlow({
       if (feedbackInFlight.current) return;
 
       const sessionKey = previous.sessionKey ?? createIdempotencyKey("session");
+      const sessionLocale = previous.sessionLocale ?? previous.locale;
       const responseKey = previous.responseKey ?? createIdempotencyKey("response");
-      dispatch({ type: "feedback-started", sessionKey, responseKey });
+      dispatch({ type: "feedback-started", sessionKey, sessionLocale, responseKey });
 
       if (!navigator.onLine) {
         dispatch({ type: "feedback-offline" });
@@ -315,9 +369,9 @@ export function CustomerFlow({
       try {
         const result = await feedbackMutation.mutateAsync({
           rating,
-          locale: previous.locale,
           sessionId: previous.sessionId,
           sessionKey,
+          sessionLocale,
           responseKey,
         });
         const destinationKey =

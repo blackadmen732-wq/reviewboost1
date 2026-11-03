@@ -85,4 +85,5 @@ export const EXPECTED_MIGRATIONS: readonly string[] = [
   "apple_sign_in_tokens",
   "sms_pack_money",
   "tag_key_check",
+  "tag_opens",
 ];

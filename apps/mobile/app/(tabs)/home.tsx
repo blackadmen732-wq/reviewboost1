@@ -112,11 +112,11 @@ function ActiveHome({ home }: { home: HomeData }) {
       {model.week || insights ? (
         <View style={styles.tiles} accessibilityLabel="Your numbers">
           {model.week ? (
+            // How many people tapped, and how many of them rated: the
+            // website's weekTile, word for word. An older server sends no taps.
             <NumberTile
               label="This week"
-              value={model.week.count.toLocaleString("en-US")}
-              unit={model.week.count === 1 ? "rating" : "ratings"}
-              note={model.week.change}
+              {...weekTile(model.week)}
               hint="Opens Feedback"
               onPress={() => router.navigate({ pathname: "/(tabs)/feedback", params: { show: "all" } })}
             />
@@ -269,6 +269,18 @@ function SetupSteps({ steps }: { steps: HomeSetupStep[] }) {
  * One number to read from arm's length: what it counts, the number big, the
  * word for it, one quiet line of context. The whole card is the button.
  */
+/** frontend/features/dashboard/home-model.ts weekTile */
+function weekTile(week: { count: number; change: string | null; taps?: number | null }): {
+  value: string;
+  unit: string;
+  note: string | null;
+} {
+  if (week.taps == null) {
+    return { value: week.count.toLocaleString("en-US"), unit: week.count === 1 ? "rating" : "ratings", note: week.change };
+  }
+  return { value: week.taps.toLocaleString("en-US"), unit: week.taps === 1 ? "tap" : "taps", note: `${week.count} rated` };
+}
+
 function NumberTile({
   label,
   value,

@@ -9,6 +9,7 @@ import {
   type HomePrimary,
   type SetupStep,
   tagStatusLine,
+  weekTile,
 } from "@/features/dashboard/home-model";
 import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page";
 import { SetupSeen } from "@/features/dashboard/setup-seen";
@@ -288,12 +289,12 @@ function ActiveHome({
       {model.week || insights ? (
         <section aria-label="Your numbers" className="grid max-w-[36rem] grid-cols-2 gap-3">
           {model.week ? (
+            // How many people tapped, and how many of them rated: the two
+            // numbers Home exists for. Stars are the tile beside it.
             <NumberTile
               href="/feedback?show=all"
               label="This week"
-              value={String(model.week.count)}
-              unit={model.week.count === 1 ? "rating" : "ratings"}
-              note={model.week.change}
+              {...weekTile(model.week)}
               action="See all feedback"
               testId="home-week"
             />

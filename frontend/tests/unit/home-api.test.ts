@@ -53,6 +53,7 @@ vi.mock("@/lib/server/owner-data", () => {
       hasGoogleLink: true,
       ratingsThisWeek: 5,
       ratingsLastWeek: 2,
+      tapsThisWeek: 8,
     }),
     listStands: seen([
       { standId: "stand-1", label: "Front counter", status: "active", nfcProvisionedAt: "2026-10-01T00:00:00Z", tokenRotatedAt: null },
@@ -112,7 +113,8 @@ describe("GET /api/v1/home", () => {
     expect(data.unreadCount).toBe(2);
     expect(data.model.kind).toBe("active");
     expect(data.model.attentions.map((attention) => attention.kind)).toContain("unread");
-    expect(data.model.week).toEqual({ count: 5, change: "3 more than last week" });
+    // Taps lead: how many people opened a Tag, beside how many rated.
+    expect(data.model.week).toEqual({ count: 5, change: "3 more than last week", taps: 8 });
     expect(data.insights).toEqual({ average: "4.3", total: 12, direction: null });
     expect(typeof data.tagStatusLine).toBe("string");
     // With more than one Tag, each rating says which one it came from.

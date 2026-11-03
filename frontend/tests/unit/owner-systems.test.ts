@@ -10,7 +10,7 @@ import { lastUsedLabel, tagReadiness, tagReadinessLabel } from "@/lib/owner/tag-
 import { payloadContainsTenantIds } from "@/lib/owner/public-customer";
 import { NFC_SCENE_COPY } from "@/lib/owner/nfc-presentation";
 import { PROGRAM_PHASE_COPY } from "@/lib/owner/nfc-phases";
-import { weekNumbers } from "@/features/dashboard/home-model";
+import { weekNumbers, weekTile } from "@/features/dashboard/home-model";
 
 function source(path: string): string {
   return readFileSync(join(process.cwd(), path), "utf8");
@@ -202,14 +202,38 @@ describe("Home's week number", () => {
     expect(weekNumbers({ ratingsThisWeek: 12, ratingsLastWeek: 9 })).toEqual({
       count: 12,
       change: "3 more than last week",
+      taps: null,
     });
     expect(weekNumbers({ ratingsThisWeek: 9, ratingsLastWeek: 10 })).toEqual({
       count: 9,
       change: "1 fewer than last week",
+      taps: null,
     });
     expect(weekNumbers({ ratingsThisWeek: 4, ratingsLastWeek: 4 })?.change).toBe("Same as last week");
-    expect(weekNumbers({ ratingsThisWeek: 1, ratingsLastWeek: 0 })).toEqual({ count: 1, change: null });
+    expect(weekNumbers({ ratingsThisWeek: 1, ratingsLastWeek: 0 })).toEqual({ count: 1, change: null, taps: null });
     expect(weekNumbers({ ratingsThisWeek: 0, ratingsLastWeek: 0 })).toBeNull();
+  });
+
+  it("leads with taps once they are counted, and still shows a week of taps with no ratings", () => {
+    const week = weekNumbers({ ratingsThisWeek: 18, ratingsLastWeek: 12, tapsThisWeek: 24 });
+    expect(week).toEqual({ count: 18, change: "6 more than last week", taps: 24 });
+    expect(weekTile(week!)).toEqual({ value: "24", unit: "taps", note: "18 rated" });
+
+    // People tapped and nobody rated: that is exactly what an owner needs to see.
+    const quiet = weekNumbers({ ratingsThisWeek: 0, ratingsLastWeek: 0, tapsThisWeek: 3 });
+    expect(weekTile(quiet!)).toEqual({ value: "3", unit: "taps", note: "0 rated" });
+    expect(weekTile(weekNumbers({ ratingsThisWeek: 1, ratingsLastWeek: 0, tapsThisWeek: 1 })!)).toEqual({
+      value: "1",
+      unit: "tap",
+      note: "1 rated",
+    });
+
+    // An older server, with no taps: the ratings tile, as before.
+    expect(weekTile({ count: 5, change: "Same as last week", taps: null })).toEqual({
+      value: "5",
+      unit: "ratings",
+      note: "Same as last week",
+    });
   });
 });
 

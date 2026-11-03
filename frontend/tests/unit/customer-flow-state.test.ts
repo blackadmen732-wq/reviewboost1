@@ -22,6 +22,7 @@ describe("customer flow state", () => {
       state = customerFlowReducer(state, {
         type: "feedback-started",
         sessionKey: "session-key-123456",
+        sessionLocale: "en",
         responseKey: "response-key-123456",
       });
       state = customerFlowReducer(state, {
@@ -50,6 +51,7 @@ describe("customer flow state", () => {
     state = customerFlowReducer(state, {
       type: "feedback-started",
       sessionKey: "session-key-123456",
+      sessionLocale: "en",
       responseKey: "response-key-123456",
     });
     screens.add(state.screen);
@@ -68,17 +70,38 @@ describe("customer flow state", () => {
     const started = customerFlowReducer(initialCustomerFlowState, {
       type: "feedback-started",
       sessionKey: "session-key-123456",
+      sessionLocale: "en",
       responseKey: "response-key-123456",
     });
     const failed = customerFlowReducer(started, { type: "feedback-failed" });
     const retried = customerFlowReducer(failed, {
       type: "feedback-started",
       sessionKey: failed.sessionKey as string,
+      sessionLocale: "en",
       responseKey: failed.responseKey as string,
     });
 
     expect(retried.sessionKey).toBe("session-key-123456");
     expect(retried.responseKey).toBe("response-key-123456");
+  });
+
+  it("keeps the session the page opened with, key and language, whatever happens next", () => {
+    let state = customerFlowReducer(initialCustomerFlowState, {
+      type: "session-opening",
+      sessionKey: "session-key-opened",
+      sessionLocale: "es",
+    });
+    // A second opening (a reload, a tab shown again) is the same session.
+    state = customerFlowReducer(state, {
+      type: "session-opening",
+      sessionKey: "session-key-other",
+      sessionLocale: "en",
+    });
+    state = customerFlowReducer(state, { type: "change-locale", locale: "ht" });
+
+    expect(state.sessionKey).toBe("session-key-opened");
+    expect(state.sessionLocale).toBe("es");
+    expect(state.locale).toBe("ht");
   });
 
   it("creates a fresh response attempt after the rating changes", () => {
@@ -87,6 +110,7 @@ describe("customer flow state", () => {
       {
         type: "feedback-started",
         sessionKey: "session-key-123456",
+        sessionLocale: "en",
         responseKey: "response-key-123456",
       },
     );

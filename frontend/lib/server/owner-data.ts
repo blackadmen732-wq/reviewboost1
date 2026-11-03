@@ -853,6 +853,12 @@ export interface OwnerCounts {
   ratingsToday: number;
   ratingsThisWeek: number;
   ratingsLastWeek: number;
+  /**
+   * People who opened a Tag this week, by tap or by scan: what Home leads
+   * with, beside the ratings they left. Link previews and crawlers are not
+   * counted (`counts_as_scan`).
+   */
+  tapsThisWeek: number;
   unread: number;
   /** Of `unread`, how many are three stars or fewer. */
   unreadLow: number;
@@ -884,7 +890,7 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string, db?:
   // subtraction put the boundary at 23:00 or 01:00 on the wrong day.
   const priorWeekStart = localDay(timezone, -13).start;
 
-  const [today, thisWeek, lastWeek, unread, unreadLow, openLow, praise, stands, locations, recent] = await Promise.all([
+  const [today, thisWeek, lastWeek, tapsWeek, unread, unreadLow, openLow, praise, stands, locations, recent] = await Promise.all([
     supabase
       .from("customer_responses")
       .select("id", { count: "exact", head: true })
@@ -901,6 +907,13 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string, db?:
       .eq("org_id", orgId)
       .gte("submitted_at", priorWeekStart.toISOString())
       .lt("submitted_at", weekStart.toISOString()),
+    // Every session is an open: the customer page starts one as it loads.
+    supabase
+      .from("public_review_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("counts_as_scan", true)
+      .gte("created_at", weekStart.toISOString()),
     // Unread *and* unresolved, matching the list Home and Feedback actually
     // show. Counting every unread row meant a rating a teammate had already
     // resolved still said "1 message needs you" above a list with nothing in
@@ -949,6 +962,7 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string, db?:
   if (today.error) dataFailure("owner_counts.today", today.error);
   if (thisWeek.error) dataFailure("owner_counts.week", thisWeek.error);
   if (lastWeek.error) dataFailure("owner_counts.last_week", lastWeek.error);
+  if (tapsWeek.error) dataFailure("owner_counts.taps_week", tapsWeek.error);
   if (unread.error) dataFailure("owner_counts.unread", unread.error);
   if (unreadLow.error) dataFailure("owner_counts.unread_low", unreadLow.error);
   if (openLow.error) dataFailure("owner_counts.open_low", openLow.error);
@@ -961,6 +975,7 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string, db?:
     ratingsToday: today.count ?? 0,
     ratingsThisWeek: thisWeek.count ?? 0,
     ratingsLastWeek: lastWeek.count ?? 0,
+    tapsThisWeek: tapsWeek.count ?? 0,
     unread: unread.count ?? 0,
     unreadLow: unreadLow.count ?? 0,
     openLow: openLow.count ?? 0,

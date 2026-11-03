@@ -43,7 +43,7 @@ reviewboost.com ─────────────▶  /login  ────
  Support · Delete account                                 later")             ├─ Texts ────────── send review requests (consent-gated)
                                                         3 Done → Tags          ├─ Tags ─────────── 1 Customer page 2 Tag 3 Test
                                                                                │    ├─ /customer-page  editor + live preview
-                                                                               │    └─ /stands/[id]    one Tag: program / print
+                                                                               │    └─ /stands/[id]    one Tag: set up tap / print
                                                                                └─ Settings ──────── business, Google link, theme,
                                                                                     ├─ Connections   Google Sheets · CSV · Square
                                                                                     ├─ Billing ─────▶ Stripe Checkout / Portal (web only)
@@ -60,7 +60,7 @@ Same sign-in, Home, Feedback, Texts, Tags, Settings. No purchase button. Account
 
 The connecting threads:
 
-- **The Tag is the centre of everything.** Made in Tags. The customer taps it. Feedback shows what came from it. Home tells you when it needs attention (not programmed, needs rewriting).
+- **The Tag is the centre of everything.** Made in Tags. The customer taps it. Feedback shows what came from it. Home says when it needs you (tap not set up, a new code).
 - **The Google review link** is entered once (in onboarding or Settings). It is used by the customer page, checked on Home ("Your link is a listing, not a review link"), and is step 1 in Tags.
 - **Customers** arrive from three places: a Tag rating, a Connections import, or a text request. Only **consent** decides who may be texted. An import never counts as consent.
 - **Billing** decides the text allowance. Texts shows the remaining credit. Billing is only ever changed on the web.
@@ -150,7 +150,7 @@ Headings use `text-wrap: balance`; paragraphs use `text-wrap: pretty`.
 **Spacing scale.** 4, 8, 12, 16, 24, 32, 40, 48, 64, 80, 96, 120, 144px. Use tight spacing inside a group and generous spacing between tasks.
 
 **Shape.**
-- Controls have a 12px radius; cards have 16px.
+- Controls have a 16px radius; cards and sheets have 24px.
 - Rows, inputs and buttons are 56px tall.
 - Nothing tappable is smaller than 44px.
 
@@ -248,7 +248,7 @@ Used for setup, onboarding and the per-text tracker.
 
 ### 6.5 Cards and lists
 
-- A card is white with a hairline border and 16px radius. Never put a card inside a card.
+- A card is white with a hairline border and 24px radius. Never put a card inside a card.
 - A list is rows with dividers. Each row shows a title, one line of detail, a status chip on the right and a chevron if it opens.
 - Rows are at least 56px tall.
 
@@ -314,7 +314,7 @@ Each screen follows the same pattern: what it's for, its status line, its one ne
   5. Tap not set up or a new code → "Set up tap" or "Print your code"
 - **Content:**
   - An attention card when something needs the owner.
-  - "This week", comparing ratings this week with last week, in plain numbers.
+  - "This week": how many people tapped or scanned a Tag, and how many rated (`weekTile`).
   - Recent ratings, the newest three.
   - A link to Tags while setup isn't finished.
 - **States:**
@@ -569,9 +569,7 @@ For every screen that changes:
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Warm-white palette, glossy button, dark mode | ✅ PR #82 |
-| 2 | Set up page with 3 steps and "Show me how" | ✅ PR #82 |
-| 3 | Ink selected tab, never-dead buttons, labelled loading, empty states with actions, unsaved-changes warning | ✅ PR #82 |
+| 1–3 | Warm-white palette and dark mode, the 3-step setup page, ink selected tab, never-dead buttons, labelled loading, empty states with actions, unsaved-changes warning | ✅ PR #82 |
 | 4 | Google Sheets + CSV import, list removal | ✅ PR #79 (Google keys 👤) |
 | 5 | Connections directory with official logos | ✅ PR #79 (logo files 👤) |
 | 6 | Sign-in screen: labelled Google / Apple / Email + Sign in with Apple | 🔨 |

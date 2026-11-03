@@ -27,6 +27,8 @@ export interface HomeCounts {
   googleLinkNeedsUpgrade?: boolean;
   ratingsThisWeek?: number;
   ratingsLastWeek?: number;
+  /** People who tapped or scanned a Tag this week. Absent in older callers. */
+  tapsThisWeek?: number;
 }
 
 export type HomeKind = "empty" | "active";
@@ -311,19 +313,36 @@ export function unreadBody(unread: number, low: number | undefined): string {
  * "down 1 what?", so the comparison names last week every time.
  */
 export interface WeekNumbers {
+  /** Ratings this week. */
   count: number;
   /** "3 more than last week", "1 fewer than last week", "Same as last week". */
   change: string | null;
+  /**
+   * People who tapped or scanned a Tag this week, or null where they were not
+   * counted. A week of taps and no ratings still shows: that gap is the news.
+   */
+  taps: number | null;
 }
 
-export function weekNumbers(counts: Pick<HomeCounts, "ratingsThisWeek" | "ratingsLastWeek">): WeekNumbers | null {
+export function weekNumbers(
+  counts: Pick<HomeCounts, "ratingsThisWeek" | "ratingsLastWeek" | "tapsThisWeek">,
+): WeekNumbers | null {
   const thisWeek = counts.ratingsThisWeek;
   if (thisWeek == null) return null;
+  const taps = counts.tapsThisWeek ?? null;
   const lastWeek = counts.ratingsLastWeek ?? 0;
-  if (lastWeek === 0) return thisWeek === 0 ? null : { count: thisWeek, change: null };
+  if (lastWeek === 0) return thisWeek === 0 && !taps ? null : { count: thisWeek, change: null, taps };
   const delta = thisWeek - lastWeek;
-  if (delta === 0) return { count: thisWeek, change: "Same as last week" };
-  return { count: thisWeek, change: `${Math.abs(delta)} ${delta > 0 ? "more" : "fewer"} than last week` };
+  if (delta === 0) return { count: thisWeek, change: "Same as last week", taps };
+  return { count: thisWeek, change: `${Math.abs(delta)} ${delta > 0 ? "more" : "fewer"} than last week`, taps };
+}
+
+/** The tile's words for this week: taps first when they are counted. */
+export function weekTile(week: WeekNumbers): { value: string; unit: string; note: string | null } {
+  if (week.taps === null) {
+    return { value: String(week.count), unit: week.count === 1 ? "rating" : "ratings", note: week.change };
+  }
+  return { value: String(week.taps), unit: week.taps === 1 ? "tap" : "taps", note: `${week.count} rated` };
 }
 
 export function tagStatusLine(status: TagStatus): string {

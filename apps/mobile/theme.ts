@@ -49,8 +49,8 @@ export const colors = {
 } as const;
 
 export const radii = {
-  control: 12,
-  card: 16,
+  control: 16,
+  card: 24,
   badge: 8,
 } as const;
 

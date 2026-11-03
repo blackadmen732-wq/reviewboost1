@@ -166,7 +166,8 @@ describe("brand migration", () => {
   });
 
   it("locks control and card radii", () => {
-    expect(CSS).toMatch(/--radius-control:\s*12px/);
-    expect(CSS).toMatch(/--radius-card:\s*16px/);
+    // Mark's bar: 24 outside, 16 inside. iOS 26 rounds its groups the same way.
+    expect(CSS).toMatch(/--radius-control:\s*16px/);
+    expect(CSS).toMatch(/--radius-card:\s*24px/);
   });
 });
