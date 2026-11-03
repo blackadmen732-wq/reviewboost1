@@ -158,8 +158,10 @@ describe("the App Store listing describes this product", () => {
   it("names the NFC labels the app actually shows", () => {
     // A reviewer following instructions that name a button which is not there
     // files a rejection, not a bug report.
-    expect(submission).toContain("Program NFC");
-    expect(submission).not.toMatch(/Programme NFC/);
+    expect(submission).toContain("Set up tap");
+    // The button was renamed from "Program NFC": a reviewer told to find the
+    // old name would not find it.
+    expect(submission).not.toMatch(/Program(me)? NFC/);
   });
 });
 

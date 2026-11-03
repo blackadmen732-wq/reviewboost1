@@ -68,8 +68,8 @@ describe("the machine's phases collapse into four owner-visible states", () => {
     expect(tagDetected("reading")).toBe(false);
     expect(tagDetected("programming")).toBe(true);
     expect(writingCopy(false, "android").title).toBe("Hold near your Tag");
-    expect(writingCopy(true, "android").title).toBe("Writing Tag…");
-    expect(writingCopy(true, "android").body).toBe("Keep it there while ReviewBoost programs it.");
+    expect(writingCopy(true, "android").title).toBe("Keep still");
+    expect(writingCopy(true, "android").body).toBe("Saving your link to the Tag…");
   });
 
   it("tells each phone where its reader is, without assuming Android's", () => {
@@ -153,7 +153,7 @@ describe("failures say what happened, and only promise what is true", () => {
 
   it("falls back to the plain error when the reason is unknown", () => {
     expect(failureCopy(null)).toEqual(NFC_SCENE_COPY.error);
-    expect(failureCopy(null).title).toBe("Couldn’t program this Tag");
+    expect(failureCopy(null).title).toBe("Couldn’t set up this Tag");
   });
 
   it("does not offer Try again where trying again cannot help", () => {

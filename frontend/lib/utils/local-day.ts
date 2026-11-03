@@ -173,12 +173,44 @@ export function startOfLocalMonth(timezone: string, now: Date = new Date()): Dat
 /**
  * How far the zone is from UTC at a given instant, in milliseconds.
  *
- * Positive west of Greenwich. Derived by formatting one instant in both zones
- * rather than from a table, so it stays correct across daylight-saving changes
- * and political offset changes without anything to maintain.
+ * Positive west of Greenwich. Derived by reading the zone's wall clock at that
+ * instant rather than from a table, so it stays correct across daylight-saving
+ * changes and political offset changes without anything to maintain.
+ *
+ * The wall clock is rebuilt with Date.UTC from its parts. Parsing a formatted
+ * string back with `new Date(...)` reads it in the *server's* zone, so on a
+ * machine that itself keeps daylight saving the two readings straddled its
+ * own clock change and the offset came out an hour wrong for the whole month
+ * after a transition (November's "this month" began at 01:00).
  */
+const WALL_CLOCK = new Map<string, Intl.DateTimeFormat>();
+
 function offsetMs(timezone: string, at: Date): number {
-  const inZone = new Date(at.toLocaleString("en-US", { timeZone: timezone }));
-  const inUtc = new Date(at.toLocaleString("en-US", { timeZone: "UTC" }));
-  return inUtc.getTime() - inZone.getTime();
+  let format = WALL_CLOCK.get(timezone);
+  if (!format) {
+    format = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    WALL_CLOCK.set(timezone, format);
+  }
+  const parts = format.formatToParts(at);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  const wallClockAsUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour"),
+    get("minute"),
+    get("second"),
+  );
+  // Whole seconds on both sides: the wall clock carries no milliseconds.
+  return Math.floor(at.getTime() / 1000) * 1000 - wallClockAsUtc;
 }

@@ -58,7 +58,7 @@ export function tagChecks(input: TagTimes): { qr: { ok: boolean; label: string }
   const nfcOk = status === "ready" || status === "needs-qr";
   return {
     qr: { ok: qrOk, label: qrOk ? "QR ready" : "Reprint QR" },
-    nfc: { ok: nfcOk, label: nfcOk ? "NFC ready" : tagNeedsRewrite(input) ? "Reprogram NFC" : "Program NFC" },
+    nfc: { ok: nfcOk, label: nfcOk ? "Tap ready" : tagNeedsRewrite(input) ? "Set up tap again" : "Set up tap" },
   };
 }
 

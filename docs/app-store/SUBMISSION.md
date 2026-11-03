@@ -54,7 +54,7 @@ FOR THE BUSINESS
 TAGS AND NFC
 
 Bring your own blank NFC tags (NTAG213 or NTAG215). Tap a tag to your iPhone
-and the app programmes it with your review page URL in seconds. No extra
+and the app writes your review page link to it in seconds. No extra
 hardware required — QR codes work on every smartphone too.
 
 PRIVACY
@@ -121,15 +121,15 @@ download is required.
 
 TO TEST THE CORE FLOW
 1. Sign in with the demo credentials above.
-2. Open any Tag from the Tags tab, then tap "Open customer page".
+2. Open any Tag from the Tags tab, then tap "Preview customer page".
 3. Tap any star — you will be sent to the configured Google review URL.
    (The demo account points to a real but publicly known Google My Business
    listing — this is intentional so reviewers can see the destination.)
 
 TO TEST NFC (requires iPhone 7+ with iOS 14+)
 1. On the Tags tab, tap the Tag you want to program.
-2. Tap "Program NFC" and hold a blank NTAG213 or NTAG215 tag to the top of
-   the device when the screen says "Hold near your Tag".
+2. Tap "Set up tap", then "Start", and hold a blank NTAG213 or NTAG215 tag
+   to the top of the device when the screen says "Hold near your Tag".
 3. A green check and "Tag ready" means the tag carries the review URL. Tap it with
    any NFC-capable phone to verify.
    NFC tags are not required to use the app — this feature is opt-in, and the
@@ -291,7 +291,7 @@ purchase button, not after.
 
 | Permission | Reason shown to user |
 |---|---|
-| NFC (`NFCReaderUsageDescription`) | "ReviewBoost uses NFC to programme your physical review tags." |
+| NFC (`NFCReaderUsageDescription`) | "ReviewBoost uses NFC to write your business's review link to your ReviewBoost Tags and to check what a Tag already holds before changing it." (`apps/mobile/app.json`) |
 
 No other system permissions are requested. No camera, microphone, location, contacts, or notifications.
 

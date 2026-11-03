@@ -142,7 +142,7 @@ describe("OwnerHome", () => {
       <OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />,
     );
 
-    expect(screen.getByText("Tag is not programmed yet")).toBeVisible();
+    expect(screen.getByText("Your Tag isn’t set up yet")).toBeVisible();
     expect(screen.getByRole("link", { name: "Print your code" })).toBeVisible();
     expect(
       await screen.findByRole("link", { name: /Preview customer page/ }),
@@ -206,7 +206,7 @@ describe("OwnerHome", () => {
       "href",
       "/feedback",
     );
-    expect(screen.getByText("1 tag · not programmed yet")).toBeVisible();
+    expect(screen.getByText("1 tag · tap not set up yet")).toBeVisible();
     expect(screen.queryByText("No ratings yet.")).not.toBeInTheDocument();
   });
 });

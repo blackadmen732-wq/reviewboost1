@@ -125,7 +125,7 @@ describe("Program Tag sheet", () => {
   }
 
   async function hold() {
-    fireEvent.click(screen.getByRole("button", { name: /^program nfc$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^start$/i }));
   }
 
   /** The owner-visible scene, as opposed to the machine phase underneath. */
@@ -317,7 +317,7 @@ describe("Program Tag sheet", () => {
     renderSheet();
 
     expect(scene()).toBe("ready");
-    expect(title()).toBe("Program your Tag");
+    expect(title()).toBe("Set up tap");
     expect(FakeNDEFReader.scans).toBe(0);
   });
 
@@ -342,7 +342,7 @@ describe("Program Tag sheet", () => {
     expect(screen.queryByText(/%|\bcm\b/)).toBeNull();
 
     act(() => emit?.([]));
-    await waitFor(() => expect(title()).toBe("Writing Tag…"));
+    await waitFor(() => expect(title()).toBe("Keep still"));
     // Reading, writing and checking are one scene, not three.
     expect(scene()).toBe("writing");
 
@@ -422,7 +422,7 @@ describe("Program Tag sheet", () => {
     renderSheet();
     await hold();
 
-    await waitFor(() => expect(title()).toBe("This phone can’t program Tags"));
+    await waitFor(() => expect(title()).toBe("This phone can’t set up tap"));
     expect(screen.getByText(/QR code on the Tag still works/i)).toBeVisible();
     expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
     expect(screen.getByRole("button", { name: /^close$/i })).toBeVisible();
@@ -437,7 +437,7 @@ describe("Program Tag sheet", () => {
     await hold();
 
     await waitFor(() => expect(scene()).toBe("error"));
-    expect(title()).toBe("Couldn’t program this Tag");
+    expect(title()).toBe("Couldn’t set up this Tag");
     expect(screen.queryByText(/nothing on the tag was changed/i)).toBeNull();
   });
 

@@ -70,17 +70,17 @@ describe("Make a new code", () => {
     expect(ROTATE_WARNING).toMatch(/NFC chip you programmed/);
   });
 
-  it("says what to do next: reprint, and reprogram NFC", async () => {
+  it("says what to do next: reprint, and set up tap again", async () => {
     const { dialog } = await openWarning();
     const steps = dialog.querySelector("[data-rotate-consequences]");
     expect(steps).toHaveTextContent("Print the new code and replace the one on the counter.");
-    expect(steps).toHaveTextContent("If this Tag has an NFC chip, program it again.");
+    expect(steps).toHaveTextContent("If this Tag has tap, set it up again.");
   });
 
   it("is specific when this Tag's NFC chip has been programmed", async () => {
     const { dialog } = await openWarning({ ...stand, nfcProvisionedAt: "2026-09-01T00:00:00.000Z" } as Stand);
     expect(dialog.querySelector("[data-rotate-consequences]")).toHaveTextContent(
-      "Program this Tag’s NFC chip again.",
+      "Set up tap on this Tag again.",
     );
   });
 
@@ -111,7 +111,7 @@ describe("Make a new code", () => {
     expect(calls.filter((url) => url.endsWith("/rotate-token"))).toHaveLength(1);
     expect(notify.success).toHaveBeenCalledWith(
       "New code ready",
-      "The old code no longer works. Print this one and program NFC again.",
+      "The old code no longer works. Print this one and set up tap again.",
     );
   });
 });

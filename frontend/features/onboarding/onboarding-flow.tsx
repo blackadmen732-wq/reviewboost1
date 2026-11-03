@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { TestGoogleLinkButton } from "@/features/dashboard/google-link-care";
 import {
   GOOGLE_LINK_BLAST,
+  GOOGLE_LINK_HELP_STEPS,
   GOOGLE_LINK_LATER,
   GOOGLE_LINK_NOT_REVIEW_LINK,
   googleLinkState,
@@ -229,11 +230,7 @@ export function OnboardingFlow({
         {/* Numbered, three steps, no paragraph. Someone who has never done this
             can follow it while holding a phone in the other hand. */}
         <ol className="flex flex-col gap-3 rounded-[var(--radius-card)] bg-quiet p-5">
-          {[
-            "Open your business on Google",
-            "Tap “Ask for reviews”",
-            "Copy the link and paste it below",
-          ].map((instruction, index) => (
+          {GOOGLE_LINK_HELP_STEPS.map((instruction, index) => (
             <li key={instruction} className="flex items-start gap-3">
               <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface text-sm font-bold text-ink">
                 {index + 1}

@@ -77,7 +77,7 @@ export const SETUP_STEPS = [
   { title: "Sign up with your email", body: "We email you a six-digit code. There is no password to remember." },
   {
     title: "Name your business and add your Google link",
-    body: "Open your business on Google, tap “Ask for reviews”, copy the link and paste it in. We check that it is a real review link.",
+    body: "Open your business on Google, tap “Get more reviews”, copy the link and paste it in. We check that it is a real review link.",
   },
   { title: "Get your first Tag", body: "It is made for you. Print its QR code, or program an NFC tag with your phone." },
   {

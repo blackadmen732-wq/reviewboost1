@@ -29,19 +29,25 @@ export const GOOGLE_LINK_INVALID =
 export const GOOGLE_LINK_LEGACY_TITLE = "Upgrade this link";
 
 export const GOOGLE_LINK_LEGACY =
-  "This link still works, so your Tags keep working. But it opens your Google listing, not the review box. Replace it with your “Ask for reviews” link so customers land straight on writing a review. Your printed codes and NFC Tags stay the same.";
+  "This link still works, so your Tags keep working. But it opens your Google listing, not the review box. Replace it with your “Get more reviews” link so customers land straight on writing a review. Your printed codes and NFC Tags stay the same.";
 
 /** A listing or short link pasted as a new link: it cannot be saved any more. */
 export const GOOGLE_LINK_NOT_REVIEW_LINK =
-  "This opens your Google listing, not the review box. Paste your “Ask for reviews” link instead.";
+  "This opens your Google listing, not the review box. Paste your “Get more reviews” link instead.";
 
 export const GOOGLE_LINK_LATER =
   "The Google link is not set. Customers can rate you. They cannot be sent to Google until you add it in Settings.";
 
+/**
+ * Google's own words, from its help page "Get more reviews"
+ * (support.google.com/business/answer/16816815): Read reviews, then
+ * Get more reviews, then Copy. Google renamed "Ask for reviews"; owners
+ * looking for the old button do not find it.
+ */
 export const GOOGLE_LINK_HELP_STEPS = [
   "Open your business on Google",
-  "Tap “Ask for reviews”",
-  "Copy the link and paste it here",
+  "Tap “Read reviews”, then “Get more reviews”",
+  "Tap “Copy” and paste the link here",
 ] as const;
 
 export function googleLinkState(value: string | null | undefined): GoogleLinkState {

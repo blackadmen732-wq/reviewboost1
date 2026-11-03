@@ -48,8 +48,8 @@ describe("Tags list", () => {
       "/stands/11111111-1111-1111-1111-111111111111",
     );
     // QR and NFC are separate states, because they fail separately.
-    expect(screen.getByText("Program NFC")).toBeVisible();
-    expect(screen.getByText("NFC ready")).toBeVisible();
+    expect(screen.getByText("Set up tap")).toBeVisible();
+    expect(screen.getByText("Tap ready")).toBeVisible();
     expect(screen.getAllByText("QR ready")).toHaveLength(2);
     expect(screen.getByText(/High Street · Not used yet/)).toBeVisible();
     expect(screen.getByText(/Used today/)).toBeVisible();
@@ -68,6 +68,6 @@ describe("Tags list", () => {
     );
 
     expect(screen.getByText("Reprint QR")).toBeVisible();
-    expect(screen.getByText("Reprogram NFC")).toBeVisible();
+    expect(screen.getByText("Set up tap again")).toBeVisible();
   });
 });

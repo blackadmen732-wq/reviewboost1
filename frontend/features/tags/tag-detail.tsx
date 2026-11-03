@@ -113,7 +113,7 @@ function ReadOnlyTagDetail({ stand }: { stand: Stand }) {
         </p>
       </header>
       <p className="text-base text-muted" data-tag-access="read-only">
-        {ownerOrAdmin("print, program or change this Tag")}
+        {ownerOrAdmin("print, set up or change this Tag")}
       </p>
     </div>
   );
@@ -128,7 +128,7 @@ function ManagedTagDetail({
 }) {
   const router = useRouter();
   const qr = useAuthenticatedQr(stand.standId, organizationId);
-  // Set the moment a Tag is programmed so the header stops saying "NFC not programmed"
+  // Set the moment a Tag is programmed so the header stops saying "Tap not set up"
   // while router.refresh() fetches the server's version. Without it the owner
   // programmed a Tag, watched it succeed, and was still told it needed doing.
   const [justProgrammedAt, setJustProgrammedAt] = useState<string | null>(null);
@@ -174,7 +174,7 @@ function ManagedTagDetail({
       qr.reload();
       notify.success(
         "New code ready",
-        "The old code no longer works. Print this one and program NFC again.",
+        "The old code no longer works. Print this one and set up tap again.",
       );
     } catch {
       qr.reload();
@@ -267,7 +267,7 @@ function ManagedTagDetail({
 
       <section className="max-w-[28rem]" aria-labelledby="nfc-heading" data-nfc-section>
         <h2 id="nfc-heading" className="text-base font-semibold text-ink">
-          NFC
+          Tap
         </h2>
         <p className="mt-1 text-base leading-relaxed text-muted">{nfcLine(status)}</p>
         <Button
@@ -277,12 +277,12 @@ function ManagedTagDetail({
           onClick={() => setProgram(true)}
         >
           <Smartphone className="size-5" aria-hidden="true" />
-          {status === "both" ? "Program NFC again" : "Program NFC"}
+          {status === "both" ? "Set up tap again" : "Set up tap"}
         </Button>
         {nfcCapable === false ? (
           <p className="mt-2 text-sm leading-relaxed text-muted" data-nfc-unsupported>
-            This browser can’t write NFC. Use Chrome on an Android phone, or the
-            ReviewBoost iPhone app. The printed code works either way.
+            This browser can’t set up tap. Use the ReviewBoost iPhone app or
+            Chrome on Android. The printed code works either way.
           </p>
         ) : null}
       </section>
@@ -313,8 +313,8 @@ function ManagedTagDetail({
               <li>Print the new code and replace the one on the counter.</li>
               <li>
                 {(justProgrammedAt ?? stand.nfcProvisionedAt)
-                  ? "Program this Tag’s NFC chip again."
-                  : "If this Tag has an NFC chip, program it again."}
+                  ? "Set up tap on this Tag again."
+                  : "If this Tag has tap, set it up again."}
               </li>
             </ul>
             <p className="mt-3 text-sm text-muted" data-rotate-not-needed>
@@ -333,9 +333,9 @@ function ManagedTagDetail({
 
 /** What the chip holds, in one sentence. */
 function nfcLine(status: ReturnType<typeof tagReadiness>): string {
-  if (status === "both") return "The code changed, so the chip still opens the old link. Program it again.";
-  if (status === "needs-nfc") return "Not programmed yet. Write your link to the Tag’s chip and a phone tap opens your page.";
-  return "Programmed. A phone tap opens your customer page.";
+  if (status === "both") return "The code changed, so a tap still opens the old link. Set it up again.";
+  if (status === "needs-nfc") return "Not set up yet. Once it is, a phone tap opens your page.";
+  return "Set up. A phone tap opens your customer page.";
 }
 
 /**

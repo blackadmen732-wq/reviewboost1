@@ -25,10 +25,10 @@ export function TagsList({ stands }: { stands: Stand[] }) {
         const qrOk = status === "ready" || status === "needs-nfc";
         const nfcOk = status === "ready" || status === "needs-qr";
         const nfcLabel = nfcOk
-          ? "NFC ready"
+          ? "Tap ready"
           : tagNeedsRewrite(stand)
-            ? "Reprogram NFC"
-            : "Program NFC";
+            ? "Set up tap again"
+            : "Set up tap";
         return (
           <li key={stand.standId}>
             <Link

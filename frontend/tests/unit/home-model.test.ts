@@ -200,7 +200,7 @@ describe("deriveHomeModel", () => {
 
     expect(model.tagStatus.needsRewrite).toBe(1);
     expect(model.attentions[0]?.kind).toBe("tag-rewrite");
-    expect(model.primary).toEqual({ label: "Program a tag", href: "/stands" });
+    expect(model.primary).toEqual({ label: "Set up tap", href: "/stands" });
   });
 });
 
@@ -241,13 +241,13 @@ describe("tagStatusLine", () => {
   it("uses real counts only", () => {
     expect(
       tagStatusLine({ total: 2, live: 2, programmed: 1, needsRewrite: 0 }),
-    ).toBe("2 tags · 1 programmed");
+    ).toBe("2 tags · 1 ready to tap");
   });
 
   it("names reprogramming in the sequence", () => {
     expect(
       tagStatusLine({ total: 2, live: 2, programmed: 2, needsRewrite: 1 }),
-    ).toBe("2 tags · 1 needs reprogramming");
+    ).toBe("2 tags · 1 has a new code");
   });
 });
 

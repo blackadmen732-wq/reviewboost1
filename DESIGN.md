@@ -18,7 +18,7 @@ ReviewBoost works the same way. **Every screen answers three questions, in this 
 |---|---|---|
 | **Where am I?** | Page title, plus the selected tab in the nav | "Home" |
 | **What's happening?** | One status line, in words plus a dot or icon (never colour alone) | "All good · 3 ratings today" or "Needs you · Your Tag isn't programmed yet" |
-| **What's next?** | **One** filled (black) button for the most useful next action. Everything else is a secondary or quiet button. | "Program your Tag" |
+| **What's next?** | **One** filled (black) button for the most useful next action. Everything else is a secondary or quiet button. | "Set up tap" |
 
 Rules that come from this:
 
@@ -311,7 +311,7 @@ Each screen follows the same pattern: what it's for, its status line, its one ne
   2. Unread ratings → "Read feedback", saying how many are 3★ or lower
   3. No Tag → "Create a Tag"
   4. Google link missing → "Add Google link"
-  5. Tag not programmed or needs rewriting → "Program a tag" or "Print your code"
+  5. Tap not set up or a new code → "Set up tap" or "Print your code"
 - **Content:**
   - An attention card when something needs the owner.
   - "This week", comparing ratings this week with last week, in plain numbers.
@@ -338,11 +338,9 @@ This is the one place an owner programs anything.
 
 ### 7.3 One Tag `/stands/[id]`
 
-- **Status:** "Ready", "NFC not programmed", or "Code changed: reprint and reprogram" (`tagReadinessLabel`). The Tags list shows the code and the chip separately: "QR ready" / "Reprint QR" and "NFC ready" / "Program NFC" / "Reprogram NFC".
-- **Next action:**
-  - Not programmed: "Program Tag" on Android with NFC, otherwise "Print code".
-  - Live: "Print code" as a secondary action.
-- **Program sheet:** full screen: "Program your Tag" → "Hold near your Tag" → "Tag ready". A failure says why, e.g. "Couldn’t program this Tag".
+- **Status:** "Ready", "Tap not set up", or "Code changed: reprint and set up tap" (`tagReadinessLabel`). The Tags list shows the code and the chip separately: "QR ready" / "Reprint QR" and "Tap ready" / "Set up tap" / "Set up tap again". Owners never read "NFC" or "program" on a button.
+- **Next action:** not set up: "Set up tap" where the phone can write, otherwise "Print code". Ready: "Print code", secondary.
+- **Tap sheet:** full screen: "Set up tap" → "Hold near your Tag" → "Keep still" → "Tag ready". A failure says why, e.g. "Couldn’t set up this Tag".
 - **Other actions:** rename, rotate the code (inside "Advanced", with confirmation), and retire.
 
 ### 7.4 Customer page editor `/customer-page`

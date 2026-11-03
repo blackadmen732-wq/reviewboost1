@@ -151,8 +151,8 @@ Software that exists:
 - Token-rotation awareness: a Tag whose token moved after the last write is
   treated as needing a rewrite.
 
-What an owner sees is one operation: **Program NFC → Hold Near Reader → a
-green check → Done**, returning to the Tag automatically. Looking, reading,
+What an owner sees is one operation: **Set up tap → Start → Hold near your
+Tag → a green check → Done**, returning to the Tag automatically. Looking, reading,
 programming and checking are real steps and none of them is a screen. The three
 exceptions are the moments that need a human decision — a Tag that already
 carries something, a Tag that cannot be read, and a write that succeeded while
@@ -415,8 +415,8 @@ time anyone read it:
 - It said Tags include "Copy NFC Link, NFC Tools instructions". Those existed
   only in `features/dashboard/stand-card.tsx`, which nothing rendered and which
   has been deleted. The live Tag detail is `features/tags/tag-detail.tsx`,
-  and NFC is one visible operation: Program NFC → Hold Near Reader → a green
-  check → Done.
+  and NFC is one visible operation: Set up tap → Start → Hold near your Tag →
+  a green check → Done.
 - It said "stands" throughout. The product says **Tag**. `review_stands`,
   `/stands` and `standUrl` remain as identifiers, deliberately — they are
   attached to live tokens and a printed URL — but nothing a person reads says

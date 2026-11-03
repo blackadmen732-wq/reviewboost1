@@ -41,7 +41,7 @@ describe("hero transform", () => {
 });
 
 describe("tag readiness", () => {
-  it("is NFC not programmed for a new Tag, reprint-and-reprogram after a code change, Ready when programmed", () => {
+  it("is tap not set up for a new Tag, reprint-and-set-up after a code change, Ready when set up", () => {
     expect(tagReadiness({ nfcProvisionedAt: null, tokenRotatedAt: null })).toBe("needs-nfc");
     expect(
       tagReadiness({
@@ -55,8 +55,8 @@ describe("tag readiness", () => {
         tokenRotatedAt: "2026-09-01T00:00:00.000Z",
       }),
     ).toBe("ready");
-    expect(tagReadinessLabel("needs-nfc")).toBe("NFC not programmed");
-    expect(tagReadinessLabel("both")).toBe("Code changed: reprint and reprogram");
+    expect(tagReadinessLabel("needs-nfc")).toBe("Tap not set up");
+    expect(tagReadinessLabel("both")).toBe("Code changed: reprint and set up tap");
     expect(lastUsedLabel(null)).toBe("Not used yet");
   });
 });

@@ -87,7 +87,8 @@ describe("real loop language", () => {
     expect(detail).not.toMatch(/\bNDEF\b/);
     expect(sheet.replace(/NDEFReader/g, "")).not.toMatch(/\bNDEF\b/);
 
-    expect(detail).toContain("Program NFC");
+    expect(detail).toContain("Set up tap");
+    expect(detail).not.toContain("Program NFC");
     expect(detail).toContain("Print this code");
 
     expect(create).toContain("Create a Tag");

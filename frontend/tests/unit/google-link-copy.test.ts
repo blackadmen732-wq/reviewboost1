@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   GOOGLE_LINK_EMPTY,
+  GOOGLE_LINK_HELP_STEPS,
   GOOGLE_LINK_INVALID,
   GOOGLE_LINK_LEGACY,
+  GOOGLE_LINK_NOT_REVIEW_LINK,
   canOpenGoogleReviewUrl,
   googleLinkDisplay,
   googleLinkRefusal,
@@ -46,6 +48,18 @@ describe("googleLinkState", () => {
     expect(GOOGLE_LINK_LEGACY).toMatch(/still works/);
     expect(GOOGLE_LINK_LEGACY).toMatch(/review box/);
     expect(GOOGLE_LINK_LEGACY).toMatch(/printed codes and NFC Tags stay the same/);
+  });
+
+  it("names Google's buttons as Google shows them today", () => {
+    // Google renamed "Ask for reviews" to "Get more reviews". An owner told
+    // to tap a button that no longer exists gives up at step 2.
+    const steps = GOOGLE_LINK_HELP_STEPS.join(" ");
+    expect(steps).toContain("“Read reviews”");
+    expect(steps).toContain("“Get more reviews”");
+    expect(steps).toContain("“Copy”");
+    for (const copy of [steps, GOOGLE_LINK_LEGACY, GOOGLE_LINK_NOT_REVIEW_LINK]) {
+      expect(copy).not.toMatch(/ask for reviews/i);
+    }
   });
 
   it("will not treat a present-but-wrong address as openable", () => {

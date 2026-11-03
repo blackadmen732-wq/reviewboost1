@@ -44,7 +44,7 @@ describe("the native write machine collapses into four visible states", () => {
     expect(tagDetected("writing")).toBe(true);
     expect(writingCopy(false, "ios").body).toBe("Hold the top of your iPhone near the Tag.");
     expect(writingCopy(false, "android").body).not.toMatch(/top|iphone/i);
-    expect(writingCopy(true, "ios").title).toBe("Writing Tag…");
+    expect(writingCopy(true, "ios").title).toBe("Keep still");
   });
 });
 

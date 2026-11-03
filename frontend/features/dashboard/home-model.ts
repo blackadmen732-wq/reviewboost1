@@ -53,7 +53,7 @@ export interface HomePrimary {
     | "Create a Tag"
     | "Print your code"
     | "Add Google link"
-    | "Program a tag"
+    | "Set up tap"
     | "Read feedback"
     | "Choose a plan"
     | "Update payment"
@@ -215,14 +215,14 @@ export function deriveHomeModel({
   if (hasStand && tags.needsRewrite > 0) {
     attentions.push({
       kind: "tag-rewrite",
-      title: tags.needsRewrite === 1 ? "One tag needs reprogramming" : `${tags.needsRewrite} tags need reprogramming`,
-      body: "The code changed. Program the tag again, or reprint the code.",
+      title: tags.needsRewrite === 1 ? "One Tag has a new code" : `${tags.needsRewrite} Tags have a new code`,
+      body: "The old code stopped working. Reprint it and set up tap again.",
     });
   } else if (hasStand && tags.programmed === 0) {
     attentions.push({
       kind: "tag-unprogrammed",
-      title: "Tag is not programmed yet",
-      body: "Print the code or program the tag. Same link either way.",
+      title: "Your Tag isn’t set up yet",
+      body: "Print the code or set up tap. Same link either way.",
     });
   }
 
@@ -235,7 +235,7 @@ export function deriveHomeModel({
     attentions.push({
       kind: "google-upgrade",
       title: "Upgrade your Google link",
-      body: "It still works. It opens your Google listing rather than the review box — swap it for your “Ask for reviews” link in Settings. Your Tags stay the same.",
+      body: "It still works. It opens your Google listing rather than the review box — swap it for your “Get more reviews” link in Settings. Your Tags stay the same.",
     });
   }
 
@@ -247,7 +247,7 @@ export function deriveHomeModel({
   } else if (!counts.hasGoogleLink) {
     primary = { label: "Add Google link", href: googleHref };
   } else if (tags.needsRewrite > 0) {
-    primary = { label: "Program a tag", href: "/stands" };
+    primary = { label: "Set up tap", href: "/stands" };
   } else if (kind === "empty" || tags.programmed === 0) {
     primary = { label: "Print your code", href: "/stands" };
   } else {
@@ -335,11 +335,11 @@ export function tagStatusLine(status: TagStatus): string {
   const tagWord = status.total === 1 ? "tag" : "tags";
   const parts = [`${status.total} ${tagWord}`];
   if (status.needsRewrite > 0) {
-    parts.push(status.needsRewrite === 1 ? "1 needs reprogramming" : `${status.needsRewrite} need reprogramming`);
+    parts.push(status.needsRewrite === 1 ? "1 has a new code" : `${status.needsRewrite} have a new code`);
   } else if (status.programmed > 0) {
-    parts.push(status.programmed === 1 ? "1 programmed" : `${status.programmed} programmed`);
+    parts.push(status.programmed === 1 ? "1 ready to tap" : `${status.programmed} ready to tap`);
   } else {
-    parts.push("not programmed yet");
+    parts.push("tap not set up yet");
   }
   return parts.join(" · ");
 }

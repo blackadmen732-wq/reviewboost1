@@ -40,14 +40,14 @@ export function tagReadiness(input: TagReadinessInput): TagReadiness {
  * labels: accurate, and nobody could act on them.
  *
  * needs-nfc only happens before the first program (a rotation always makes
- * the printed code stale too), so it reads as "not programmed"; both means
+ * the printed code stale too), so it reads as "tap not set up"; both means
  * the code changed, so the printout and the chip carry the old link.
  */
 export function tagReadinessLabel(status: TagReadiness): string {
   if (status === "ready") return "Ready";
   if (status === "needs-qr") return "Reprint the code";
-  if (status === "needs-nfc") return "NFC not programmed";
-  return "Code changed: reprint and reprogram";
+  if (status === "needs-nfc") return "Tap not set up";
+  return "Code changed: reprint and set up tap";
 }
 
 export function lastUsedLabel(

@@ -79,16 +79,16 @@ export interface SceneCopy {
 
 export const NFC_SCENE_COPY: Record<NfcScene, SceneCopy> = {
   ready: {
-    title: "Program your Tag",
-    body: "Hold the Tag near your phone when you’re ready.",
-    action: "Program NFC",
+    title: "Set up tap",
+    body: "Press Start, then hold your phone to the Tag.",
+    action: "Start",
     dismiss: "Cancel",
   },
   writing: {
     // No progress, no percentage, no distance: NFC reports none of them, so
     // anything quantitative here would be invented.
     title: "Hold near your Tag",
-    body: "Keep it there while ReviewBoost programs it.",
+    body: "Keep it there.",
     dismiss: "Cancel",
   },
   success: {
@@ -96,7 +96,7 @@ export const NFC_SCENE_COPY: Record<NfcScene, SceneCopy> = {
     body: "Customers can tap it now.",
   },
   error: {
-    title: "Couldn’t program this Tag",
+    title: "Couldn’t set up this Tag",
     body: "Keep the Tag near your phone and try again.",
     action: "Try again",
     dismiss: "Cancel",
@@ -125,8 +125,8 @@ export const HOLD_HINT: Record<NfcPlatform, string> = {
 
 /** Once the chip is found: the same screen, the next instruction. */
 export const WRITING_DETECTED: SceneCopy = {
-  title: "Writing Tag…",
-  body: "Keep it there while ReviewBoost programs it.",
+  title: "Keep still",
+  body: "Saving your link to the Tag…",
   dismiss: "Cancel",
 };
 
@@ -178,8 +178,8 @@ export const NFC_FAILURE_COPY: Record<NfcFailure, FailureCopy> = {
     retry: true,
   },
   "not-writable": {
-    title: "This Tag can’t be programmed",
-    body: "It’s locked against changes. Try a different Tag.",
+    title: "This Tag is locked",
+    body: "It can’t be changed. Try a different Tag.",
     nothingChanged: true,
     retry: true,
   },
@@ -196,8 +196,8 @@ export const NFC_FAILURE_COPY: Record<NfcFailure, FailureCopy> = {
     retry: true,
   },
   unsupported: {
-    title: "This phone can’t program Tags",
-    body: "The QR code on the Tag still works. To add NFC, use the ReviewBoost app or Chrome on Android.",
+    title: "This phone can’t set up tap",
+    body: "The QR code on the Tag still works. To set up tap, use the ReviewBoost app or Chrome on Android.",
     nothingChanged: true,
     retry: false,
   },
@@ -214,7 +214,7 @@ export const NFC_FAILURE_COPY: Record<NfcFailure, FailureCopy> = {
     retry: false,
   },
   write: {
-    title: "Couldn’t program this Tag",
+    title: "Couldn’t set up this Tag",
     body: "Keep the Tag near your phone and try again.",
     nothingChanged: false,
     retry: true,

@@ -101,7 +101,7 @@ App Store Connect Help, read 2026-09-26.
 |---|---|---|---|
 | In-app controls | Parental controls | **No** | None |
 | In-app controls | Age assurance | **No** | None |
-| Capabilities | Unrestricted web access | **No** | No in-app browser or WebView. Privacy, Terms, Support and "Open customer page" open fixed ReviewBoost URLs in Safari, outside the app (`Linking.openURL`) |
+| Capabilities | Unrestricted web access | **No** | No in-app browser or WebView. Privacy, Terms, Support and "Preview customer page" open fixed ReviewBoost URLs in Safari, outside the app (`Linking.openURL`) |
 | Capabilities | User-generated content | **No** | Apple defines this as "broad distribution of content created by users". Customers give a star rating and nothing else; there is no box for them to write in. The only free text is a private note a business's own team adds to a rating, seen only by that team. Nothing is published, shared between businesses or discoverable. See the note below the table |
 | Capabilities | Social media | **No** | No feed of other people's content, no likes, no shares |
 | Capabilities | Messaging and chat | **No** | Users of the app cannot message each other, and there is no chat. This build sends no messages at all: texting is switched off (§13 has the answer for when it is on) |
@@ -223,11 +223,11 @@ Sign-in normally uses a six-digit code sent by email. Enter the demo email on th
 WHAT TO LOOK AT
 - Home: what needs the owner now, this week's ratings and the last 30 days' average, unread ratings, and how the Tags are doing.
 - Feedback: "Needs you" and "Everything". Tap a row: the rating, when and from which Tag, "Mark as sorted", and private team notes ("What we did").
-- Tags: open "Front counter": its QR code, "Preview customer page" (exactly what a customer sees), "Share link", and "Program NFC".
+- Tags: open "Front counter": its QR code, "Preview customer page" (exactly what a customer sees), "Share link", and "Set up tap".
 - Settings (the gear at the top right): the business, plan status, Privacy, Terms, Support, Sign out, Delete account.
 
 NFC
-"Program NFC" (Tags > Front counter) writes the Tag's web link to a standard NDEF tag using Core NFC. Any blank, unlocked NDEF tag works (NTAG213/215/216). The app reads the tag first, asks before replacing anything already on it, writes, then reads it back to confirm. Without a tag you can still see the system NFC sheet and cancel it. The attached QR code opens the same customer page the tag would.
+"Set up tap" (Tags > Front counter), then "Start", writes the Tag's web link to a standard NDEF tag using Core NFC. Any blank, unlocked NDEF tag works (NTAG213/215/216). The app reads the tag first, asks before replacing anything already on it, writes, then reads it back to confirm. Without a tag you can still see the system NFC sheet and cancel it. The attached QR code opens the same customer page the tag would.
 
 PAYMENTS
 The app sells nothing and has no purchase, upgrade or subscribe buttons and no links to buy. Subscriptions are set up and managed by businesses outside the app. The app only shows the current plan's status, under Guideline 3.1.3(f).
@@ -262,8 +262,8 @@ not be used. Guideline 2.3.3 requires screenshots that show the app in use.
 | 1 | Home | New ratings waiting, the week and 30-day numbers | See what needs you at a glance |
 | 2 | Feedback list | "Needs you", unread and read rows, mixed stars | Every rating, from every Tag |
 | 3 | Feedback detail | One rating with its Tag, time, Mark as sorted and a team note | Sort it, and note what you did |
-| 4 | Tag detail | "Front counter" with Program NFC visible | Program Tags from your iPhone |
-| 5 | NFC sheet | The "Ready to write" sheet over the Tag | Checked before, verified after |
+| 4 | Tag detail | "Front counter" with "Set up tap" visible | Set up tap from your iPhone |
+| 5 | NFC sheet | The "Set up tap" sheet over the Tag | Checked before, verified after |
 | 6 | Settings | Plan status and the Privacy / Terms / Support rows | |
 
 Rules for the captures:
@@ -290,20 +290,20 @@ one. Use NTAG213/215/216 stickers. Record pass/fail, the iOS version and the dev
 
 | # | Case | Setup | Expected |
 |---|---|---|---|
-| N1 | Blank tag | New NTAG, never written | "Program your Tag" → "Hold near your Tag" → "Writing Tag…" → "Tag ready"; read back; server confirms (the Tags list shows "NFC tag written") |
+| N1 | Blank tag | New NTAG, never written | "Set up tap" → Start → "Hold near your Tag" → "Keep still" → "Tag ready"; read back; server confirms (the Tags list shows "Tap ready") |
 | N2 | Already this Tag | The tag from N1 | "Tag ready" with nothing written; server confirmation still recorded |
 | N3 | Another ReviewBoost Tag's link | Tag programmed for a different Tag | "This Tag already has something on it", describing it; nothing written until Replace |
 | N4 | Foreign content | Tag holding any other URL or text | Conflict screen; Replace writes only to *that* chip |
 | N5 | Replace, different chip | After N4's Replace, present a different tag | Read and reported, not written |
-| N6 | Locked / read-only | A tag made read-only | "This Tag can’t be programmed" and "Nothing on the Tag was changed"; nothing claims success |
+| N6 | Locked / read-only | A tag made read-only | "This Tag is locked" and "Nothing on the Tag was changed"; nothing claims success |
 | N7 | Pulled away mid-write | Remove the tag during the write | Failure copy; retry works; no false success |
 | N8 | Timeout | Open the sheet, present nothing until iOS ends the session | "No Tag found" with Try again; nothing changed |
 | N9 | Cancel | Tap Cancel on the system sheet | Back to Ready, not an error |
 | N10 | Read-back mismatch | Hard to force. Covered by `nfc-program.test.ts` | Failure, never success |
 | N11 | Server confirmation fails | Airplane mode after the write completes | "Your Tag works" (partial): the chip is correct; retry records it without touching the chip |
 | N12 | Second phone | Tap the programmed tag with a different iPhone and an Android phone, apps closed | The customer page opens in the browser; the rating is recorded; the rating appears in Feed |
-| N13 | NFC unavailable | The Simulator, or a device without NFC writing | "This phone cannot program Tags"; the QR code still works |
-| N14 | Not an owner or admin | Sign in as a viewer | The Program section is replaced by "Only owners and admins can program Tags" |
+| N13 | NFC unavailable | The Simulator, or a device without NFC writing | "This phone can’t set up tap"; the QR code still works |
+| N14 | Not an owner or admin | Sign in as a viewer | The Tap section is replaced by "Only owners and admins can print or set up Tags" |
 | N15 | VoiceOver | Run N1 with VoiceOver on | Each state is announced; the sheet can be dismissed |
 
 ## 10. TestFlight plan

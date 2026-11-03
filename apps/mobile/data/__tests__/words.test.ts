@@ -36,9 +36,9 @@ describe("Tag checks", () => {
   const rotated = { nfcProvisionedAt: "2026-10-01T00:00:00Z", tokenRotatedAt: "2026-10-10T00:00:00Z" };
 
   it("shows the printed code and the chip separately, because they fail separately", () => {
-    expect(tagChecks(fresh)).toEqual({ qr: { ok: true, label: "QR ready" }, nfc: { ok: false, label: "Program NFC" } });
-    expect(tagChecks(programmed)).toEqual({ qr: { ok: true, label: "QR ready" }, nfc: { ok: true, label: "NFC ready" } });
-    expect(tagChecks(rotated)).toEqual({ qr: { ok: false, label: "Reprint QR" }, nfc: { ok: false, label: "Reprogram NFC" } });
+    expect(tagChecks(fresh)).toEqual({ qr: { ok: true, label: "QR ready" }, nfc: { ok: false, label: "Set up tap" } });
+    expect(tagChecks(programmed)).toEqual({ qr: { ok: true, label: "QR ready" }, nfc: { ok: true, label: "Tap ready" } });
+    expect(tagChecks(rotated)).toEqual({ qr: { ok: false, label: "Reprint QR" }, nfc: { ok: false, label: "Set up tap again" } });
     expect(tagReadiness(rotated)).toBe("both");
   });
 });

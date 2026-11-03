@@ -261,10 +261,10 @@ export default function StandDetailScreen() {
   const nfcLine = !stand
     ? null
     : tagNeedsRewrite(stand)
-      ? "The code changed, so the chip still has the old link. Program it again."
+      ? "The code changed, so a tap still opens the old link. Set it up again."
       : stand.nfcProvisionedAt === null
-        ? "Not programmed yet. Write your link to the Tag’s chip and a phone tap opens your page."
-        : "Programmed. A phone tap opens your customer page.";
+        ? "Not set up yet. Once it is, a phone tap opens your page."
+        : "Set up. A phone tap opens your customer page.";
 
   if (loading && !stand) {
     return (
@@ -286,7 +286,7 @@ export default function StandDetailScreen() {
           </Text>
           {stand ? (
             <Text style={styles.meta}>
-              {[stand.locationName ?? "Place", checks?.nfc.ok ? null : "NFC not programmed", lastUsedLabel(stand.lastOpenedAt)]
+              {[stand.locationName ?? "Place", checks?.nfc.ok ? null : "Tap not set up", lastUsedLabel(stand.lastOpenedAt)]
                 .filter(Boolean)
                 .join(" · ")}
             </Text>
@@ -336,15 +336,15 @@ export default function StandDetailScreen() {
         ) : null}
 
         {/* Programming a Tag. The button only opens the sheet: scanning
-            starts when the owner presses Program NFC inside it, holding the
+            starts when the owner presses Start inside it, holding the
             Tag, and not a moment before. */}
         {canProvision ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>NFC</Text>
+            <Text style={styles.sectionTitle}>Tap</Text>
             {nfcLine ? <Text style={styles.sectionDesc}>{nfcLine}</Text> : null}
             {Platform.OS !== "web" && nfcSupported ? (
               <Button
-                label={stand && stand.nfcProvisionedAt !== null && !tagNeedsRewrite(stand) ? "Program again" : "Program NFC"}
+                label={stand && stand.nfcProvisionedAt !== null && !tagNeedsRewrite(stand) ? "Set up tap again" : "Set up tap"}
                 variant={checks && !checks.nfc.ok ? "action" : "secondary"}
                 disabled={!standUrl}
                 onPress={() => setSheetOpen(true)}
@@ -361,15 +361,14 @@ export default function StandDetailScreen() {
               // The QR code on the same Tag works without any of this, which is
               // the useful thing to say — not a list of third-party tools.
               <Text style={styles.sectionDesc}>
-                This phone can’t program Tags. The QR code still works; to add NFC, program it from an iPhone or an
-                Android phone with NFC.
+                This phone can’t set up tap. The QR code still works. Use an iPhone, or an Android phone with NFC.
               </Text>
             )}
           </View>
         ) : (
           <View style={styles.section}>
             <Text style={styles.sectionDesc}>
-              Only owners and admins can print or program Tags. Ask the account owner for access.
+              Only owners and admins can print or set up Tags. Ask the account owner for access.
             </Text>
           </View>
         )}

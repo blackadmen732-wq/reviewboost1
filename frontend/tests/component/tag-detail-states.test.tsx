@@ -67,7 +67,7 @@ describe("Tag detail code states", () => {
     expect(document.querySelector("[data-tag-access='read-only']")).toBeTruthy();
     // No code is requested: the QR route is owner/admin only.
     expect(document.querySelector("[data-qr-state]")).toBeNull();
-    for (const name of [/print/i, /program nfc/i, /more/i, /preview customer page/i]) {
+    for (const name of [/print/i, /set up tap/i, /more/i, /preview customer page/i]) {
       expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     }
   });
@@ -136,18 +136,18 @@ describe("Tag readiness after programming", () => {
   it("starts out needing NFC", () => {
     setQr("ready", "blob:code");
     render(<TagDetail stand={stand} canManage />);
-    expect(screen.getByText(/NFC not programmed/)).toBeVisible();
+    expect(screen.getByText(/Tap not set up/)).toBeVisible();
   });
 
-  it("stops saying NFC not programmed as soon as programming reports success", () => {
+  it("stops saying tap is not set up as soon as setup reports success", () => {
     setQr("ready", "blob:code");
     render(<TagDetail stand={stand} canManage />);
-    expect(screen.getByText(/NFC not programmed/)).toBeVisible();
+    expect(screen.getByText(/Tap not set up/)).toBeVisible();
 
     expect(capturedOnReady).toBeTypeOf("function");
     act(() => capturedOnReady?.());
 
-    expect(screen.queryByText(/NFC not programmed/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tap not set up/)).not.toBeInTheDocument();
     expect(screen.getByText(/Ready/)).toBeVisible();
   });
 
