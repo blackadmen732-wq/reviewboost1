@@ -190,7 +190,7 @@ forward migration before step 6, not an edit.
 | Security docs match reality | TESTED for MFA claims | `mfa-claims.test.ts`; SYSTEM_CONTEXT §9 corrected |
 | MFA / step-up on sensitive operations | NOT IMPLEMENTED, not claimed — design in MFA_DESIGN.md | |
 | Dependency vulnerabilities (web) | TESTED — 0 prod advisories after upgrading next/sharp/fast-uri; CI blocks on high | `ci.yml` dependency-audit |
-| Dependency vulnerabilities (mobile) | **FAILED** — 3 Nov: in-SDK patch updates took it from 27 (1 critical, 12 high) to 18 (6 high, 11 moderate, 1 low). Every one left needs Expo SDK 58 (`npm audit fix --force` installs `expo@58`), almost all in build tooling (`@expo/cli`, `xcode`, `zod`) rather than the app bundle; reported, not blocking | `npm audit --omit=dev` in `apps/mobile` |
+| Dependency vulnerabilities (mobile) | **FAILED** — 3 Nov: 27 (1 critical, 12 high, 12 moderate, 2 low), nearly all in build tooling (`@expo/cli`, `xcode`, `shell-quote`, `zod`) rather than the app bundle. `npm audit fix` clears 9 by moving to expo 57.0.31, but that expo wants other native versions (react-native 0.86.3, react-native-screens ~4.26, expo-dev-client ~57.0.20, expo-secure-store ~57.0.4), so it is a native change to build and try on a phone, not a lockfile edit; it was tried and backed out. The rest need SDK 58. Reported, not blocking | `npm audit --omit=dev`, `node scripts/check-native-deps.js` in `apps/mobile` |
 | Load tests | **BLOCKED** — need a staging deployment; not performed | SCALING.md |
 | Production smoke-test runbook | IMPLEMENTED | §5 |
 
@@ -326,8 +326,9 @@ maintenance; dead-letter releasing credit.
 3. **MFA** — build it (TOTP enrollment + server-side `aal2` on billing, member
    administration, organization deletion), or launch without it. The claim has
    been removed either way.
-4. **Mobile dependency advisories** — the Expo SDK 58 upgrade before the app
-   ships, or ship on SDK 57 with the remaining build-tool advisories noted.
+4. **Mobile dependency advisories** — before the app ships: the latest SDK 57
+   patch (`npx expo install --fix`, then a new build tried on a phone), or the
+   SDK 58 upgrade; or ship as is with the build-tool advisories noted.
 5. **Access for verification** — a Supabase connector or token, Vercel access,
    Stripe test keys and a Twilio test account in a session whose network policy
    allows those hosts.
