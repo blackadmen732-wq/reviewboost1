@@ -33,7 +33,14 @@ export function tagLabels(
   return (standId) => labels.get(standId) ?? null;
 }
 
-export function FeedbackList({ items }: { items: FeedbackItem[] }) {
+export function FeedbackList({
+  items,
+  timeZone,
+}: {
+  items: FeedbackItem[];
+  /** The business's, so "Yesterday" is the business's yesterday. */
+  timeZone: string;
+}) {
   return (
     <ul className="divide-y divide-border border-y border-border">
       {items.map((item) => (
@@ -78,7 +85,7 @@ export function FeedbackList({ items }: { items: FeedbackItem[] }) {
                     item.isRead ? "text-muted" : "font-medium text-ink",
                   )}
                 >
-                  {relativeDay(item.submittedAt)}
+                  {relativeDay(item.submittedAt, timeZone)}
                 </time>
               </div>
 

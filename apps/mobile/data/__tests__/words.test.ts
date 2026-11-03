@@ -7,10 +7,31 @@ const daysAgo = (n: number) => new Date(NOW - n * 86_400_000).toISOString();
 
 describe("days and times", () => {
   it("counts days the way the website's lists do", () => {
-    expect(relativeDay(daysAgo(0), NOW)).toBe("Today");
-    expect(relativeDay(daysAgo(1), NOW)).toBe("Yesterday");
-    expect(relativeDay(daysAgo(5), NOW)).toBe("5 days ago");
-    expect(relativeDay("2026-10-22T12:00:00Z", NOW)).toBe("Oct 22");
+    expect(relativeDay(daysAgo(0), "UTC", NOW)).toBe("Today");
+    expect(relativeDay(daysAgo(1), "UTC", NOW)).toBe("Yesterday");
+    expect(relativeDay(daysAgo(5), "UTC", NOW)).toBe("5 days ago");
+    expect(relativeDay("2026-10-22T12:00:00Z", "UTC", NOW)).toBe("Oct 22");
+  });
+
+  /**
+   * It counted 24-hour periods, so last night's rating, read the next
+   * morning, was "Today at 6:00 PM". Days are the business's calendar days,
+   * as on the website.
+   */
+  it("counts the business's calendar days, not 24-hour periods", () => {
+    const nextMorning = Date.parse("2026-11-03T09:00:00-05:00");
+    expect(relativeDay("2026-11-02T18:00:00-05:00", "America/New_York", nextMorning)).toBe("Yesterday");
+    expect(relativeDay("2026-11-03T00:30:00-05:00", "America/New_York", nextMorning)).toBe("Today");
+    expect(relativeDay("2026-11-01T10:00:00-05:00", "America/New_York", nextMorning)).toBe("2 days ago");
+    // 01:30 UTC on 3 Nov is the evening of 2 Nov in New York, the night of 3 Nov in London.
+    const morning = Date.parse("2026-11-03T14:00:00Z");
+    expect(relativeDay("2026-11-03T01:30:00Z", "America/New_York", morning)).toBe("Yesterday");
+    expect(relativeDay("2026-11-03T01:30:00Z", "Europe/London", morning)).toBe("Today");
+    expect(relativeDay("2026-10-20T02:00:00Z", "America/Los_Angeles", morning)).toBe("Oct 19");
+  });
+
+  it("falls back to UTC for a zone the phone does not know, like the clock", () => {
+    expect(relativeDay("2026-11-03T01:30:00Z", "Not/AZone", Date.parse("2026-11-03T14:00:00Z"))).toBe("Today");
   });
 
   it("tells the time in the business's own time zone", () => {
@@ -19,9 +40,13 @@ describe("days and times", () => {
   });
 
   it("says when a Tag was last used", () => {
-    expect(lastUsedLabel(null, NOW)).toBe("Not used yet");
-    expect(lastUsedLabel(daysAgo(0), NOW)).toBe("Used today");
-    expect(lastUsedLabel(daysAgo(3), NOW)).toBe("Used 3 days ago");
+    expect(lastUsedLabel(null, "UTC", NOW)).toBe("Not used yet");
+    expect(lastUsedLabel(daysAgo(0), "UTC", NOW)).toBe("Used today");
+    expect(lastUsedLabel(daysAgo(3), "UTC", NOW)).toBe("Used 3 days ago");
+    // Opened last night: yesterday, though fewer than 24 hours ago.
+    const nextMorning = Date.parse("2026-11-03T09:00:00-05:00");
+    expect(lastUsedLabel("2026-11-02T20:00:00-05:00", "America/New_York", nextMorning)).toBe("Used yesterday");
+    expect(lastUsedLabel("2026-10-12T23:30:00-04:00", "America/New_York", nextMorning)).toBe("Used Oct 12");
   });
 
   it("writes counts as words", () => {

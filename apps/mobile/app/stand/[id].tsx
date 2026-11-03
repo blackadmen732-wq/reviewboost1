@@ -291,7 +291,7 @@ export default function StandDetailScreen() {
             <View style={styles.metaRow}>
               <View style={[styles.metaDot, { backgroundColor: allGood ? colors.brand : colors.starFilled }]} />
               <Text style={styles.metaStatus}>{tagReadinessLabel(tagReadiness(stand))}</Text>
-              <Text style={styles.meta}>{lastUsedLabel(stand.lastOpenedAt)}</Text>
+              <Text style={styles.meta}>{lastUsedLabel(stand.lastOpenedAt, activeOrg?.timezone ?? "UTC")}</Text>
               {stand.locationName ? <Text style={styles.meta}>{stand.locationName}</Text> : null}
             </View>
           ) : null}

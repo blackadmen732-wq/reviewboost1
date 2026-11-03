@@ -22,7 +22,7 @@ const row = (id: string, status: string) => ({
 });
 
 function draw(recent: ReturnType<typeof row>[]) {
-  return <TextRequestComposer balance={balance} tags={tags} recent={recent} canSendRequests />;
+  return <TextRequestComposer timeZone="UTC" balance={balance} tags={tags} recent={recent} canSendRequests />;
 }
 
 describe("Recent Text Requests", () => {

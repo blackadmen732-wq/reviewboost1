@@ -95,6 +95,12 @@ export function addLocalDays(date: LocalDate, days: number): LocalDate {
   return formatLocalDate(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, shifted.getUTCDate());
 }
 
+/** The calendar date an instant falls on where the business is. */
+export function localDateOf(timezone: string, at: Date): LocalDate {
+  const { year, month, day } = localCalendarDate(timezone, at);
+  return formatLocalDate(year, month, day);
+}
+
 /** Whole calendar days from one date to another (positive when `to` is later). */
 export function localDaysBetween(from: LocalDate, to: LocalDate): number {
   const a = parseLocalDate(from);

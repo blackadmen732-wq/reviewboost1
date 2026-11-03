@@ -49,7 +49,7 @@ const stand = {
 
 async function openWarning(tag: Stand = stand) {
   const user = userEvent.setup();
-  render(<TagDetail stand={tag} canManage />);
+  render(<TagDetail timeZone="UTC" stand={tag} canManage />);
   await user.click(screen.getByRole("button", { name: "More" }));
   await user.click(screen.getByRole("button", { name: "Make a new code" }));
   return { user, dialog: await screen.findByRole("alertdialog") };

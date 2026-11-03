@@ -62,7 +62,7 @@ describe("Tag detail code states", () => {
    */
   it("gives a member or viewer the Tag, not controls the API would refuse", () => {
     setQr("loading");
-    render(<TagDetail stand={stand} canManage={false} />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage={false} />);
 
     expect(document.querySelector("[data-tag-access='read-only']")).toBeTruthy();
     // No code is requested: the QR route is owner/admin only.
@@ -74,7 +74,7 @@ describe("Tag detail code states", () => {
 
   it("spins only while actually loading", () => {
     setQr("loading");
-    render(<TagDetail stand={stand} canManage />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage />);
 
     expect(document.querySelector("[data-qr-state='loading']")).toBeTruthy();
     expect(document.querySelector("[data-qr-state='error']")).toBeNull();
@@ -82,7 +82,7 @@ describe("Tag detail code states", () => {
 
   it("offers a way back in when the session expired", () => {
     setQr("expired");
-    render(<TagDetail stand={stand} canManage />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage />);
 
     expect(document.querySelector("[data-qr-state='expired']")).toBeTruthy();
     expect(screen.getByText(/session expired/i)).toBeVisible();
@@ -92,7 +92,7 @@ describe("Tag detail code states", () => {
 
   it("offers a retry when the code failed to load", () => {
     setQr("error");
-    render(<TagDetail stand={stand} canManage />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage />);
 
     expect(document.querySelector("[data-qr-state='error']")).toBeTruthy();
     expect(screen.getByRole("button", { name: /try again/i })).toBeVisible();
@@ -101,7 +101,7 @@ describe("Tag detail code states", () => {
 
   it("shows the code once it is ready, and no spinner", () => {
     setQr("ready", "blob:code");
-    render(<TagDetail stand={stand} canManage />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage />);
 
     expect(screen.getByAltText(/code for front counter/i)).toBeVisible();
     expect(document.querySelector("[data-qr-state='loading']")).toBeNull();
@@ -114,7 +114,7 @@ describe("Tag detail code states", () => {
       nfcProvisionedAt: "2026-01-01T00:00:00Z",
       tokenRotatedAt: "2026-02-01T00:00:00Z",
     } as Stand;
-    render(<TagDetail stand={rotated} canManage />);
+    render(<TagDetail timeZone="UTC" stand={rotated} canManage />);
 
     expect(document.querySelector("[data-qr-state='rotation-required']")).toBeTruthy();
     expect(screen.getByText(/no longer works/i)).toBeVisible();
@@ -135,13 +135,13 @@ describe("Tag readiness after programming", () => {
 
   it("starts out needing NFC", () => {
     setQr("ready", "blob:code");
-    render(<TagDetail stand={stand} canManage />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage />);
     expect(screen.getByText(/Tap not set up/)).toBeVisible();
   });
 
   it("stops saying tap is not set up as soon as setup reports success", () => {
     setQr("ready", "blob:code");
-    render(<TagDetail stand={stand} canManage />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage />);
     expect(screen.getByText(/Tap not set up/)).toBeVisible();
 
     expect(capturedOnReady).toBeTypeOf("function");
@@ -153,7 +153,7 @@ describe("Tag readiness after programming", () => {
 
   it("also asks the server for the authoritative version", () => {
     setQr("ready", "blob:code");
-    render(<TagDetail stand={stand} canManage />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage />);
 
     act(() => capturedOnReady?.());
     expect(refresh).toHaveBeenCalled();
@@ -161,16 +161,16 @@ describe("Tag readiness after programming", () => {
 
   it("keeps the current code on screen, dimmed, while a new one loads, and fades only a replaced code", () => {
     setQr("ready", "blob:first");
-    const { container, rerender } = render(<TagDetail stand={stand} canManage />);
+    const { container, rerender } = render(<TagDetail timeZone="UTC" stand={stand} canManage />);
     expect(screen.getByAltText("Code for Front counter")).not.toHaveClass("animate-qr-in");
 
     setQr("loading", "blob:first");
-    rerender(<TagDetail stand={stand} canManage />);
+    rerender(<TagDetail timeZone="UTC" stand={stand} canManage />);
     expect(container.querySelector('[data-qr-state="replacing"] img')).toHaveAttribute("src", "blob:first");
     expect(screen.queryByLabelText("Loading code")).toBeNull();
 
     setQr("ready", "blob:second");
-    rerender(<TagDetail stand={stand} canManage />);
+    rerender(<TagDetail timeZone="UTC" stand={stand} canManage />);
     const code = screen.getByAltText("Code for Front counter");
     expect(code).toHaveAttribute("src", "blob:second");
     expect(code).toHaveClass("animate-qr-in");

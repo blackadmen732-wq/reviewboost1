@@ -15,7 +15,7 @@ vi.mock("next/link", () => ({
 describe("FeedbackList", () => {
   it("shows gold only through stars, plus the real message", () => {
     const { container } = render(
-      <FeedbackList
+      <FeedbackList timeZone="UTC"
         items={[
           {
             id: "r1",

@@ -57,7 +57,17 @@ describe("tag readiness", () => {
     ).toBe("ready");
     expect(tagReadinessLabel("needs-nfc")).toBe("Tap not set up");
     expect(tagReadinessLabel("both")).toBe("Code changed: reprint and set up tap");
-    expect(lastUsedLabel(null)).toBe("Not used yet");
+    expect(lastUsedLabel(null, "UTC")).toBe("Not used yet");
+  });
+
+  it("says when a Tag was last used in the business's calendar days", () => {
+    const nextMorning = new Date("2026-11-03T09:00:00-05:00").getTime();
+    // Opened last night: yesterday, though fewer than 24 hours ago.
+    expect(lastUsedLabel("2026-11-02T20:00:00-05:00", "America/New_York", nextMorning)).toBe("Used yesterday");
+    expect(lastUsedLabel("2026-11-03T08:00:00-05:00", "America/New_York", nextMorning)).toBe("Used today");
+    expect(lastUsedLabel("2026-10-31T12:00:00-04:00", "America/New_York", nextMorning)).toBe("Used 3 days ago");
+    // Late on 12 Oct in New York (summer time) is already 13 Oct in UTC.
+    expect(lastUsedLabel("2026-10-12T23:30:00-04:00", "America/New_York", nextMorning)).toBe("Used Oct 12");
   });
 });
 

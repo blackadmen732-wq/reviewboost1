@@ -64,7 +64,7 @@ export default async function FeedbackDetailPage({
           </h1>
           <p className="mt-3 text-base text-muted">
             <time dateTime={review.submittedAt} title={full}>
-              {relativeDay(review.submittedAt)} at {clock}
+              {relativeDay(review.submittedAt, organization.timezone)} at {clock}
             </time>
             {from ? <> · {from}</> : null}
           </p>
@@ -97,7 +97,11 @@ export default async function FeedbackDetailPage({
         </div>
       </article>
 
-      <ActionThread responseId={review.responseId} actions={actions} />
+      <ActionThread
+        responseId={review.responseId}
+        actions={actions}
+        timeZone={organization.timezone}
+      />
     </OwnerShell>
   );
 }

@@ -17,7 +17,14 @@ import { cn } from "@/lib/utils/cn";
  * QR and NFC are shown separately because they fail separately. The single
  * pill this replaces could only say "Both", which nobody could act on.
  */
-export function TagsList({ stands }: { stands: Stand[] }) {
+export function TagsList({
+  stands,
+  timeZone,
+}: {
+  stands: Stand[];
+  /** The business's, so "Used yesterday" is the business's yesterday. */
+  timeZone: string;
+}) {
   return (
     <ul className="divide-y divide-border border-y border-border">
       {stands.map((stand) => {
@@ -45,7 +52,7 @@ export function TagsList({ stands }: { stands: Stand[] }) {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-base font-semibold text-ink">{stand.label}</p>
                 <p className="mt-0.5 truncate text-sm text-muted">
-                  {stand.locationName ?? "Place"} · {lastUsedLabel(stand.lastOpenedAt)}
+                  {stand.locationName ?? "Place"} · {lastUsedLabel(stand.lastOpenedAt, timeZone)}
                 </p>
                 <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm">
                   <Readiness ok={qrOk} label={qrOk ? "QR ready" : "Reprint QR"} />

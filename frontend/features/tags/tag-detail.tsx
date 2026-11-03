@@ -52,6 +52,7 @@ export function TagDetail({
   canManage,
   organizationId,
   businessName,
+  timeZone,
   closedNotice = null,
 }: {
   stand: Stand;
@@ -59,6 +60,8 @@ export function TagDetail({
   organizationId?: string;
   /** Printed above the code. */
   businessName?: string;
+  /** The business's, so "Used yesterday" is the business's yesterday. */
+  timeZone: string;
   closedNotice?: ClosedNotice | null;
 }) {
   return (
@@ -83,9 +86,10 @@ export function TagDetail({
           stand={stand}
           organizationId={organizationId}
           businessName={businessName}
+          timeZone={timeZone}
         />
       ) : (
-        <ReadOnlyTagDetail stand={stand} />
+        <ReadOnlyTagDetail stand={stand} timeZone={timeZone} />
       )}
     </>
   );
@@ -107,7 +111,7 @@ function useNfcCapable(): boolean | null {
   );
 }
 
-function ReadOnlyTagDetail({ stand }: { stand: Stand }) {
+function ReadOnlyTagDetail({ stand, timeZone }: { stand: Stand; timeZone: string }) {
   const status = tagReadiness(stand);
   return (
     <div className="flex flex-col gap-8">
@@ -115,7 +119,7 @@ function ReadOnlyTagDetail({ stand }: { stand: Stand }) {
         <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
           {stand.label}
         </h1>
-        <StatusLine stand={stand} status={status} />
+        <StatusLine stand={stand} status={status} timeZone={timeZone} />
       </header>
       <p className="text-base text-muted" data-tag-access="read-only">
         {ownerOrAdmin("print, set up or change this Tag")}
@@ -128,10 +132,12 @@ function ManagedTagDetail({
   stand,
   organizationId,
   businessName,
+  timeZone,
 }: {
   stand: Stand;
   organizationId: string | undefined;
   businessName: string | undefined;
+  timeZone: string;
 }) {
   const router = useRouter();
   const qr = useAuthenticatedQr(stand.standId, organizationId);
@@ -203,7 +209,7 @@ function ManagedTagDetail({
             <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
               {stand.label}
             </h1>
-            <StatusLine stand={stand} status={status} />
+            <StatusLine stand={stand} status={status} timeZone={timeZone} />
           </div>
           <button
             type="button"
@@ -362,9 +368,11 @@ function ManagedTagDetail({
 function StatusLine({
   stand,
   status,
+  timeZone,
 }: {
   stand: Stand;
   status: ReturnType<typeof tagReadiness>;
+  timeZone: string;
 }) {
   const good = status === "ready";
   return (
@@ -376,7 +384,7 @@ function StatusLine({
         <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", good ? "bg-brand" : "bg-star")} />
         {tagReadinessLabel(status)}
       </span>
-      <span>{lastUsedLabel(stand.lastOpenedAt)}</span>
+      <span>{lastUsedLabel(stand.lastOpenedAt, timeZone)}</span>
       {stand.locationName ? <span>{stand.locationName}</span> : null}
     </p>
   );

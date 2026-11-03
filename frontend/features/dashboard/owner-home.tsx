@@ -29,12 +29,15 @@ import { cn } from "@/lib/utils/cn";
 
 export function OwnerHome({
   businessName,
+  timeZone,
   model,
   unreadItems,
   insights = null,
   seenDone = null,
 }: {
   businessName: string;
+  /** The business's, for the unread ratings' "Today" and "Yesterday". */
+  timeZone: string;
   model: HomeModel;
   unreadItems: FeedbackItem[];
   /**
@@ -57,7 +60,12 @@ export function OwnerHome({
       {model.kind === "empty" ? (
         <EmptyHome model={model} seenDone={seenDone} />
       ) : (
-        <ActiveHome model={model} unreadItems={unreadItems} insights={insights} />
+        <ActiveHome
+          model={model}
+          unreadItems={unreadItems}
+          insights={insights}
+          timeZone={timeZone}
+        />
       )}
     </div>
   );
@@ -254,10 +262,12 @@ function ActiveHome({
   model,
   unreadItems,
   insights,
+  timeZone,
 }: {
   model: HomeModel;
   unreadItems: FeedbackItem[];
   insights: InsightsHomeSummary | null;
+  timeZone: string;
 }) {
   const [firstAttention, ...otherAttentions] = model.attentions;
 
@@ -321,7 +331,7 @@ function ActiveHome({
       {unreadItems.length > 0 ? (
         <section>
           <h2 className="mb-2 text-sm font-medium text-muted">Unread feedback</h2>
-          <FeedbackList items={unreadItems} />
+          <FeedbackList items={unreadItems} timeZone={timeZone} />
         </section>
       ) : null}
 

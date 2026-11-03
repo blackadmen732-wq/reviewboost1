@@ -40,7 +40,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 it("starts on the customer list, with each person's texting status", () => {
-  render(<TextRequestComposer canSendRequests balance={BALANCE} tags={[TAG]} recent={[]} customers={CUSTOMERS} />);
+  render(<TextRequestComposer timeZone="UTC" canSendRequests balance={BALANCE} tags={[TAG]} recent={[]} customers={CUSTOMERS} />);
   expect(screen.getByText("Ana Ruiz · ••• 0101")).toBeInTheDocument();
   expect(screen.getByText("Hasn't agreed to texts yet")).toBeInTheDocument();
   expect(screen.getByText("Can text")).toBeInTheDocument();
@@ -65,7 +65,7 @@ it("previews a picked customer by id, never by a number the browser holds", asyn
     ),
   );
   vi.stubGlobal("fetch", fetcher);
-  render(<TextRequestComposer canSendRequests balance={BALANCE} tags={[TAG]} recent={[]} customers={CUSTOMERS} />);
+  render(<TextRequestComposer timeZone="UTC" canSendRequests balance={BALANCE} tags={[TAG]} recent={[]} customers={CUSTOMERS} />);
 
   fireEvent.change(screen.getByRole("searchbox"), { target: { value: "ben" } });
   fireEvent.click(screen.getByRole("button", { name: /Ben Cole/ }));
@@ -81,20 +81,20 @@ it("previews a picked customer by id, never by a number the browser holds", asyn
 });
 
 it("still lets the owner type a number", () => {
-  render(<TextRequestComposer canSendRequests balance={BALANCE} tags={[TAG]} recent={[]} customers={CUSTOMERS} />);
+  render(<TextRequestComposer timeZone="UTC" canSendRequests balance={BALANCE} tags={[TAG]} recent={[]} customers={CUSTOMERS} />);
   fireEvent.click(screen.getByRole("button", { name: "Type a number instead" }));
   expect(screen.getByLabelText(/mobile number/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Choose from your customers" })).toBeInTheDocument();
 });
 
 it("says so when customers couldn't be loaded, instead of showing none", () => {
-  render(<TextRequestComposer canSendRequests balance={BALANCE} tags={[TAG]} recent={[]} customers={null} />);
+  render(<TextRequestComposer timeZone="UTC" canSendRequests balance={BALANCE} tags={[TAG]} recent={[]} customers={null} />);
   expect(screen.getByText(/couldn.t be loaded/)).toBeInTheDocument();
   expect(screen.getByLabelText(/mobile number/i)).toBeInTheDocument();
 });
 
 it("with no customers, it is the number field as before", () => {
-  render(<TextRequestComposer canSendRequests balance={BALANCE} tags={[TAG]} recent={[]} customers={[]} />);
+  render(<TextRequestComposer timeZone="UTC" canSendRequests balance={BALANCE} tags={[TAG]} recent={[]} customers={[]} />);
   expect(screen.getByLabelText(/mobile number/i)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Type a number instead" })).toBeNull();
 });

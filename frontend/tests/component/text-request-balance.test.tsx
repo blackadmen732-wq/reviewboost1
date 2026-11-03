@@ -15,7 +15,7 @@ const empty = { monthly: 0, purchased: 0, total: 0 };
 
 function draw(planStatus: "trialing" | "active" | null, balance = empty) {
   return (
-    <TextRequestComposer balance={balance} tags={tags} recent={[]} canSendRequests planStatus={planStatus} />
+    <TextRequestComposer timeZone="UTC" balance={balance} tags={tags} recent={[]} canSendRequests planStatus={planStatus} />
   );
 }
 

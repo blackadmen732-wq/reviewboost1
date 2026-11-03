@@ -40,6 +40,7 @@ export default async function TagDetailPage({
       <TagDetail
         organizationId={organization.orgId}
         businessName={organization.name}
+        timeZone={organization.timezone}
         stand={stand}
         canManage={can.manageTags}
         closedNotice={

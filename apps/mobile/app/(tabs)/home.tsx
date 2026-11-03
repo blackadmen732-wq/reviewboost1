@@ -7,7 +7,7 @@ import { Icon } from "@/components/icon";
 import { TabScreen } from "@/components/screen";
 import { Stars } from "@/components/stars";
 import { Tappable } from "@/components/tappable";
-import { useAuth } from "@/data/auth-context";
+import { useAuth, useBusinessTimeZone } from "@/data/auth-context";
 import { useHome, type HomeData, type HomeSetupStep } from "@/data/home";
 import { go, opensBrowser } from "@/lib/destinations";
 import { plural, relativeDay } from "@/lib/words";
@@ -83,6 +83,7 @@ function PrimaryAction({ primary }: { primary: HomeData["model"]["primary"] }) {
 }
 
 function ActiveHome({ home }: { home: HomeData }) {
+  const timeZone = useBusinessTimeZone();
   const { model, insights, unread } = home;
   const [first, ...others] = model.attentions;
 
@@ -146,7 +147,7 @@ function ActiveHome({ home }: { home: HomeData }) {
                 "Unread",
                 item.hasNote ? "Has a message" : null,
                 item.tagLabel,
-                relativeDay(item.submittedAt),
+                relativeDay(item.submittedAt, timeZone),
               ]
                 .filter(Boolean)
                 .join(". ")}
@@ -158,7 +159,7 @@ function ActiveHome({ home }: { home: HomeData }) {
                 <View style={styles.ratingMeta}>
                   {item.hasNote ? <Icon name="text.bubble" glyph="✎" size={15} color={colors.inkMuted} /> : null}
                   <Text style={styles.when} numberOfLines={1}>
-                    {relativeDay(item.submittedAt)}
+                    {relativeDay(item.submittedAt, timeZone)}
                   </Text>
                 </View>
               </View>

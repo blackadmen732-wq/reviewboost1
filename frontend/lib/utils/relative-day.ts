@@ -1,21 +1,26 @@
+import { localDateOf, localDaysBetween } from "@/lib/utils/local-day";
+
 /**
  * Dates the way a person says them.
  *
  * "Today" and "Yesterday" beat a date nobody has to decode. Past a week that
- * flips: "23 days ago" is harder to place than "12 Jul", because at that
+ * flips: "23 days ago" is harder to place than "Jul 12", because at that
  * distance people think in dates, not in counts.
  *
- * Rendered on the server, so the string is identical in the HTML and after
- * hydration — which is why call sites pair this with `suppressHydrationWarning`
- * only where the viewer's own locale is genuinely involved.
+ * Days on the business's calendar, not 24-hour periods. Counting hours made
+ * a rating left at 6 PM and read at 9 the next morning "Today at 6:00 PM",
+ * which is every evening's ratings at the hour an owner reads them. The zone
+ * and the locale are fixed (the business's zone, en-US like the rest of the
+ * product), so the server's HTML and the hydrated page say the same thing.
  */
-export function relativeDay(iso: string, now: number = Date.now()): string {
+export function relativeDay(iso: string, timeZone: string, now: number = Date.now()): string {
   const then = new Date(iso);
-  const days = Math.floor((now - then.getTime()) / 86_400_000);
+  const days = localDaysBetween(localDateOf(timeZone, then), localDateOf(timeZone, new Date(now)));
 
+  // Clock skew can put a timestamp a moment in the future: that is today.
   if (days <= 0) return "Today";
   if (days === 1) return "Yesterday";
   if (days < 7) return `${days} days ago`;
 
-  return then.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return then.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone });
 }

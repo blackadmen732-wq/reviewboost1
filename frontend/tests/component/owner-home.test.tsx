@@ -67,7 +67,7 @@ describe("OwnerHome", () => {
     });
 
     render(
-      <OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />,
+      <OwnerHome timeZone="UTC" businessName="Oak & Vine" model={model} unreadItems={[]} />,
     );
 
     expect(screen.getByRole("heading", { name: "Oak & Vine" })).toBeVisible();
@@ -92,7 +92,7 @@ describe("OwnerHome", () => {
     });
 
     render(
-      <OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />,
+      <OwnerHome timeZone="UTC" businessName="Oak & Vine" model={model} unreadItems={[]} />,
     );
 
     expect(screen.getByText("No tag yet")).toBeVisible();
@@ -116,7 +116,7 @@ describe("OwnerHome", () => {
     });
 
     render(
-      <OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />,
+      <OwnerHome timeZone="UTC" businessName="Oak & Vine" model={model} unreadItems={[]} />,
     );
 
     expect(screen.getByText("Google link is missing")).toBeVisible();
@@ -139,7 +139,7 @@ describe("OwnerHome", () => {
     });
 
     render(
-      <OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />,
+      <OwnerHome timeZone="UTC" businessName="Oak & Vine" model={model} unreadItems={[]} />,
     );
 
     expect(screen.getByText("Your Tag isn’t set up yet")).toBeVisible();
@@ -160,7 +160,7 @@ describe("OwnerHome", () => {
     });
 
     render(
-      <OwnerHome businessName="Oak & Vine" model={model} unreadItems={[]} />,
+      <OwnerHome timeZone="UTC" businessName="Oak & Vine" model={model} unreadItems={[]} />,
     );
 
     expect(screen.getByText("No ratings yet.")).toBeVisible();
@@ -183,7 +183,7 @@ describe("OwnerHome", () => {
     });
 
     render(
-      <OwnerHome
+      <OwnerHome timeZone="UTC"
         businessName="Oak & Vine"
         model={model}
         unreadItems={[
@@ -223,7 +223,7 @@ describe("setup steps finished since the last visit", () => {
 
   it("draw nothing on a first visit, where everything would be new", () => {
     const { container } = render(
-      <OwnerHome
+      <OwnerHome timeZone="UTC"
         businessName="Oak & Vine"
         model={model()}
         unreadItems={[]}
@@ -241,7 +241,7 @@ describe("setup steps finished since the last visit", () => {
       .map((step) => step.key);
     expect(done.length).toBeGreaterThan(0);
     const { container } = render(
-      <OwnerHome
+      <OwnerHome timeZone="UTC"
         businessName="Oak & Vine"
         model={m}
         unreadItems={[]}
@@ -262,7 +262,7 @@ describe("setup steps finished since the last visit", () => {
       .filter((step) => step.done)
       .map((step) => step.key);
     const { container } = render(
-      <OwnerHome
+      <OwnerHome timeZone="UTC"
         businessName="Oak & Vine"
         model={m}
         unreadItems={[]}

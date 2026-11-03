@@ -8,6 +8,8 @@
  * Ready: programmed and the code has not moved since.
  */
 
+import { relativeDay } from "@/lib/utils/relative-day";
+
 export type TagReadiness = "ready" | "needs-qr" | "needs-nfc" | "both";
 
 export interface TagReadinessInput {
@@ -52,13 +54,14 @@ export function tagReadinessLabel(status: TagReadiness): string {
 
 export function lastUsedLabel(
   iso: string | null,
+  timeZone: string,
   now: number = Date.now(),
 ): string {
   if (!iso) return "Not used yet";
-  const then = new Date(iso);
-  const days = Math.floor((now - then.getTime()) / 86_400_000);
-  if (days <= 0) return "Used today";
-  if (days === 1) return "Used yesterday";
-  if (days < 7) return `Used ${days} days ago`;
-  return `Used ${then.toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+  // The same calendar days as a rating's "Yesterday" (`relativeDay`): a Tag
+  // opened last night was used yesterday, however few hours ago that was.
+  const day = relativeDay(iso, timeZone, now);
+  if (day === "Today") return "Used today";
+  if (day === "Yesterday") return "Used yesterday";
+  return `Used ${day}`;
 }

@@ -5,7 +5,7 @@ import { Button } from "@/components/button";
 import { Group, Row } from "@/components/group";
 import { Icon } from "@/components/icon";
 import { TabScreen } from "@/components/screen";
-import { useAuth } from "@/data/auth-context";
+import { useAuth, useBusinessTimeZone } from "@/data/auth-context";
 import { useStands } from "@/data/use-stands";
 import { lastUsedLabel, tagChecks } from "@/lib/words";
 import { colors, radii, type } from "@/theme";
@@ -62,7 +62,7 @@ function TagRow({ stand }: { stand: StandItem }) {
   const checks = tagChecks(stand);
   const live = stand.status === "active";
   const place = stand.locationName ?? "Place";
-  const used = lastUsedLabel(stand.lastOpenedAt);
+  const used = lastUsedLabel(stand.lastOpenedAt, useBusinessTimeZone());
   const state = live ? null : stand.status === "paused" ? "Paused" : "Retired";
   return (
     <Row

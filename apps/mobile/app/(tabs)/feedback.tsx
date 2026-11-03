@@ -6,7 +6,7 @@ import { Group, Row } from "@/components/group";
 import { TabScreen } from "@/components/screen";
 import { Segmented } from "@/components/segmented";
 import { Stars } from "@/components/stars";
-import { useAuth } from "@/data/auth-context";
+import { useAuth, useBusinessTimeZone } from "@/data/auth-context";
 import { useFeedback, type FeedbackShow } from "@/data/use-feedback";
 import { relativeDay } from "@/lib/words";
 import { colors, type } from "@/theme";
@@ -86,6 +86,7 @@ export default function FeedbackScreen() {
 }
 
 function FeedbackRow({ item }: { item: FeedbackItem }) {
+  const when = relativeDay(item.submittedAt, useBusinessTimeZone());
   return (
     <Row
       onPress={() => router.push(`/feedback/${item.id}`)}
@@ -94,7 +95,7 @@ function FeedbackRow({ item }: { item: FeedbackItem }) {
         !item.isRead ? "Unread" : null,
         item.isResolved ? "Sorted" : null,
         item.note ?? null,
-        relativeDay(item.submittedAt),
+        when,
       ]
         .filter(Boolean)
         .join(". ")}
@@ -105,7 +106,7 @@ function FeedbackRow({ item }: { item: FeedbackItem }) {
         <Stars rating={item.rating} size={20} />
         <Text style={[styles.when, item.isRead ? styles.whenRead : null]} numberOfLines={1}>
           {item.isResolved ? "Sorted · " : ""}
-          {relativeDay(item.submittedAt)}
+          {when}
         </Text>
       </View>
       {item.note ? (

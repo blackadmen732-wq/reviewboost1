@@ -110,7 +110,7 @@ export default async function SetupPage() {
             {canManage ? "No tags yet. Create a Tag, print the code, and put it on the counter. Step 2 walks you through it." : ownerOrAdmin("create a Tag")}
           </p>
         ) : (
-          <TagsList stands={stands} />
+          <TagsList stands={stands} timeZone={organization.timezone} />
         )}
       </section>
     </OwnerShell>

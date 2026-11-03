@@ -54,6 +54,8 @@ interface RecentRequest {
 
 interface TextRequestComposerProps {
   canSendRequests: boolean;
+  /** The business's, so "Yesterday" is the business's yesterday. */
+  timeZone: string;
   balance: Balance;
   tags: readonly TagOption[];
   recent: readonly RecentRequest[];
@@ -113,6 +115,7 @@ export function TextRequestComposer({
   canSendRequests,
   customers = [],
   planStatus,
+  timeZone,
 }: TextRequestComposerProps) {
   const router = useRouter();
   const hasCustomers = customers !== null && customers.length > 0;
@@ -622,7 +625,7 @@ export function TextRequestComposer({
         )}
       </section>
 
-      <RecentList recent={recent} />
+      <RecentList recent={recent} timeZone={timeZone} />
     </div>
   );
 }
@@ -718,7 +721,13 @@ function useListChanges(recent: readonly RecentRequest[]) {
   };
 }
 
-function RecentList({ recent }: { recent: readonly RecentRequest[] }) {
+function RecentList({
+  recent,
+  timeZone,
+}: {
+  recent: readonly RecentRequest[];
+  timeZone: string;
+}) {
   const { isNew, statusMoved } = useListChanges(recent);
   return (
     <section aria-labelledby="recent-heading">
@@ -749,7 +758,7 @@ function RecentList({ recent }: { recent: readonly RecentRequest[] }) {
                     ••• {item.recipientLastFour ?? "????"}
                   </span>
                   <span className="block text-sm text-muted">
-                    {relativeDay(item.createdAt)}
+                    {relativeDay(item.createdAt, timeZone)}
                   </span>
                 </span>
                 <span

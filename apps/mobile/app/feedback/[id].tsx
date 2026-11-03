@@ -80,7 +80,8 @@ export default function FeedbackDetailScreen() {
     );
   }
 
-  const when = `${relativeDay(item.submittedAt)} at ${clock(item.submittedAt, activeOrg?.timezone ?? "UTC")}`;
+  const timeZone = activeOrg?.timezone ?? "UTC";
+  const when = `${relativeDay(item.submittedAt, timeZone)} at ${clock(item.submittedAt, timeZone)}`;
   // A low rating is the one that may need doing something about; praise can
   // still be marked sorted, quietly.
   const needsAction = item.rating <= 3 && !item.isResolved;
@@ -172,7 +173,7 @@ export default function FeedbackDetailScreen() {
                       <Text style={styles.noteAuthor} numberOfLines={1}>
                         {entry.authorName}
                       </Text>
-                      <Text style={styles.noteWhen}>{relativeDay(entry.createdAt)}</Text>
+                      <Text style={styles.noteWhen}>{relativeDay(entry.createdAt, timeZone)}</Text>
                     </View>
                     <Text style={styles.noteBody} selectable>
                       {entry.body}

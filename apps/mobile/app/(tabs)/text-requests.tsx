@@ -5,7 +5,7 @@ import { Button } from "@/components/button";
 import { Checkbox, RadioCard } from "@/components/choice";
 import { Group, Row } from "@/components/group";
 import { TabScreen } from "@/components/screen";
-import { useAuth } from "@/data/auth-context";
+import { useAuth, useBusinessTimeZone } from "@/data/auth-context";
 import { useHome } from "@/data/home";
 import { balanceView } from "@/data/billing-view";
 import { useStands } from "@/data/use-stands";
@@ -359,6 +359,7 @@ function Composer({
 }
 
 function Recent({ items, loading }: { items: TextRequestItem[]; loading: boolean }) {
+  const timeZone = useBusinessTimeZone();
   if (loading && items.length === 0) return null;
   return items.length === 0 ? (
     <View>
@@ -370,7 +371,7 @@ function Recent({ items, loading }: { items: TextRequestItem[]; loading: boolean
       {items.map((item) => {
         const status = textStatus(item.status);
         return (
-          <Row key={item.id} accessibilityLabel={`Ending ${item.recipientLastFour ?? "unknown"}. ${status.label}. ${relativeDay(item.createdAt)}`}>
+          <Row key={item.id} accessibilityLabel={`Ending ${item.recipientLastFour ?? "unknown"}. ${status.label}. ${relativeDay(item.createdAt, timeZone)}`}>
             <View style={styles.recentRow}>
               <Text style={styles.recentNumber}>••• {item.recipientLastFour ?? "····"}</Text>
               <View style={styles.recentMeta}>
@@ -378,7 +379,7 @@ function Recent({ items, loading }: { items: TextRequestItem[]; loading: boolean
                 <Text style={styles.recentStatus}>{status.label}</Text>
               </View>
             </View>
-            <Text style={styles.recentWhen}>{relativeDay(item.createdAt)}</Text>
+            <Text style={styles.recentWhen}>{relativeDay(item.createdAt, timeZone)}</Text>
           </Row>
         );
       })}

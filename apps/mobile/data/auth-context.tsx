@@ -252,3 +252,12 @@ export function useAuth(): AuthState {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
+
+/**
+ * The business's time zone, which "Today" and "Yesterday" are counted in
+ * (`lib/words.ts`), as the rating's clock already is. UTC before a business
+ * is chosen, as the clock does.
+ */
+export function useBusinessTimeZone(): string {
+  return useAuth().activeOrg?.timezone ?? "UTC";
+}

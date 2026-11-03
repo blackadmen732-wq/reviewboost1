@@ -36,9 +36,12 @@ import { relativeDay } from "@/lib/utils/relative-day";
 export function ActionThread({
   responseId,
   actions,
+  timeZone,
 }: {
   responseId: string;
   actions: ActionNote[];
+  /** The business's, so "Yesterday" is the business's yesterday. */
+  timeZone: string;
 }) {
   const router = useRouter();
   const [body, setBody] = useState("");
@@ -155,7 +158,7 @@ export function ActionThread({
                   dateTime={action.createdAt}
                   className="shrink-0 text-sm text-muted"
                 >
-                  {relativeDay(action.createdAt)}
+                  {relativeDay(action.createdAt, timeZone)}
                 </time>
               </div>
               <p className="whitespace-pre-wrap text-base leading-relaxed text-ink">

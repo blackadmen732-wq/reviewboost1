@@ -67,6 +67,7 @@ export default async function HomePage() {
       <InstallPrompt />
       <OwnerHome
         businessName={organization.name}
+        timeZone={organization.timezone}
         model={model}
         insights={insightsHomeSummary(insights)}
         seenDone={parseSetupSeen((await cookies()).get(SETUP_SEEN_COOKIE)?.value)}

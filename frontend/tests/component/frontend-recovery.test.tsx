@@ -151,7 +151,7 @@ it("records consent separately and never includes it in the send request", async
     );
   vi.stubGlobal("fetch", fetcher);
   render(
-    <TextRequestComposer
+    <TextRequestComposer timeZone="UTC"
       balance={{ monthly: 10, purchased: 0, total: 10 }}
       tags={[{ standId: "local-tag", label: "Counter", locationName: null }]}
       recent={[]}

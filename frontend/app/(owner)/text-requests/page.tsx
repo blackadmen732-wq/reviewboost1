@@ -73,6 +73,7 @@ export default async function TextRequestsPage() {
         recent={recent}
         canSendRequests={permissionsFor(organization.role).sendTextRequests}
         customers={customers}
+        timeZone={organization.timezone}
       />
     </OwnerShell>
   );

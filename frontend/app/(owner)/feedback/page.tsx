@@ -109,6 +109,7 @@ export default async function FeedbackPage({
       ) : (
         <>
           <FeedbackList
+            timeZone={organization.timezone}
             items={items.map((item) => ({
               id: item.responseId,
               rating: item.rating,

@@ -9,14 +9,41 @@
 
 const DAY = 86_400_000;
 
-/** frontend/lib/utils/relative-day.ts */
-export function relativeDay(iso: string, now: number = Date.now()): string {
+/**
+ * Formats in the business's zone, or in UTC for a zone this phone's Intl
+ * does not know, as `clock` does, so a day label and its time never
+ * disagree about the zone.
+ */
+function inZone(at: Date, timeZone: string, options: Intl.DateTimeFormatOptions): string {
+  try {
+    return at.toLocaleDateString("en-US", { ...options, timeZone });
+  } catch {
+    return at.toLocaleDateString("en-US", { ...options, timeZone: "UTC" });
+  }
+}
+
+/** The business's calendar day an instant falls on, as a whole day number. */
+function calendarDay(at: Date, timeZone: string): number {
+  // en-US numeric dates read month/day/year ("11/3/2026"); the separators
+  // are not relied on, only the order.
+  const parts = /(\d+)\D+(\d+)\D+(\d+)/.exec(
+    inZone(at, timeZone, { year: "numeric", month: "numeric", day: "numeric" }),
+  );
+  if (!parts) return Math.floor(at.getTime() / DAY);
+  return Date.UTC(Number(parts[3]), Number(parts[1]) - 1, Number(parts[2])) / DAY;
+}
+
+/**
+ * frontend/lib/utils/relative-day.ts: days on the business's calendar, not
+ * 24-hour periods, so last night's rating is "Yesterday" in the morning.
+ */
+export function relativeDay(iso: string, timeZone: string, now: number = Date.now()): string {
   const then = new Date(iso);
-  const days = Math.floor((now - then.getTime()) / DAY);
+  const days = calendarDay(new Date(now), timeZone) - calendarDay(then, timeZone);
   if (days <= 0) return "Today";
   if (days === 1) return "Yesterday";
   if (days < 7) return `${days} days ago`;
-  return then.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+  return inZone(then, timeZone, { day: "numeric", month: "short" });
 }
 
 /** "7:30 AM" in the business's own time zone, like the rating page. */
@@ -71,14 +98,12 @@ export function tagChecks(input: TagTimes): { qr: { ok: boolean; label: string }
 }
 
 /** frontend/lib/owner/tag-readiness.ts lastUsedLabel */
-export function lastUsedLabel(iso: string | null, now: number = Date.now()): string {
+export function lastUsedLabel(iso: string | null, timeZone: string, now: number = Date.now()): string {
   if (!iso) return "Not used yet";
-  const then = new Date(iso);
-  const days = Math.floor((now - then.getTime()) / DAY);
-  if (days <= 0) return "Used today";
-  if (days === 1) return "Used yesterday";
-  if (days < 7) return `Used ${days} days ago`;
-  return `Used ${then.toLocaleDateString("en-US", { day: "numeric", month: "short" })}`;
+  const day = relativeDay(iso, timeZone, now);
+  if (day === "Today") return "Used today";
+  if (day === "Yesterday") return "Used yesterday";
+  return `Used ${day}`;
 }
 
 /** frontend/features/dashboard/text-request-composer.tsx STATUS */

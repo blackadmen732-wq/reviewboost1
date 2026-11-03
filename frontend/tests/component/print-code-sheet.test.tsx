@@ -71,7 +71,7 @@ afterEach(() => {
 describe("the printed code, from a Tag", () => {
   it("is the code, the business and the customer page's own question, and nothing of the app", () => {
     setQr("ready", "blob:code");
-    render(<TagDetail stand={stand} canManage businessName="Mario’s Pizza" />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage businessName="Mario’s Pizza" />);
 
     const paper = sheet();
     expect(paper).not.toBeNull();
@@ -89,34 +89,34 @@ describe("the printed code, from a Tag", () => {
   it("names the place only when it is not just the business's name again", () => {
     setQr("ready", "blob:code");
     render(
-      <TagDetail stand={{ ...stand, locationName: "Mario’s Pizza" }} canManage businessName="Mario’s Pizza" />,
+      <TagDetail timeZone="UTC" stand={{ ...stand, locationName: "Mario’s Pizza" }} canManage businessName="Mario’s Pizza" />,
     );
     expect(sheet()!.lastElementChild?.textContent).toBe("Front counter");
   });
 
   it("prints from the Print tile", () => {
     setQr("ready", "blob:code");
-    render(<TagDetail stand={stand} canManage businessName="Mario’s Pizza" />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage businessName="Mario’s Pizza" />);
     fireEvent.click(screen.getByRole("button", { name: /print this code/i }));
     expect(window.print).toHaveBeenCalledOnce();
   });
 
   it("holds no code while a new one loads: the dimmed one on screen no longer works", () => {
     setQr("loading", "blob:old-code");
-    render(<TagDetail stand={stand} canManage businessName="Mario’s Pizza" />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage businessName="Mario’s Pizza" />);
     expect(sheet()).toBeNull();
     expect(screen.getByRole("button", { name: /print this code/i })).toBeDisabled();
   });
 
   it("holds nothing when the code could not load", () => {
     setQr("error", null);
-    render(<TagDetail stand={stand} canManage businessName="Mario’s Pizza" />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage businessName="Mario’s Pizza" />);
     expect(sheet()).toBeNull();
   });
 
   it("is not there for a member or viewer, who cannot load the code", () => {
     setQr("ready", "blob:code");
-    render(<TagDetail stand={stand} canManage={false} businessName="Mario’s Pizza" />);
+    render(<TagDetail timeZone="UTC" stand={stand} canManage={false} businessName="Mario’s Pizza" />);
     expect(sheet()).toBeNull();
   });
 });

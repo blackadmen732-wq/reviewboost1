@@ -401,7 +401,7 @@ describe("Home's month numbers", () => {
     const summary = insightsHomeSummary(build(QUIET));
     expect(summary).toEqual({ average: "4.3", total: 84, direction: "Improving" });
     render(
-      <OwnerHome
+      <OwnerHome timeZone="UTC"
         businessName="Mario's"
         model={deriveHomeModel({ counts, stands, hasLocation: true })}
         unreadItems={[]}

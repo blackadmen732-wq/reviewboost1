@@ -30,7 +30,7 @@ const stand = (over: Partial<Stand> = {}): Stand => ({
 describe("Tags list", () => {
   it("shows name, place, status, and last used on a tappable row", () => {
     render(
-      <TagsList
+      <TagsList timeZone="UTC"
         stands={[
           stand(),
           stand({
@@ -57,7 +57,7 @@ describe("Tags list", () => {
 
   it("says which half to redo after the code changed", () => {
     render(
-      <TagsList
+      <TagsList timeZone="UTC"
         stands={[
           stand({
             nfcProvisionedAt: "2026-09-01T00:00:00.000Z",

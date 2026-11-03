@@ -31,7 +31,7 @@ afterEach(() => vi.unstubAllGlobals());
 it("preserves an uncertain note and checks a fresh thread before allowing a duplicate append", async () => {
   const fetcher = vi.fn().mockRejectedValue(new TypeError("Lost response"));
   vi.stubGlobal("fetch", fetcher);
-  const view = render(<ActionThread responseId="response" actions={[]} />);
+  const view = render(<ActionThread timeZone="UTC" responseId="response" actions={[]} />);
   const input = screen.getByRole("textbox");
   fireEvent.change(input, { target: { value: "Checked with the team" } });
   fireEvent.click(screen.getByRole("button", { name: "Save note" }));
@@ -40,7 +40,7 @@ it("preserves an uncertain note and checks a fresh thread before allowing a dupl
   expect(screen.getByRole("button", { name: "Save note" })).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "Check saved notes" }));
   view.rerender(
-    <ActionThread
+    <ActionThread timeZone="UTC"
       responseId="response"
       actions={[
         {
@@ -59,14 +59,14 @@ it("preserves an uncertain note and checks a fresh thread before allowing a dupl
 });
 it("recovers an uncertain note whose authoritative refreshed thread contains no new note", async () => {
   vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Offline")));
-  const view = render(<ActionThread responseId="response" actions={[]} />);
+  const view = render(<ActionThread timeZone="UTC" responseId="response" actions={[]} />);
   fireEvent.change(screen.getByRole("textbox"), {
     target: { value: "Retain this note" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Save note" }));
   await screen.findByRole("alert");
   fireEvent.click(screen.getByRole("button", { name: "Check saved notes" }));
-  view.rerender(<ActionThread responseId="response" actions={[]} />);
+  view.rerender(<ActionThread timeZone="UTC" responseId="response" actions={[]} />);
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Save note" })).toBeEnabled(),
   );
