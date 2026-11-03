@@ -184,13 +184,13 @@ forward migration before step 6, not an edit.
 | Keys still open the Tags in the field | TESTED — readiness refuses, and health reports `tag_keys_mismatch`, when the configured keys do not open sampled live Tags | `readiness.test.ts` "the keys still open the Tags", `tag_key_check_test.sql` |
 | Backups active | **FAILED** — LIVE VERIFIED that the Free plan has no automated backups (re-checked 2026-11-03: the organization is still on Free). Needs Pro, or a scheduled off-site `supabase db dump` | OPERATIONS.md §0, §2 |
 | Restore drill | **BLOCKED** — not performed; RPO/RTO undefined until it is | OPERATIONS.md |
-| Storage recovery | **BLOCKED** — procedure written, not drilled; bucket not created by any migration | OPERATIONS.md |
+| Storage recovery | **BLOCKED** — procedure written, not drilled. The `customer-page` bucket is created by migration `20260926000100_customer_page_bucket` | OPERATIONS.md |
 | Security advisor findings reviewed | TESTED on local head; hosted advisor **BLOCKED** | SECURITY_REVIEW.md |
 | Service-role usage contained | TESTED (static guard) | `service-role-containment.test.ts` |
 | Security docs match reality | TESTED for MFA claims | `mfa-claims.test.ts`; SYSTEM_CONTEXT §9 corrected |
 | MFA / step-up on sensitive operations | NOT IMPLEMENTED, not claimed — design in MFA_DESIGN.md | |
 | Dependency vulnerabilities (web) | TESTED — 0 prod advisories after upgrading next/sharp/fast-uri; CI blocks on high | `ci.yml` dependency-audit |
-| Dependency vulnerabilities (mobile) | **FAILED** — 7 high in production deps; reported, not blocking | `npm audit --omit=dev` in `apps/mobile` |
+| Dependency vulnerabilities (mobile) | **FAILED** — 3 Nov: in-SDK patch updates took it from 27 (1 critical, 12 high) to 18 (6 high, 11 moderate, 1 low). Every one left needs Expo SDK 58 (`npm audit fix --force` installs `expo@58`), almost all in build tooling (`@expo/cli`, `xcode`, `zod`) rather than the app bundle; reported, not blocking | `npm audit --omit=dev` in `apps/mobile` |
 | Load tests | **BLOCKED** — need a staging deployment; not performed | SCALING.md |
 | Production smoke-test runbook | IMPLEMENTED | §5 |
 
@@ -227,7 +227,8 @@ decision — except the Twilio row, while texting is switched off.
    events a pack is paid and not credited until the daily reconciliation heals it (it replays the
    last 30 days of these events), and a refund older than that would never
    be seen.
-3. **Storage:** create public bucket `customer-page`.
+3. **Storage:** the public `customer-page` bucket comes with the migrations
+   (`20260926000100_customer_page_bucket`); check it exists after migrating.
 4. **Digest key.** Production requires `TOKEN_DIGEST_KEY` ≠
    `CUSTOMER_NOTE_ENCRYPTION_KEY` and an explicit `TOKEN_DIGEST_KEY_VERSION`.
    If production ever ran on the old fallback and Tags are printed, move off it
@@ -325,10 +326,14 @@ maintenance; dead-letter releasing credit.
 3. **MFA** — build it (TOTP enrollment + server-side `aal2` on billing, member
    administration, organization deletion), or launch without it. The claim has
    been removed either way.
-4. **Mobile dependency advisories** — the Expo SDK upgrade before the app ships.
+4. **Mobile dependency advisories** — the Expo SDK 58 upgrade before the app
+   ships, or ship on SDK 57 with the remaining build-tool advisories noted.
 5. **Access for verification** — a Supabase connector or token, Vercel access,
    Stripe test keys and a Twilio test account in a session whose network policy
    allows those hosts.
+6. **Paid plans before the first paying business gets a Tag** — Supabase Pro
+   (automated backups; the Free plan has none) and Vercel Pro if the project
+   is on Hobby (the scheduler). Not needed to build, test or submit the app.
 
 ## 8. What changed on this branch
 
@@ -344,3 +349,5 @@ maintenance; dead-letter releasing credit.
 | Service role | last table read moved to an RPC; two needless bypasses removed; static guard |
 | Claims | TOTP/lockout claims corrected; MFA-claim guard |
 | Logs | PostgREST `details` and phone numbers kept out |
+| Taps | the customer page starts its session as it opens: one round trip fewer at the star, and Home counts taps (`20261103000300_tag_opens`, `counts_as_scan`) |
+| Local day | the zone offset no longer depends on the server's own zone (November's "this month" began at 01:00 on a DST host) |

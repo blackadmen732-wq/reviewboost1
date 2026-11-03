@@ -51,14 +51,14 @@ const TOPICS: Topic[] = [
     ),
   },
   {
-    question: "Which phones can program an NFC Tag?",
+    question: "Which phones can set up tap (NFC) on a Tag?",
     answer: (
       <>
-        The ReviewBoost app on iPhone or Android, or Chrome on Android. Other
-        browsers cannot write to NFC at all, which is a limitation of the browser
-        rather than the Tag. You supply your own blank tags; any unlocked NDEF
-        tag works, and ReviewBoost reads one before writing so it will never
-        silently replace something already on it.
+        The ReviewBoost app on iPhone (iOS 16.4 or later) or Android, or Chrome
+        on Android. Other browsers cannot write to a Tag at all, which is a
+        limit of the browser, not the Tag. Any blank, unlocked NFC sticker
+        works (NTAG213, 215 or 216), and ReviewBoost reads it first, so it
+        never quietly replaces something already on it.
       </>
     ),
   },

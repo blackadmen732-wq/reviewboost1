@@ -73,7 +73,8 @@ reviewboost.fit — this app shows your plan's status.
 
 ---
 Requires an internet connection for setup and to receive ratings in real time.
-NFC Tag programming requires an iPhone 7 or later running iOS 14 or later.
+Requires iOS 16.4 or later (iPhone 8 or newer). Setting up tap needs an
+iPhone that runs the app; QR codes work on any smartphone.
 QR codes work on any smartphone.
 ```
 
@@ -126,7 +127,7 @@ TO TEST THE CORE FLOW
    (The demo account points to a real but publicly known Google My Business
    listing — this is intentional so reviewers can see the destination.)
 
-TO TEST NFC (requires iPhone 7+ with iOS 14+)
+TO TEST NFC (any iPhone that runs this app: iOS 16.4 or later)
 1. On the Tags tab, tap the Tag you want to program.
 2. Tap "Set up tap", then "Start", and hold a blank NTAG213 or NTAG215 tag
    to the top of the device when the screen says "Hold near your Tag".
