@@ -584,3 +584,255 @@
     transition: none;
   }
 }
+
+/* ---- Homepage bands, written for a busy owner (Nov 2026) ---------------- */
+/* Longer, plainer headline lines than the old two short words, so the serif
+   is set a step smaller to keep each line on one line. */
+.public-shell--home .public-hero__title {
+  font-size: clamp(3.4rem, 6vw, 5.4rem);
+}
+.public-hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin: 0 0 20px;
+  padding: 0 14px;
+  border: 1px solid var(--rb-border);
+  border-radius: 999px;
+  background: var(--rb-surface);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--rb-muted);
+}
+.public-hero__facts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 22px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+  color: var(--rb-ink);
+}
+.public-hero__facts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.public-eyebrow {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--rb-brand-text);
+}
+.public-h2 {
+  margin: 0;
+  max-width: 24ch;
+  font-size: clamp(1.75rem, 3.2vw, 2.5rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  color: var(--rb-ink);
+}
+.text-center .public-h2 {
+  margin-inline: auto;
+}
+.public-lede {
+  max-width: 46ch;
+  margin: 16px 0 0;
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--rb-muted);
+}
+.public-quiet-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--rb-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rb-border);
+  text-underline-offset: 5px;
+  transition: text-decoration-color 150ms;
+}
+.public-quiet-link:hover {
+  text-decoration-color: currentColor;
+}
+.public-quiet-link:focus-visible {
+  outline: 3px solid var(--rb-focus);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.public-step {
+  padding: 24px;
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  background: var(--rb-surface);
+  box-shadow: 0 1px 2px rgb(23 26 24 / 4%), 0 12px 28px -22px rgb(23 26 24 / 22%);
+}
+.public-step__icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--rb-ink);
+  color: var(--rb-canvas);
+}
+.public-step__icon--soft {
+  width: 44px;
+  height: 44px;
+  background: var(--rb-quiet);
+  color: var(--rb-ink);
+}
+.public-step__number {
+  margin: 20px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--rb-muted);
+}
+.public-step__title {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--rb-ink);
+}
+.public-step__body {
+  margin: 10px 0 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--rb-muted);
+}
+.public-owner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  align-items: center;
+  gap: 56px;
+}
+.owner-preview {
+  margin: 0;
+}
+.owner-preview .phone-frame {
+  width: min(100%, 290px);
+  margin-inline: auto;
+}
+.public-compare {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 0;
+  padding: 0;
+  list-style: none;
+}
+.public-compare__card {
+  padding: 24px;
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  background: var(--rb-surface);
+}
+/* Ours is told apart by a darker edge and a lift, never by a "popular" badge
+   (DESIGN.md §7.11). */
+.public-compare__card--ours {
+  border: 2px solid var(--rb-ink);
+  box-shadow: 0 18px 36px -24px rgb(23 26 24 / 35%);
+}
+@media (max-width: 1023px) {
+  .public-owner {
+    gap: 40px;
+  }
+}
+@media (max-width: 767px) {
+  .public-shell--home .public-hero__title {
+    font-size: clamp(2.6rem, 11.2vw, 3.6rem);
+  }
+  .public-hero__eyebrow {
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .public-hero__facts {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .public-lede {
+    font-size: 17px;
+  }
+  .public-step {
+    padding: 20px;
+  }
+  .public-step__title {
+    font-size: 20px;
+  }
+  .public-owner,
+  .public-compare {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .owner-preview .phone-frame {
+    width: min(78%, 270px);
+  }
+}
+
+/* Product page: the whole product, group by group. */
+.public-feature-group h2 {
+  margin-top: 0;
+}
+.public-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.public-feature {
+  padding: 20px;
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  background: var(--rb-surface);
+}
+.public-feature h3 {
+  margin: 14px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--rb-ink);
+}
+.public-article__body .public-feature p {
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.public-article__close {
+  padding-top: 32px;
+  border-top: 1px solid var(--rb-border);
+}
+@media (max-width: 639px) {
+  .public-feature-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.public-article__body .public-eyebrow {
+  color: var(--rb-brand-text);
+  margin-bottom: 8px;
+}
+@media (max-width: 639px) {
+  /* On a phone a feature reads as a row: icon, then words, half the height. */
+  .public-feature {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    column-gap: 14px;
+    padding: 16px;
+  }
+  .public-feature > span {
+    grid-row: span 2;
+  }
+  .public-feature h3 {
+    margin-top: 2px;
+  }
+}

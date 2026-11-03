@@ -19,7 +19,7 @@ vi.mock("next/link", () => ({
 
 import { PUBLIC_PLANS } from "@/features/public/pricing-plans";
 import { PublicHome } from "@/features/public/public-home";
-import { INTEGRITY, PUBLIC_HERO, SECURITY, START_HREF } from "@/features/public/public-copy";
+import { COMPARE, INTEGRITY, PUBLIC_HERO, SECURITY, START_HREF } from "@/features/public/public-copy";
 
 describe("PublicHome", () => {
   it("leads with the honest hero and one Action CTA", () => {
@@ -30,6 +30,13 @@ describe("PublicHome", () => {
 
     const starts = screen.getAllByRole("link", { name: "Get started" });
     expect(starts[0]).toHaveAttribute("href", START_HREF);
+    // The hero and the closing band name the offer itself.
+    const trials = screen.getAllByRole("link", { name: PUBLIC_HERO.primary.label });
+    expect(PUBLIC_HERO.primary.label).toBe("Start free trial");
+    expect(trials.length).toBe(2);
+    for (const link of trials) expect(link).toHaveAttribute("href", START_HREF);
+    // Who it is for, said before anything else.
+    expect(screen.getByText(PUBLIC_HERO.eyebrow)).toBeVisible();
     expect(screen.getAllByRole("link", { name: "Sign in" })[0]).toHaveAttribute("href", "/login");
   });
 
@@ -65,6 +72,19 @@ describe("PublicHome", () => {
     // phrase would fail on the denial, so this checks the offer instead: every
     // plan on the page costs money.
     expect(PUBLIC_PLANS.every((plan) => plan.price > 0)).toBe(true);
+  });
+
+  it("compares honestly: categories, no rival's name, no price we do not charge", () => {
+    render(<PublicHome />);
+
+    expect(screen.getByRole("heading", { name: COMPARE.headline })).toBeVisible();
+    for (const option of COMPARE.options) {
+      expect(screen.getByRole("heading", { level: 3, name: option.name })).toBeVisible();
+    }
+    const text = COMPARE.options.map((option) => `${option.price} ${option.body}`).join(" ");
+    expect(text).not.toMatch(/podium|birdeye|nicejob|yelp/i);
+    // The owner's screen is a picture, and says so.
+    expect(screen.getByText(/Example · Home on the owner/)).toBeVisible();
   });
 
   it("reuses the ReviewBoost logo placeholder in chrome", () => {

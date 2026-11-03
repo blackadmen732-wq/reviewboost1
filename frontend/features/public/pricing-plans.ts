@@ -87,8 +87,10 @@ export const TRIAL = {
 
 /** What every paid plan includes, so the cards do not repeat nine lines each. */
 export const EVERY_PLAN = [
-  "Your own customer page",
+  "Your own customer page, in English, Español and Kreyòl",
   "QR and NFC on the same Tag",
   "Every rating, including the quiet ones",
   "The same Google link for every rating",
+  "Home, Feedback and Insights",
+  "Text Requests, with the texts your plan includes",
 ] as const;

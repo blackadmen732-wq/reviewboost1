@@ -1,30 +1,40 @@
 import Link from "next/link";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, ArrowUpRight, BellRing, Check, MessageSquareText, QrCode, Star, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { FAQ } from "@/features/public/faq";
+import { OwnerPreview } from "@/features/public/owner-preview";
 import { PricingSection } from "@/features/public/pricing-table";
 import {
   CLOSE,
+  COMPARE,
   HOW_IT_WORKS,
   INTEGRITY,
+  OWNER_SIDE,
   PRICING,
-  PRIVACY,
   PUBLIC_HERO,
   SECURITY,
   START_HREF,
 } from "@/features/public/public-copy";
 import { ProductDemo } from "@/features/public/product-demo";
 import { PublicShell } from "@/features/public/public-shell";
+import { cn } from "@/lib/utils/cn";
 
 /**
- * Signed-out homepage. One idea per band. No testimonials, no invented counts.
+ * Signed-out homepage, for a busy owner deciding in seconds: who it is for,
+ * what it does, how it works, what they see, why it beats a plain card, what
+ * it costs. One idea per band. No testimonials, no invented counts: the one
+ * screen with numbers on it is labelled as an example.
  */
+const STEP_ICONS = [QrCode, Star, ArrowUpRight] as const;
+const OWNER_ICONS = [BellRing, Users, MessageSquareText] as const;
+
 export function PublicHome() {
   return (
     <PublicShell homepage currentPath="/">
       <section className="public-section public-hero">
         <div className="public-hero__copy">
+          <p className="public-hero__eyebrow">{PUBLIC_HERO.eyebrow}</p>
           <h1 className="public-hero__title">
             <span>{PUBLIC_HERO.titleLines[0]}</span>{" "}
             <span>{PUBLIC_HERO.titleLines[1]}</span>
@@ -32,165 +42,138 @@ export function PublicHome() {
           <p className="public-hero__lede">{PUBLIC_HERO.lede}</p>
           <div className="public-hero__actions">
             <Button asChild variant="action" className="w-auto">
-              <Link href={PUBLIC_HERO.primary.href}>
-                {PUBLIC_HERO.primary.label}
-              </Link>
+              <Link href={PUBLIC_HERO.primary.href}>{PUBLIC_HERO.primary.label}</Link>
             </Button>
             <a href="#customer-example" className="public-hero__sample-link">
-              Try the example{" "}
-              <ArrowDown className="size-4" aria-hidden="true" />
+              Try the example <ArrowDown className="size-4" aria-hidden="true" />
             </a>
           </div>
-          <p className="public-hero__note">
-            QR or NFC. No app for your customers.
-          </p>
+          <ul className="public-hero__facts" aria-label="At a glance">
+            {PUBLIC_HERO.facts.map((fact) => (
+              <li key={fact}>
+                <Check aria-hidden="true" className="size-4 shrink-0 text-brand-text" strokeWidth={2.5} />
+                {fact}
+              </li>
+            ))}
+          </ul>
         </div>
         <ProductDemo hero />
       </section>
 
       <section className="border-t border-border">
         <div className="public-section" id="how-it-works">
-          <h2 className="text-2xl font-semibold tracking-tight text-ink">
-            From the counter to your Feedback.
-          </h2>
+          <p className="public-eyebrow">How it works</p>
+          <h2 className="public-h2">Three steps. No app for your customers.</h2>
           <ol className="public-steps mt-10">
-            {HOW_IT_WORKS.map((step, index) => (
-              <li key={step.title} className="flex gap-4">
-                <span className="w-6 shrink-0 text-sm font-semibold text-muted">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <div>
-                  <h3 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-                    {step.title}
-                  </h3>
-                  <p className="mt-2 max-w-[36ch] text-base leading-relaxed text-muted">
-                    {step.body}
-                  </p>
-                </div>
-              </li>
-            ))}
+            {HOW_IT_WORKS.map((step, index) => {
+              const Icon = STEP_ICONS[index]!;
+              return (
+                <li key={step.title} className="public-step">
+                  <span className="public-step__icon" aria-hidden="true">
+                    <Icon className="size-6" strokeWidth={1.9} />
+                  </span>
+                  <p className="public-step__number">Step {index + 1}</p>
+                  <h3 className="public-step__title">{step.title}</h3>
+                  <p className="public-step__body">{step.body}</p>
+                </li>
+              );
+            })}
           </ol>
           <p className="mt-8">
-            <Link
-              href="/how-it-works"
-              className="inline-flex min-h-11 items-center text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-            >
-              The whole path
+            <Link href="/how-it-works" className="public-quiet-link">
+              The whole path, step by step
             </Link>
           </p>
         </div>
       </section>
 
       <section className="border-t border-border">
-        <div className="public-section public-owner-jobs">
+        <div className="public-section public-owner">
           <div>
-            <p className="text-sm font-medium text-muted">
-              Your side of the counter
+            <p className="public-eyebrow">{OWNER_SIDE.eyebrow}</p>
+            <h2 className="public-h2">{OWNER_SIDE.headline}</h2>
+            <p className="public-lede">{OWNER_SIDE.lede}</p>
+            <ul className="mt-8 flex flex-col gap-6">
+              {OWNER_SIDE.items.map((item, index) => {
+                const Icon = OWNER_ICONS[index]!;
+                return (
+                  <li key={item.title} className="flex gap-4">
+                    <span className="public-step__icon public-step__icon--soft" aria-hidden="true">
+                      <Icon className="size-5" strokeWidth={1.9} />
+                    </span>
+                    <div>
+                      <h3 className="text-lg font-semibold text-ink">{item.title}</h3>
+                      <p className="mt-1 max-w-[42ch] text-base leading-relaxed text-muted">{item.body}</p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mt-8">
+              <Link href="/product" className="public-quiet-link">
+                See the product
+              </Link>
             </p>
-            <h2 className="mt-4 max-w-[20ch] text-3xl font-semibold leading-tight tracking-tight text-ink">
-              Know what needs you. Get back to your day.
-            </h2>
-            <p className="mt-4 max-w-[40ch] text-base leading-relaxed text-muted">
-              Open Home between customers. See new ratings, read Feedback, and
-              keep your Tags ready.
-            </p>
-            <Link
-              href="/product"
-              className="mt-5 inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline-offset-4 hover:underline"
-            >
-              See the product
-            </Link>
           </div>
-          <ol className="divide-y divide-border border-y border-border">
-            <li className="py-5">
-              <h3 className="font-semibold text-ink">Make the page yours</h3>
-              <p className="mt-1 text-sm leading-relaxed text-muted">
-                Add your business photo. Preview the same page customers see,
-                then publish.
-              </p>
-            </li>
-            <li className="py-5">
-              <h3 className="font-semibold text-ink">
-                Keep every rating together
-              </h3>
-              <p className="mt-1 text-sm leading-relaxed text-muted">
-                Home shows what is new. Feedback keeps the full picture,
-                including the low ratings.
-              </p>
-            </li>
-            <li className="py-5">
-              <h3 className="font-semibold text-ink">Ask after a visit</h3>
-              <p className="mt-1 text-sm leading-relaxed text-muted">
-                Text Requests sends the same Tag link to customers who agreed to
-                receive it.
-              </p>
-            </li>
-          </ol>
+          <OwnerPreview />
+        </div>
+      </section>
+
+      <section className="border-t border-border">
+        <div className="public-section">
+          <p className="public-eyebrow">Compared</p>
+          <h2 className="public-h2">{COMPARE.headline}</h2>
+          <p className="public-lede">{COMPARE.lede}</p>
+          <ul className="public-compare mt-10">
+            {COMPARE.options.map((option) => (
+              <li key={option.name} className={cn("public-compare__card", option.ours && "public-compare__card--ours")}>
+                <h3 className="text-lg font-semibold text-ink">{option.name}</h3>
+                <p className="mt-1 text-base font-medium text-muted">{option.price}</p>
+                <p className="mt-4 text-base leading-relaxed text-ink">{option.body}</p>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
       <section className="border-t border-border bg-quiet">
-        <div className="mx-auto max-w-[40rem] px-5 py-12 sm:px-8 sm:py-16">
-          <p className="text-sm font-medium text-muted">Integrity</p>
-          <h2 className="mt-4 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {INTEGRITY.headline}
-          </h2>
-          <p className="mt-4 max-w-[40ch] text-base leading-relaxed text-muted">
-            {INTEGRITY.lede}
+        <div className="mx-auto max-w-[44rem] px-5 py-14 sm:px-8 sm:py-20">
+          <p className="public-eyebrow">Integrity</p>
+          <h2 className="public-h2">{INTEGRITY.headline}</h2>
+          <p className="public-lede">{INTEGRITY.lede}</p>
+          <p className="mt-3 max-w-[46ch] text-base leading-relaxed text-muted">{INTEGRITY.body}</p>
+          <p className="mt-6 flex max-w-[46ch] gap-3 text-base font-medium leading-relaxed text-ink">
+            <Check aria-hidden="true" className="mt-1 size-5 shrink-0 text-brand-text" strokeWidth={2.5} />
+            {INTEGRITY.rule}
           </p>
-          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">
-            {INTEGRITY.body}
-          </p>
-          <p className="mt-8">
-            <Link
-              href="/integrity"
-              className="inline-flex min-h-11 items-center text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-            >
+          <p className="mt-6">
+            <Link href="/integrity" className="public-quiet-link">
               Why this is the product
             </Link>
           </p>
         </div>
       </section>
 
-      {/* The prices themselves, as a full-width dark band. This section used
-          to be a headline, a lede and a link — a pricing section with no
-          prices in it, which is the one question a visitor came to answer. */}
+      {/* The prices themselves, as a full-width band: the one question a
+          visitor came to answer. */}
       <PricingSection headline={PRICING.headline} lede={PRICING.lede}>
-        {/* The trial terms are already on the Starter card and in the line
-            under the cards; a third telling here was repetition. */}
         <p className="mt-12 text-center text-sm">
-          <Link
-            href="/pricing"
-            className="font-medium text-ink underline-offset-4 transition-colors duration-150 hover:underline"
-          >
+          <Link href="/pricing" className="font-medium text-ink underline-offset-4 transition-colors duration-150 hover:underline">
             How we charge
           </Link>
         </p>
       </PricingSection>
 
       <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-12 sm:px-8 sm:py-16">
-          <p className="text-sm font-medium text-muted">Security and privacy</p>
-          <h2 className="mt-4 text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {SECURITY.headline}
-          </h2>
-          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">
-            {SECURITY.lede}
-          </p>
-          <p className="mt-3 max-w-[40ch] text-base leading-relaxed text-muted">
-            {PRIVACY.lede}
-          </p>
-          <p className="mt-8 flex flex-wrap gap-x-6">
-            <Link
-              href="/security"
-              className="inline-flex min-h-11 items-center text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-            >
+        <div className="mx-auto max-w-[44rem] px-5 py-14 sm:px-8 sm:py-20">
+          <p className="public-eyebrow">Security and privacy</p>
+          <h2 className="public-h2">{SECURITY.headline}</h2>
+          <p className="public-lede">{SECURITY.lede}</p>
+          <p className="mt-6 flex flex-wrap gap-x-6">
+            <Link href="/security" className="public-quiet-link">
               Security
             </Link>
-            <Link
-              href="/privacy"
-              className="inline-flex min-h-11 items-center text-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
-            >
+            <Link href="/privacy" className="public-quiet-link">
               Privacy
             </Link>
           </p>
@@ -198,25 +181,21 @@ export function PublicHome() {
       </section>
 
       <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-12 sm:px-8 sm:py-16">
-          <p className="text-sm font-medium text-muted">Questions</p>
+        <div className="mx-auto max-w-[44rem] px-5 py-14 sm:px-8 sm:py-20">
+          <p className="public-eyebrow">Questions</p>
+          <h2 className="public-h2">What owners ask first</h2>
           {/* Plain <details>. It is keyboard accessible and works before any
               JavaScript arrives, which matters on a phone with two bars. */}
           <div className="mt-8 divide-y divide-border border-y border-border">
             {FAQ.map((entry) => (
               <details key={entry.question} className="group py-4">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 text-base font-medium text-ink [&::-webkit-details-marker]:hidden">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 text-lg font-medium text-ink [&::-webkit-details-marker]:hidden">
                   {entry.question}
-                  <span
-                    aria-hidden="true"
-                    className="shrink-0 text-muted transition-transform duration-150 group-open:rotate-45"
-                  >
+                  <span aria-hidden="true" className="shrink-0 text-xl text-muted transition-transform duration-150 group-open:rotate-45">
                     +
                   </span>
                 </summary>
-                <p className="mt-3 max-w-[52ch] text-base leading-relaxed text-muted">
-                  {entry.answer}
-                </p>
+                <p className="mt-3 max-w-[56ch] text-base leading-relaxed text-muted">{entry.answer}</p>
               </details>
             ))}
           </div>
@@ -224,18 +203,15 @@ export function PublicHome() {
       </section>
 
       <section className="border-t border-border">
-        <div className="mx-auto max-w-[40rem] px-5 py-12 sm:px-8 sm:py-16">
-          <h2 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
-            {CLOSE.headline}
-          </h2>
-          <p className="mt-3 max-w-[36ch] text-base leading-relaxed text-muted">
-            {CLOSE.lede}
-          </p>
-          <div className="mt-8 max-w-xs">
+        <div className="mx-auto max-w-[44rem] px-5 py-14 text-center sm:px-8 sm:py-20">
+          <h2 className="public-h2">{CLOSE.headline}</h2>
+          <p className="public-lede mx-auto">{CLOSE.lede}</p>
+          <div className="mx-auto mt-8 max-w-xs">
             <Button asChild variant="action" size="lg">
-              <Link href={START_HREF}>Get started</Link>
+              <Link href={START_HREF}>{PUBLIC_HERO.primary.label}</Link>
             </Button>
           </div>
+          <p className="mx-auto mt-4 max-w-[40ch] text-sm leading-relaxed text-muted">{CLOSE.note}</p>
         </div>
       </section>
     </PublicShell>

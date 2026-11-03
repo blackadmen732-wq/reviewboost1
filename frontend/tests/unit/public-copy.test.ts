@@ -72,7 +72,9 @@ describe("public + activation copy", () => {
   });
 
   it("describes Tags without inventing a price", () => {
-    expect(PRODUCT.headline.toLowerCase()).toContain("tag");
+    expect(PRODUCT.tagLine.toLowerCase()).toContain("tag");
+    // The Product page shows the whole product, the Tag first.
+    expect(PRODUCT.groups[0]?.title).toBe("The Tag");
     // Was "Billing is not live yet" — true when written, false since Stripe
     // shipped, and the kind of stale line that makes a visitor doubt the rest
     // of the page. The caveat still has to say a card is needed up front.

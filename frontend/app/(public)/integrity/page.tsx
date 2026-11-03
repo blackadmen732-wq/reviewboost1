@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { INTEGRITY, START_HREF } from "@/features/public/public-copy";
+import { INTEGRITY, PUBLIC_HERO, START_HREF } from "@/features/public/public-copy";
 import { PublicArticle } from "@/features/public/public-article";
 import { publicPageMetadata } from "@/lib/site";
 
@@ -43,9 +43,15 @@ export default function IntegrityPage() {
         the public review link after a low rating. We do not treat a missing
         public review as a win.
       </p>
+      <h2>Why it protects you</h2>
+      <p>
+        {INTEGRITY.rule} Asking only the customers you expect to be happy is
+        called review gating, and Google&apos;s rules for business reviews do
+        not allow it.
+      </p>
       <div className="mt-4 max-w-xs">
         <Button asChild variant="action">
-          <Link href={START_HREF}>Get started</Link>
+          <Link href={START_HREF}>{PUBLIC_HERO.primary.label}</Link>
         </Button>
       </div>
     </PublicArticle>
