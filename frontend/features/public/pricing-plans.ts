@@ -85,6 +85,32 @@ export const TRIAL = {
   note: "Starter only. A card is required to start, and nothing is charged until the seven days are up. Growth and Pro are charged when you subscribe.",
 } as const;
 
+/**
+ * Extra texts, for a business that sends more than its plan includes.
+ *
+ * Paid once, 8¢ a text, never expiring, and spent after the month's included
+ * texts. The database is the authority (`app.sms_pack_catalog` in
+ * `20261103000100_sms_pack_money.sql`): it mints a pack only when Stripe
+ * collected exactly this price. `pricing-plans.test.ts` reads that migration
+ * and fails if this list ever disagrees with it. Only an active plan can buy
+ * one — never during the trial.
+ */
+export interface TextPack {
+  id: "pack_50" | "pack_200" | "pack_500";
+  texts: number;
+  /** Whole dollars, paid once. */
+  price: number;
+}
+
+export const TEXT_PACKS: readonly TextPack[] = [
+  { id: "pack_50", texts: 50, price: 4 },
+  { id: "pack_200", texts: 200, price: 16 },
+  { id: "pack_500", texts: 500, price: 40 },
+] as const;
+
+/** What one extra text costs, in cents. The same for every pack. */
+export const CENTS_PER_EXTRA_TEXT = 8;
+
 /** What every paid plan includes, so the cards do not repeat nine lines each. */
 export const EVERY_PLAN = [
   "Your own customer page, in English, Español and Kreyòl",

@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 
 import { tryDecrypt } from "@/lib/server/crypto";
 import { effectiveStatus, locationLimit, tagLimit, type EntitlementStatus } from "@/lib/server/entitlements";
+import { stripePackPricesConfigured } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { isGoogleReviewWritingUrl, isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
 import {
@@ -1227,6 +1228,11 @@ export interface OwnerBilling {
     locations: { used: number; limit: number };
     tags: { used: number; limit: number };
   } | null;
+  /**
+   * Whether this business can buy extra texts now: its plan is active (never
+   * during a trial, never past due) and this deployment has the pack prices.
+   */
+  packsAvailable: boolean;
 }
 
 /**
@@ -1286,6 +1292,7 @@ export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBillin
           tags: { used: tags.count ?? 0, limit: tagLimit(row.plan_id, row.status) },
         }
       : null,
+    packsAvailable: row?.status === "active" && stripePackPricesConfigured(),
   };
 });
 

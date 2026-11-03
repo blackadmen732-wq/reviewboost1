@@ -5,12 +5,20 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/features/public/breadcrumbs";
 import {
+  CENTS_PER_EXTRA_TEXT,
   EVERY_PLAN,
   PUBLIC_PLANS,
+  TEXT_PACKS,
   TRIAL,
   type PublicPlan,
 } from "@/features/public/pricing-plans";
 import { startForPlan } from "@/lib/owner/plan-choice";
+
+/** "50 ($4), 200 ($16) or 500 ($40)" — read from the pack list, never typed. */
+function extraTextPacks(): string {
+  const parts = TEXT_PACKS.map((pack) => `${pack.texts.toLocaleString("en-US")} ($${pack.price})`);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} or ${parts[parts.length - 1]}` : (parts[0] ?? "");
+}
 
 /**
  * The price list, as a visitor reads it.
@@ -128,6 +136,14 @@ export function PricingTable({
           {TRIAL.locations} location.
         </span>{" "}
         {TRIAL.note}
+      </p>
+
+      {/* Extra texts, from the same list the Billing page sells from. */}
+      <p className="mx-auto mt-3 max-w-[60ch] text-center text-sm leading-relaxed text-muted">
+        <span className="font-medium text-ink">Need more texts?</span>{" "}
+        {CENTS_PER_EXTRA_TEXT}¢ each, in packs of {extraTextPacks()}. Bought
+        texts never expire, and are used after the month&rsquo;s included
+        texts.
       </p>
 
       <section

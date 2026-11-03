@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { OwnerShell } from "@/features/dashboard/owner-shell";
-import { BillingPanel } from "@/features/dashboard/billing-panel";
+import { BillingPanel, type PackReturn } from "@/features/dashboard/billing-panel";
 import { billingForPlan, parsePlanChoice } from "@/lib/owner/plan-choice";
 import { permissionsFor } from "@/lib/owner/permissions";
 import { BackLink } from "@/components/ui/back-link";
@@ -25,9 +25,14 @@ export const dynamic = "force-dynamic";
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plan?: string }>;
+  searchParams: Promise<{ plan?: string; pack?: string }>;
 }) {
-  const selectedPlan = parsePlanChoice((await searchParams).plan);
+  const params = await searchParams;
+  const selectedPlan = parsePlanChoice(params.plan);
+  // Only the two return addresses this app gives Stripe. Anything else in the
+  // query string is ignored, and neither grants anything — the webhook does.
+  const packReturn: PackReturn =
+    params.pack === "complete" || params.pack === "cancelled" ? params.pack : null;
   const { organization } = await requireOwner(billingForPlan(selectedPlan));
   const [billing, unread] = await Promise.all([
     readOwnerBilling(organization.orgId),
@@ -48,6 +53,7 @@ export default async function BillingPage({
 
       <BillingPanel
         selectedPlan={selectedPlan}
+        packReturn={packReturn}
         billing={billing}
         canManage={permissionsFor(organization.role).manageBilling}
         timeZone={organization.timezone}

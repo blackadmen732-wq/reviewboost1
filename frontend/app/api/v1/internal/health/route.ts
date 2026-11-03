@@ -31,6 +31,10 @@ const STALE_AFTER_SECONDS: Record<string, number> = {
   maintenance: 45 * 60,
 };
 
+// Pack reconciliation runs once a day with maintenance; two days allows one
+// missed run before a missed webhook can sit unhealed unnoticed.
+const PACK_RECONCILE_STALE_AFTER_SECONDS = 2 * 24 * 60 * 60;
+
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
     if (!workerAuthorized(request)) {
@@ -106,6 +110,34 @@ export async function GET(request: NextRequest): Promise<Response> {
       if (row.failing) problems.push(`${row.worker}_failing`);
     }
 
+    // Text packs. Each count is money that moved without the credit matching
+    // it — paid with nothing granted, refunded after it was spent, a refund
+    // for a payment never seen — and none of them raises an error by itself.
+    // A paid pack with no reconciliation run in two days means a missed
+    // webhook would go unhealed.
+    const packHealth = await serviceRoleClient().rpc("rpc_billing_pack_health");
+    const pack = Array.isArray(packHealth.data)
+      ? (packHealth.data[0] as Record<string, unknown> | undefined)
+      : undefined;
+    const packsPaid = Number(pack?.["purchases_paid"] ?? 0);
+    const packsPaidWithoutCredit = Number(pack?.["paid_without_credit"] ?? 0);
+    const packsNeedReview = Number(pack?.["needs_review"] ?? 0);
+    const packsNeedReviewSegments = Number(pack?.["needs_review_segments"] ?? 0);
+    const packsRefundWithoutPayment = Number(pack?.["refund_without_payment"] ?? 0);
+    const reconcileAge =
+      pack?.["last_reconcile_age_s"] === null || pack?.["last_reconcile_age_s"] === undefined
+        ? null
+        : Number(pack["last_reconcile_age_s"]);
+    const reconcileOk = pack?.["last_reconcile_ok"] === undefined ? null : (pack["last_reconcile_ok"] as boolean | null);
+    if (packHealth.error) problems.push("pack_health_unavailable");
+    if (packsPaidWithoutCredit > 0) problems.push("packs_paid_without_credit");
+    if (packsNeedReview > 0) problems.push("packs_need_review");
+    if (packsRefundWithoutPayment > 0) problems.push("packs_refund_without_payment");
+    if (packsPaid > 0 && (reconcileAge === null || reconcileAge > PACK_RECONCILE_STALE_AFTER_SECONDS)) {
+      problems.push("packs_reconcile_stale");
+    }
+    if (reconcileOk === false) problems.push("packs_reconcile_not_ok");
+
     // Configuration drift after deploy (a variable removed in the dashboard)
     // is as fatal as a dead queue, so the gate's cheap half runs here too.
     const config = checkConfiguration();
@@ -123,6 +155,15 @@ export async function GET(request: NextRequest): Promise<Response> {
         outbox: { pending: outboxPending, deadLetter, oldestPendingAgeSeconds: oldestPendingAge },
         providerUnknown: { count: providerUnknown, oldestAgeSeconds: oldestUnknownAge },
         webhooks: { sms: smsWebhooks, stripe: stripeWebhooks },
+        packs: {
+          paid: packsPaid,
+          paidWithoutCredit: packsPaidWithoutCredit,
+          needsReview: packsNeedReview,
+          needsReviewSegments: packsNeedReviewSegments,
+          refundWithoutPayment: packsRefundWithoutPayment,
+          lastReconcileAgeSeconds: reconcileAge,
+          lastReconcileOk: reconcileOk,
+        },
         connections: {
           byState: connectionsByState,
           stalled: connectionsStalled,

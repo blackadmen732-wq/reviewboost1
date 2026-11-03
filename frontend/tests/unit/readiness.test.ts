@@ -40,6 +40,9 @@ const READY: Record<string, string> = {
   STRIPE_PRICE_STARTER: "price_starter1",
   STRIPE_PRICE_GROWTH: "price_growth1",
   STRIPE_PRICE_PRO: "price_pro1",
+  STRIPE_PRICE_SMS_PACK_50: "price_pack50",
+  STRIPE_PRICE_SMS_PACK_200: "price_pack200",
+  STRIPE_PRICE_SMS_PACK_500: "price_pack500",
   SMS_PROVIDER: "twilio",
   TWILIO_ACCOUNT_SID: `AC${"a".repeat(32)}`,
   TWILIO_AUTH_TOKEN: "t".repeat(32),
@@ -266,6 +269,16 @@ describe("Stripe", () => {
   it("refuses two plans sharing one price", async () => {
     configure({ STRIPE_PRICE_PRO: "price_starter1" });
     expect(problemsOf(await gate())).toMatch(/repeats another plan's price/);
+  });
+
+  it("refuses a missing text pack price — owners could not buy texts", async () => {
+    configure({ STRIPE_PRICE_SMS_PACK_200: "" });
+    expect(problemsOf(await gate())).toMatch(/STRIPE_PRICE_SMS_PACK_200 is required/);
+  });
+
+  it("refuses a text pack sold on a plan's price", async () => {
+    configure({ STRIPE_PRICE_SMS_PACK_50: "price_growth1" });
+    expect(problemsOf(await gate())).toMatch(/STRIPE_PRICE_SMS_PACK_50 repeats/);
   });
 });
 

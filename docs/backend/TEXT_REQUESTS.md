@@ -296,8 +296,11 @@ them trigger on `supabase/**`, `frontend/lib/server/**`, and `frontend/app/api/*
 ## 21. Still missing before a real SMS can be sent
 
 - A configured provider + credentials + verified sending number (above). **[needs-provider]**
-- An allocation of quota per org (`rpc_sms_quota_allocate`) tied to billing — the
-  ledger exists; the purchase/plan integration does not. **[impl: ledger only]**
+- Credit tied to billing: a paid plan invoice mints the month's texts
+  (`rpc_billing_apply_invoice_paid`) and a paid text pack mints purchased texts
+  (`rpc_billing_apply_pack_payment`); refunds and disputes take back only unspent
+  credit (docs/MONEY.md §4–§5). **[impl][test-ci]** — not yet exercised
+  against Stripe. **[needs-provider]**
 - Recording real consent per recipient: the owner attestation path exists
   (`/text-requests/consent`, with method, wording version and acting user as
   evidence; see `docs/connections/07-consent-and-eligibility.md`). Whether an

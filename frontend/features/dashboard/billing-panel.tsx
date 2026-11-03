@@ -5,7 +5,13 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
-import { PUBLIC_PLANS, TRIAL } from "@/features/public/pricing-plans";
+import {
+  CENTS_PER_EXTRA_TEXT,
+  PUBLIC_PLANS,
+  TEXT_PACKS,
+  TRIAL,
+  type TextPack,
+} from "@/features/public/pricing-plans";
 import { ownerOnly } from "@/lib/owner/permissions";
 import { cn } from "@/lib/utils/cn";
 import { withWriteDeadline } from "@/lib/api/read-deadline";
@@ -28,7 +34,12 @@ interface Billing {
     locations: { used: number; limit: number };
     tags: { used: number; limit: number };
   } | null;
+  /** The server's answer: an active plan, and pack prices configured. */
+  packsAvailable?: boolean;
 }
+
+/** Where Stripe sent the owner back from a text pack checkout, if anywhere. */
+export type PackReturn = "complete" | "cancelled" | null;
 
 /**
  * The locked plans come from `PUBLIC_PLANS`, the same list the pricing page
@@ -260,6 +271,112 @@ function count(used: number, limit: number, one: string, many: string): string {
 }
 
 /**
+ * Extra texts, for an active plan: one choice and one button.
+ *
+ * The pack is picked here, paid on Stripe, and credited by Stripe's signed
+ * webhook — never by coming back to this page, which only proves a redirect
+ * happened (docs/MONEY.md §1). The middle pack is preselected so the button
+ * always names exactly what will be charged.
+ */
+function ExtraTexts({
+  monthlyAllowance,
+  busy,
+  onBuy,
+}: {
+  monthlyAllowance: number;
+  busy: string | null;
+  onBuy: (pack: TextPack) => void;
+}) {
+  const [packId, setPackId] = useState<TextPack["id"]>("pack_200");
+  const pack = TEXT_PACKS.find((option) => option.id === packId) ?? TEXT_PACKS[0]!;
+
+  return (
+    <section aria-labelledby="extra-texts-heading" className="flex flex-col gap-4">
+      <div>
+        <h2 id="extra-texts-heading" className="text-base font-semibold text-ink">
+          Extra texts
+        </h2>
+        <p className="mt-1 max-w-[62ch] text-sm leading-relaxed text-muted">
+          {CENTS_PER_EXTRA_TEXT}¢ a text, paid once. They never expire, and they are used
+          {monthlyAllowance
+            ? ` after your ${monthlyAllowance.toLocaleString("en-US")} monthly texts.`
+            : " after your monthly texts."}
+        </p>
+      </div>
+
+      <fieldset disabled={busy !== null}>
+        <legend className="sr-only">How many extra texts</legend>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {TEXT_PACKS.map((option) => (
+            <label
+              key={option.id}
+              data-pack={option.id}
+              className="flex min-h-14 cursor-pointer items-center justify-between gap-3 rounded-[var(--radius-control)] border border-border bg-surface p-4 transition-colors hover:border-[color:var(--rb-border-strong)] has-[:checked]:border-[color:var(--rb-ink)] has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[color:var(--rb-focus-soft)] motion-reduce:transition-none"
+            >
+              <span className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="text-pack"
+                  className="size-5 shrink-0 accent-action"
+                  value={option.id}
+                  checked={packId === option.id}
+                  onChange={() => setPackId(option.id)}
+                />
+                <span className="text-base font-medium text-ink tabular-nums">
+                  {option.texts.toLocaleString("en-US")} texts
+                </span>
+              </span>
+              <span className="text-base font-semibold text-ink tabular-nums">
+                ${option.price}
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+        <Button
+          type="button"
+          variant="action"
+          className="sm:w-auto sm:shrink-0"
+          onClick={() => onBuy(pack)}
+          loading={busy === `pack:${pack.id}`}
+          loadingLabel="Opening…"
+          disabled={busy !== null}
+        >
+          Buy {pack.texts.toLocaleString("en-US")} texts for ${pack.price}
+        </Button>
+        <p className="text-sm text-muted">
+          You pay on Stripe. The texts show up here once Stripe confirms the payment.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/** What coming back from a pack checkout means — and only what it means. */
+function PackReturnNotice({ packReturn }: { packReturn: PackReturn }) {
+  if (packReturn === "complete") {
+    return (
+      <InlineNotice kind="info" title="Thanks — your texts are on the way">
+        <p>
+          They are added to Texts left as soon as Stripe confirms the payment, usually
+          within a minute. Refresh this page to see them.
+        </p>
+      </InlineNotice>
+    );
+  }
+  if (packReturn === "cancelled") {
+    return (
+      <InlineNotice kind="info" title="No texts bought">
+        <p>The payment was not finished, so nothing was charged.</p>
+      </InlineNotice>
+    );
+  }
+  return null;
+}
+
+/**
  * `canManage` is the owner: `api/v1/billing` POST refuses everyone else. An
  * admin, member or viewer reads the same state with no checkout or portal
  * button that would come back 403.
@@ -272,11 +389,14 @@ export function BillingPanel({
   billing,
   canManage,
   selectedPlan = null,
+  packReturn = null,
   timeZone,
 }: {
   billing: Billing;
   canManage: boolean;
   selectedPlan?: PlanId | null;
+  /** Set when Stripe has just sent the owner back from a text pack checkout. */
+  packReturn?: PackReturn;
   /** The business's IANA time zone, so server and browser print the same day. */
   timeZone?: string;
 }) {
@@ -380,6 +500,13 @@ export function BillingPanel({
   // Every other state needs its sentence — a trial's end, a cancellation's
   // last day — and that sentence already carries the date.
   const quiet = billing.status === "active" && !billing.cancelAtPeriodEnd;
+  // Extra texts: only an active plan that is not ending, and only the owner,
+  // because only the owner can pay. A business on its way out is not sold
+  // texts its plan will not be there to send.
+  const offerPacks =
+    canManage &&
+    quiet &&
+    billing.packsAvailable === true;
   const factLine = quiet && periodEnd ? `Next payment ${periodEnd}` : null;
 
   return (
@@ -405,6 +532,8 @@ export function BillingPanel({
           <p>{error}</p>
         </InlineNotice>
       ) : null}
+
+      {error ? null : <PackReturnNotice packReturn={packReturn} />}
 
       <section
         aria-labelledby="plan-heading"
@@ -542,6 +671,14 @@ export function BillingPanel({
             />
           </div>
         </section>
+      ) : null}
+
+      {offerPacks ? (
+        <ExtraTexts
+          monthlyAllowance={monthlyAllowance}
+          busy={busy}
+          onBuy={(pack) => void act({ action: "pack", packId: pack.id }, `pack:${pack.id}`)}
+        />
       ) : null}
 
       {canManage && needsCheckout ? (

@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 
+import { reconcileSmsPacks } from "@/lib/server/billing-service";
+import { stripeSecretKey } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { withHeartbeat } from "@/lib/server/heartbeat";
 import { handle, json } from "@/lib/server/http";
@@ -12,7 +14,8 @@ import { workerAuthorized } from "@/lib/server/worker-auth";
  *
  * Reconciliation closes out sends whose outcome the provider never told us,
  * dead-letter release gives back credit for messages that never left, and
- * expiry retires monthly allowance at its billing boundary. None of it is
+ * expiry retires monthly allowance at its billing boundary, and text packs
+ * paid in Stripe are checked against the credit they gave. None of it is
  * driven by a user action, so without a scheduler all three simply never
  * happen — which shows up as credit stuck in reservations and businesses
  * unable to send.
@@ -51,7 +54,45 @@ async function runMaintenance(requestId: string): Promise<Record<string, number 
     summary[step.name] = typeof data === "number" ? data : 0;
   }
 
+  summary["reconcile_sms_packs"] = await reconcilePacksStep(requestId);
   return summary;
+}
+
+/**
+ * Text packs paid in Stripe against the credit the ledger gave (daily).
+ *
+ * A missed webhook is healed here, through the same path the webhook uses;
+ * refunds and disputes on a pack's charge are carried across. Where Stripe is
+ * not configured at all there is nothing to compare, and nothing is pretended:
+ * the step reports "skipped". Findings are not a step failure — the database
+ * lists them and health reports them; only a run that could not finish is.
+ */
+async function reconcilePacksStep(requestId: string): Promise<number | string> {
+  try {
+    stripeSecretKey();
+  } catch {
+    return "skipped";
+  }
+
+  try {
+    const result = await reconcileSmsPacks();
+    if (result.errors > 0) {
+      logger.error("maintenance.step_failed", {
+        requestId,
+        step: "reconcile_sms_packs",
+        errors: result.errors,
+      });
+      return "failed";
+    }
+    return result.healed;
+  } catch (error) {
+    logger.error("maintenance.step_failed", {
+      requestId,
+      step: "reconcile_sms_packs",
+      reason: error instanceof Error ? error.message : "unknown",
+    });
+    return "failed";
+  }
 }
 
 async function handleRequest(request: NextRequest): Promise<Response> {

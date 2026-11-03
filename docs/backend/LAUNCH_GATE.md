@@ -49,9 +49,9 @@ Supabase and Vercel connectors. Nothing in production was changed.
 | **Production code vs database** | **Mismatched.** `main` carries 58 migrations' worth of code (billing, entitlements, Customer Page, SMS) against a 36-migration database. No traffic yet, so no user has hit it |
 | Previews | every push to `claude/festive-thompson-i28bpq` builds READY (latest `e0e7fc0`) |
 | Duplicate project | `reviewboost1-od3w` also builds every push and deploys `main` to production, with only the two public Supabase variables and no domain. Recommend disconnecting it |
-| Production env (names only) | set: `PUBLIC_FRONTEND_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `CUSTOMER_NOTE_ENCRYPTION_KEY`, Stripe integration vars. **Missing**: `TOKEN_DIGEST_KEY`, `TOKEN_DIGEST_KEY_VERSION`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER/GROWTH/PRO`, `SMS_PROVIDER`, `TWILIO_*`, `SMS_PUBLIC_WEBHOOK_BASE_URL`, `SMS_RATE_PER_SEGMENT_MICROS`, `CRON_SECRET` |
+| Production env (names only, re-checked 2026-11-02) | set: `PUBLIC_FRONTEND_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `CUSTOMER_NOTE_ENCRYPTION_KEY`, `CRON_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER/GROWTH/PRO` (labelled sandbox, "no live payments"), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `SMS_DEFAULT_COUNTRY_CALLING_CODE`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID/API_KEY/PROJECT_NUMBER`. **Missing**: `TOKEN_DIGEST_KEY`, `TOKEN_DIGEST_KEY_VERSION` (and `TOKEN_DIGEST_KEY_PREVIOUS` for the §4 rotation), `STRIPE_PRICE_SMS_PACK_50/200/500`, `SMS_PROVIDER`, `TWILIO_*`, `SMS_PUBLIC_WEBHOOK_BASE_URL`, `SMS_RATE_PER_SEGMENT_MICROS`, `NEXT_PUBLIC_AUTH_PROVIDERS`, `APPLE_*` |
 | Preview env | no Supabase variables at all; a variable named `PUBLIC_FRONTEND_URL4` (typo) |
-| Environment separation | **None for Stripe**: the Stripe integration injects one `STRIPE_SECRET_KEY` (and `STRIPE_MCP_KEY`) into production, preview and development; Vercel flags them `readable-secret`. The readiness gate rejects this (live key on non-production, or test key on production) |
+| Environment separation | Re-checked 2026-11-02: `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are now set separately for production, preview and development (values are not readable here). Whether production's key is live mode is unverified; the readiness gate refuses a test key in production and a live key anywhere else. (2026-09-24: one integration-injected key for all three.) |
 | Crons | `vercel.json` daily floor (dispatch 19:00 UTC, maintenance 08:00 UTC) |
 | Runtime errors | not readable through the connector (403) |
 
@@ -209,6 +209,19 @@ decision.
    ```
    A grandfathered price stays in the table with its plan. Removing a price
    stops new grants on it; cancellations still revoke.
+2b. **Text pack prices** (docs/MONEY.md §4.2): three one-time USD prices in
+   the same Stripe mode — $4, $16, $40 — set as `STRIPE_PRICE_SMS_PACK_50`,
+   `STRIPE_PRICE_SMS_PACK_200`, `STRIPE_PRICE_SMS_PACK_500`. Checkout refuses a
+   price whose amount, currency or type differs, and production readiness
+   refuses a missing one. Packs need no table rows: the database's own card
+   (`app.sms_pack_catalog`) decides what a paid pack is worth.
+2c. **Webhook events.** The Stripe endpoint (`/api/v1/webhooks/stripe`) must
+   send: `customer.subscription.created`, `.updated`, `.deleted`,
+   `invoice.paid`, `invoice.payment_failed`, `checkout.session.completed`,
+   `checkout.session.async_payment_succeeded`, `charge.refunded`,
+   `charge.dispute.created`, `.updated`, `.closed`, `.funds_withdrawn`,
+   `.funds_reinstated`. Without the checkout and charge events a pack is paid
+   and never credited until the daily reconciliation heals it.
 3. **Storage:** create public bucket `customer-page`.
 4. **Digest key.** Production requires `TOKEN_DIGEST_KEY` ≠
    `CUSTOMER_NOTE_ENCRYPTION_KEY` and an explicit `TOKEN_DIGEST_KEY_VERSION`.
@@ -242,7 +255,10 @@ schema.** The readiness gate enforces the last part mechanically
    re-emits functions compatibly, **except** `20260924000100`, which replaces
    `rpc_billing_apply_invoice_paid`'s third argument: between it and the new
    build, `invoice.paid` events fail and Stripe retries them (delayed, not
-   lost). Deploy the build promptly after.
+   lost). Deploy the build promptly after. `20261103000100_sms_pack_money`
+   is additive (new tables, two ledger functions re-emitted with `- revoked`)
+   and closes `rpc_billing_apply_credit_purchase` to the service role; no
+   application code calls it.
 5. Deploy the build **without assigning the production domain** (disable
    "auto-assign custom production domains" in Vercel, or
    `vercel deploy --prod --skip-domain`).
@@ -276,6 +292,16 @@ replayed after a newer one (stale); an unmapped price (expect 500 +
 applied); an unknown customer (200, inbox row unprocessed); account deletion
 cancelling the subscription first. After each, compare `billing_subscriptions`
 and `entitlement_snapshots` with the Stripe dashboard.
+
+Text packs, the same way: buy each pack once with a test card → exactly that
+many purchased texts, once, however often the event is resent; a delayed
+payment method → nothing until `checkout.session.async_payment_succeeded`;
+a full refund of an unspent pack → its texts gone; a partial refund → its
+share gone, rounded up; a refund after some were sent → the rest gone and the
+spent part listed as `needs_review`; a dispute opened → all of it frozen, won →
+back; delete the webhook endpoint, buy, then run maintenance → the pack is
+healed by reconciliation and the run is not ok; a price edited to $5 → checkout
+refuses with `billing.pack_price_mismatch` and nobody is charged.
 
 Twilio (staging, `APP_ENV=staging`, real test phone): send; status callbacks
 (delivered, undelivered); STOP → suppression and no further sends; START;

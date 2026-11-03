@@ -4,6 +4,7 @@ import {
   deploymentTier,
   encryptionKey,
   publicFrontendUrl,
+  stripePackPriceId,
   stripePriceId,
   supabaseAnonKey,
   supabaseServiceRoleKey,
@@ -140,6 +141,18 @@ export function checkConfiguration(): ReadinessReport {
           throw new Error(`STRIPE_PRICE_${plan.toUpperCase()} is not a Stripe price id`);
         }
         if (prices.has(price)) throw new Error(`STRIPE_PRICE_${plan.toUpperCase()} repeats another plan's price`);
+        prices.add(price);
+      });
+    }
+    // Extra texts are part of the price list (docs/MONEY.md §4.2). A pack
+    // price that is missing means owners cannot buy texts; one that repeats a
+    // plan's price would put a subscription and a pack on the same line.
+    for (const pack of ["pack_50", "pack_200", "pack_500"] as const) {
+      const name = `STRIPE_PRICE_SMS_${pack.toUpperCase()}`;
+      attempt("stripe", problems, () => {
+        const price = stripePackPriceId(pack);
+        if (!/^price_[A-Za-z0-9_]+$/.test(price)) throw new Error(`${name} is not a Stripe price id`);
+        if (prices.has(price)) throw new Error(`${name} repeats another plan's or pack's price`);
         prices.add(price);
       });
     }

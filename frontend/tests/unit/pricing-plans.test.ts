@@ -3,7 +3,13 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { EVERY_PLAN, PUBLIC_PLANS, TRIAL } from "@/features/public/pricing-plans";
+import {
+  CENTS_PER_EXTRA_TEXT,
+  EVERY_PLAN,
+  PUBLIC_PLANS,
+  TEXT_PACKS,
+  TRIAL,
+} from "@/features/public/pricing-plans";
 import { PLAN_CATALOG } from "@/lib/owner/plan-catalog";
 
 /**
@@ -86,5 +92,58 @@ describe("the trial is a trial, not a free plan", () => {
     const words = [...PUBLIC_PLANS.map((p) => `${p.name} ${p.fit}`), ...EVERY_PLAN].join(" ");
     expect(words.toLowerCase()).not.toMatch(/\bfree\b|forever/);
     expect(PUBLIC_PLANS.every((plan) => plan.price > 0)).toBe(true);
+  });
+});
+
+/**
+ * Extra texts are sold from the same card the database grants from.
+ *
+ * `app.sms_pack_catalog` mints a pack only when Stripe collected exactly its
+ * price, so a public page quoting a different price would sell packs the
+ * database then refuses to credit.
+ */
+const PACK_MIGRATION = join(
+  process.cwd(),
+  "..",
+  "supabase/migrations/20261103000100_sms_pack_money.sql",
+);
+
+function databasePacks(): Record<string, { segments: number; cents: number; currency: string }> {
+  const sql = readFileSync(PACK_MIGRATION, "utf8");
+  const body = sql.slice(sql.indexOf("function app.sms_pack_catalog"));
+  const found: Record<string, { segments: number; cents: number; currency: string }> = {};
+  for (const [, id, segments, cents, currency] of body
+    .slice(0, body.indexOf("$$;"))
+    .matchAll(/\('(\w+)',\s*(\d+)::bigint,\s*(\d+)::bigint,\s*'(\w+)'\)/g)) {
+    found[id!] = { segments: Number(segments), cents: Number(cents), currency: currency! };
+  }
+  return found;
+}
+
+describe("extra texts are priced the way the database grants them", () => {
+  it("quotes exactly the packs the database sells", () => {
+    const database = databasePacks();
+    // Guard the reader itself: an empty parse would make this vacuously pass.
+    expect(Object.keys(database).sort()).toEqual(["pack_200", "pack_50", "pack_500"]);
+
+    for (const pack of TEXT_PACKS) {
+      expect(database[pack.id], `${pack.id} is advertised wrong`).toEqual({
+        segments: pack.texts,
+        cents: pack.price * 100,
+        currency: "usd",
+      });
+    }
+    expect(TEXT_PACKS.map((p) => [p.texts, p.price])).toEqual([
+      [50, 4],
+      [200, 16],
+      [500, 40],
+    ]);
+  });
+
+  it("charges every extra text the same 8 cents, in whole cents", () => {
+    for (const pack of TEXT_PACKS) {
+      expect((pack.price * 100) / pack.texts).toBe(CENTS_PER_EXTRA_TEXT);
+    }
+    expect(CENTS_PER_EXTRA_TEXT).toBe(8);
   });
 });

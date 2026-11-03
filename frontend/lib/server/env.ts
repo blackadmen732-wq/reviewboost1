@@ -345,6 +345,38 @@ export function stripePriceId(planId: "starter" | "growth" | "pro"): string {
   }
 }
 
+/**
+ * Stripe price ids for the three text packs (one-time prices, never a
+ * subscription line).
+ *
+ * A pack whose price is not configured cannot be sold. The price's amount is
+ * not trusted either: checkout compares it with the pack card before sending
+ * anyone to Stripe, and the database mints only when Stripe collected exactly
+ * the card's price, so a misconfigured price produces a refused checkout or a
+ * visible paid-without-credit finding — never a pack sold at the wrong price.
+ */
+export function stripePackPriceId(packId: "pack_50" | "pack_200" | "pack_500"): string {
+  switch (packId) {
+    case "pack_50":
+      return read("STRIPE_PRICE_SMS_PACK_50");
+    case "pack_200":
+      return read("STRIPE_PRICE_SMS_PACK_200");
+    case "pack_500":
+      return read("STRIPE_PRICE_SMS_PACK_500");
+  }
+}
+
+/** Whether all three pack prices are set, without throwing. */
+export function stripePackPricesConfigured(): boolean {
+  return (["pack_50", "pack_200", "pack_500"] as const).every((pack) => {
+    try {
+      return stripePackPriceId(pack).length > 0;
+    } catch {
+      return false;
+    }
+  });
+}
+
 /** Reverse of `stripePriceId`, for reading a subscription back. */
 export function planIdForPrice(priceId: string | null): "starter" | "growth" | "pro" | null {
   if (!priceId) return null;

@@ -113,6 +113,17 @@ describe("maintenance leaves a pulse", () => {
     const last = calls.filter((c) => c.name === "rpc_worker_heartbeat").at(-1);
     expect(last?.args).toMatchObject({ p_worker: "maintenance", p_outcome: "failed", p_error: "failed: expire_quota" });
   });
+
+  it("skips text pack reconciliation where Stripe is not configured, without failing", async () => {
+    const { GET } = await import("@/app/api/v1/internal/maintenance/route");
+    const response = await GET(get("/api/v1/internal/maintenance") as never);
+    const body = await response.json();
+
+    expect(body.data.reconcile_sms_packs).toBe("skipped");
+    expect(calls.some((c) => c.name === "rpc_billing_record_reconciliation_run")).toBe(false);
+    const last = calls.filter((c) => c.name === "rpc_worker_heartbeat").at(-1);
+    expect(last?.args).toMatchObject({ p_worker: "maintenance", p_outcome: "succeeded" });
+  });
 });
 
 describe("health", () => {
@@ -152,6 +163,44 @@ describe("health", () => {
     const { status, body } = await health();
     expect(status).toBe(503);
     expect(body.data.problems).toContain("stripe_webhooks_unprocessed");
+  });
+
+  it("names text pack money that does not add up", async () => {
+    results.set("rpc_billing_pack_health", {
+      data: [{
+        purchases_paid: 3, paid_without_credit: 1, needs_review: 1, needs_review_segments: 12,
+        refund_without_payment: 1, last_reconcile_age_s: 3600, last_reconcile_ok: false,
+        last_reconcile_findings: 3,
+      }],
+      error: null,
+    });
+    const { status, body } = await health();
+    expect(status).toBe(503);
+    expect(body.data.problems).toEqual(expect.arrayContaining([
+      "packs_paid_without_credit",
+      "packs_need_review",
+      "packs_refund_without_payment",
+      "packs_reconcile_not_ok",
+    ]));
+    expect(body.data.packs).toMatchObject({ paid: 3, needsReviewSegments: 12, lastReconcileOk: false });
+  });
+
+  it("expects a pack reconciliation run once a pack has been sold", async () => {
+    results.set("rpc_billing_pack_health", {
+      data: [{ purchases_paid: 1, last_reconcile_age_s: null, last_reconcile_ok: null }],
+      error: null,
+    });
+    expect((await health()).body.data.problems).toContain("packs_reconcile_stale");
+  });
+
+  it("expects no reconciliation run before any pack was sold", async () => {
+    results.set("rpc_billing_pack_health", {
+      data: [{ purchases_paid: 0, last_reconcile_age_s: null, last_reconcile_ok: null }],
+      error: null,
+    });
+    const { status, body } = await health();
+    expect(body.data.problems).toEqual([]);
+    expect(status).toBe(200);
   });
 
   it("is 503 when configuration has drifted out of readiness", async () => {
