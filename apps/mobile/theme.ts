@@ -40,6 +40,9 @@ export const colors = {
   infoBg: "#EFF6FF",
   info: "#356d8c",
 
+  // "Needs you" (DESIGN.md §3.3): the web's --rb-warning.
+  warning: "#9a6415",
+
   starFilled: "#B97D0C",
   // The website's empty star (--rb-border). Filled stars carry the rating,
   // and every row of stars is read aloud as "N out of 5 stars".

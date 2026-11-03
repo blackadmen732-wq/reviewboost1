@@ -3,6 +3,7 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -35,12 +36,15 @@ import { colors } from "@/theme";
 export function NfcProgramSheet({
   visible,
   scene,
+  detected = false,
   copy,
   onPrimary,
   onDismiss,
 }: {
   visible: boolean;
   scene: NfcScene;
+  /** While writing: the phone has found the chip, so it stays against it. */
+  detected?: boolean;
   copy: SceneCopy;
   onPrimary: () => void;
   onDismiss: () => void;
@@ -80,9 +84,9 @@ export function NfcProgramSheet({
           </View>
 
           <View style={[styles.stage, compact && styles.stageCompact]}>
-            <View style={compact ? styles.figureCompact : undefined}>
-              <View style={compact ? { transform: [{ scale: COMPACT_SCALE }] } : undefined}>
-                <NfcFigure scene={scene} reduceMotion={reduceMotion} />
+            <View style={compact ? styles.sceneFrameCompact : styles.sceneFrame}>
+              <View style={{ transform: [{ scale: compact ? COMPACT_SCALE : SCENE_SCALE }] }}>
+                <NfcFigure scene={scene} detected={detected} reduceMotion={reduceMotion} />
               </View>
             </View>
             <View style={styles.words}>
@@ -138,211 +142,337 @@ function useReduceMotion(): boolean {
   return reduce;
 }
 
-const FIGURE = 220;
-const COMPACT_SCALE = 0.7;
+/** The picture's own box. The web draws the same scene in the same box. */
+const SCENE_W = 300;
+const SCENE_H = 380;
+const SCENE_SCALE = 0.86;
+const COMPACT_SCALE = 0.56;
+
+const TAG_ART = require("../assets/nfc-tag.png");
+const PHONE_ART = require("../assets/nfc-phone.png");
+
+/** Where the phone sits, in points: waiting below, against the Tag, gone. */
+const PHONE_REST = 14;
+const PHONE_LOW = 18;
+const PHONE_UP = -32;
+const PHONE_GONE = 90;
+/** How far the Tag settles once the phone has gone. */
+const TAG_SETTLE = 84;
 
 /**
- * Soft rings, a white disc, and inside it the contactless symbol, a check or a
- * warning. While writing, an arc turns around the disc without ever filling:
- * NFC reports no distance and no progress, so nothing here may creep toward
- * "done".
+ * The owner's Tag, their phone coming up to it, and what happens between the
+ * two: the native twin of `frontend/features/tags/nfc-visuals.tsx`, drawn
+ * like Apple's "Hold Near Reader" so nobody has to read a word to know what
+ * to do.
+ *
+ * - ready:    the phone waits below the Tag, breathing a little.
+ * - writing:  the phone rises to the Tag and back while waves pulse; once the
+ *             chip is found it stays against it, with a spinner on its screen.
+ * - success:  the phone drops away, the Tag rings green, a check draws.
+ * - error:    a red mark, and the phone shakes once.
+ * - conflict, partial: an amber mark. Each needs the owner to decide.
+ *
+ * Blue while it works, green when it worked, amber when it needs the owner,
+ * red when it failed (DESIGN.md §3.3). Nothing measures anything: NFC reports
+ * no distance and no progress. The Tag and the phone are images
+ * (`scripts/brand/generate-nfc-art.mjs`): no SVG library, so no new native
+ * module and no new build for two drawings. Under Reduce Motion every scene is
+ * shown still and finished.
  */
-function NfcFigure({ scene, reduceMotion }: { scene: NfcScene; reduceMotion: boolean }) {
+function NfcFigure({
+  scene,
+  detected,
+  reduceMotion,
+}: {
+  scene: NfcScene;
+  detected: boolean;
+  reduceMotion: boolean;
+}) {
   const tone =
-    scene === "error" ? colors.danger : scene === "conflict" ? colors.inkMuted : colors.brand;
-  const mark = scene === "success" ? "check" : scene === "error" ? "alert" : "waves";
+    scene === "success"
+      ? colors.brand
+      : scene === "error"
+        ? colors.danger
+        : scene === "conflict" || scene === "partial"
+          ? colors.warning
+          : colors.info;
+  const mark = scene === "success" || scene === "partial" ? "check" : scene === "error" || scene === "conflict" ? "alert" : null;
+  const looking = scene === "writing" && !detected;
+  const found = scene === "writing" && detected;
+
+  const phoneY = useRef(new Animated.Value(PHONE_REST)).current;
+  const phoneX = useRef(new Animated.Value(0)).current;
+  const phoneOpacity = useRef(new Animated.Value(1)).current;
+  const tagY = useRef(new Animated.Value(0)).current;
+  const ring = useRef(new Animated.Value(0)).current;
+  const halo = useRef(new Animated.Value(1)).current;
+  const badge = useRef(new Animated.Value(0)).current;
+  const spin = useRef(new Animated.Value(0)).current;
+  const waves = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
+
+  // Where everything is, and how it moves, for this scene.
+  useEffect(() => {
+    const running: Animated.CompositeAnimation[] = [];
+    const run = (animation: Animated.CompositeAnimation) => {
+      running.push(animation);
+      animation.start();
+    };
+    const settle = (value: Animated.Value, toValue: number, duration = 300) =>
+      reduceMotion
+        ? value.setValue(toValue)
+        : run(Animated.timing(value, { toValue, duration, easing: Easing.out(Easing.cubic), useNativeDriver: true }));
+    const spring = (value: Animated.Value, toValue: number) =>
+      reduceMotion
+        ? value.setValue(toValue)
+        : run(Animated.spring(value, { toValue, speed: 14, bounciness: 9, useNativeDriver: true }));
+
+    const success = scene === "success";
+    const answered = mark !== null;
+
+    // The phone.
+    phoneX.setValue(0);
+    if (success) {
+      settle(phoneY, PHONE_GONE, 450);
+      settle(phoneOpacity, 0, 350);
+    } else {
+      phoneOpacity.setValue(1);
+      if (found || (looking && reduceMotion)) spring(phoneY, PHONE_UP);
+      else if (looking) {
+        run(
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(phoneY, { toValue: PHONE_UP, duration: 1080, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+              Animated.delay(600),
+              Animated.timing(phoneY, { toValue: PHONE_LOW, duration: 720, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            ]),
+          ),
+        );
+      } else if (scene === "ready" && !reduceMotion) {
+        phoneY.setValue(PHONE_REST);
+        run(
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(phoneY, { toValue: PHONE_REST - 8, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+              Animated.timing(phoneY, { toValue: PHONE_REST, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            ]),
+          ),
+        );
+      } else settle(phoneY, PHONE_REST);
+    }
+    if (scene === "error" && !reduceMotion) {
+      // One shake, the way a phone says "no". It does not repeat.
+      run(
+        Animated.sequence(
+          [-9, 8, -6, 4, 0].map((toValue) =>
+            Animated.timing(phoneX, { toValue, duration: 90, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          ),
+        ),
+      );
+    }
+
+    // The Tag settles into the middle once the phone has gone.
+    if (success) spring(tagY, TAG_SETTLE);
+    else settle(tagY, 0);
+    settle(ring, success ? 1 : 0, 250);
+
+    // The answer over the Tag.
+    if (answered) {
+      badge.setValue(reduceMotion ? 1 : 0);
+      spring(badge, 1);
+    } else badge.setValue(0);
+
+    // The waves between the phone and the Tag, and the halo behind it all.
+    waves.forEach((value) => value.setValue(found || (looking && reduceMotion) ? 0.85 : 0));
+    halo.setValue(1);
+    if (looking && !reduceMotion) {
+      waves.forEach((value, index) =>
+        run(
+          Animated.loop(
+            Animated.sequence([
+              Animated.delay(index * 250),
+              Animated.timing(value, { toValue: 1, duration: 1500, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+              Animated.timing(value, { toValue: 0, duration: 0, useNativeDriver: true }),
+              Animated.delay((2 - index) * 250),
+            ]),
+          ),
+        ),
+      );
+      run(
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(halo, { toValue: 1.06, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            Animated.timing(halo, { toValue: 0.94, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          ]),
+        ),
+      );
+    }
+
+    // The phone's screen while it writes.
+    spin.setValue(0);
+    if (found && !reduceMotion) {
+      run(Animated.loop(Animated.timing(spin, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: true })));
+    }
+
+    return () => running.forEach((animation) => animation.stop());
+  }, [badge, found, halo, looking, mark, phoneOpacity, phoneX, phoneY, reduceMotion, ring, scene, spin, tagY, waves]);
+
+  const badgeScale = badge.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   return (
-    <View style={styles.figure} importantForAccessibility="no-hide-descendants">
-      {/* Keyed by the mark, so the entrance plays when the mark changes. */}
-      <Rings key={mark} tone={tone} reduceMotion={reduceMotion} fade={mark === "alert"} />
-      <View style={styles.disc} />
-      {mark === "waves" ? (
-        <>
-          <Spinner active={scene === "writing"} reduceMotion={reduceMotion} />
-          <Waves tone={tone} active={scene === "writing"} reduceMotion={reduceMotion} />
-        </>
-      ) : null}
-      {mark === "check" ? <Check reduceMotion={reduceMotion} /> : null}
-      {mark === "alert" ? <Alert /> : null}
+    <View style={styles.scene} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+      <Animated.View
+        style={[styles.halo, { backgroundColor: tint(tone, 0.07), transform: [{ scale: halo }] }]}
+      >
+        <View style={[styles.haloInner, { backgroundColor: tint(tone, 0.08) }]} />
+      </Animated.View>
+
+      <Animated.View style={[styles.tagWrap, { transform: [{ translateY: tagY }] }]}>
+        <Animated.View style={[styles.tagRing, { opacity: ring }]} />
+        <View style={styles.tagShadow}>
+          <Image source={TAG_ART} style={styles.tagArt} accessibilityIgnoresInvertColors />
+        </View>
+      </Animated.View>
+
+      {[18, 30, 42].map((radius, index) => {
+        const cy = 178 - index * 4;
+        const value = waves[index] as Animated.Value;
+        const scale = looking && !reduceMotion ? value.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.2] }) : 1;
+        const opacity = looking && !reduceMotion
+          ? value.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0, 1, 0] })
+          : value;
+        return (
+          <Animated.View
+            key={radius}
+            style={[
+              styles.wave,
+              {
+                left: 150 - radius,
+                top: cy - radius,
+                width: radius * 2,
+                height: radius * 2,
+                borderRadius: radius,
+                borderTopColor: tone,
+                borderRightColor: tone,
+                opacity,
+                transform: [{ translateY: radius }, { scale }, { translateY: -radius }, { rotate: "-45deg" }],
+              },
+            ]}
+          />
+        );
+      })}
+
+      <Animated.View
+        style={[
+          styles.phone,
+          {
+            opacity: phoneOpacity,
+            transform: [{ translateX: phoneX }, { translateY: phoneY }, { rotate: "-6deg" }],
+          },
+        ]}
+      >
+        <Image source={PHONE_ART} style={styles.phoneArt} accessibilityIgnoresInvertColors />
+        {found ? (
+          <View style={styles.spinnerBox}>
+            <View style={styles.spinnerTrack} />
+            {reduceMotion ? (
+              <View style={[styles.spinnerTrack, { borderColor: colors.info }]} />
+            ) : (
+              <Animated.View style={[styles.spinnerArc, { transform: [{ rotate }] }]} />
+            )}
+          </View>
+        ) : null}
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.badge,
+          { backgroundColor: tone, opacity: badge, transform: [{ translateY: tagY }, { scale: badgeScale }] },
+        ]}
+      >
+        {mark === "check" ? <Check reduceMotion={reduceMotion} /> : null}
+        {mark === "alert" ? (
+          <>
+            <View style={styles.alertBar} />
+            <View style={styles.alertDot} />
+          </>
+        ) : null}
+      </Animated.View>
+
+      {scene === "success" && !reduceMotion ? <Sparks /> : null}
     </View>
   );
 }
 
-function Rings({ tone, reduceMotion, fade }: { tone: string; reduceMotion: boolean; fade: boolean }) {
-  const enter = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
+/** The tick draws itself, A to B then B to C, once. */
+function Check({ reduceMotion }: { reduceMotion: boolean }) {
+  const short = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
+  const long = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
   useEffect(() => {
-    if (reduceMotion) return;
-    Animated.timing(enter, {
-      toValue: 1,
-      duration: fade ? 220 : 420,
-      easing: Easing.bezier(0.22, 1, 0.36, 1),
-      useNativeDriver: true,
-    }).start();
-  }, [enter, fade, reduceMotion]);
-
-  const scale = fade ? 1 : enter.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] });
-
+    if (reduceMotion) return undefined;
+    const draw = Animated.sequence([
+      Animated.delay(200),
+      Animated.timing(short, { toValue: 1, duration: 140, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(long, { toValue: 1, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]);
+    draw.start();
+    return () => draw.stop();
+  }, [long, reduceMotion, short]);
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, styles.centre, { opacity: enter, transform: [{ scale }] }]}>
-      <View style={[styles.ring, { width: FIGURE, height: FIGURE, backgroundColor: tint(tone, 0.07) }]} />
-      <View style={[styles.ring, { width: 176, height: 176, backgroundColor: tint(tone, 0.09) }]} />
-    </Animated.View>
+    <View style={styles.checkBox}>
+      <Animated.View style={[styles.stroke, { left: 6, top: 19, width: 16, transform: [{ rotate: "45deg" }, { scaleX: short }] }]} />
+      <Animated.View style={[styles.stroke, { left: 17, top: 30, width: 30, transform: [{ rotate: "-47deg" }, { scaleX: long }] }]} />
+    </View>
   );
 }
 
-/** A quarter arc that turns. Under reduced motion, a still full ring instead. */
-function Spinner({ active, reduceMotion }: { active: boolean; reduceMotion: boolean }) {
-  const turn = useRef(new Animated.Value(0)).current;
+/** Where each spark travels from the badge. They fly once and fade; nothing loops. */
+const SPARKS: ReadonlyArray<readonly [number, number]> = [
+  [-70, -36],
+  [-44, -70],
+  [0, -84],
+  [46, -68],
+  [72, -32],
+  [-82, 12],
+  [84, 14],
+  [0, 46],
+];
+
+function Sparks() {
+  const burst = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (!active || reduceMotion) return undefined;
-    turn.setValue(0);
-    const loop = Animated.loop(
-      Animated.timing(turn, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: true }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [active, reduceMotion, turn]);
-
-  if (!active) return null;
-
-  if (reduceMotion) {
-    return <View style={[styles.spinner, { borderColor: tint(colors.brand, 0.5) }]} />;
-  }
-
-  const rotate = turn.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
+    const fly = Animated.sequence([
+      Animated.delay(250),
+      Animated.timing(burst, { toValue: 1, duration: 800, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]);
+    fly.start();
+    return () => fly.stop();
+  }, [burst]);
   return (
-    <Animated.View
-      style={[
-        styles.spinner,
-        { borderColor: "transparent", borderTopColor: colors.brand, transform: [{ rotate }] },
-      ]}
-    />
-  );
-}
-
-/** Three arcs opening to the right, the contactless symbol. */
-function Waves({ tone, active, reduceMotion }: { tone: string; active: boolean; reduceMotion: boolean }) {
-  const values = useRef([0, 1, 2].map(() => new Animated.Value(1))).current;
-
-  useEffect(() => {
-    if (!active || reduceMotion) {
-      values.forEach((value) => value.setValue(1));
-      return undefined;
-    }
-    const loops = values.map((value, index) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(index * 180),
-          Animated.timing(value, { toValue: 0.28, duration: 560, useNativeDriver: true }),
-          Animated.timing(value, { toValue: 1, duration: 680, useNativeDriver: true }),
-          Animated.delay((2 - index) * 180),
-        ]),
-      ),
-    );
-    loops.forEach((loop) => loop.start());
-    return () => loops.forEach((loop) => loop.stop());
-  }, [active, reduceMotion, values]);
-
-  return (
-    <View style={styles.wavesCentre}>
-      {[16, 30, 44].map((radius, index) => (
+    <>
+      {SPARKS.map(([dx, dy], index) => (
         <Animated.View
-          key={radius}
+          key={index}
           style={[
-            styles.wave,
+            styles.spark,
+            index % 2 === 1 && styles.sparkGold,
             {
-              left: -radius,
-              top: -radius,
-              width: radius * 2,
-              height: radius * 2,
-              borderRadius: radius,
-              borderRightColor: tone,
-              opacity: values[index],
+              opacity: burst.interpolate({ inputRange: [0, 0.05, 1], outputRange: [0, 1, 0] }),
+              transform: [
+                { translateY: TAG_SETTLE },
+                { translateX: burst.interpolate({ inputRange: [0, 1], outputRange: [0, dx] }) },
+                { translateY: burst.interpolate({ inputRange: [0, 1], outputRange: [0, dy] }) },
+                { scale: burst.interpolate({ inputRange: [0, 1], outputRange: [1, 0.4] }) },
+              ],
             },
           ]}
         />
       ))}
-    </View>
-  );
-}
-
-/** The check: its circle settles in, then the tick draws itself, once. */
-function Check({ reduceMotion }: { reduceMotion: boolean }) {
-  const ring = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
-  const short = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
-  const long = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
-  const specks = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (reduceMotion) return;
-    Animated.sequence([
-      Animated.timing(ring, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(short, { toValue: 1, duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.timing(long, { toValue: 1, duration: 170, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-    ]).start();
-    Animated.sequence([
-      Animated.delay(360),
-      Animated.timing(specks, { toValue: 1, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-    ]).start();
-  }, [long, reduceMotion, ring, short, specks]);
-
-  const ringScale = ring.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
-  const speckOpacity = specks.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.9, 0] });
-
-  return (
-    <>
-      {!reduceMotion
-        ? SPECKS.map(([x, y, size], index) => (
-            <Animated.View
-              key={index}
-              style={[
-                styles.speck,
-                { left: x, top: y, width: size, height: size, borderRadius: size / 2, opacity: speckOpacity },
-              ]}
-            />
-          ))
-        : null}
-      <Animated.View style={[styles.checkRing, { opacity: ring, transform: [{ scale: ringScale }] }]}>
-        {/* Two strokes from the tick's corners, each growing from its start
-            point — A to B, then B to C — so the check draws rather than pops. */}
-        <Animated.View
-          style={[
-            styles.stroke,
-            { left: 28, top: 51 - 4.5, width: 23, transform: [{ rotate: "45deg" }, { scaleX: short }] },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.stroke,
-            { left: 44, top: 67 - 4.5, width: 43, transform: [{ rotate: "-46deg" }, { scaleX: long }] },
-          ]}
-        />
-      </Animated.View>
     </>
   );
 }
 
-/** Quiet: it fades in with the rings. It does not shake. */
-function Alert() {
-  return (
-    <View style={styles.alertRing}>
-      <View style={styles.alertBar} />
-      <View style={styles.alertDot} />
-    </View>
-  );
-}
-
-const SPECKS: ReadonlyArray<readonly [number, number, number]> = [
-  [44, 66, 7],
-  [172, 58, 5],
-  [186, 132, 7],
-  [36, 146, 5],
-  [132, 184, 7],
-  [80, 26, 5],
-];
-
-/** A hex colour at an alpha, for the soft rings. */
+/** A hex colour at an alpha, for the soft halo. */
 function tint(hex: string, alpha: number): string {
   const value = hex.replace("#", "");
   const r = parseInt(value.slice(0, 2), 16);
@@ -381,12 +511,6 @@ const styles = StyleSheet.create({
     gap: 28,
   },
   stageCompact: { gap: 18, paddingVertical: 8 },
-  figureCompact: {
-    width: FIGURE * COMPACT_SCALE,
-    height: FIGURE * COMPACT_SCALE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   words: { alignItems: "center", gap: 10, paddingHorizontal: 8 },
   title: {
     fontSize: 26,
@@ -424,73 +548,115 @@ const styles = StyleSheet.create({
   secondaryPressed: { backgroundColor: colors.surfaceAlt },
   secondaryText: { color: colors.ink, fontSize: 17, fontWeight: "600" },
 
-  figure: { width: FIGURE, height: FIGURE, alignItems: "center", justifyContent: "center" },
-  centre: { alignItems: "center", justifyContent: "center" },
-  // Absolutely placed children without insets are centred by the parent.
-  ring: {
+  scene: { width: SCENE_W, height: SCENE_H },
+  sceneFrame: { width: SCENE_W * SCENE_SCALE, height: SCENE_H * SCENE_SCALE, alignItems: "center", justifyContent: "center" },
+  sceneFrameCompact: { width: SCENE_W * COMPACT_SCALE, height: SCENE_H * COMPACT_SCALE, alignItems: "center", justifyContent: "center" },
+  halo: {
     position: "absolute",
-    borderRadius: 999,
+    left: 10,
+    top: 0,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  disc: {
+  haloInner: { width: 196, height: 196, borderRadius: 98 },
+  tagWrap: { position: "absolute", left: 56, top: 16, width: 188, height: 124 },
+  tagRing: {
     position: "absolute",
-    width: 144,
-    height: 144,
-    borderRadius: 72,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  spinner: {
-    position: "absolute",
-    width: 168,
-    height: 168,
-    borderRadius: 84,
+    left: 0,
+    top: 0,
+    width: 188,
+    height: 124,
+    borderRadius: 24,
     borderWidth: 4,
-  },
-  // All three arcs share one centre, set a little left of the disc's, so the
-  // symbol as a whole sits in the middle.
-  wavesCentre: {
-    position: "absolute",
-    left: FIGURE / 2 - 14,
-    top: FIGURE / 2,
-    width: 0,
-    height: 0,
-  },
-  wave: {
-    position: "absolute",
-    borderWidth: 9,
-    borderColor: "transparent",
-  },
-  checkRing: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 7,
     borderColor: colors.brand,
   },
+  tagShadow: {
+    position: "absolute",
+    left: 4,
+    top: 4,
+    width: 180,
+    height: 116,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
+  },
+  tagArt: { width: 180, height: 116 },
+  wave: {
+    position: "absolute",
+    borderWidth: 5,
+    borderColor: "transparent",
+  },
+  phone: {
+    position: "absolute",
+    left: 98,
+    top: 168,
+    width: 104,
+    height: 204,
+    // Rounded like the phone, so the shadow is too wherever it is drawn as a box.
+    borderRadius: 26,
+    shadowColor: "#000",
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 14 },
+  },
+  phoneArt: { width: 104, height: 204 },
+  spinnerBox: { position: "absolute", left: 22, top: 72, width: 60, height: 60 },
+  spinnerTrack: {
+    position: "absolute",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 5,
+    borderColor: "#e3ecf6",
+  },
+  spinnerArc: {
+    position: "absolute",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 5,
+    borderColor: "transparent",
+    borderTopColor: colors.info,
+  },
+  badge: {
+    position: "absolute",
+    left: 114,
+    top: 42,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  checkBox: { width: 52, height: 52 },
   stroke: {
     position: "absolute",
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.canvas,
+    transformOrigin: "left center",
+  },
+  alertBar: { width: 8, height: 22, borderRadius: 4, backgroundColor: colors.canvas },
+  alertDot: { width: 9, height: 9, borderRadius: 4.5, backgroundColor: colors.canvas, marginTop: 6 },
+  spark: {
+    position: "absolute",
+    left: 150 - 4.5,
+    top: 78 - 4.5,
+    width: 9,
     height: 9,
     borderRadius: 4.5,
     backgroundColor: colors.brand,
-    transformOrigin: "left center",
-    // The ring's border offsets its children; the tick is placed in the
-    // ring's outer box, so pull it back by the border width.
-    marginLeft: -7,
-    marginTop: -7,
   },
-  speck: { position: "absolute", backgroundColor: colors.brand },
-  alertRing: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 6,
-    borderColor: colors.danger,
-    backgroundColor: colors.dangerBg,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  alertBar: { width: 9, height: 30, borderRadius: 4.5, backgroundColor: colors.danger },
-  alertDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.danger },
+  sparkGold: { backgroundColor: colors.starFilled, width: 7, height: 7, borderRadius: 3.5, left: 150 - 3.5, top: 78 - 3.5 },
 });

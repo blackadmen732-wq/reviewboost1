@@ -18,6 +18,7 @@ import type { NfcScene, SceneCopy } from "@/lib/owner/nfc-presentation";
 export function NfcSheetView({
   scene,
   phase,
+  detected = false,
   copy,
   onPrimary,
   onDismiss,
@@ -25,6 +26,8 @@ export function NfcSheetView({
   scene: NfcScene;
   /** The machine phase underneath, exposed for tests and nothing else. */
   phase: string;
+  /** While writing: the phone has found the chip, so it stays against it. */
+  detected?: boolean;
   copy: SceneCopy;
   onPrimary: () => void;
   onDismiss: () => void;
@@ -50,7 +53,7 @@ export function NfcSheetView({
             </div>
 
             <div className="nfc-sheet__stage">
-              <NfcFigure scene={scene} />
+              <NfcFigure scene={scene} detected={detected} />
 
               <div className="nfc-sheet__words" aria-live="polite">
                 <Dialog.Title asChild>
@@ -58,7 +61,7 @@ export function NfcSheetView({
                 </Dialog.Title>
                 <Dialog.Description asChild>
                   <p className={copy.body ? "nfc-sheet__body" : "sr-only"}>
-                    {copy.body ?? "NFC setup for your ReviewBoost Tag."}
+                    {copy.body ?? "Setting up tap on your ReviewBoost Tag."}
                   </p>
                 </Dialog.Description>
               </div>

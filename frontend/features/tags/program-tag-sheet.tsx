@@ -327,7 +327,14 @@ export function ProgramTagSheet({
         : () => void program();
 
   return (
-    <NfcSheetView scene={scene} phase={phase} copy={copy} onPrimary={primary} onDismiss={close} />
+    <NfcSheetView
+      scene={scene}
+      phase={phase}
+      detected={scene === "writing" && tagDetected(phase)}
+      copy={copy}
+      onPrimary={primary}
+      onDismiss={close}
+    />
   );
 }
 

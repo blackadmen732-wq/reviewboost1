@@ -376,6 +376,7 @@ export default function StandDetailScreen() {
         <NfcProgramSheet
           visible={sheetOpen}
           scene={scene}
+          detected={scene === "writing" && tagDetected(writeState)}
           copy={sceneCopy}
           onPrimary={onPrimary}
           onDismiss={closeSheet}
