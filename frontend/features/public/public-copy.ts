@@ -47,7 +47,7 @@ export const PUBLIC_HERO = {
   titleLines: HERO_TITLE_LINES,
   // Says "Google review" because that is what owners search for and buy. It
   // promises the ask, never the outcome: every customer gets the link.
-  lede: "Put a Tag by your register. Customers tap it or scan it, pick a star, and get your Google review page. You see every rating on your phone.",
+  lede: "Customers tap your Tag, pick a star, and land on your Google review page. You see every rating.",
   primary: { href: START_HREF, label: "Start free trial" },
   /** Three facts that remove the usual reasons not to try. Each is checked in faq.ts. */
   facts: ["7 days free on Starter", "No app for your customers", "Cancel any time"],
@@ -56,15 +56,15 @@ export const PUBLIC_HERO = {
 export const HOW_IT_WORKS = [
   {
     title: "Put a Tag where people pay",
-    body: "Print the QR code, or write it onto an NFC tag with your phone. Same link either way.",
+    body: "Print the code, or set up tap with your phone. Same page either way.",
   },
   {
     title: "They tap a star",
-    body: "Their phone opens your page. One tap. No app, no sign-up, no name asked.",
+    body: "No app, no sign-up, no name asked.",
   },
   {
     title: "Feedback for you. Google for everyone.",
-    body: "You see the rating right away. Every customer, one star or five, is offered your Google review page.",
+    body: "One star or five, every customer is offered your Google page.",
   },
 ] as const;
 
@@ -79,7 +79,7 @@ export const SETUP_STEPS = [
     title: "Name your business and add your Google link",
     body: "Open your business on Google, tap “Get more reviews”, copy the link and paste it in. We check that it is a real review link.",
   },
-  { title: "Get your first Tag", body: "It is made for you. Print its QR code, or program an NFC tag with your phone." },
+  { title: "Get your first Tag", body: "It is made for you. Print its code, or set up tap with your phone." },
   {
     title: "Choose a plan to switch it on",
     body: "Starter is free for seven days. A card is needed to start, and nothing is charged until the seven days are up.",
@@ -102,17 +102,17 @@ export const AFTER_STEPS = [
 export const OWNER_SIDE = {
   eyebrow: "On your phone",
   headline: "Know how every visit went.",
-  lede: "Between customers, open ReviewBoost and see what is new: fresh ratings, the low ones that need you, and whether your Tags are working.",
+  lede: "New ratings, the low ones that need you, and whether your Tags work.",
   items: [
     {
       icon: "new",
       title: "Every rating, as it comes in",
-      body: "Home shows what is new and what needs you. Open a rating to see when it came in and at which Tag.",
+      body: "Home shows what is new and what needs you.",
     },
     {
       icon: "team",
       title: "The low ones reach you too",
-      body: "A two-star visit lands in your Feedback like any other, so you can talk to your team. Mark it sorted when it is.",
+      body: "A two-star visit reaches you like any other. Mark it sorted when it is.",
     },
     textingEnabled()
       ? ({
@@ -123,7 +123,7 @@ export const OWNER_SIDE = {
       : ({
           icon: "insights",
           title: "See where you stand",
-          body: "Insights shows your average over 7, 30 or 90 days, and whether it is moving up or down.",
+          body: "Your average over 7, 30 or 90 days, and which way it is moving.",
         } as const),
   ],
 } as const;
@@ -135,12 +135,12 @@ export const OWNER_SIDE = {
  */
 export const COMPARE = {
   headline: "Why not just a review card?",
-  lede: "A card on the counter is a good start. Here is what changes with ReviewBoost.",
+  lede: "A card is a good start. Here is what changes.",
   options: [
     {
       name: "A plain review card",
       price: "Pay once",
-      body: "It opens Google, and that is all. You never hear how a visit went unless they post it.",
+      body: "It opens Google. You never hear how a visit went.",
       ours: false,
     },
     {
@@ -154,7 +154,7 @@ export const COMPARE = {
     {
       name: "Big review software",
       price: "A much bigger bill",
-      body: "Usually a yearly contract, set up for chains, with far more than a local shop uses.",
+      body: "Usually a yearly contract, built for chains.",
       ours: false,
     },
   ],
@@ -181,7 +181,7 @@ export const PRODUCT = {
       title: "The Tag",
       features: [
         { icon: "qr", title: "Print a code", body: "Your QR code, ready to print. Put it by the register, on a table, or on a receipt." },
-        { icon: "nfc", title: "Program an NFC Tag", body: "Write the same link onto a blank NFC tag with your phone. Customers just tap." },
+        { icon: "nfc", title: "Set up tap", body: "Write the same link onto a blank NFC sticker with your phone. Customers just tap." },
         { icon: "link", title: "Change your Google link any time", body: "Your Tag points at ReviewBoost, so a new Google link never means reprinting a code." },
       ],
     },
@@ -243,6 +243,6 @@ export const PRIVACY = {
 
 export const CLOSE = {
   headline: "Put your first Tag on the counter.",
-  lede: "Sign up, add your Google link, then print your code or program a Tag. Your first ratings can come in today.",
+  lede: "Sign up, add your Google link, print your code or set up tap. Ratings can come in today.",
   note: "Starter is free for 7 days. A card is needed to start; nothing is charged until the seven days are up.",
 } as const;

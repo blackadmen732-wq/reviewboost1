@@ -119,7 +119,7 @@ export default function ProductPage() {
 
       <section className="public-article__close">
         <h2>Put your first Tag on the counter.</h2>
-        <p>Sign up, add your Google link, then print your code or program a Tag.</p>
+        <p>Sign up, add your Google link, then print your code or set up tap.</p>
         <div className="mt-6 max-w-xs">
           <Button asChild variant="action" size="lg">
             <Link href={START_HREF}>{PUBLIC_HERO.primary.label}</Link>

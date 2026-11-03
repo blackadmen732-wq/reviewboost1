@@ -147,7 +147,6 @@ export function PublicHome() {
           <p className="public-eyebrow">Integrity</p>
           <h2 className="public-h2">{INTEGRITY.headline}</h2>
           <p className="public-lede">{INTEGRITY.lede}</p>
-          <p className="mt-3 max-w-[46ch] text-base leading-relaxed text-muted">{INTEGRITY.body}</p>
           <p className="mt-6 flex max-w-[46ch] gap-3 text-base font-medium leading-relaxed text-ink">
             <Check aria-hidden="true" className="mt-1 size-5 shrink-0 text-brand-text" strokeWidth={2.5} />
             {INTEGRITY.rule}
