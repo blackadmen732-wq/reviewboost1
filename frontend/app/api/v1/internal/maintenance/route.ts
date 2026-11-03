@@ -59,14 +59,24 @@ async function runMaintenance(requestId: string): Promise<Record<string, number 
 }
 
 /**
- * Text packs paid in Stripe against the credit the ledger gave (daily).
+ * Text packs paid in Stripe against the credit the ledger gave.
  *
- * A missed webhook is healed here, through the same path the webhook uses;
- * refunds and disputes on a pack's charge are carried across. Where Stripe is
- * not configured at all there is nothing to compare, and nothing is pretended:
- * the step reports "skipped". Findings are not a step failure — the database
- * lists them and health reports them; only a run that could not finish is.
+ * Maintenance runs every fifteen minutes in production (and once a day on the
+ * Vercel cron floor); reconciliation does not need to. It runs when the last
+ * run is a day old, or an hour after one that was not ok — so a failing run
+ * is retried without turning every pass into another Stripe listing and
+ * another alert. Where Stripe is not configured at all there is nothing to
+ * compare, and nothing is pretended: the step reports "skipped".
+ *
+ * Its failures are its own. A Stripe outage records a failed reconciliation
+ * run, which health reports as `packs_reconcile_not_ok`; it does not mark the
+ * maintenance worker failed, because the steps above it — releasing credit,
+ * expiring allowances — did run, and an operator told "maintenance is
+ * failing" would look in the wrong place.
  */
+const RECONCILE_EVERY_SECONDS = 23 * 60 * 60;
+const RECONCILE_RETRY_AFTER_SECONDS = 60 * 60;
+
 async function reconcilePacksStep(requestId: string): Promise<number | string> {
   try {
     stripeSecretKey();
@@ -74,24 +84,32 @@ async function reconcilePacksStep(requestId: string): Promise<number | string> {
     return "skipped";
   }
 
+  const { data, error } = await serviceRoleClient().rpc("rpc_billing_pack_health");
+  if (!error) {
+    const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
+    const age = row?.["last_reconcile_age_s"];
+    const lastOk = row?.["last_reconcile_ok"];
+    if (age !== null && age !== undefined) {
+      const seconds = Number(age);
+      const wait = lastOk === false ? RECONCILE_RETRY_AFTER_SECONDS : RECONCILE_EVERY_SECONDS;
+      if (seconds < wait) return "not_due";
+    }
+  }
+  // A health read that failed is no reason to skip: run, and let the run's
+  // own record say how it went.
+
   try {
     const result = await reconcileSmsPacks();
     if (result.errors > 0) {
-      logger.error("maintenance.step_failed", {
-        requestId,
-        step: "reconcile_sms_packs",
-        errors: result.errors,
-      });
-      return "failed";
+      logger.error("maintenance.pack_reconcile_errors", { requestId, errors: result.errors });
     }
     return result.healed;
   } catch (error) {
-    logger.error("maintenance.step_failed", {
+    logger.error("maintenance.pack_reconcile_failed", {
       requestId,
-      step: "reconcile_sms_packs",
       reason: error instanceof Error ? error.message : "unknown",
     });
-    return "failed";
+    return "reconcile_failed";
   }
 }
 

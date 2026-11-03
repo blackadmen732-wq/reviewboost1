@@ -125,7 +125,9 @@ Enforced by: `app.entitlement_tag_limit`, `app.entitlement_location_limit`,
   the database would then refuse to credit. Production readiness requires all
   three.
 - **Sold on the website's Billing page only**, to the owner of an active plan
-  that is not ending. The iPhone and Android apps show the balance and sell
+  that is not set to end — checkout refuses the rest, and its payment page
+  expires after about half an hour, so a plan that lapses meanwhile is not
+  sold texts on an old page. The iPhone and Android apps show the balance and sell
   nothing (App Store 3.1.3; Play Payments policy).
 
 Enforced by: `sms_credit_grants`, `sms_reservation_slices`,
@@ -176,6 +178,16 @@ recorded before the payment it refunds and applies the moment the grant does.
 
 Proved in `supabase/tests/sms_pack_money_test.sql` §§3–8.
 
+**A refused payment** (`paid_without_credit`) closes when it is refunded in
+full (`refunded_without_credit`) or when an operator settles it with
+`rpc_billing_resolve_pack_review` (`resolved_without_credit`); the same
+resolution closes a `refund_without_payment`. Neither stays a finding forever.
+
+**A deleted account** takes its pack purchases and their review records with
+it, like the rest of its data; Stripe keeps the payments. A refund, chargeback
+or delayed payment that arrives afterwards is completed and ignored
+(`billing.pack_event_after_deletion`), not retried for days.
+
 **Refunds of subscription invoices** do not claw back monthly credit in V1.
 That credit expires at its period end regardless, and a refunded subscription
 is an operator action taken in Stripe. Revisit if refunds become routine.
@@ -208,11 +220,25 @@ is an operator action taken in Stripe. Revisit if refunds become routine.
 
 ## 8. Reconciliation
 
-Daily, in maintenance (`reconcileSmsPacks`): every paid pack Checkout Session
-from the last seven days is applied again through the same idempotent path the
-webhook uses — a missed webhook is **healed**, not just reported — and any
-refund or dispute on its charge is carried across. Then
-`rpc_billing_pack_reconciliation_findings` lists what still does not add up:
+Once a day, from maintenance (`reconcileSmsPacks`). Maintenance itself runs
+every fifteen minutes in production; reconciliation runs when its last run is
+a day old, or an hour after one that was not ok. Two passes, both through the
+idempotent paths the webhook uses, so a missed webhook is **healed**, not just
+reported:
+
+1. Every paid pack Checkout Session from the last seven days, older than an
+   hour (a younger one may have its webhook still in flight), is applied
+   again, and any refund or dispute on its charge is carried across.
+2. Every pack money event Stripe still holds — 30 days, its whole retention —
+   is offered to the webhook handler. The inbox already has the ones that
+   arrived; a refund or chargeback that came weeks after the purchase and
+   never reached us is applied here.
+
+A run Stripe never answered is still recorded, as not ok, so health reports
+the reconciliation (`packs_reconcile_not_ok`) instead of going quiet — and it
+does not mark the maintenance worker failed, because the rest of maintenance
+did run. Then `rpc_billing_pack_reconciliation_findings` lists what still does
+not add up:
 
 | Finding | Means |
 |---|---|
@@ -245,7 +271,10 @@ names:
 
 Logs with stable names for an alert to key on: `billing.pack_paid_without_credit`,
 `billing.pack_price_mismatch`, `billing.pack_checkout_failed`,
-`billing.pack_reconcile_healed`, `billing.pack_clawback_outstanding`. Delivery
+`billing.pack_reconcile_healed`, `billing.pack_reconcile_event_replayed`,
+`billing.pack_reconcile_stripe_failed`, `billing.pack_clawback_outstanding`,
+`billing.pack_event_after_deletion`. They carry ids and counts only — never a
+database error's details, which can quote a ledger row. Delivery
 signals are listed in `docs/backend/TEXT_REQUESTS.md` §22.
 
 ## 10. REJECT checklist

@@ -1229,8 +1229,9 @@ export interface OwnerBilling {
     tags: { used: number; limit: number };
   } | null;
   /**
-   * Whether this business can buy extra texts now: its plan is active (never
-   * during a trial, never past due) and this deployment has the pack prices.
+   * Whether this business can buy extra texts now: its plan is active and not
+   * set to end (never during a trial, never past due) and this deployment has
+   * the pack prices. The same rule checkout enforces.
    */
   packsAvailable: boolean;
 }
@@ -1292,7 +1293,8 @@ export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBillin
           tags: { used: tags.count ?? 0, limit: tagLimit(row.plan_id, row.status) },
         }
       : null,
-    packsAvailable: row?.status === "active" && stripePackPricesConfigured(),
+    packsAvailable:
+      row?.status === "active" && !row.cancel_at_period_end && stripePackPricesConfigured(),
   };
 });
 

@@ -542,12 +542,16 @@ begin
 
     v_out := app.sms_pack_sync(v_row.id);
 
-    insert into public.audit_events
-        (org_id, actor_type, action, target_type, target_id, metadata)
-    values
-        (p_org_id, 'system', 'sms_pack.refund_recorded', 'sms_pack_purchase', v_row.id::text,
-         jsonb_build_object('amountRefundedCents', p_amount_refunded_cents,
-                            'outstandingSegments', v_out));
+    -- Written once per change. Reconciliation carries the same refund across
+    -- again on every pass, and a repeat is not a new fact.
+    if p_amount_refunded_cents > v_row.amount_refunded_cents then
+        insert into public.audit_events
+            (org_id, actor_type, action, target_type, target_id, metadata)
+        values
+            (p_org_id, 'system', 'sms_pack.refund_recorded', 'sms_pack_purchase', v_row.id::text,
+             jsonb_build_object('amountRefundedCents', p_amount_refunded_cents,
+                                'outstandingSegments', v_out));
+    end if;
 
     return query select
         case when v_row.grant_id is null then 'recorded_before_grant' else 'applied' end,
@@ -608,11 +612,15 @@ begin
 
     v_out := app.sms_pack_sync(v_row.id);
 
-    insert into public.audit_events
-        (org_id, actor_type, action, target_type, target_id, metadata)
-    values
-        (p_org_id, 'system', 'sms_pack.dispute_recorded', 'sms_pack_purchase', v_row.id::text,
-         jsonb_build_object('disputeStatus', p_dispute_status, 'outstandingSegments', v_out));
+    -- Written once per change of dispute or status, for the same reason.
+    if v_row.dispute_id is distinct from p_dispute_id
+       or v_row.dispute_status is distinct from p_dispute_status then
+        insert into public.audit_events
+            (org_id, actor_type, action, target_type, target_id, metadata)
+        values
+            (p_org_id, 'system', 'sms_pack.dispute_recorded', 'sms_pack_purchase', v_row.id::text,
+             jsonb_build_object('disputeStatus', p_dispute_status, 'outstandingSegments', v_out));
+    end if;
 
     return query select
         case when v_row.grant_id is null then 'recorded_before_grant' else 'applied' end,
@@ -673,6 +681,11 @@ select
                                  as unrecoverable_segments,
     case
         when p.paid_at is null then 'awaiting_payment'
+        -- Refused and given back in full: the money and the credit agree.
+        when p.grant_id is null and p.amount_cents is not null
+             and p.amount_refunded_cents >= p.amount_cents then 'refunded_without_credit'
+        -- Refused, and an operator settled it some other way.
+        when p.grant_id is null and p.review_resolution is not null then 'resolved_without_credit'
         when p.grant_id is null then 'paid_without_credit'
         when p.dispute_status = 'lost' then 'chargeback_lost'
         when p.dispute_status is not null
@@ -827,6 +840,7 @@ as $$
       from public.sms_pack_purchases p
      where p.paid_at is null
        and p.created_at < now() - interval '1 day'
+       and p.review_resolution is null
     union all
     -- Should be impossible: owed credit that is sitting unspent.
     select 'clawback_unapplied', p.id, p.org_id,
@@ -873,13 +887,32 @@ as $$
         (select coalesce(sum(unrecoverable_segments), 0)::bigint
            from public.sms_pack_accounting where review_state = 'needs_review'),
         (select count(*) from public.sms_pack_purchases
-          where paid_at is null and created_at < now() - interval '1 day'),
+          where paid_at is null and created_at < now() - interval '1 day'
+            and review_resolution is null),
         (select extract(epoch from now() - max(finished_at))::bigint
            from public.billing_reconciliation_runs where kind = 'sms_packs'),
         (select r.ok from public.billing_reconciliation_runs r
           where r.kind = 'sms_packs' order by r.finished_at desc limit 1),
         (select r.findings from public.billing_reconciliation_runs r
           where r.kind = 'sms_packs' order by r.finished_at desc limit 1);
+$$;
+
+-- ===================================================== deleted accounts ===
+
+-- Whether an organization was deleted. A refund, a chargeback or a late
+-- delayed payment for a pack can arrive after its business deleted its
+-- account, and then neither its Stripe customer nor its purchases are here to
+-- find. Without this, the event fails and is retried forever, and health
+-- stays red for something that is finished. The tombstone deliberately has no
+-- foreign key, so it outlives what it names.
+create or replace function public.rpc_billing_org_deleted(p_org_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+    select exists (select 1 from public.account_deletions d where d.org_id = p_org_id);
 $$;
 
 -- ============================================================= grants ======
@@ -889,6 +922,12 @@ $$;
 -- the database owner; the service role now buys packs only through the path
 -- that records what was paid.
 revoke all on function public.rpc_billing_apply_credit_purchase(uuid, text, bigint)
+    from public, anon, authenticated, service_role;
+
+-- The same for the older allocation RPC: with no expiry it mints spendable
+-- credit with no payment behind it, and no application path calls it. Monthly
+-- texts come from a paid invoice and extra texts from a paid pack, nothing else.
+revoke all on function public.rpc_sms_quota_allocate(uuid, bigint, text, timestamptz, text)
     from public, anon, authenticated, service_role;
 
 do $$
@@ -903,6 +942,7 @@ begin
         'public.rpc_billing_resolve_pack_review(uuid, text, text)',
         'public.rpc_billing_record_reconciliation_run(text, timestamptz, boolean, integer, integer, integer, jsonb)',
         'public.rpc_billing_pack_reconciliation_findings()',
+        'public.rpc_billing_org_deleted(uuid)',
         'public.rpc_billing_pack_health()'
     ]
     loop

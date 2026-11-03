@@ -48,6 +48,8 @@ function workers(dispatchAge: number | null, maintenanceAge: number | null, fail
 }
 
 beforeEach(() => {
+  // Each test configures exactly what it needs; nothing leaks into the next.
+  vi.unstubAllEnvs();
   vi.resetModules();
   calls.length = 0;
   results.clear();
@@ -112,6 +114,59 @@ describe("maintenance leaves a pulse", () => {
     expect(calls.some((c) => c.name === "rpc_entitlements_expire_trials")).toBe(true);
     const last = calls.filter((c) => c.name === "rpc_worker_heartbeat").at(-1);
     expect(last?.args).toMatchObject({ p_worker: "maintenance", p_outcome: "failed", p_error: "failed: expire_quota" });
+  });
+
+  async function withStripe(listing: () => AsyncGenerator<unknown>) {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_maintenance");
+    const { __setStripeClientForTests } = await import("@/lib/server/stripe");
+    __setStripeClientForTests({
+      checkout: { sessions: { list: () => ({ [Symbol.asyncIterator]: listing }) } },
+      events: { list: () => ({ [Symbol.asyncIterator]: listing }) },
+    } as never);
+  }
+
+  it("reconciles text packs once a day, not on every fifteen-minute pass", async () => {
+    await withStripe(async function* () {});
+    results.set("rpc_billing_pack_health", {
+      data: [{ purchases_paid: 4, last_reconcile_age_s: 3600, last_reconcile_ok: true }],
+      error: null,
+    });
+    const { GET } = await import("@/app/api/v1/internal/maintenance/route");
+    const body = await (await GET(get("/api/v1/internal/maintenance") as never)).json();
+
+    expect(body.data.reconcile_sms_packs).toBe("not_due");
+    expect(calls.some((c) => c.name === "rpc_billing_record_reconciliation_run")).toBe(false);
+  });
+
+  it("retries a reconciliation that was not ok after an hour, not a day", async () => {
+    await withStripe(async function* () {});
+    results.set("rpc_billing_pack_health", {
+      data: [{ purchases_paid: 4, last_reconcile_age_s: 2 * 3600, last_reconcile_ok: false }],
+      error: null,
+    });
+    const { GET } = await import("@/app/api/v1/internal/maintenance/route");
+    await GET(get("/api/v1/internal/maintenance") as never);
+
+    expect(calls.some((c) => c.name === "rpc_billing_record_reconciliation_run")).toBe(true);
+  });
+
+  it("does not call maintenance failing when only Stripe is down", async () => {
+    await withStripe(async function* () {
+      throw new Error("Request timed out");
+    });
+    results.set("rpc_billing_pack_health", {
+      data: [{ purchases_paid: 4, last_reconcile_age_s: 2 * 24 * 3600, last_reconcile_ok: true }],
+      error: null,
+    });
+    const { GET } = await import("@/app/api/v1/internal/maintenance/route");
+    await GET(get("/api/v1/internal/maintenance") as never);
+
+    // The failure is the reconciliation's, recorded as its own failed run...
+    const run = calls.find((c) => c.name === "rpc_billing_record_reconciliation_run");
+    expect(run?.args).toMatchObject({ p_ok: false });
+    // ...and the steps that did run leave a successful pulse.
+    const last = calls.filter((c) => c.name === "rpc_worker_heartbeat").at(-1);
+    expect(last?.args).toMatchObject({ p_worker: "maintenance", p_outcome: "succeeded" });
   });
 
   it("skips text pack reconciliation where Stripe is not configured, without failing", async () => {

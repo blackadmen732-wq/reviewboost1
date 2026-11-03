@@ -221,7 +221,9 @@ decision.
    `checkout.session.async_payment_succeeded`, `charge.refunded`,
    `charge.dispute.created`, `.updated`, `.closed`, `.funds_withdrawn`,
    `.funds_reinstated`. Without the checkout and charge events a pack is paid
-   and never credited until the daily reconciliation heals it.
+   and not credited until the daily reconciliation heals it (it replays the
+   last 30 days of these events), and a refund older than that would never
+   be seen.
 3. **Storage:** create public bucket `customer-page`.
 4. **Digest key.** Production requires `TOKEN_DIGEST_KEY` ≠
    `CUSTOMER_NOTE_ENCRYPTION_KEY` and an explicit `TOKEN_DIGEST_KEY_VERSION`.
@@ -257,8 +259,8 @@ schema.** The readiness gate enforces the last part mechanically
    build, `invoice.paid` events fail and Stripe retries them (delayed, not
    lost). Deploy the build promptly after. `20261103000100_sms_pack_money`
    is additive (new tables, two ledger functions re-emitted with `- revoked`)
-   and closes `rpc_billing_apply_credit_purchase` to the service role; no
-   application code calls it.
+   and closes `rpc_billing_apply_credit_purchase` and `rpc_sms_quota_allocate`
+   to the service role; no application code calls either.
 5. Deploy the build **without assigning the production domain** (disable
    "auto-assign custom production domains" in Vercel, or
    `vercel deploy --prod --skip-domain`).
@@ -301,7 +303,8 @@ share gone, rounded up; a refund after some were sent → the rest gone and the
 spent part listed as `needs_review`; a dispute opened → all of it frozen, won →
 back; delete the webhook endpoint, buy, then run maintenance → the pack is
 healed by reconciliation and the run is not ok; a price edited to $5 → checkout
-refuses with `billing.pack_price_mismatch` and nobody is charged.
+refuses with `billing.pack_price_mismatch` and nobody is charged; a refund
+for a business that has since deleted its account → completed and ignored.
 
 Twilio (staging, `APP_ENV=staging`, real test phone): send; status callbacks
 (delivered, undelivered); STOP → suppression and no further sends; START;

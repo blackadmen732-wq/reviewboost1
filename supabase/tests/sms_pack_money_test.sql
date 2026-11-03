@@ -14,7 +14,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(77);
+select plan(91);
 
 insert into public.organizations (id, name, slug, status)
 values
@@ -23,7 +23,8 @@ values
     ('00000000-c201-0000-0000-000000000003', 'Flight Co', 'flight-co', 'active'),
     ('00000000-c201-0000-0000-000000000004', 'Dispute Co', 'dispute-co', 'active'),
     ('00000000-c201-0000-0000-000000000005', 'Trial Co', 'trial-co', 'active'),
-    ('00000000-c201-0000-0000-000000000006', 'Early Co', 'early-co', 'active');
+    ('00000000-c201-0000-0000-000000000006', 'Early Co', 'early-co', 'active'),
+    ('00000000-c201-0000-0000-000000000007', 'Repeat Co', 'repeat-co', 'active');
 
 create or replace function pg_temp.purchased(p_org uuid) returns bigint
 language sql as $$ select purchased from app.sms_balance(p_org) $$;
@@ -355,6 +356,88 @@ select is((select total from app.sms_balance('00000000-c201-0000-0000-0000000000
 select is(
     (select reserved from app.sms_quota_reserve('00000000-c201-0000-0000-000000000005', 1, 'res-trial-1', null)),
     false, 'and not a single segment can be sent');
+
+-- ============================================================
+-- 11. A REFUSED PAYMENT THAT IS REFUNDED, OR SETTLED, IS CLOSED
+-- ============================================================
+
+-- pi_cheap1 was refused in §2 (a $40 pack paid at $4). Giving the money back
+-- closes it: the money and the credit agree, so it is no longer a finding,
+-- and health stops counting it.
+select is(
+    (select outcome from public.rpc_billing_apply_pack_refund('00000000-c201-0000-0000-000000000001',
+        'pi_cheap1', 400, 400, 'evt_cheap_refund')),
+    'recorded_before_grant', 'a refused payment can be refunded');
+select is(
+    (select accounting_state from public.sms_pack_accounting where payment_intent_id = 'pi_cheap1'),
+    'refunded_without_credit', 'refused and refunded in full reads as closed');
+select is(
+    (select count(*)::integer from public.rpc_billing_pack_reconciliation_findings()
+      where kind = 'paid_without_credit' and org_id = '00000000-c201-0000-0000-000000000001'),
+    2, 'and is no longer reported');
+
+-- pi_eur1 is settled by an operator another way.
+select is(
+    public.rpc_billing_resolve_pack_review(
+        (select id from public.sms_pack_purchases where payment_intent_id = 'pi_eur1'),
+        'recovered_externally', 'refunded by hand in the Stripe dashboard'),
+    0::bigint, 'an operator can close a refused payment');
+select is(
+    (select accounting_state from public.sms_pack_accounting where payment_intent_id = 'pi_eur1'),
+    'resolved_without_credit', 'which then reads as resolved');
+select is(
+    (select count(*)::integer from public.rpc_billing_pack_reconciliation_findings()
+      where kind = 'paid_without_credit' and org_id = '00000000-c201-0000-0000-000000000001'),
+    1, 'leaving only the one nobody has dealt with');
+
+-- The same refund carried across again (reconciliation does this on every
+-- pass) is not a new fact, and is not written down again.
+select public.rpc_billing_apply_pack_refund('00000000-c201-0000-0000-000000000001',
+    'pi_full1', 400, 400, 'evt_r1_again');
+select is(
+    (select count(*)::integer from public.audit_events
+      where action = 'sms_pack.refund_recorded'
+        and target_id = (select id::text from public.sms_pack_purchases where payment_intent_id = 'pi_full1')),
+    1, 'one refund, one audit row, however often it is carried across');
+
+-- ============================================================
+-- 12. A DISPUTE SEEN AGAIN IS NOT WRITTEN DOWN AGAIN
+-- ============================================================
+
+select is(
+    public.rpc_billing_apply_pack_payment('00000000-c201-0000-0000-000000000007',
+        'pi_rep1', 'cs_test_rep1', 'pack_50', 400, 'usd', 'evt_rep_pay'),
+    'granted', 'a pack is paid');
+select public.rpc_billing_apply_pack_dispute('00000000-c201-0000-0000-000000000007',
+    'pi_rep1', 'du_rep1', 'needs_response', now() - interval '2 hours', 'evt_rep_d1');
+select public.rpc_billing_apply_pack_dispute('00000000-c201-0000-0000-000000000007',
+    'pi_rep1', 'du_rep1', 'needs_response', now() - interval '1 hour', 'evt_rep_d1_again');
+select is(
+    (select count(*)::integer from public.audit_events
+      where action = 'sms_pack.dispute_recorded' and org_id = '00000000-c201-0000-0000-000000000007'),
+    1, 'the same dispute status twice is one audit row');
+select public.rpc_billing_apply_pack_dispute('00000000-c201-0000-0000-000000000007',
+    'pi_rep1', 'du_rep1', 'won', now(), 'evt_rep_d2');
+select is(
+    (select count(*)::integer from public.audit_events
+      where action = 'sms_pack.dispute_recorded' and org_id = '00000000-c201-0000-0000-000000000007'),
+    2, 'a new status is a new row');
+
+-- ============================================================
+-- 13. DELETED ACCOUNTS, AND THE OTHER WAY TO MINT
+-- ============================================================
+
+insert into public.account_deletions (org_id) values ('00000000-c201-0000-0000-0000000000dd');
+select ok(public.rpc_billing_org_deleted('00000000-c201-0000-0000-0000000000dd'),
+    'a deleted business is known to have been deleted');
+select ok(not public.rpc_billing_org_deleted('00000000-c201-0000-0000-000000000007'),
+    'a live one is not');
+
+select ok(not has_function_privilege('authenticated', 'public.rpc_billing_org_deleted(uuid)', 'execute'),
+    'owners cannot ask which businesses were deleted');
+select ok(not has_function_privilege('service_role',
+    'public.rpc_sms_quota_allocate(uuid, bigint, text, timestamptz, text)', 'execute'),
+    'the old allocation RPC cannot mint credit from the application either');
 
 select * from finish();
 rollback;

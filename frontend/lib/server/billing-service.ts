@@ -195,6 +195,24 @@ function describeError(error: unknown): string {
 }
 
 /**
+ * What went wrong, safe for an error log: the message and code only. Never
+ * PostgREST's `details`, which for a constraint failure quotes the failing
+ * ledger row — payment ids and amounts the logger's key redaction cannot see
+ * once they are inside one string.
+ */
+function errorSummary(error: unknown): { message: string; code: string | null } {
+  if (error instanceof Error) return { message: error.message, code: null };
+  if (error && typeof error === "object") {
+    const { message, code } = error as { message?: unknown; code?: unknown };
+    return {
+      message: typeof message === "string" ? message : "unknown",
+      code: typeof code === "string" ? code : null,
+    };
+  }
+  return { message: String(error), code: null };
+}
+
+/**
  * An event for a price the database does not map, or whose plan the two
  * sides disagree on, is an operator problem, not a transient one: it will
  * fail on every retry until someone edits `billing_plan_prices` or the
@@ -402,22 +420,34 @@ export async function createPackCheckoutSession(
 ): Promise<{ url: string }> {
   const { data: entitlement, error } = await context.db
     .from("entitlement_snapshots")
-    .select("status, trial_ends_at")
+    .select("status, trial_ends_at, cancel_at_period_end")
     .eq("org_id", orgId)
     .maybeSingle();
 
   if (error) {
-    logger.error("billing.pack_entitlement_failed", { requestId, orgId, error });
+    logger.error("billing.pack_entitlement_failed", { requestId, orgId, error: errorSummary(error) });
     throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Please try again shortly.");
   }
 
-  const row = entitlement as { status: EntitlementStatus; trial_ends_at: string | null } | null;
+  const row = entitlement as {
+    status: EntitlementStatus;
+    trial_ends_at: string | null;
+    cancel_at_period_end: boolean | null;
+  } | null;
   const status = row ? effectiveStatus(row.status, row.trial_ends_at) : "suspended";
   if (status !== "active") {
     throw new ApiError(
       403,
       ERROR_CODE.forbidden,
       "Extra texts can be bought once your plan is active.",
+    );
+  }
+  // A plan that is set to end is not sold texts it will not be there to send.
+  if (row?.cancel_at_period_end) {
+    throw new ApiError(
+      403,
+      ERROR_CODE.forbidden,
+      "Your plan is set to end, so extra texts can't be bought. Turn renewal back on under Manage plan and payment first.",
     );
   }
 
@@ -444,6 +474,10 @@ export async function createPackCheckoutSession(
         payment_intent_data: { metadata },
         success_url: `${origin}/settings/billing?pack=complete`,
         cancel_url: `${origin}/settings/billing?pack=cancelled`,
+        // Stripe's shortest life for a session (30 minutes, plus a minute for
+        // clock drift). The plan was checked as active just now; a payment
+        // page left open for a day could be paid after it no longer is.
+        expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
       },
       // Retrying this request must not open a second payment.
       { idempotencyKey: `pack:${orgId}:${packId}:${requestId}` },
@@ -453,7 +487,7 @@ export async function createPackCheckoutSession(
     // Stripe unreachable, a key missing, a customer that could not be made:
     // nothing was charged, and the owner is told that and what to do. The
     // cause goes to the log, never to the page.
-    logger.error("billing.pack_checkout_failed", { requestId, orgId, reason: describeError(error) });
+    logger.error("billing.pack_checkout_failed", { requestId, orgId, error: errorSummary(error) });
     throw new ApiError(
       503,
       ERROR_CODE.serviceUnavailable,
@@ -486,7 +520,29 @@ export type EventOutcome =
   // health and reconciliation, and not retried: a retry cannot fix a price.
   | "paid_without_credit";
 
-type PackOrg = { kind: "pack"; orgId: string } | { kind: "not_pack" } | { kind: "unknown_customer" };
+type PackOrg =
+  | { kind: "pack"; orgId: string }
+  | { kind: "not_pack" }
+  | { kind: "unknown_customer" }
+  // The business deleted its account; its customer and purchases went with it.
+  | { kind: "deleted" };
+
+/**
+ * Whether the business a pack's metadata names deleted its account.
+ *
+ * A refund, a chargeback or a delayed payment can arrive after the business
+ * is gone, and then neither its Stripe customer nor its purchase is here to
+ * find. That is finished, not lost: answering "unknown customer" would make
+ * Stripe retry it for days and keep health red for nothing.
+ */
+async function packOrgWasDeleted(labelledOrgId: string | null | undefined): Promise<boolean> {
+  if (!labelledOrgId) return false;
+  const { data, error } = await serviceRoleClient().rpc("rpc_billing_org_deleted", {
+    p_org_id: labelledOrgId,
+  });
+  if (error) throw error;
+  return data === true;
+}
 
 /**
  * Whether a PaymentIntent paid for a pack, and whose.
@@ -507,7 +563,8 @@ async function resolvePackOrg(paymentIntentId: string): Promise<PackOrg> {
   if (intent.metadata?.["kind"] !== PACK_METADATA_KIND) return { kind: "not_pack" };
 
   const orgId = await orgForCustomer(idOf(intent.customer as string | { id: string } | null));
-  return orgId ? { kind: "pack", orgId } : { kind: "unknown_customer" };
+  if (orgId) return { kind: "pack", orgId };
+  return (await packOrgWasDeleted(intent.metadata?.["org_id"])) ? { kind: "deleted" } : { kind: "unknown_customer" };
 }
 
 /**
@@ -517,11 +574,17 @@ async function resolvePackOrg(paymentIntentId: string): Promise<PackOrg> {
 async function applyPackPayment(
   session: Stripe.Checkout.Session,
   eventId: string,
-): Promise<"granted" | "duplicate" | "paid_without_credit" | "not_paid" | "unknown_customer"> {
+): Promise<"granted" | "duplicate" | "paid_without_credit" | "not_paid" | "unknown_customer" | "deleted"> {
   if (session.payment_status !== "paid") return "not_paid";
 
   const orgId = await orgForCustomer(idOf(session.customer as string | { id: string } | null));
-  if (!orgId) return "unknown_customer";
+  if (!orgId) {
+    if (await packOrgWasDeleted(session.metadata?.["org_id"])) {
+      logger.warn("billing.pack_event_after_deletion", { checkoutSession: session.id });
+      return "deleted";
+    }
+    return "unknown_customer";
+  }
 
   // The session's metadata was written by our own server, and the event is
   // signed. It still has to agree with the customer on record: a pack is
@@ -549,7 +612,7 @@ async function applyPackPayment(
 
   logger.error("billing.pack_paid_without_credit", {
     orgId,
-    sessionId: session.id,
+    checkoutSession: session.id,
     reason: typeof data === "string" ? data : "unknown",
   });
   return "paid_without_credit";
@@ -561,6 +624,10 @@ async function applyPackRefund(charge: Stripe.Charge, eventId: string): Promise<
 
   const pack = await resolvePackOrg(paymentIntentId);
   if (pack.kind === "not_pack") return "ignored";
+  if (pack.kind === "deleted") {
+    logger.warn("billing.pack_event_after_deletion", { paymentIntentId, kind: "refund" });
+    return "ignored";
+  }
   if (pack.kind === "unknown_customer") return "unknown_customer";
 
   const { data, error } = await serviceRoleClient().rpc("rpc_billing_apply_pack_refund", {
@@ -586,6 +653,10 @@ async function applyPackDispute(
 
   const pack = await resolvePackOrg(paymentIntentId);
   if (pack.kind === "not_pack") return "ignored";
+  if (pack.kind === "deleted") {
+    logger.warn("billing.pack_event_after_deletion", { paymentIntentId, kind: "dispute" });
+    return "ignored";
+  }
   if (pack.kind === "unknown_customer") return "unknown_customer";
 
   const { data, error } = await serviceRoleClient().rpc("rpc_billing_apply_pack_dispute", {
@@ -726,7 +797,11 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
       if (outcome === "unknown_customer") return "unknown_customer";
       if (outcome === "paid_without_credit") return "paid_without_credit";
       // `not_paid` is a delayed payment method: its own success event follows.
-      return outcome === "not_paid" ? "ignored" : "applied";
+      // `deleted`: the business is gone, and so is everything it could be given.
+      if (outcome === "not_paid" || outcome === "deleted") return "ignored";
+      // Already granted — by the other checkout event, or by reconciliation.
+      // Nothing new happened, and reconciliation must not count it as a heal.
+      return outcome === "duplicate" ? "duplicate" : "applied";
     }
 
     case "charge.refunded":
@@ -806,7 +881,12 @@ export interface PackReconciliation {
   ok: boolean;
   /** Paid pack Checkout Sessions Stripe reported in the window. */
   checked: number;
-  /** Paid packs with no grant until this run — a webhook that never landed. */
+  /**
+   * Money events this run applied that had not been applied before: a paid
+   * pack with no grant, or a pack refund or dispute the webhook never
+   * delivered. Each one is a webhook that failed, so a heal is worth an alert
+   * even though it is fixed.
+   */
   healed: number;
   /** Rows the database says a human should look at. */
   findings: number;
@@ -814,29 +894,57 @@ export interface PackReconciliation {
   byKind: Record<string, number>;
 }
 
-const RECONCILE_LOOKBACK_DAYS = 7;
+/** Paid sessions are re-applied for a week; Stripe keeps events for 30 days. */
+const RECONCILE_SESSION_LOOKBACK_DAYS = 7;
+const RECONCILE_EVENT_LOOKBACK_DAYS = 30;
+/** A session this young may simply have its webhook still in flight. */
+const RECONCILE_MIN_SESSION_AGE_SECONDS = 60 * 60;
+/** Each Stripe call, and the whole run, end well inside a function's life. */
+const RECONCILE_STRIPE_TIMEOUT_MS = 15_000;
+const RECONCILE_BUDGET_MS = 60_000;
+
+/** The Stripe events that move money on a pack, replayed through the webhook path. */
+const PACK_EVENT_TYPES = [
+  "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+  "charge.refunded",
+  "charge.dispute.created",
+  "charge.dispute.updated",
+  "charge.dispute.closed",
+  "charge.dispute.funds_withdrawn",
+  "charge.dispute.funds_reinstated",
+] as const;
 
 /**
- * Stripe's paid pack sessions against the purchased-credit grants.
+ * Stripe's record of pack money against the credit the ledger gave.
  *
  * Stripe is the record of what was paid; the grants are the record of what
- * was given. For every paid pack session in the lookback window this applies
- * the payment through the same idempotent path the webhook uses — so a missed
- * webhook is healed rather than merely reported — and carries across any
- * refund or dispute on its charge. Then the database lists anything that
- * still does not add up, and the run is recorded for health to read.
+ * was given. Two passes, both through the same idempotent paths the webhook
+ * uses, so a missed webhook is healed rather than merely reported:
  *
- * Idempotent end to end: a second run changes nothing and reports the same.
+ * 1. Every paid pack Checkout Session from the last week (older than an hour,
+ *    so a webhook still in flight is not mistaken for a missing one) is
+ *    applied again, and any refund or dispute on its charge carried across.
+ * 2. Every pack money event from the last 30 days — Stripe's whole retention —
+ *    is offered to the webhook handler. The inbox already has the ones that
+ *    arrived, so they cost a lookup; a refund or chargeback that came weeks
+ *    after the purchase and never reached us is applied here.
+ *
+ * Then the database lists anything that still does not add up, and the run is
+ * always recorded — including one Stripe never answered — so health can say
+ * reconciliation failed instead of going quiet. Idempotent end to end.
  */
 export async function reconcileSmsPacks(
-  options: { lookbackDays?: number; now?: Date } = {},
+  options: { now?: Date } = {},
 ): Promise<PackReconciliation> {
   const service = serviceRoleClient();
   const stripe = stripeClient();
   const startedAt = options.now ?? new Date();
-  const since =
-    Math.floor(startedAt.getTime() / 1000) -
-    (options.lookbackDays ?? RECONCILE_LOOKBACK_DAYS) * 24 * 60 * 60;
+  const startedMs = Date.now();
+  const nowSeconds = Math.floor(startedAt.getTime() / 1000);
+  const eventId = `reconcile:${startedAt.toISOString()}`;
+  const requestOptions = { timeout: RECONCILE_STRIPE_TIMEOUT_MS };
+  const overBudget = () => Date.now() - startedMs > RECONCILE_BUDGET_MS;
 
   const result: PackReconciliation = {
     ok: true,
@@ -847,44 +955,100 @@ export async function reconcileSmsPacks(
     byKind: {},
   };
 
-  const sessions = stripe.checkout.sessions.list({
-    created: { gte: since },
-    limit: 100,
-    expand: ["data.payment_intent.latest_charge"],
-  });
+  try {
+    // ---- 1. paid sessions -------------------------------------------------
+    const sessions = stripe.checkout.sessions.list(
+      {
+        created: { gte: nowSeconds - RECONCILE_SESSION_LOOKBACK_DAYS * 24 * 60 * 60 },
+        limit: 100,
+        expand: ["data.payment_intent.latest_charge"],
+      },
+      requestOptions,
+    );
 
-  for await (const session of sessions) {
-    if (session.mode !== "payment" || session.metadata?.["kind"] !== PACK_METADATA_KIND) continue;
-    if (session.payment_status !== "paid") continue;
-    result.checked += 1;
-
-    try {
-      const eventId = `reconcile:${startedAt.toISOString()}`;
-      const outcome = await applyPackPayment(session, eventId);
-      if (outcome === "granted") {
-        result.healed += 1;
-        logger.error("billing.pack_reconcile_healed", { sessionId: session.id });
+    for await (const session of sessions) {
+      if (overBudget()) {
+        result.errors += 1;
+        logger.error("billing.pack_reconcile_over_budget", { pass: "sessions" });
+        break;
       }
+      if (session.mode !== "payment" || session.metadata?.["kind"] !== PACK_METADATA_KIND) continue;
+      if (session.payment_status !== "paid") continue;
+      if (session.created > nowSeconds - RECONCILE_MIN_SESSION_AGE_SECONDS) continue;
+      result.checked += 1;
 
-      const intent = typeof session.payment_intent === "object" ? session.payment_intent : null;
-      const charge =
-        intent && typeof intent.latest_charge === "object" ? intent.latest_charge : null;
+      try {
+        const outcome = await applyPackPayment(session, eventId);
+        if (outcome === "granted") {
+          result.healed += 1;
+          logger.error("billing.pack_reconcile_healed", { checkoutSession: session.id });
+        }
 
-      if (charge && (charge.amount_refunded ?? 0) > 0) {
-        await applyPackRefund(charge, eventId);
+        const intent = typeof session.payment_intent === "object" ? session.payment_intent : null;
+        const charge =
+          intent && typeof intent.latest_charge === "object" ? intent.latest_charge : null;
+
+        if (charge && (charge.amount_refunded ?? 0) > 0) {
+          await applyPackRefund(charge, eventId);
+        }
+        if (charge?.disputed && intent) {
+          const disputes = await stripe.disputes.list(
+            { payment_intent: intent.id, limit: 1 },
+            requestOptions,
+          );
+          const dispute = disputes.data[0];
+          if (dispute) await applyPackDispute(dispute, eventId, startedAt.toISOString());
+        }
+      } catch (error) {
+        result.errors += 1;
+        logger.error("billing.pack_reconcile_session_failed", {
+          checkoutSession: session.id,
+          error: errorSummary(error),
+        });
       }
-      if (charge?.disputed && intent) {
-        const disputes = await stripe.disputes.list({ payment_intent: intent.id, limit: 1 });
-        const dispute = disputes.data[0];
-        if (dispute) await applyPackDispute(dispute, eventId, startedAt.toISOString());
-      }
-    } catch (error) {
-      result.errors += 1;
-      logger.error("billing.pack_reconcile_session_failed", {
-        sessionId: session.id,
-        reason: describeError(error),
-      });
     }
+
+    // ---- 2. money events the webhook may have missed ------------------------
+    const events = stripe.events.list(
+      {
+        types: [...PACK_EVENT_TYPES],
+        created: { gte: nowSeconds - RECONCILE_EVENT_LOOKBACK_DAYS * 24 * 60 * 60 },
+        limit: 100,
+      },
+      requestOptions,
+    );
+
+    for await (const event of events) {
+      if (overBudget()) {
+        result.errors += 1;
+        logger.error("billing.pack_reconcile_over_budget", { pass: "events" });
+        break;
+      }
+      // Too young to call missing: its own delivery may still be on the way.
+      if (event.created > nowSeconds - RECONCILE_MIN_SESSION_AGE_SECONDS) continue;
+
+      try {
+        const { outcome } = await receiveStripeWebhook(event);
+        // `duplicate` is the normal case: the webhook delivered it. Anything
+        // else that was about a pack is money this run had to apply itself.
+        if (outcome === "applied" || outcome === "paid_without_credit") {
+          result.healed += 1;
+          logger.error("billing.pack_reconcile_event_replayed", { eventId: event.id, type: event.type });
+        }
+      } catch (error) {
+        result.errors += 1;
+        logger.error("billing.pack_reconcile_event_failed", {
+          eventId: event.id,
+          type: event.type,
+          error: errorSummary(error),
+        });
+      }
+    }
+  } catch (error) {
+    // Stripe did not answer the listing at all. Recorded below as a failed
+    // run, so health reports the reconciliation — not the whole worker.
+    result.errors += 1;
+    logger.error("billing.pack_reconcile_stripe_failed", { error: errorSummary(error) });
   }
 
   const { data: findings, error: findingsError } = await service.rpc(
@@ -892,9 +1056,9 @@ export async function reconcileSmsPacks(
   );
   if (findingsError) {
     result.errors += 1;
-    logger.error("billing.pack_reconcile_findings_failed", { reason: describeError(findingsError) });
+    logger.error("billing.pack_reconcile_findings_failed", { error: errorSummary(findingsError) });
   } else {
-    for (const row of (findings ?? []) as Array<{ kind: string }>) {
+    for (const row of (Array.isArray(findings) ? findings : []) as Array<{ kind: string }>) {
       result.byKind[row.kind] = (result.byKind[row.kind] ?? 0) + 1;
       result.findings += 1;
     }
@@ -912,7 +1076,7 @@ export async function reconcileSmsPacks(
     p_detail: { byKind: result.byKind, errors: result.errors },
   });
   if (recordError) {
-    logger.error("billing.pack_reconcile_record_failed", { reason: describeError(recordError) });
+    logger.error("billing.pack_reconcile_record_failed", { error: errorSummary(recordError) });
   }
 
   return result;
@@ -930,7 +1094,7 @@ export interface BillingState {
   plans: typeof PLANS;
   /** The text pack card, smallest first. Shown whether or not it can be bought. */
   packs: readonly SmsPack[];
-  /** Whether this business can buy a pack right now: an active plan, prices set. */
+  /** Whether this business can buy a pack now: an active plan that is not ending, prices set. */
   packsAvailable: boolean;
 }
 
@@ -993,6 +1157,9 @@ export async function readBillingState(
     },
     plans: PLANS,
     packs: SMS_PACK_LIST,
-    packsAvailable: status === "active" && stripePackPricesConfigured(),
+    // An active plan that is not ending, with prices configured: the same
+    // rule checkout enforces, so the button is never offered and refused.
+    packsAvailable:
+      status === "active" && !(row?.cancel_at_period_end ?? false) && stripePackPricesConfigured(),
   };
 }

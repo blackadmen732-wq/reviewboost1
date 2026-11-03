@@ -62,6 +62,10 @@ let listedSessions: unknown[] = [];
 let stripePrices: Record<string, Record<string, unknown>> = {};
 /** When set, Stripe cannot be reached to open a checkout. */
 let checkoutFails = false;
+/** Events Stripe has kept (for reconciliation's replay pass). */
+let listedEvents: unknown[] = [];
+/** When set, Stripe does not answer reconciliation's listing. */
+let listingFails = false;
 
 const fakeStripe = {
   paymentIntents: {
@@ -90,10 +94,21 @@ const fakeStripe = {
         stripeCalls.push({ method: "checkout.sessions.list", args });
         return {
           async *[Symbol.asyncIterator]() {
+            if (listingFails) throw new Error("Request timed out");
             for (const session of listedSessions) yield session;
           },
         };
       },
+    },
+  },
+  events: {
+    list: (...args: unknown[]) => {
+      stripeCalls.push({ method: "events.list", args });
+      return {
+        async *[Symbol.asyncIterator]() {
+          for (const item of listedEvents) yield item;
+        },
+      };
     },
   },
   disputes: {
@@ -147,6 +162,8 @@ beforeEach(async () => {
   tableRows = new Map();
   paymentIntentMetadata = {};
   listedSessions = [];
+  listedEvents = [];
+  listingFails = false;
   checkoutFails = false;
   stripePrices = {
     price_pack50_test: oneTimePrice(400),
@@ -169,6 +186,7 @@ beforeEach(async () => {
     data: [{ outcome: "applied", outstanding_segments: 0 }],
     error: null,
   });
+  rpcResults.set("rpc_billing_org_deleted", { data: false, error: null });
 });
 
 function called(name: string): RpcCall | undefined {
@@ -368,6 +386,41 @@ describe("a pack being refunded or disputed", () => {
     }
   });
 
+  it("treats a refund, a dispute or a late payment after an account was deleted as finished", async () => {
+    // The cascade took the Stripe customer link and the purchase with it.
+    rpcResults.set("rpc_billing_pack_org", { data: null, error: null });
+    rpcResults.set("rpc_billing_org_for_customer", { data: null, error: null });
+    rpcResults.set("rpc_billing_org_deleted", { data: true, error: null });
+    paymentIntentMetadata = { kind: "sms_pack", org_id: ORG, pack_id: "pack_50" };
+
+    const { receiveStripeWebhook } = await import("@/lib/server/billing-service");
+    for (const [type, object] of [
+      ["charge.refunded", { id: "ch_gone", payment_intent: "pi_gone", amount: 400, amount_refunded: 400 }],
+      ["charge.dispute.created", { id: "du_gone", payment_intent: "pi_gone", status: "needs_response" }],
+      ["checkout.session.async_payment_succeeded", paidPackSession({ payment_intent: "pi_gone" })],
+    ] as const) {
+      rpcCalls.length = 0;
+      const { outcome } = await receiveStripeWebhook(event(type, object as never, `evt_gone_${type}`) as never);
+      expect(outcome, type).toBe("ignored");
+      // Completed, so Stripe is answered 200 and stops retrying.
+      expect(called("rpc_stripe_event_complete"), type).toBeDefined();
+      expect(rpcCalls.filter(({ name }) => name.startsWith("rpc_billing_apply")), type).toEqual([]);
+    }
+  });
+
+  it("still retries an unknown customer whose business was not deleted", async () => {
+    rpcResults.set("rpc_billing_pack_org", { data: null, error: null });
+    rpcResults.set("rpc_billing_org_for_customer", { data: null, error: null });
+    paymentIntentMetadata = { kind: "sms_pack", org_id: ORG, pack_id: "pack_50" };
+
+    const { applyStripeEvent } = await import("@/lib/server/billing-service");
+    expect(
+      await applyStripeEvent(
+        event("charge.refunded", { id: "ch_x", payment_intent: "pi_x", amount: 400, amount_refunded: 400 }) as never,
+      ),
+    ).toBe("unknown_customer");
+  });
+
   it("reports an out-of-order dispute event as stale", async () => {
     rpcResults.set("rpc_billing_apply_pack_dispute", {
       data: [{ outcome: "stale", outstanding_segments: 0 }],
@@ -436,6 +489,31 @@ describe("buying a pack", () => {
     expect(options["idempotencyKey"]).toBe(`pack:${ORG}:pack_200:req-3`);
   });
 
+  it("is refused to a plan that is set to end, with what to do instead", async () => {
+    tableRows.set("entitlement_snapshots", [{ status: "active", trial_ends_at: null, cancel_at_period_end: true }]);
+    const { createPackCheckoutSession } = await import("@/lib/server/billing-service");
+
+    await expect(createPackCheckoutSession(await context(), ORG, "pack_50", "req-end")).rejects.toMatchObject({
+      status: 403,
+      message: expect.stringMatching(/Turn renewal back on/),
+    });
+    expect(stripeCalls).toEqual([]);
+  });
+
+  it("opens a payment page that expires in about half an hour, not a day", async () => {
+    tableRows.set("entitlement_snapshots", [{ status: "active", trial_ends_at: null }]);
+    const { createPackCheckoutSession } = await import("@/lib/server/billing-service");
+    const before = Math.floor(Date.now() / 1000);
+
+    await createPackCheckoutSession(await context(), ORG, "pack_50", "req-exp");
+    const [params] = stripeCalls.find(({ method }) => method === "checkout.sessions.create")!.args as [
+      Record<string, unknown>,
+    ];
+    const expiresAt = params["expires_at"] as number;
+    expect(expiresAt).toBeGreaterThanOrEqual(before + 30 * 60);
+    expect(expiresAt).toBeLessThanOrEqual(before + 32 * 60);
+  });
+
   it("refuses to send anyone to pay a price that is not the card's", async () => {
     tableRows.set("entitlement_snapshots", [{ status: "active", trial_ends_at: null }]);
     const { createPackCheckoutSession } = await import("@/lib/server/billing-service");
@@ -499,6 +577,11 @@ describe("the billing state an owner reads", () => {
       { plan_id: "starter", status: "trialing", trial_ends_at: new Date(Date.now() + 86_400_000).toISOString() },
     ]);
     expect((await readBillingState(await ctx(), ORG, "req-8")).packsAvailable).toBe(false);
+
+    tableRows.set("entitlement_snapshots", [
+      { plan_id: "starter", status: "active", trial_ends_at: null, cancel_at_period_end: true },
+    ]);
+    expect((await readBillingState(await ctx(), ORG, "req-8b")).packsAvailable).toBe(false);
 
     tableRows.set("entitlement_snapshots", [{ plan_id: "starter", status: "active", trial_ends_at: null }]);
     const saved = process.env.STRIPE_PRICE_SMS_PACK_200;
@@ -574,6 +657,67 @@ describe("reconciliation", () => {
     expect(called("rpc_billing_apply_pack_refund")?.args["p_amount_refunded_cents"]).toBe(100);
     expect(called("rpc_billing_apply_pack_dispute")?.args["p_dispute_status"]).toBe("lost");
     expect(result).toMatchObject({ ok: false, findings: 1, byKind: { needs_review: 1 } });
+  });
+
+  it("leaves a session young enough to have its webhook still in flight", async () => {
+    listedSessions = [paidPackSession({ created: Math.floor(Date.now() / 1000) - 60 })];
+    rpcResults.set("rpc_billing_pack_reconciliation_findings", { data: [], error: null });
+
+    const { reconcileSmsPacks } = await import("@/lib/server/billing-service");
+    const result = await reconcileSmsPacks();
+    expect(result).toMatchObject({ ok: true, checked: 0, healed: 0 });
+    expect(called("rpc_billing_apply_pack_payment")).toBeUndefined();
+  });
+
+  it("records a failed run when Stripe does not answer, rather than going quiet", async () => {
+    listingFails = true;
+    rpcResults.set("rpc_billing_pack_reconciliation_findings", { data: [], error: null });
+
+    const { reconcileSmsPacks } = await import("@/lib/server/billing-service");
+    const result = await reconcileSmsPacks();
+    expect(result).toMatchObject({ ok: false, errors: 1 });
+    expect(called("rpc_billing_record_reconciliation_run")?.args).toMatchObject({ p_kind: "sms_packs", p_ok: false });
+  });
+
+  it("applies a pack refund weeks later that the webhook never delivered", async () => {
+    const weeksAgo = Math.floor(Date.now() / 1000) - 20 * 24 * 60 * 60;
+    listedEvents = [
+      {
+        id: "evt_missed_refund",
+        type: "charge.refunded",
+        created: weeksAgo,
+        data: { object: { id: "ch_old", payment_intent: "pi_pack1", amount: 400, amount_refunded: 400 } },
+      },
+    ];
+    rpcResults.set("rpc_billing_pack_reconciliation_findings", { data: [], error: null });
+
+    const { reconcileSmsPacks } = await import("@/lib/server/billing-service");
+    const result = await reconcileSmsPacks();
+
+    const [params] = stripeCalls.find(({ method }) => method === "events.list")!.args as [Record<string, unknown>];
+    expect(params["types"]).toEqual(expect.arrayContaining(["charge.refunded", "charge.dispute.created"]));
+    // Stripe keeps events for 30 days, so that is how far back this looks.
+    expect((params["created"] as { gte: number }).gte).toBeLessThanOrEqual(weeksAgo);
+    expect(called("rpc_billing_apply_pack_refund")?.args).toMatchObject({ p_amount_refunded_cents: 400 });
+    expect(result).toMatchObject({ ok: false, healed: 1 });
+  });
+
+  it("does not count an event the webhook already delivered", async () => {
+    listedEvents = [
+      {
+        id: "evt_delivered",
+        type: "charge.refunded",
+        created: Math.floor(Date.now() / 1000) - 5 * 24 * 60 * 60,
+        data: { object: { id: "ch_1", payment_intent: "pi_pack1", amount: 400, amount_refunded: 400 } },
+      },
+    ];
+    rpcResults.set("rpc_stripe_event_record", { data: "duplicate", error: null });
+    rpcResults.set("rpc_billing_pack_reconciliation_findings", { data: [], error: null });
+
+    const { reconcileSmsPacks } = await import("@/lib/server/billing-service");
+    const result = await reconcileSmsPacks();
+    expect(result).toMatchObject({ ok: true, healed: 0 });
+    expect(called("rpc_billing_apply_pack_refund")).toBeUndefined();
   });
 
   it("keeps going past one session that fails, and says so", async () => {
