@@ -62,9 +62,11 @@ describe("the Product page tells the truth about Tags", () => {
 
 describe("the product copy uses the product's own words", () => {
   it("capitalises Tag, because that is the product noun", () => {
-    const items = PRODUCT.items.map((item) => item.title).join(" ");
-    expect(items).not.toMatch(/\btag\b/);
-    expect(items).toMatch(/\bTag\b/);
+    const shown = PRODUCT.groups
+      .flatMap((group) => [group.title, ...group.features.flatMap((feature) => [feature.title, feature.body])])
+      .join(" ");
+    expect(shown).not.toMatch(/\btag\b/);
+    expect(shown).toMatch(/\bTag\b/);
   });
 
   it("never says Stand", () => {

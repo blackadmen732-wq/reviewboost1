@@ -165,16 +165,6 @@ export const PRODUCT = {
   lede: "A Tag for your counter, a page for your customers, and a simple app for you.",
   // Kept for the Tag section and its tests: what a Tag is, in one line.
   tagLine: "A Tag is the thing they scan: a printed code, an NFC tag, or both, all opening the same page.",
-  items: [
-    {
-      title: "Print a code",
-      body: "Print your QR code. Put it by the till, on a receipt, or where customers can see it.",
-    },
-    {
-      title: "Program a Tag",
-      body: "Write that same link onto a blank NFC tag. They tap. The page opens. No app for them.",
-    },
-  ],
   groups: [
     {
       eyebrow: "For your counter",
