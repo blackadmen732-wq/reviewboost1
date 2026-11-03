@@ -613,3 +613,80 @@ textarea {
      the viewport, not this wrapper, as their containing block. */
   animation: page-enter 180ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
 }
+
+/* "Print this code" (features/tags/print-code-sheet.tsx). On screen the
+   sheet is hidden; on paper it is all there is: the app around it is hidden,
+   the page is white in either theme, and the sheet's page has no margin, so
+   the browser prints no address or date along its edges. Colours are fixed,
+   not theme tokens: paper has one theme. */
+.print-code {
+  display: none;
+}
+
+@page rb-code {
+  margin: 0;
+}
+
+@media print {
+  html:has(> body > .print-code),
+  html:has(> body > .print-code) > body {
+    background: #ffffff !important;
+    color-scheme: light;
+  }
+
+  body:has(> .print-code) > :not(.print-code) {
+    display: none !important;
+  }
+
+  /* Set from the top, not centred on 100vh: a print engine that sizes vh
+     to the window, not the paper, would make the sheet taller than the page
+     and split the code across two. 36 mm down puts it a little above the
+     middle on Letter and on A4. */
+  .print-code {
+    page: rb-code;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 36mm 16mm 16mm;
+    color: #111827;
+    text-align: center;
+    overflow-wrap: anywhere;
+    break-inside: avoid;
+  }
+
+  .print-code__business {
+    margin: 0;
+    font-size: 18pt;
+    font-weight: 500;
+    color: #4b5563;
+  }
+
+  .print-code__question {
+    margin: 3mm 0 0;
+    font-size: 40pt;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .print-code__code {
+    display: block;
+    width: 110mm;
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    margin: 12mm 0 0;
+  }
+
+  .print-code__hint {
+    margin: 8mm 0 0;
+    font-size: 16pt;
+    color: #4b5563;
+  }
+
+  .print-code__tag {
+    margin: 16mm 0 0;
+    font-size: 10pt;
+    color: #6b7280;
+  }
+}

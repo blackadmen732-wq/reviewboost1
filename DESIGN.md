@@ -333,15 +333,16 @@ This is the one place an owner programs anything.
   1. **Make your customer page.** Done when the Google review link is saved. The button is "Finish your business details", "Add your Google review link" or "Edit customer page", whichever applies. If there's no photo, it nudges: "Adding a photo of your business makes it feel like yours."
   2. **Set up your Tag.** Done when a Tag is programmed. Button: "Set up your Tag" or "Open your Tag". "Show me how" covers Android NFC, iPhone or no NFC (print the code), and that the Tag is locked once it's written.
   3. **Test it.** Done when the first rating arrives. "Tap your Tag or scan the code with your own phone, then tap a star." When done, the button is "Open Feedback".
-- **Your Tags:** a list of Tags, each with its name, status ("Live", "Not programmed" or "Needs rewriting") and a chevron, plus "Add a Tag".
+- **Your Tags:** each Tag's name, two chips ("QR ready" / "Reprint QR", "Tap ready" / "Set up tap" / "Set up tap again") and a chevron; "Add a Tag".
 - **Empty:** "No tags yet. Create a Tag, print the code, and put it on the counter. Step 2 walks you through it."
 
 ### 7.3 One Tag `/stands/[id]`
 
-- **Status:** "Ready", "Tap not set up", or "Code changed: reprint and set up tap" (`tagReadinessLabel`). The Tags list shows the code and the chip separately: "QR ready" / "Reprint QR" and "Tap ready" / "Set up tap" / "Set up tap again". Owners never read "NFC" or "program" on a button.
-- **Next action:** not set up: "Set up tap" where the phone can write, otherwise "Print code". Ready: "Print code", secondary.
+- **Status:** "Ready", "Reprint the code", "Tap not set up" or "Code changed: reprint and set up tap" (`tagReadinessLabel`). Owners never read "NFC" or "program" on a button.
+- **Next action:** not set up: "Set up tap" where the phone can write, otherwise "Print this code". Ready: neither is filled.
+- **Print:** one black-on-white page: business, "How was your visit?", the code, "Scan with your phone’s camera", the Tag's name, small. Nothing else.
 - **Tap sheet:** full screen: "Set up tap" → "Hold near your Tag" → "Keep still" → "Tag ready". A failure says why, e.g. "Couldn’t set up this Tag".
-- **Other actions:** rename, rotate the code (inside "Advanced", with confirmation), and retire.
+- **More (…):** "Save code", and "Make a new code" behind a warning.
 
 ### 7.4 Customer page editor `/customer-page`
 

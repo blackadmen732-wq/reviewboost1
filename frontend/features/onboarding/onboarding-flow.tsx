@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
 import { TestGoogleLinkButton } from "@/features/dashboard/google-link-care";
+import { PrintCodeSheet } from "@/features/tags/print-code-sheet";
 import {
   GOOGLE_LINK_BLAST,
   GOOGLE_LINK_HELP_STEPS,
@@ -394,6 +395,9 @@ export function OnboardingFlow({
           )}
         </div>
       ) : null}
+      {created && qr.status === "ready" && qr.objectUrl ? (
+        <PrintCodeSheet src={qr.objectUrl} businessName={name.trim()} />
+      ) : null}
 
       <div className="flex w-full flex-col gap-3">
         <Button variant="action" size="lg" asChild>
@@ -401,7 +405,11 @@ export function OnboardingFlow({
             {selectedPlan ? "Continue to your plan" : "Choose a plan"}
           </a>
         </Button>
-        <Button variant="secondary" onClick={() => window.print()}>
+        <Button
+          variant="secondary"
+          disabled={qr.status !== "ready"}
+          onClick={() => window.print()}
+        >
           <Printer className="size-5" aria-hidden="true" />
           Print this code
         </Button>

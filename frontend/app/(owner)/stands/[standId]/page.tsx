@@ -39,6 +39,7 @@ export default async function TagDetailPage({
       <BackLink href="/stands">Tags</BackLink>
       <TagDetail
         organizationId={organization.orgId}
+        businessName={organization.name}
         stand={stand}
         canManage={can.manageTags}
         closedNotice={

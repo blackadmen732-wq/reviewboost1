@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog } from "@/components/ui/dialog";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { notify } from "@/components/ui/toast";
+import { PrintCodeSheet } from "@/features/tags/print-code-sheet";
 import { ProgramTagSheet } from "@/features/tags/program-tag-sheet";
 import {
   useAuthenticatedQr,
@@ -50,11 +51,14 @@ export function TagDetail({
   stand,
   canManage,
   organizationId,
+  businessName,
   closedNotice = null,
 }: {
   stand: Stand;
   canManage: boolean;
   organizationId?: string;
+  /** Printed above the code. */
+  businessName?: string;
   closedNotice?: ClosedNotice | null;
 }) {
   return (
@@ -75,7 +79,11 @@ export function TagDetail({
         </div>
       ) : null}
       {canManage ? (
-        <ManagedTagDetail stand={stand} organizationId={organizationId} />
+        <ManagedTagDetail
+          stand={stand}
+          organizationId={organizationId}
+          businessName={businessName}
+        />
       ) : (
         <ReadOnlyTagDetail stand={stand} />
       )}
@@ -119,9 +127,11 @@ function ReadOnlyTagDetail({ stand }: { stand: Stand }) {
 function ManagedTagDetail({
   stand,
   organizationId,
+  businessName,
 }: {
   stand: Stand;
   organizationId: string | undefined;
+  businessName: string | undefined;
 }) {
   const router = useRouter();
   const qr = useAuthenticatedQr(stand.standId, organizationId);
@@ -283,6 +293,21 @@ function ManagedTagDetail({
       <div className="max-w-[28rem]">
         <PreviewCustomerPage standId={stand.standId} variant="button" />
       </div>
+
+      {/* Only the current code reaches paper: while a new one loads, the old
+          image is still on screen, dimmed, and printing it would print a
+          dead code. */}
+      {qr.status === "ready" && qr.objectUrl ? (
+        <PrintCodeSheet
+          src={qr.objectUrl}
+          businessName={businessName}
+          tagName={
+            stand.locationName && stand.locationName !== businessName
+              ? `${stand.label}, ${stand.locationName}`
+              : stand.label
+          }
+        />
+      ) : null}
 
       <ProgramTagSheet
         standId={stand.standId}
