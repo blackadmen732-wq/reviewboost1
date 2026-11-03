@@ -17,6 +17,7 @@ import {
 import { textingEnabled } from "@/lib/features";
 import { EXPECTED_MIGRATIONS } from "@/lib/server/schema-manifest";
 import { getProviderRate, getSmsProvider } from "@/lib/server/sms/provider";
+import { tagKeyProblems, type TagKeySample } from "@/lib/server/tag-keys";
 
 /**
  * The production readiness gate.
@@ -201,6 +202,8 @@ export interface LiveProbe {
   bucket(name: string): Promise<{ exists: boolean; public: boolean }>;
   smsHealth(): Promise<boolean>;
   appliedMigrations(): Promise<string[]>;
+  /** Live Tags per digest key version, with a few saved copies (rpc_tag_key_sample). */
+  tagKeySample(): Promise<TagKeySample[]>;
 }
 
 export async function checkLive(probe: LiveProbe, report: ReadinessReport): Promise<ReadinessReport> {
@@ -262,6 +265,20 @@ export async function checkLive(probe: LiveProbe, report: ReadinessReport): Prom
     }
   } catch {
     problems.push({ subsystem: "database", problem: "rpc_sms_health failed" });
+  }
+
+  // The keys must still open the Tags already in the field. A key that is
+  // present and well formed but not the one the Tags were made with passes
+  // every check above and stops every Tag at once (lib/server/tag-keys.ts).
+  try {
+    const sample = await probe.tagKeySample();
+    try {
+      for (const problem of tagKeyProblems(sample)) problems.push({ subsystem: "keys", problem });
+    } catch {
+      // A missing or malformed key: the configuration check has named it.
+    }
+  } catch {
+    problems.push({ subsystem: "keys", problem: "cannot read the Tags to check that the keys still open them (rpc_tag_key_sample)" });
   }
 
   try {

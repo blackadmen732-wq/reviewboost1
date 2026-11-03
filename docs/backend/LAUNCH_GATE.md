@@ -180,8 +180,9 @@ forward migration before step 6, not an edit.
 | Real Stripe test-mode flow | **BLOCKED** — no Stripe credentials or egress | §6 script |
 | Real Twilio flow | **BLOCKED** — no Twilio account, phone, or egress. Needed only once texting is switched on (TEXT_REQUESTS.md) | §6 script |
 | Webhook retry / out-of-order | TESTED at DB and handler; not against Stripe | |
-| Monitoring and alerts active | **BLOCKED** — thresholds defined (OPERATIONS.md); no monitor exists yet | |
-| Backups active | **FAILED** — LIVE VERIFIED that the Free plan has no automated backups. Needs Pro, or a scheduled off-site `supabase db dump` | OPERATIONS.md |
+| Monitoring and alerts active | IMPLEMENTED — `.github/workflows/uptime.yml` every 15 min (site, a Tag lookup through the database; one real Tag and health once `MONITOR_TAG_URL` / `MONITOR_SECRET` are set), alerting by GitHub's failed-run email. Runs only from `main`; not yet running | OPERATIONS.md §0–§1 |
+| Keys still open the Tags in the field | TESTED — readiness refuses, and health reports `tag_keys_mismatch`, when the configured keys do not open sampled live Tags | `readiness.test.ts` "the keys still open the Tags", `tag_key_check_test.sql` |
+| Backups active | **FAILED** — LIVE VERIFIED that the Free plan has no automated backups (re-checked 2026-11-03: the organization is still on Free). Needs Pro, or a scheduled off-site `supabase db dump` | OPERATIONS.md §0, §2 |
 | Restore drill | **BLOCKED** — not performed; RPO/RTO undefined until it is | OPERATIONS.md |
 | Storage recovery | **BLOCKED** — procedure written, not drilled; bucket not created by any migration | OPERATIONS.md |
 | Security advisor findings reviewed | TESTED on local head; hosted advisor **BLOCKED** | SECURITY_REVIEW.md |
@@ -263,6 +264,7 @@ schema.** The readiness gate enforces the last part mechanically
    is additive (new tables, two ledger functions re-emitted with `- revoked`)
    and closes `rpc_billing_apply_credit_purchase` and `rpc_sms_quota_allocate`
    to the service role; no application code calls either.
+   `20261103000200_tag_key_check` adds one read-only, service-only function.
 5. Deploy the build **without assigning the production domain** (disable
    "auto-assign custom production domains" in Vercel, or
    `vercel deploy --prod --skip-domain`).

@@ -243,6 +243,24 @@ describe("health", () => {
     expect(body.data.problems).toContain("integration_dead_letters");
   });
 
+  it("turns red when the keys would no longer open the Tags in the field", async () => {
+    vi.stubEnv("TOKEN_DIGEST_KEY_VERSION", "2");
+    results.set("rpc_tag_key_sample", {
+      data: [{ key_version: 1, tags: 3, token_encrypted: null, token_hash: null }],
+      error: null,
+    });
+    const { status, body } = await health();
+    expect(status).toBe(503);
+    expect(body.data.problems).toContain("tag_keys_mismatch");
+    // Counts and versions only: never a link.
+    expect(body.data.tagKeys).toEqual({ versions: [{ version: 1, tags: 3 }], problems: 1 });
+  });
+
+  it("says so when it cannot check the keys", async () => {
+    results.set("rpc_tag_key_sample", { data: null, error: { message: "does not exist" } });
+    expect((await health()).body.data.problems).toContain("tag_key_check_unavailable");
+  });
+
   it("is 503 on an unprocessed Stripe event", async () => {
     results.set("rpc_sms_health", { data: [{ ...HEALTHY_SMS[0], stripe_unprocessed: 1 }], error: null });
     const { status, body } = await health();

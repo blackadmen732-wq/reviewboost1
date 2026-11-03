@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EXPECTED_MIGRATIONS } from "@/lib/server/schema-manifest";
+import type { TagKeySample } from "@/lib/server/tag-keys";
 
 vi.mock("server-only", () => ({}));
 
@@ -326,6 +327,7 @@ describe("live checks", () => {
     bucket: async () => ({ exists: true, public: true }),
     smsHealth: async () => true,
     appliedMigrations: async () => [...EXPECTED_MIGRATIONS],
+    tagKeySample: async (): Promise<TagKeySample[]> => [],
   };
 
   async function live(probe: Partial<typeof healthy>) {
@@ -389,6 +391,89 @@ describe("live checks", () => {
     expect(problemsOf(await live({ bucket: async () => ({ exists: false, public: false }) }))).toMatch(
       /bucket customer-page does not exist/,
     );
+  });
+
+  describe("the keys still open the Tags already in the field", () => {
+    // READY: CUSTOMER_NOTE_ENCRYPTION_KEY is KEY_A, TOKEN_DIGEST_KEY is KEY_B
+    // at version 2, and no rotation is in progress.
+    const TOKEN = "kc_tag_link_0123456789abcdefghijklmnopqrstuv";
+
+    /** A Tag as the database keeps it: its link saved under one key, digested under another. */
+    async function savedTag(version: number, digestKey: string, savedWith = KEY_A): Promise<TagKeySample> {
+      vi.stubEnv("CUSTOMER_NOTE_ENCRYPTION_KEY", savedWith);
+      const { encrypt, keyedDigest } = await import("@/lib/server/crypto");
+      const row = {
+        key_version: version,
+        tags: 4,
+        token_encrypted: encrypt(TOKEN),
+        token_hash: keyedDigest(TOKEN, "stand_token", Buffer.from(digestKey, "base64")),
+      };
+      vi.stubEnv("CUSTOMER_NOTE_ENCRYPTION_KEY", KEY_A);
+      return row;
+    }
+
+    it("passes when the configured keys open the saved Tags", async () => {
+      const tag = await savedTag(2, KEY_B);
+      expect(await live({ tagKeySample: async () => [tag] })).toMatchObject({ ok: true });
+    });
+
+    it("refuses a TOKEN_DIGEST_KEY that is not the one the Tags were made with", async () => {
+      const tag = await savedTag(2, KEY_C);
+      expect(problemsOf(await live({ tagKeySample: async () => [tag] }))).toMatch(
+        /TOKEN_DIGEST_KEY is not the key Tags on version 2 were made with: they would not open/,
+      );
+    });
+
+    it("refuses a rotation that leaves older Tags without their key", async () => {
+      const report = await live({
+        tagKeySample: async () => [{ key_version: 1, tags: 5, token_encrypted: null, token_hash: null }],
+      });
+      expect(problemsOf(report)).toMatch(/5 Tag\(s\) still use digest key version 1 and TOKEN_DIGEST_KEY_PREVIOUS is not set/);
+    });
+
+    it("accepts a rotation in progress when the previous key opens the older Tags", async () => {
+      configure({ TOKEN_DIGEST_KEY_PREVIOUS: KEY_C });
+      const older = await savedTag(1, KEY_C);
+      const moved = await savedTag(2, KEY_B);
+      expect(await live({ tagKeySample: async () => [older, moved] })).toMatchObject({ ok: true });
+    });
+
+    it("refuses a previous key that is not the one the older Tags were made with", async () => {
+      configure({ TOKEN_DIGEST_KEY_PREVIOUS: KEY_C });
+      const older = await savedTag(1, KEY_A);
+      expect(problemsOf(await live({ tagKeySample: async () => [older] }))).toMatch(
+        /TOKEN_DIGEST_KEY_PREVIOUS is not the key Tags on version 1 were made with/,
+      );
+    });
+
+    it("refuses an encryption key that cannot read the saved Tag links", async () => {
+      const tag = await savedTag(2, KEY_B, KEY_C);
+      expect(problemsOf(await live({ tagKeySample: async () => [tag] }))).toMatch(
+        /CUSTOMER_NOTE_ENCRYPTION_KEY cannot read the saved Tag links/,
+      );
+    });
+
+    it("refuses Tags made under a key newer than this configuration, as after a rollback", async () => {
+      const report = await live({
+        tagKeySample: async () => [{ key_version: 3, tags: 2, token_encrypted: null, token_hash: null }],
+      });
+      expect(problemsOf(report)).toMatch(/version 3, newer than TOKEN_DIGEST_KEY_VERSION 2/);
+    });
+
+    it("fails closed when the Tags cannot be read", async () => {
+      const report = await live({
+        tagKeySample: async () => {
+          throw new Error("function does not exist");
+        },
+      });
+      expect(problemsOf(report)).toMatch(/cannot read the Tags to check that the keys still open them/);
+    });
+
+    it("never puts a link or a key in a problem", async () => {
+      const tag = await savedTag(2, KEY_C, KEY_C);
+      const text = problemsOf(await live({ tagKeySample: async () => [tag] }));
+      for (const secret of [TOKEN, KEY_A, KEY_B, KEY_C]) expect(text).not.toContain(secret);
+    });
   });
 
   it("fails when the Customer Page bucket is private", async () => {

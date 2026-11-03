@@ -5,6 +5,7 @@ import { handle, json } from "@/lib/server/http";
 import { textingEnabled } from "@/lib/features";
 import { checkConfiguration } from "@/lib/server/readiness";
 import { serviceRoleClient } from "@/lib/server/supabase";
+import { tagKeyProblems, tagKeyRows } from "@/lib/server/tag-keys";
 import { workerAuthorized } from "@/lib/server/worker-auth";
 
 /**
@@ -146,6 +147,23 @@ export async function GET(request: NextRequest): Promise<Response> {
     }
     if (reconcileOk === false) problems.push("packs_reconcile_not_ok");
 
+    // The keys still open the Tags in the field. A key changed in the
+    // dashboard passes every presence check and stops every Tag at once, with
+    // nothing else turning red (lib/server/tag-keys.ts). Counts only here.
+    const tagKeys = await serviceRoleClient().rpc("rpc_tag_key_sample", { p_per_version: 2 });
+    const tagKeySample = tagKeyRows(tagKeys.data);
+    let tagKeyIssues = 0;
+    if (tagKeys.error) {
+      problems.push("tag_key_check_unavailable");
+    } else {
+      try {
+        tagKeyIssues = tagKeyProblems(tagKeySample).length;
+      } catch {
+        // A missing or malformed key: config_not_ready below names it.
+      }
+      if (tagKeyIssues > 0) problems.push("tag_keys_mismatch");
+    }
+
     // Configuration drift after deploy (a variable removed in the dashboard)
     // is as fatal as a dead queue, so the gate's cheap half runs here too.
     const config = checkConfiguration();
@@ -171,6 +189,12 @@ export async function GET(request: NextRequest): Promise<Response> {
           refundWithoutPayment: packsRefundWithoutPayment,
           lastReconcileAgeSeconds: reconcileAge,
           lastReconcileOk: reconcileOk,
+        },
+        tagKeys: {
+          versions: tagKeySample
+            .filter((row, index, all) => all.findIndex((other) => other.key_version === row.key_version) === index)
+            .map((row) => ({ version: Number(row.key_version), tags: Number(row.tags) })),
+          problems: tagKeyIssues,
         },
         connections: {
           byState: connectionsByState,

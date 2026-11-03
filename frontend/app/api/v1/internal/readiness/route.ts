@@ -4,6 +4,7 @@ import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json } from "@/lib/server/http";
 import { checkConfiguration, checkLive, type LiveProbe } from "@/lib/server/readiness";
 import { serviceRoleClient } from "@/lib/server/supabase";
+import { tagKeyRows } from "@/lib/server/tag-keys";
 import { workerAuthorized } from "@/lib/server/worker-auth";
 
 /**
@@ -43,6 +44,11 @@ const probe: LiveProbe = {
   async smsHealth() {
     const { error } = await serviceRoleClient().rpc("rpc_sms_health");
     return !error;
+  },
+  async tagKeySample() {
+    const { data, error } = await serviceRoleClient().rpc("rpc_tag_key_sample", { p_per_version: 3 });
+    if (error) throw new Error("tag keys");
+    return tagKeyRows(data);
   },
 };
 

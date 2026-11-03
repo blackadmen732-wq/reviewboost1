@@ -1,8 +1,32 @@
 # Operations: monitoring, backup, recovery
 
-Status of everything here: **written, not yet running.** No monitor, alert
-route, backup verification or restore drill has been performed. See
-LAUNCH_GATE.md for the state of each.
+Status: the uptime monitor (`.github/workflows/uptime.yml`) and the Tag key
+check run once this branch is on `main`. Nothing else here is running yet: no
+backup has been verified and no restore drill performed. See LAUNCH_GATE.md for
+the state of each.
+
+## 0. What can stop every Tag at once
+
+Every printed QR code and every programmed NFC chip carries one ReviewBoost
+link, `https://reviewboost.fit/q/<code>`. That is what lets an owner change
+their Google link without a reprint, and what stops a Tag when its plan stops.
+It also means each risk below stops every Tag at every business at the same
+moment, and a printed Tag cannot be recalled.
+
+| Risk | What guards it in code | What only the owner can do |
+|---|---|---|
+| The database is lost, or paused | Nothing in code can bring it back | **Supabase Pro** (from $25 a month on Supabase's pricing page): daily backups kept 7 days, and a paid project is never paused. The free plan has no automatic backups and pauses a project after a week without activity. Then §2 |
+| A key is wrong, replaced, or rotated without its predecessor | Readiness refuses the deploy, and health turns red (`tag_keys_mismatch`), when the keys no longer open the Tags already in the field (`frontend/lib/server/tag-keys.ts`, `rpc_tag_key_sample`) | Keep `CUSTOMER_NOTE_ENCRYPTION_KEY` and `TOKEN_DIGEST_KEY` (with `TOKEN_DIGEST_KEY_VERSION`) in a password manager, apart from any backup. A lost key cannot be recovered by anyone |
+| The site is down and nobody knows | The uptime workflow, every 15 minutes: the site, a Tag lookup through the database, optionally one real Tag and health. A failed run emails the GitHub account that last changed its schedule | Keep GitHub's emails for failed Actions on. Optional: repository variable `MONITOR_TAG_URL` (one real Tag's link) and, once the production scheduler runs, secret `MONITOR_SECRET` (the value of `CRON_SECRET`) |
+| The domain expires or is lost | `PUBLIC_FRONTEND_URL` may never be a `*.vercel.app` address in production (readiness) | Auto-renew on, several years paid ahead, transfer lock on, at the registrar. The domain is printed on every Tag and can never change |
+| An account is taken over or locked out | — | Two-factor sign-in on GitHub, Vercel, Supabase, Stripe, the registrar and Google, with the recovery codes saved |
+| The hosting plan | — | Vercel's free Hobby plan is for personal, non-commercial use; a product that charges businesses belongs on a paid plan |
+
+Two limits of the uptime workflow: GitHub runs a schedule only from `main`,
+and it disables a public repository's schedules after 60 days without a push
+(it emails first; re-enable under Actions). Checks run from GitHub's network,
+so a failure GitHub itself causes reads as an outage — open the site before
+acting on one.
 
 ## 1. Monitoring
 
@@ -19,10 +43,11 @@ A monitor must treat **anything but 200 with `data.ok === true`** as down.
 Health returns 503 whenever `ok` is false precisely so status-code-only
 monitors cannot read a broken product as fine.
 
-Recommended: an uptime monitor (Better Stack, Checkly, UptimeRobot or
-similar) polling health every minute with the bearer header and a JSON
-assertion on `data.ok`, paging after 2 consecutive failures; readiness every
-15 minutes.
+Running: `.github/workflows/uptime.yml` (§0) checks the site and a Tag
+lookup every 15 minutes, and health too once `MONITOR_SECRET` is set. For
+paging within minutes, an outside monitor (Better Stack, Checkly, UptimeRobot
+or similar) can also poll health every minute with the bearer header and a
+JSON assertion on `data.ok`, paging after 2 consecutive failures.
 
 ### Health problems and thresholds
 
@@ -37,6 +62,8 @@ assertion on `data.ok`, paging after 2 consecutive failures; readiness every
 | `stripe_webhooks_unprocessed` | any unprocessed Stripe event | billing state not applied | `stripe_webhook_events.last_error`: `unknown_price` → map the price and resend; unknown customer → investigate |
 | `sms_webhooks_unprocessed` | any unprocessed SMS webhook | delivery/STOP state not applied | inbox rows |
 | `config_not_ready` | readiness config check failing | a variable was removed or broken after deploy | readiness endpoint names it |
+| `tag_keys_mismatch` | the keys no longer open sampled live Tags, or Tags sit on a key version nothing configured opens | **every Tag stops opening**: a key changed, or was rotated without `TOKEN_DIGEST_KEY_PREVIOUS` | readiness names the variable and version; roll the deployment back (`vercel rollback`), which brings its keys back with it |
+| `tag_key_check_unavailable` | `rpc_tag_key_sample` failed | database down, or migration `20261103000200` not applied | database status, migration ledger |
 | `worker_health_unavailable` | heartbeat RPC failed | database or migration problem | database status |
 
 ### Log-based alerts (Vercel log drain → the log tool)
