@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { PRICING } from "@/features/public/public-copy";
+import { textingEnabled } from "@/lib/features";
 import { PricingSection } from "@/features/public/pricing-table";
 import { PublicShell } from "@/features/public/public-shell";
 import { publicPageMetadata } from "@/lib/site";
@@ -40,11 +41,14 @@ export default function PricingPage() {
             link. That is the unit we charge for — not a seat, not a scan.
           </p>
           <p>{PRICING.caveat}</p>
-          <p>
-            Texts are the monthly allowance included with a paid plan. They are
-            added when each month is paid for and do not roll over, so an
-            unusually quiet month does not bank credit against a busy one.
-          </p>
+          {/* Only while texts are sold (lib/features.ts). */}
+          {textingEnabled() ? (
+            <p>
+              Texts are the monthly allowance included with a paid plan. They are
+              added when each month is paid for and do not roll over, so an
+              unusually quiet month does not bank credit against a busy one.
+            </p>
+          ) : null}
           <p>
             Change plan or cancel from Billing in your account. Cancelling stops
             the next charge; your Tags keep working until the period you have

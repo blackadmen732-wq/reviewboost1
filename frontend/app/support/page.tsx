@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Breadcrumbs } from "@/features/public/breadcrumbs";
+import { textingEnabled } from "@/lib/features";
 import { PublicShell } from "@/features/public/public-shell";
 import { publicPageMetadata } from "@/lib/site";
 
@@ -72,16 +73,21 @@ const TOPICS: Topic[] = [
       </>
     ),
   },
-  {
-    question: "I ran out of texts",
-    answer: (
-      <>
-        The monthly allowance is added each time a month is paid for and is spent
-        before anything you have bought separately. Billing shows what is left.
-        Unused monthly allowance does not carry into the next month.
-      </>
-    ),
-  },
+  // Only while texts are sold (lib/features.ts).
+  ...(textingEnabled()
+    ? [
+        {
+          question: "I ran out of texts",
+          answer: (
+            <>
+              The monthly allowance is added each time a month is paid for and is
+              spent before anything you have bought separately. Billing shows what
+              is left. Unused monthly allowance does not carry into the next month.
+            </>
+          ),
+        },
+      ]
+    : []),
   {
     question: "How do I cancel?",
     answer: (

@@ -7,12 +7,19 @@ Nothing has been entered in App Store Connect and nothing has been submitted. It
 **NEEDS OWNER INPUT** are facts only you can supply. Character counts were checked with a
 script on 2026-09-26, not estimated.
 
+**Texting is switched off for launch.** The app that ships shows Home, Feedback and Tags,
+plus Settings: no Texts tab, and nothing that offers, counts or sends a text. Every field
+below describes that app. The texting wording waits in the last section, *When texting is
+switched on*, for the release that turns it on: that build is made with
+`EXPO_PUBLIC_TEXTING_ENABLED=true`, so App Review sees the tab the listing describes
+(Guideline 2.3.1). The switch itself is explained in `docs/backend/TEXT_REQUESTS.md`.
+
 ## 1. App information
 
 | Field | Value | Limit / note |
 |---|---|---|
 | Name | **ReviewBoost** | 11 / 30 |
-| Subtitle | **Ratings, Tags, review requests** | 30 / 30 |
+| Subtitle | **Customer ratings and NFC Tags** | 29 / 30. The texting version is in §13 |
 | Bundle ID | `fit.reviewboost.app` | Must match the App ID. The App ID needs the *NFC Tag Reading* capability |
 | SKU | `reviewboost-ios` | Internal only; any unique string |
 | Primary language | English (U.S.) | |
@@ -20,7 +27,7 @@ script on 2026-09-26, not estimated.
 | Secondary category | **Productivity** | Optional |
 | Content rights | Does not contain, show or access third-party content | The app shows only the business's own data. "Google" appears only as the name of the destination the owner chose |
 | Price | Free | No in-app purchases |
-| Availability | NEEDS OWNER INPUT | Start with the countries where you can support customers and where Text Requests are allowed. The EU also needs trader status (§8) |
+| Availability | NEEDS OWNER INPUT | Start with the countries where you can support customers. The EU also needs trader status (§8) |
 | Copyright | `2026 <legal entity name>` | **NEEDS OWNER INPUT:** the legal entity that owns ReviewBoost. Apple wants the owner's name, not the app's |
 
 ### URLs
@@ -59,9 +66,6 @@ Read each rating as it comes in, with the Tag it came from. Unread feedback stan
 TAGS
 Program the NFC chip in a ReviewBoost Tag straight from your iPhone. ReviewBoost reads the chip before writing, never replaces something already on it without asking you first, and reads it back afterwards to confirm the write. You can also preview exactly what a customer sees, or share a Tag's link.
 
-TEXTS
-See the review requests your business has sent by text message, where each one got to, and how many messages you have left.
-
 ACCOUNT
 Your plan's status, the privacy policy, terms, support, sign out and account deletion, all in one place.
 
@@ -75,7 +79,7 @@ ReviewBoost never writes, filters or hides reviews, and never sends unhappy cust
 ### Keywords (100 max, comma-separated, no spaces after commas)
 
 ```text
-ratings,feedback,customer feedback,nfc,nfc tag,qr code,review request,small business,local business
+ratings,feedback,customer feedback,nfc,nfc tag,qr code,star rating,small business,local business
 ```
 
 - No competitor names and no "Google" (Guideline 2.3.7 and trademark).
@@ -100,7 +104,7 @@ App Store Connect Help, read 2026-09-26.
 | Capabilities | Unrestricted web access | **No** | No in-app browser or WebView. Privacy, Terms, Support and "Open customer page" open fixed ReviewBoost URLs in Safari, outside the app (`Linking.openURL`) |
 | Capabilities | User-generated content | **No** | Apple defines this as "broad distribution of content created by users". Customers give a star rating and nothing else; there is no box for them to write in. The only free text is a private note a business's own team adds to a rating, seen only by that team. Nothing is published, shared between businesses or discoverable. See the note below the table |
 | Capabilities | Social media | **No** | No feed of other people's content, no likes, no shares |
-| Capabilities | Messaging and chat | **No** | Users of the app cannot message each other, and there is no chat. The Texts tab sends one review request to one customer's phone by SMS, chosen from fixed, approved wording (no free text), only to a number whose consent is recorded; replies are not shown in the app |
+| Capabilities | Messaging and chat | **No** | Users of the app cannot message each other, and there is no chat. This build sends no messages at all: texting is switched off (§13 has the answer for when it is on) |
 | Capabilities | Advertising | **No** | No ads, no ad SDK |
 | Mature themes | Profanity / crude humour; horror / fear; alcohol, tobacco or drugs | **None** | The app's own content has none. Team notes are private free text (see the note) |
 | Medical or wellness | Medical or treatment information; health or wellness topics | **None** | |
@@ -181,7 +185,7 @@ Do this only after the production migration is live. The app's routes need it (a
    - One Tag, "Front counter", printed or not.
    - Review destination: ReviewBoost's own Google review link, if it has a Business Profile.
      Never a third party's listing. **NEEDS OWNER INPUT.**
-   - Text Requests: leave sending off for this business. No real phone numbers.
+   - Nothing to set up for texting: it is switched off in this release. No phone numbers anywhere.
    - Entitlement: **NEEDS OWNER DECISION.** New businesses start `suspended` until
      checkout, and a suspended business's customer page does not load. Pick one, and test it
      on staging first:
@@ -219,18 +223,14 @@ Sign-in normally uses a six-digit code sent by email. Enter the demo email on th
 WHAT TO LOOK AT
 - Home: what needs the owner now, this week's ratings and the last 30 days' average, unread ratings, and how the Tags are doing.
 - Feedback: "Needs you" and "Everything". Tap a row: the rating, when and from which Tag, "Mark as sorted", and private team notes ("What we did").
-- Texts: send one review request to one customer, with fixed wording, and see the status of recent requests and the text balance.
 - Tags: open "Front counter": its QR code, "Preview customer page" (exactly what a customer sees), "Share link", and "Program NFC".
 - Settings (the gear at the top right): the business, plan status, Privacy, Terms, Support, Sign out, Delete account.
 
 NFC
 "Program NFC" (Tags > Front counter) writes the Tag's web link to a standard NDEF tag using Core NFC. Any blank, unlocked NDEF tag works (NTAG213/215/216). The app reads the tag first, asks before replacing anything already on it, writes, then reads it back to confirm. Without a tag you can still see the system NFC sheet and cancel it. The attached QR code opens the same customer page the tag would.
 
-TEXT REQUESTS
-A Text Request is a single text message a business sends to one customer, asking them to rate their visit. Each request has one recipient, uses one of two fixed, approved messages (there is no free text), and shows the exact message before it can be sent; there is no bulk or broadcast sending. A text is blocked unless consent for that number is recorded. Recipients can reply STOP, after which ReviewBoost will not text that number again, for any business, unless the recipient replies START. The customer is not anonymous to the business that texted them. The demo business has sending turned off: Preview works, and Send is refused with a message saying why.
-
 PAYMENTS
-The app sells nothing and has no purchase, upgrade or subscribe buttons and no links to buy. Subscriptions are set up and managed by businesses outside the app. The app only shows the current plan's status and text balance, under Guideline 3.1.3(f).
+The app sells nothing and has no purchase, upgrade or subscribe buttons and no links to buy. Subscriptions are set up and managed by businesses outside the app. The app only shows the current plan's status, under Guideline 3.1.3(f).
 
 RATINGS AND REVIEWS
 Every rating, one star or five, is offered the same review destination. ReviewBoost does not filter or hide reviews, and cannot know whether a customer goes on to post one.
@@ -264,8 +264,7 @@ not be used. Guideline 2.3.3 requires screenshots that show the app in use.
 | 3 | Feedback detail | One rating with its Tag, time, Mark as sorted and a team note | Sort it, and note what you did |
 | 4 | Tag detail | "Front counter" with Program NFC visible | Program Tags from your iPhone |
 | 5 | NFC sheet | The "Ready to write" sheet over the Tag | Checked before, verified after |
-| 6 | Texts | The exact-message preview, then a few statuses. Use a staging business with fictional numbers if the demo business has none | Ask one customer for a review |
-| 7 | Settings | Plan status and the Privacy / Terms / Support rows | |
+| 6 | Settings | Plan status and the Privacy / Terms / Support rows | |
 
 Rules for the captures:
 
@@ -373,3 +372,42 @@ done.** Then:
       entitlement choice.
 - [ ] You have read this pack and decided to submit. No Apple submission was made while
       preparing it.
+
+## 13. When texting is switched on
+
+Not for the first submission. Use this in the release that turns texting on:
+
+1. Turn texting on for the server first (`NEXT_PUBLIC_TEXTING_ENABLED=true` and everything
+   `docs/backend/TEXT_REQUESTS.md` lists), so the reviewer can open the tab. The demo
+   business uses fictional numbers only.
+2. Build with `"EXPO_PUBLIC_TEXTING_ENABLED": "true"` added to the `production` profile's
+   `env` in `apps/mobile/eas.json`. A build without it never shows the Texts tab, whatever
+   the server says; the server can still switch texting off for every build at once.
+3. Change the listing in the same submission:
+
+| Field | Change |
+|---|---|
+| Subtitle | **Ratings, Tags, review requests** (30 / 30) |
+| Keywords | `review request` back in place of `star rating` |
+| Availability | Only countries where Text Requests are allowed |
+| Age rating → Messaging and chat | Still **No**. Why: "Users of the app cannot message each other, and there is no chat. The Texts tab sends one review request to one customer's phone by SMS, chosen from fixed, approved wording (no free text), only to a number whose consent is recorded; replies are not shown in the app" |
+| App Privacy (§4) | Check it again against that build: the Texts tab sends a customer's phone number to the server |
+| Reviewer account (§6) | Replace the texting line with "Text Requests: leave sending off for this business. No real phone numbers." |
+| Screenshots (§7) | Add "Texts — the exact-message preview, then a few statuses", caption "Ask one customer for a review". Use a staging business with fictional numbers if the demo business has none |
+
+Description: add after TAGS.
+
+```text
+TEXTS
+See the review requests your business has sent by text message, where each one got to, and how many messages you have left.
+```
+
+Review notes: add to WHAT TO LOOK AT, before Tags,
+"- Texts: send one review request to one customer, with fixed wording, and see the status
+of recent requests and the text balance."; add this before PAYMENTS; and make PAYMENTS
+end "shows the current plan's status and text balance, under Guideline 3.1.3(f)."
+
+```text
+TEXT REQUESTS
+A Text Request is a single text message a business sends to one customer, asking them to rate their visit. Each request has one recipient, uses one of two fixed, approved messages (there is no free text), and shows the exact message before it can be sent; there is no bulk or broadcast sending. A text is blocked unless consent for that number is recorded. Recipients can reply STOP, after which ReviewBoost will not text that number again, for any business, unless the recipient replies START. The customer is not anonymous to the business that texted them. The demo business has sending turned off: Preview works, and Send is refused with a message saying why.
+```

@@ -49,7 +49,7 @@ Supabase and Vercel connectors. Nothing in production was changed.
 | **Production code vs database** | **Mismatched.** `main` carries 58 migrations' worth of code (billing, entitlements, Customer Page, SMS) against a 36-migration database. No traffic yet, so no user has hit it |
 | Previews | every push to `claude/festive-thompson-i28bpq` builds READY (latest `e0e7fc0`) |
 | Duplicate project | `reviewboost1-od3w` also builds every push and deploys `main` to production, with only the two public Supabase variables and no domain. Recommend disconnecting it |
-| Production env (names only, re-checked 2026-11-02) | set: `PUBLIC_FRONTEND_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `CUSTOMER_NOTE_ENCRYPTION_KEY`, `CRON_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER/GROWTH/PRO` (labelled sandbox, "no live payments"), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `SMS_DEFAULT_COUNTRY_CALLING_CODE`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID/API_KEY/PROJECT_NUMBER`. **Missing**: `TOKEN_DIGEST_KEY`, `TOKEN_DIGEST_KEY_VERSION` (and `TOKEN_DIGEST_KEY_PREVIOUS` for the §4 rotation), `STRIPE_PRICE_SMS_PACK_50/200/500`, `SMS_PROVIDER`, `TWILIO_*`, `SMS_PUBLIC_WEBHOOK_BASE_URL`, `SMS_RATE_PER_SEGMENT_MICROS`, `NEXT_PUBLIC_AUTH_PROVIDERS`, `APPLE_*` |
+| Production env (names only, re-checked 2026-11-02) | set: `PUBLIC_FRONTEND_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `CUSTOMER_NOTE_ENCRYPTION_KEY`, `CRON_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER/GROWTH/PRO` (labelled sandbox, "no live payments"), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `SMS_DEFAULT_COUNTRY_CALLING_CODE`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID/API_KEY/PROJECT_NUMBER`. **Missing**: `TOKEN_DIGEST_KEY`, `TOKEN_DIGEST_KEY_VERSION` (and `TOKEN_DIGEST_KEY_PREVIOUS` for the §4 rotation), `STRIPE_PRICE_SMS_PACK_50/200/500`, `SMS_PROVIDER`, `TWILIO_*`, `SMS_PUBLIC_WEBHOOK_BASE_URL`, `SMS_RATE_PER_SEGMENT_MICROS`, `NEXT_PUBLIC_AUTH_PROVIDERS`, `APPLE_*`. The pack prices and the SMS/Twilio variables are needed only once `NEXT_PUBLIC_TEXTING_ENABLED=true` (texting ships off; TEXT_REQUESTS.md) |
 | Preview env | no Supabase variables at all; a variable named `PUBLIC_FRONTEND_URL4` (typo) |
 | Environment separation | Re-checked 2026-11-02: `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are now set separately for production, preview and development (values are not readable here). Whether production's key is live mode is unverified; the readiness gate refuses a test key in production and a live key anywhere else. (2026-09-24: one integration-injected key for all three.) |
 | Crons | `vercel.json` daily floor (dispatch 19:00 UTC, maintenance 08:00 UTC) |
@@ -209,7 +209,9 @@ decision.
    ```
    A grandfathered price stays in the table with its plan. Removing a price
    stops new grants on it; cancellations still revoke.
-2b. **Text pack prices** (docs/MONEY.md §4.2): three one-time USD prices in
+2b. **Text pack prices** — only once texting is switched on (TEXT_REQUESTS.md,
+   *Switched off at launch*); until then readiness does not ask for them.
+   (docs/MONEY.md §4.2): three one-time USD prices in
    the same Stripe mode — $4, $16, $40 — set as `STRIPE_PRICE_SMS_PACK_50`,
    `STRIPE_PRICE_SMS_PACK_200`, `STRIPE_PRICE_SMS_PACK_500`. Checkout refuses a
    price whose amount, currency or type differs, and production readiness
@@ -277,8 +279,9 @@ schema.** The readiness gate enforces the last part mechanically
 **Smoke tests** (production, with a real test business):
 public Tag GET → create session → rating → destination event; owner sign-in
 (6-digit OTP); billing page loads the plan from the backend; Checkout opens
-(test card only on staging); a Text Request to an owned test phone is queued,
-dispatched within 2 minutes, and marked delivered by the Twilio callback;
+(test card only on staging); once texting is on, a Text Request to an owned
+test phone is queued, dispatched within 2 minutes, and marked delivered by the
+Twilio callback — while it is off, `/text-requests` redirects to Home;
 `/internal/health` 200 with `ok: true`; `/internal/readiness` 200.
 
 ## 6. Provider verification scripts (to run with access)

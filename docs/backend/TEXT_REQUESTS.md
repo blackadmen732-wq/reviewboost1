@@ -12,6 +12,47 @@ Nothing authoritative lives in application memory or an in-memory queue. This is
 technical compliance and reliability infrastructure — not a claim of legal SMS
 certification.
 
+## Switched off at launch
+
+What ReviewBoost sells first is the Tag: a customer taps, rates and is handed to
+Google. Texting is built and tested, and switched **off** until Mark decides the
+data shows it earns more than it costs (`frontend/lib/features.ts`). While it is
+off:
+
+- the website and the iPhone app show Home, Feedback and Tags (and Settings);
+  `/text-requests` and `/settings/connections` redirect, and the text-request,
+  customer-list and connection APIs answer 404 (`proxy.ts`);
+- previewing, recording consent and scheduling refuse before reading anything,
+  and the dispatch worker claims nothing, so it needs no provider and stays
+  healthy;
+- prices, plans and Billing say nothing about texts, and no pack can be bought.
+  Paid months still mint their included texts in the ledger; nothing shows or
+  spends them;
+- readiness needs neither Twilio nor the pack prices;
+- the SMS webhook is untouched, so a STOP is still recorded whenever Twilio is
+  configured.
+
+`frontend/tests/unit/texting-switch.test.tsx` proves each of these.
+
+**To turn it on**, in this order:
+
+1. Register every business that will text with the carriers (an A2P 10DLC brand
+   and campaign, or toll-free verification) before its first message. It takes
+   days, not minutes.
+2. Vercel production: `SMS_PROVIDER=twilio`, the `TWILIO_*` variables,
+   `SMS_PUBLIC_WEBHOOK_BASE_URL`, `SMS_RATE_PER_SEGMENT_MICROS`, the three pack
+   prices and their webhook events (LAUNCH_GATE.md §4, 2b–2c), then
+   `NEXT_PUBLIC_TEXTING_ENABLED=true`, and redeploy. Readiness refuses the
+   candidate until every one of them is right.
+3. iPhone app: a release built with `EXPO_PUBLIC_TEXTING_ENABLED=true`, with the
+   listing changes in `docs/mobile/APP_STORE_METADATA.md` §13. Until that
+   release, the store app keeps its three tabs whatever the server says.
+
+**To turn it off again:** unset `NEXT_PUBLIC_TEXTING_ENABLED` and redeploy; the
+Texts tab leaves every phone at its next Home load. Texts already queued wait in
+the outbox (health reports `outbox_backlog`), so cancel them or let them send
+first.
+
 ## Status legend
 
 - **[impl]** implemented in this PR

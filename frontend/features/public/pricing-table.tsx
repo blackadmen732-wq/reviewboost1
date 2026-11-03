@@ -1,3 +1,4 @@
+import { textingEnabled } from "@/lib/features";
 import { Check } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -43,7 +44,9 @@ function startLine(plan: PublicPlan): [string, string] {
   if (plan.trialDays > 0) {
     return [
       `Card required. Nothing is charged for ${plan.trialDays} days.`,
-      `The trial includes ${TRIAL.tags} Tag and no texts.`,
+      textingEnabled()
+        ? `The trial includes ${TRIAL.tags} Tag and no texts.`
+        : `The trial includes ${TRIAL.tags} Tag.`,
     ];
   }
   return ["Charged when you subscribe.", "No trial on this plan."];
@@ -91,7 +94,8 @@ function PlanCard({
 
       <hr className="my-7 border-border" />
 
-      {/* The three numbers that actually differ between plans. */}
+      {/* The numbers that actually differ between plans. Texts only once
+          texting is switched on (lib/features.ts). */}
       <p className="mb-3 text-sm font-medium text-ink">Paid plan includes</p>
       <dl className="flex flex-col gap-3.5 text-base">
         <div className="flex items-baseline justify-between gap-4">
@@ -104,12 +108,14 @@ function PlanCard({
           <dt className="text-muted">Tags</dt>
           <dd className="font-semibold text-ink tabular-nums">{plan.tags}</dd>
         </div>
-        <div className="flex items-baseline justify-between gap-4">
-          <dt className="text-muted">Texts a month</dt>
-          <dd className="font-semibold text-ink tabular-nums">
-            {plan.monthlyTexts.toLocaleString("en-US")}
-          </dd>
-        </div>
+        {textingEnabled() ? (
+          <div className="flex items-baseline justify-between gap-4">
+            <dt className="text-muted">Texts a month</dt>
+            <dd className="font-semibold text-ink tabular-nums">
+              {plan.monthlyTexts.toLocaleString("en-US")}
+            </dd>
+          </div>
+        ) : null}
       </dl>
     </li>
   );
@@ -139,12 +145,14 @@ export function PricingTable({
       </p>
 
       {/* Extra texts, from the same list the Billing page sells from. */}
-      <p className="mx-auto mt-3 max-w-[60ch] text-center text-sm leading-relaxed text-muted">
-        <span className="font-medium text-ink">Need more texts?</span>{" "}
-        {CENTS_PER_EXTRA_TEXT}¢ each, in packs of {extraTextPacks()}. Bought
-        texts never expire, and are used after the month&rsquo;s included
-        texts.
-      </p>
+      {textingEnabled() ? (
+        <p className="mx-auto mt-3 max-w-[60ch] text-center text-sm leading-relaxed text-muted">
+          <span className="font-medium text-ink">Need more texts?</span>{" "}
+          {CENTS_PER_EXTRA_TEXT}¢ each, in packs of {extraTextPacks()}. Bought
+          texts never expire, and are used after the month&rsquo;s included
+          texts.
+        </p>
+      ) : null}
 
       <section
         aria-labelledby="every-plan-heading"

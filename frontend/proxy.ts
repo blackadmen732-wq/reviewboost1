@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import {
+  matchesPrefix,
+  TEXTING_API_PREFIXES,
+  TEXTING_OFF_MESSAGE,
+  TEXTING_PAGES,
+  textingEnabled,
+} from "@/lib/features";
+
 /**
 * Session refresh and route protection.
  *
@@ -61,8 +69,39 @@ export function isOwnerPath(pathname: string): boolean {
   );
 }
 
+/**
+ * Texting is switched off (`lib/features.ts`): its pages send an owner
+ * somewhere useful and its APIs answer 404, before any auth work, so nothing
+ * texting-only can be reached by a link, a bookmark or an old app build. The
+ * services that send also refuse on their own; this is the front door.
+ */
+export function textingGate(request: NextRequest): NextResponse | null {
+  if (textingEnabled()) return null;
+  const { pathname } = request.nextUrl;
+
+  if (TEXTING_API_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))) {
+    return NextResponse.json(
+      { error: { code: "not_found", message: TEXTING_OFF_MESSAGE } },
+      { status: 404, headers: { "cache-control": "no-store" } },
+    );
+  }
+
+  const page = TEXTING_PAGES.find(({ prefix }) => matchesPrefix(pathname, prefix));
+  if (page) {
+    const url = request.nextUrl.clone();
+    url.pathname = page.redirectTo;
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  return null;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  const blocked = textingGate(request);
+  if (blocked) return blocked;
 
   // Public routes: no session needed, so no client is built and nothing here
   // can fail. This is what keeps a missing environment variable from taking

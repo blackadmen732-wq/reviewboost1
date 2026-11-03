@@ -1,3 +1,4 @@
+import { textingEnabled } from "@/lib/features";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -28,9 +29,10 @@ export default function SecurityPage() {
       <ul className="flex max-w-[42ch] flex-col gap-3 text-muted">
         <li>
           <strong className="font-semibold text-ink">What we keep.</strong> Your
-          email, your business name and Google link, the customer phone numbers
-          you add for Texts, and the star each customer taps. Customers give us
-          no name, number or email.
+          email, your business name and Google link,{" "}
+          {textingEnabled() ? "the customer phone numbers you add for Texts, " : ""}
+          and the star each customer taps. Customers give us no name, number or
+          email.
         </li>
         <li>
           <strong className="font-semibold text-ink">Who sees it.</strong> Only
@@ -53,8 +55,8 @@ export default function SecurityPage() {
 
       <h2>Owner access</h2>
       <p>
-        Home, Feedback, Text Requests, Tags and Settings all require a signed-in
-        session. Signing in is an emailed code, so there is no password here to
+        {textingEnabled() ? "Home, Feedback, Text Requests, Tags and Settings" : "Home, Feedback, Tags and Settings"} all
+        require a signed-in session. Signing in is an emailed code, so there is no password here to
         be stolen or reused.
       </p>
       <p>

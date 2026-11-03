@@ -1,3 +1,4 @@
+import { textingEnabled } from "@/lib/features";
 import { PLAN_CATALOG, type PlanId } from "@/lib/owner/plan-catalog";
 
 /**
@@ -111,12 +112,15 @@ export const TEXT_PACKS: readonly TextPack[] = [
 /** What one extra text costs, in cents. The same for every pack. */
 export const CENTS_PER_EXTRA_TEXT = 8;
 
-/** What every paid plan includes, so the cards do not repeat nine lines each. */
-export const EVERY_PLAN = [
+/**
+ * What every paid plan includes, so the cards do not repeat nine lines each.
+ * Text Requests only once texting is switched on (lib/features.ts).
+ */
+export const EVERY_PLAN: readonly string[] = [
   "Your own customer page, in English, Español and Kreyòl",
   "QR and NFC on the same Tag",
   "Every rating, including the quiet ones",
   "The same Google link for every rating",
   "Home, Feedback and Insights",
-  "Text Requests, with the texts your plan includes",
-] as const;
+  ...(textingEnabled() ? ["Text Requests, with the texts your plan includes"] : []),
+];

@@ -63,6 +63,7 @@ Read `frontend/AGENTS.md` and the relevant **installed** Next.js guide under `fr
 - TypeScript strict: preserve role gates, validation, explicit errors and safe internal return URLs. Do not replace a failed API read with a plausible zero, empty list or plan.
 - Say **Tag** in product copy; existing database names and `/stands` URLs remain stable.
 - Four daily destinations: Home, Feedback, Text Requests, Tags. Insights is inside Feedback; Settings is secondary. Legacy routes redirect without deleting historical data.
+- Texting (Text Requests, Connections, extra-text packs) is switched off until Mark launches it: `NEXT_PUBLIC_TEXTING_ENABLED=true` turns it on (`frontend/lib/features.ts`), and the iPhone app also needs a build with `EXPO_PUBLIC_TEXTING_ENABLED=true`. While it is off nothing offers, sells or sends a text; keep every new texting surface behind `textingEnabled()` and `tests/unit/texting-switch.test.tsx`.
 - All five ratings follow the same save/handoff. No gating, extra Continue, public notes, Team Praise step or theme builder.
 - No photo means a completely white hero. Shared lower rounded rating panel, approved copy, five stars and small gray lightning footer remain consistent. Owner preview faithfully matches live.
 - Do not invent customers, revenue, review completions, subscription state, trial credits, integrations, or working Connect buttons. Fixtures belong only in explicit tests/examples and must never enter production behavior.

@@ -1,3 +1,5 @@
+import { textingEnabled } from "@/lib/features";
+
 /**
  * Public + activation copy.
  *
@@ -89,7 +91,11 @@ export const SETUP_STEPS = [
 export const AFTER_STEPS = [
   { title: "Read what is new", body: "Home says what needs you. Feedback keeps every rating, low ones included." },
   { title: "Sort the low ones", body: "Talk to your team, mark the rating sorted, and note what you did. Only your team sees the note." },
-  { title: "Ask by text when it fits", body: "Send one customer your Tag's link by text, only if they agreed to hear from you." },
+  // Texting is switched off until it launches (lib/features.ts); the public
+  // site never describes a feature an owner cannot use.
+  textingEnabled()
+    ? { title: "Ask by text when it fits", body: "Send one customer your Tag's link by text, only if they agreed to hear from you." }
+    : { title: "Watch the trend", body: "Insights shows your average over 7, 30 or 90 days, and which stars it is made of." },
 ] as const;
 
 /** The owner's side, said as what they get rather than what the screens are called. */
@@ -106,10 +112,15 @@ export const OWNER_SIDE = {
       title: "The low ones reach you too",
       body: "A two-star visit lands in your Feedback like any other, so you can talk to your team. Mark it sorted when it is.",
     },
-    {
-      title: "Text a customer the link",
-      body: "After a visit, send one text with your Tag's link, only to people who said yes to a text.",
-    },
+    textingEnabled()
+      ? {
+          title: "Text a customer the link",
+          body: "After a visit, send one text with your Tag's link, only to people who said yes to a text.",
+        }
+      : {
+          title: "See where you stand",
+          body: "Insights shows your average over 7, 30 or 90 days, and whether it is moving up or down.",
+        },
   ],
 } as const;
 
@@ -131,7 +142,9 @@ export const COMPARE = {
     {
       name: "ReviewBoost",
       price: "From $49 a month",
-      body: "Every customer gets your Google link, and you see every rating, low ones included. Text Requests, QR and NFC included. Month to month.",
+      body: textingEnabled()
+        ? "Every customer gets your Google link, and you see every rating, low ones included. Text Requests, QR and NFC included. Month to month."
+        : "Every customer gets your Google link, and you see every rating, low ones included. QR and NFC on the same Tag. Month to month.",
       ours: true,
     },
     {
@@ -185,7 +198,9 @@ export const PRODUCT = {
         { icon: "home", title: "Home", body: "What needs you right now, this week's ratings and your 30-day average, at a glance." },
         { icon: "feedback", title: "Feedback", body: "Every rating in one list. Mark the low ones sorted, and note what you did for your team." },
         { icon: "insights", title: "Insights", body: "Your average over 7, 30 or 90 days, how it is moving, and which stars it is made of." },
-        { icon: "texts", title: "Text Requests", body: "Text one customer your Tag's link with approved wording, only when they agreed to a text." },
+        ...(textingEnabled()
+          ? [{ icon: "texts", title: "Text Requests", body: "Text one customer your Tag's link with approved wording, only when they agreed to a text." } as const]
+          : []),
       ],
     },
   ],

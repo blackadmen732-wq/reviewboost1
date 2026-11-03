@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 
 import { tryDecrypt } from "@/lib/server/crypto";
 import { effectiveStatus, locationLimit, tagLimit, type EntitlementStatus } from "@/lib/server/entitlements";
+import { textingEnabled } from "@/lib/features";
 import { stripePackPricesConfigured } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { isGoogleReviewWritingUrl, isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
@@ -1294,7 +1295,10 @@ export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBillin
         }
       : null,
     packsAvailable:
-      row?.status === "active" && !row.cancel_at_period_end && stripePackPricesConfigured(),
+      textingEnabled() &&
+      row?.status === "active" &&
+      !row.cancel_at_period_end &&
+      stripePackPricesConfigured(),
   };
 });
 

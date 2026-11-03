@@ -192,3 +192,53 @@ describe("the App Review instructions can be followed in the app that ships", ()
     expect(doc("docs/app-store/SUBMISSION.md")).toMatch(/REVIEW_SIGN_IN_CODE/);
   });
 });
+
+describe("the listings describe the app that ships, with texting switched off", () => {
+  // Texting ships switched off (frontend/lib/features.ts), and the store build
+  // is made without EXPO_PUBLIC_TEXTING_ENABLED, so it has no Texts tab
+  // (apps/mobile/data/features.ts). Copy that describes one is a feature the
+  // reviewer cannot find (guidelines 2.1 and 2.3). The texting wording waits
+  // in each file's last section, for the release that turns texting on.
+  const LISTINGS = [
+    "docs/mobile/APP_STORE_METADATA.md",
+    "docs/app-store/SUBMISSION.md",
+    "docs/google-play/SUBMISSION.md",
+  ];
+  const TEXTING_SECTION = /^## (?:\d+\. )?When texting is switched on$/m;
+
+  function beforeTextingSection(path: string): string {
+    const text = doc(path);
+    const at = text.search(TEXTING_SECTION);
+    expect(at, `${path} keeps its texting wording in a last section`).toBeGreaterThan(0);
+    return text.slice(0, at);
+  }
+
+  /** What is typed into a store: the fenced blocks, without their fences. */
+  function pasted(text: string): string {
+    return [...text.matchAll(/^```[a-z]*\n([\s\S]*?)^```$/gm)].map((match) => match[1]).join("\n");
+  }
+
+  it("keep texts out of everything typed into a store", () => {
+    for (const path of LISTINGS) {
+      const blocks = pasted(beforeTextingSection(path));
+      expect(blocks.length, `${path} has no pasted text to check`).toBeGreaterThan(0);
+      expect(blocks, path).not.toMatch(/\btexts?\b|\btext requests?\b|\bsms\b|twilio/i);
+    }
+  });
+
+  it("declare no phone numbers and show no Texts screen", () => {
+    for (const path of LISTINGS) {
+      const body = beforeTextingSection(path).replace(/\s+/g, " ");
+      expect(body, path).not.toMatch(/Yes — uploaded by the owner for Text Requests/);
+      expect(body, path).not.toMatch(/^\s*\d+\. Text Requests/m);
+      expect(body, path).not.toMatch(/\| \d+ \| Texts \|/);
+    }
+  });
+
+  it("say how the release that turns texting on is built", () => {
+    for (const path of LISTINGS) {
+      const section = doc(path).slice(doc(path).search(TEXTING_SECTION));
+      expect(section, path).toMatch(/EXPO_PUBLIC_TEXTING_ENABLED\W+true/);
+    }
+  });
+});

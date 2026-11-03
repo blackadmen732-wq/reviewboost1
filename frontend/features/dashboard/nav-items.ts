@@ -1,6 +1,8 @@
 import { Home, MessageSquare, QrCode, Send, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { textingEnabled } from "@/lib/features";
+
 /**
  * The destinations, defined once.
  *
@@ -9,10 +11,12 @@ import type { LucideIcon } from "lucide-react";
  * remembering both. They had not drifted yet only because nothing had been added
  * since they were written.
  *
- * THE FOUR DESTINATIONS
- * ---------------------
+ * THE DESTINATIONS
+ * ----------------
  * Home, Feedback, Text Requests, Tags — plus Settings, which lives with the
  * profile rather than in the bar. That is the whole product an owner uses.
+ * While texting is switched off (lib/features.ts) Text Requests is not one of
+ * them: the bar holds three, and nothing points at a page that would refuse.
  *
  * On the phone bar the third one reads "Texts": "Text Requests" wrapped onto
  * two lines at 320px and made that tab taller than the other three. The
@@ -68,17 +72,13 @@ export const TEXT_REQUESTS: NavItem = {
 };
 export const SETTINGS: NavItem = { href: "/settings", label: "Settings", icon: Settings };
 
-/** Phone. Exactly four, forever. */
-export const MOBILE_NAV: readonly NavItem[] = [HOME, FEEDBACK, TEXT_REQUESTS, TAGS];
+/** Phone. Never more than four. Three while texting is off. */
+export const MOBILE_NAV: readonly NavItem[] = textingEnabled()
+  ? [HOME, FEEDBACK, TEXT_REQUESTS, TAGS]
+  : [HOME, FEEDBACK, TAGS];
 
-/** Desktop. The same four, plus Settings, which the phone reaches by profile. */
-export const DESKTOP_NAV: readonly NavItem[] = [
-  HOME,
-  FEEDBACK,
-  TEXT_REQUESTS,
-  TAGS,
-  SETTINGS,
-];
+/** Desktop. The same, plus Settings, which the phone reaches by profile. */
+export const DESKTOP_NAV: readonly NavItem[] = [...MOBILE_NAV, SETTINGS];
 
 /** What the phone bar shows for an item. */
 export function mobileLabelOf(item: NavItem): string {

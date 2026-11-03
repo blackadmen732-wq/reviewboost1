@@ -72,6 +72,7 @@ the client bundle — not secrets**:
 | `EXPO_PUBLIC_API_URL` | `https://reviewboost.fit` | inline in `eas.json` (all profiles) |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | production anon (publishable) key | EAS env var per environment |
 | `EXPO_PUBLIC_AUTH_PROVIDERS` | `apple,google` once both are on in Supabase; empty until then | EAS env var per environment |
+| `EXPO_PUBLIC_TEXTING_ENABLED` | unset — texting ships off and the Texts tab never shows. `true` only in the release that launches texting (`docs/mobile/APP_STORE_METADATA.md` §13) | inline in `eas.json` (`production`), when that release is made |
 
 The anon key is kept out of git and supplied per environment **[EXTERNAL]**:
 

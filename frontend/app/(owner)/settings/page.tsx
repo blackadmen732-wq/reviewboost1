@@ -22,6 +22,7 @@ import { EditableRow, GoogleLinkHelp } from "@/features/dashboard/settings-form"
 import { SignOutButton } from "@/features/dashboard/sign-out-button";
 import { AddLocationButton } from "@/features/settings/add-location-button";
 import { ThemeControl } from "@/features/settings/theme-control";
+import { textingEnabled } from "@/lib/features";
 import { ownerOrAdmin, permissionsFor } from "@/lib/owner/permissions";
 import { getEntitlementSnapshot } from "@/lib/server/entitlements-service";
 import {
@@ -82,6 +83,7 @@ export default async function SettingsPage() {
   const several = locations.length > 1;
 
   const ownerOrAdminRole = organization.role === "owner" || organization.role === "admin";
+  const texting = textingEnabled();
 
   return (
     <OwnerShell unreadCount={unread} businessName={organization.name}>
@@ -158,16 +160,22 @@ export default async function SettingsPage() {
         </Section>
 
         {/* The Customer Page is reached from here, Tags and Home's setup list
-            — not from the bottom bar, which stays the four things an owner does
+            — not from the bottom bar, which stays the things an owner does
             every day. Connections is owners and admins only: connecting an app
-            reads customer data. */}
-        <Section title="Your page, apps and plan">
+            reads customer data. It exists for texting, so it is not offered
+            while texting is switched off (lib/features.ts). */}
+        <Section title={texting ? "Your page, apps and plan" : "Your page and plan"}>
           <RowList>
             <Row href="/customer-page" icon={ImageUp} title="Customer page" detail="Your photo, and what customers see when they scan a Tag." />
-            {ownerOrAdminRole ? (
+            {texting && ownerOrAdminRole ? (
               <Row href="/settings/connections" icon={Plug} title="Connections" detail="Bring in customers from the apps you already use." />
             ) : null}
-            <Row href="/settings/billing" icon={CreditCard} title="Billing" detail="Your plan, texts left, and payment." />
+            <Row
+              href="/settings/billing"
+              icon={CreditCard}
+              title="Billing"
+              detail={texting ? "Your plan, texts left, and payment." : "Your plan and payment."}
+            />
           </RowList>
         </Section>
 

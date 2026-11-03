@@ -172,7 +172,7 @@ Headings use `text-wrap: balance`; paragraphs use `text-wrap: pretty`.
 
 **Phone (under 768px).**
 - Content is a single column with 16px side gutters.
-- A bottom bar holds **exactly four** tabs: **Home · Feedback · Texts · Tags**.
+- Bottom bar: **Home · Feedback · Texts · Tags**; Texts only if texting is on.
 - Settings opens from the profile button at the top right.
 - The selected tab is ink and semibold; the others are muted. Green is never used for the selected tab.
 - Feedback carries the only badge (the unread count).

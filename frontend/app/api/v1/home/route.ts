@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { deriveHomeModel, tagStatusLine } from "@/features/dashboard/home-model";
+import { textingEnabled } from "@/lib/features";
 import { homeModelForApp } from "@/lib/owner/app-home";
 import { insightsHomeSummary } from "@/lib/owner/insights";
 import { permissionsFor } from "@/lib/owner/permissions";
@@ -88,6 +89,9 @@ export async function GET(request: NextRequest): Promise<Response> {
           hasNote: item.note !== null && item.note.length > 0,
           tagLabel: labels?.get(item.standId) ?? null,
         })),
+        // Product switches the app follows without a new release
+        // (lib/features.ts). Texting off: no Texts tab, no texts in Settings.
+        features: { texting: textingEnabled() },
       },
       requestId,
     });

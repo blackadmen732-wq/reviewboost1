@@ -108,6 +108,9 @@ Enforced by: `app.entitlement_tag_limit`, `app.entitlement_location_limit`,
 | `pack_200` | 200 | **$16** | $0.08 |
 | `pack_500` | 500 | **$40** | $0.08 |
 
+- Sold only while texting is switched on (`frontend/lib/features.ts`;
+  docs/backend/TEXT_REQUESTS.md, *Switched off at launch*). Until then Billing
+  offers none and checkout refuses one.
 - A one-time Stripe payment (Checkout `mode: "payment"`), never a subscription
   line. Only a business whose plan is **active** may buy one.
 - Granted by the `checkout.session.completed` /

@@ -4,9 +4,10 @@ import { useHome } from "@/data/home";
 import { colors } from "@/theme";
 
 /**
- * The four daily places, the same four as the website's bottom bar: Home,
- * Feedback, Texts, Tags. Settings is secondary (AGENTS.md), so it is the gear
- * at the top of each screen, not a fifth tab.
+ * The daily places, the same as the website's bottom bar: Home, Feedback,
+ * Texts, Tags — and only Home, Feedback, Tags while the server says texting is
+ * switched off (`data/features.ts`). Settings is secondary (AGENTS.md), so it
+ * is the gear at the top of each screen, not another tab.
  *
  * Icons are SF Symbols on iPhone; the active tab is ink, as on the website,
  * since green is the brand rather than a control colour. The label under each
@@ -33,7 +34,7 @@ function TabIcon({ label, focused }: { label: keyof typeof ICONS; focused: boole
 }
 
 export default function TabLayout() {
-  const { unreadCount } = useHome();
+  const { unreadCount, features } = useHome();
   return (
     <Tabs
       screenOptions={{
@@ -59,7 +60,12 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="text-requests"
-        options={{ title: "Texts", tabBarIcon: ({ focused }) => <TabIcon label="Texts" focused={focused} /> }}
+        options={{
+          title: "Texts",
+          tabBarIcon: ({ focused }) => <TabIcon label="Texts" focused={focused} />,
+          // Off: the route stays (an old link lands on Home), the tab goes.
+          ...(features.texting ? {} : { href: null }),
+        }}
       />
       {/* "Tags" is what the product calls the physical thing on the counter.
           The route stays /stands so existing deep links keep working. */}

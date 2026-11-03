@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { Redirect, useFocusEffect } from "expo-router";
 import { Button } from "@/components/button";
 import { Checkbox, RadioCard } from "@/components/choice";
 import { Group, Row } from "@/components/group";
 import { TabScreen } from "@/components/screen";
 import { useAuth } from "@/data/auth-context";
+import { useHome } from "@/data/home";
 import { balanceView } from "@/data/billing-view";
 import { useStands } from "@/data/use-stands";
 import { useTextComposer, type Draft } from "@/data/text-composer";
@@ -23,7 +24,18 @@ import { card, colors, radii, type } from "@/theme";
  * includes, and nothing here sells or points at where to buy (App Store
  * 3.1.3(f)).
  */
+/**
+ * Texts exists only while the server says texting is on (`data/features.ts`).
+ * Off, an old link or a deep link here lands on Home instead of a screen whose
+ * every request would be refused.
+ */
 export default function TextRequestsScreen() {
+  const { features } = useHome();
+  if (!features.texting) return <Redirect href="/(tabs)/home" />;
+  return <TextRequestsComposer />;
+}
+
+function TextRequestsComposer() {
   const { activeOrg } = useAuth();
   const orgId = activeOrg?.orgId;
   const canSend = activeOrg?.role === "owner" || activeOrg?.role === "admin";

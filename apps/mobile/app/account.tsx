@@ -7,6 +7,7 @@ import { Button } from "@/components/button";
 import { Group, Row } from "@/components/group";
 import { stackHeader } from "@/components/screen";
 import { useAuth } from "@/data/auth-context";
+import { useHome } from "@/data/home";
 import { useBilling } from "@/data/use-billing";
 import { accountView } from "@/data/billing-view";
 import { PUBLIC_LINKS } from "@/data/public-links";
@@ -26,6 +27,8 @@ import { colors, space, type } from "@/theme";
 export default function AccountScreen() {
   const { activeOrg, organizations, switchBusiness, logout, email } = useAuth();
   const { billing, loading, refreshing, error, refresh } = useBilling(activeOrg?.orgId);
+  // Texts are not shown while the server says texting is off (data/features.ts).
+  const { features } = useHome();
 
   useFocusEffect(
     useCallback(() => {
@@ -78,11 +81,12 @@ export default function AccountScreen() {
               <Text style={styles.label}>Includes</Text>
               <Text style={styles.detail}>
                 {included.locations} {included.locations === 1 ? "place" : "places"} · {included.tags}{" "}
-                {included.tags === 1 ? "Tag" : "Tags"} · {included.monthlySmsSegments.toLocaleString("en-US")} texts a month
+                {included.tags === 1 ? "Tag" : "Tags"}
+                {features.texting ? ` · ${included.monthlySmsSegments.toLocaleString("en-US")} texts a month` : ""}
               </Text>
             </Row>
           ) : null}
-          {view.kind === "ready" && billing ? (
+          {view.kind === "ready" && billing && features.texting ? (
             <Row>
               <View style={styles.planHead}>
                 <Text style={styles.label}>Texts left</Text>

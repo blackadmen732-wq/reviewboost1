@@ -5,6 +5,13 @@ The Play Console listing content, written against what the app actually does.
 goes in the console once a build is there. Blanks marked **TODO** need a person
 with account access.
 
+**Texting is switched off for launch.** The app that ships shows Home, Feedback and Tags,
+plus Settings: no Texts tab, and nothing that offers, counts or sends a text. Every field
+below describes that app. The texting wording waits in the last section, *When texting is
+switched on*, for the release that turns it on: that build is made with
+`EXPO_PUBLIC_TEXTING_ENABLED=true`, so each store's reviewer sees the tab the listing describes
+(Apple Guideline 2.3.1). The switch itself is explained in `docs/backend/TEXT_REQUESTS.md`.
+
 The App Store package is `docs/app-store/SUBMISSION.md`. Where the two stores
 ask the same question the answers here match it deliberately — a Data safety
 form that disagrees with an App Store nutrition label means at least one of
@@ -53,7 +60,6 @@ whole flow for them. No sign-up, no form, no friction.
 FOR THE BUSINESS
 
 - Every rating as it arrives, visible only to you
-- Text Requests: send a review reminder to a phone number in one tap
 - Multiple Tags and locations on paid plans
 - Your Tags keep working when you change where they point — same sticker, same
   chip, new destination
@@ -118,7 +124,7 @@ both):
 1. Home — what needs the owner, this week and the last 30 days
 2. Feedback list
 3. Tags — a Tag with its QR preview
-4. Text Requests
+4. Settings — plan status and the Privacy / Terms / Support rows
 5. The customer screen at `/q/[token]` — the star tap
 6. NFC programming — the "Hold Near Reader" screen or the green check
 
@@ -136,7 +142,7 @@ from the code rather than from what seems safe to say.
 |---|---|---|---|---|
 | Email address | Yes | No | Account management, app functionality | Required |
 | Name (business name) | Yes | No | App functionality | Required |
-| Phone numbers | Yes — uploaded by the owner for Text Requests | With Twilio, to deliver the message | App functionality | Optional feature |
+| Phone numbers | No — texting is switched off in this release (see the last section) | — | — | — |
 | Payment info | No — Stripe processes cards; the app never sees a card number | — | — | — |
 | User IDs | Yes | No | App functionality only | Required |
 
@@ -223,9 +229,9 @@ Declared in the manifest generated from `app.json`:
 
 No sensitive permissions are requested. There is no `QUERY_ALL_PACKAGES`, no
 location, no background location, no SMS or Call Log permission — the app does
-not send SMS from the device; Text Requests are sent server-side through
-Twilio, which is what keeps the SMS permission declaration out of this listing
-entirely.
+not send SMS from the device. Texting is switched off in this release; once it
+is on, Text Requests are sent server-side through Twilio, which is what keeps the
+SMS permission declaration out of this listing entirely.
 
 NFC is **not** declared as `required` via `uses-feature`, deliberately: a phone
 without NFC hardware can still use the whole app with QR codes, and marking it
@@ -237,7 +243,7 @@ required would hide the listing from those devices.
 
 The subscription is sold on the web through Stripe. The Android app contains no
 Play Billing integration, no purchase flow, and no link to one — the Account
-tab reads the current plan and remaining message allowance and sells nothing.
+tab reads the current plan and sells nothing.
 
 Play's Payments policy requires Google Play Billing for in-app purchases of
 digital content. It does not require it for a business service purchased
@@ -291,3 +297,18 @@ quoting a number for here.
 
 *Build and credential mechanics: `docs/mobile/MOBILE_RELEASE.md`.
 iOS equivalent: `docs/app-store/SUBMISSION.md`.*
+
+---
+
+## When texting is switched on
+
+Not for the first release. The release that turns texting on is built with
+`EXPO_PUBLIC_TEXTING_ENABLED=true` (see `docs/mobile/APP_STORE_METADATA.md` §13) and puts
+back:
+
+- under FOR THE BUSINESS: "Text Requests: send a review reminder to a phone number in one
+  tap";
+- screenshot 4: "Text Requests";
+- in *Data collected*: Phone numbers — "Yes — uploaded by the owner for Text Requests" —
+  shared with Twilio, to deliver the message — App functionality — optional feature;
+- under Payments: the Account tab also shows the remaining message allowance.

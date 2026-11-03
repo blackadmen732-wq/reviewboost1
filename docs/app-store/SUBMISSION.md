@@ -2,6 +2,13 @@
 
 Everything App Review needs. Fill in the blanks marked **TODO** before submitting.
 
+**Texting is switched off for launch.** The app that ships shows Home, Feedback and Tags,
+plus Settings: no Texts tab, and nothing that offers, counts or sends a text. Every field
+below describes that app. The texting wording waits in the last section, *When texting is
+switched on*, for the release that turns it on: that build is made with
+`EXPO_PUBLIC_TEXTING_ENABLED=true`, so App Review sees the tab the listing describes
+(Guideline 2.3.1). The switch itself is explained in `docs/backend/TEXT_REQUESTS.md`.
+
 ---
 
 ## App Identity
@@ -41,7 +48,6 @@ FOR THE BUSINESS
 
 - One dashboard to see every rating as it comes in
 - Every rating as it arrives, visible only to you
-- Text Requests: send a review reminder to a phone number with one tap
 - Multiple Tags and locations on paid plans
 - Works as a web app on any device, installs to the home screen like a native app
 
@@ -129,11 +135,6 @@ TO TEST NFC (requires iPhone 7+ with iOS 14+)
    NFC tags are not required to use the app — this feature is opt-in, and the
    app is fully usable with printed QR codes alone.
 
-TEXT REQUESTS
-The Text Requests tab shows texts left and recent requests. Requests are
-scheduled from the web app, not this one, and the demo business has sending
-turned off, so no text is sent during review.
-
 BILLING
 Nothing is bought in this app. The demo business's plan is set up for the
 review period on the web; no card is needed during the App Review session.
@@ -181,7 +182,7 @@ it is the kind App Review checks by looking at the binary.
 |---|---|---|
 | Email address | Yes | Account, app functionality |
 | Name | Yes (business name only) | App functionality |
-| Phone number | Yes — uploaded by the owner for Text Requests | App functionality |
+| Phone number | No — texting is switched off in this release (see the last section) | — |
 | Payment info | No — Stripe handles cards; we never see a card number | — |
 | User ID | Yes | App functionality only. Not used for analytics or tracking. |
 
@@ -332,7 +333,7 @@ Required sizes (App Store Connect will scale):
 1. Home screen — ratings card and "To read" stat, business name in header
 2. Feedback list — real or realistic feedback entries
 3. Tags screen — showing at least one Tag with QR preview
-4. Text Requests — compose screen or recent sends list
+4. Settings — plan status and the Privacy / Terms / Support rows
 5. Customer flow — star-tap screen (customer side, `/q/[token]`)
 6. NFC programming sheet (if device available)
 
@@ -353,11 +354,9 @@ You're helping us make sure everything works before we launch.
 What to try:
 - Set up a Tag and scan your own QR code
 - Leave a star rating and see where it sends you
-- Try the Text Requests screen
 - If you have a blank NFC tag, try programming it from the Tags screen
 
 Known limitations in this build:
-- SMS sending requires a real Twilio account — the demo account has limited credits
 - Billing flows through Stripe test mode; no real charges will occur
 
 Please report any issues to help@reviewboost.fit — we read every message.
@@ -378,7 +377,7 @@ Please report any issues to help@reviewboost.fit — we read every message.
 ```
 Welcome to ReviewBoost.
 
-Tap, scan, or text — your customers leave a review on Google in seconds.
+Tap or scan — your customers leave a review on Google in seconds.
 No download required for them.
 
 This is our first App Store release. We'd love your feedback:
@@ -393,7 +392,7 @@ help@reviewboost.fit
 - [ ] `EXPO_PUBLIC_SUPABASE_ANON_KEY` set in EAS environment (not in git)
 - [ ] Production Supabase project URL set in `eas.json` profiles
 - [ ] Stripe live keys set in Vercel environment (not in git)
-- [ ] Twilio credentials set in Vercel environment (not in git)
+- [ ] Texting stays off: `NEXT_PUBLIC_TEXTING_ENABLED` unset in Vercel, and the build made without `EXPO_PUBLIC_TEXTING_ENABLED` (Twilio is not needed until texting is turned on)
 - [ ] `.p8` APNs key uploaded to App Store Connect (not in git)
 - [ ] Demo account created in production Supabase
 - [ ] Sign in with Apple on for the App ID; Apple and Google on in Supabase; `EXPO_PUBLIC_AUTH_PROVIDERS=apple,google` in EAS
@@ -419,3 +418,25 @@ help@reviewboost.fit
 ---
 
 *See also: `docs/mobile/MOBILE_RELEASE.md` for the full build and deploy runbook.*
+
+---
+
+## When texting is switched on
+
+Not for the first submission. The release that turns texting on is built with
+`EXPO_PUBLIC_TEXTING_ENABLED=true` and follows `docs/mobile/APP_STORE_METADATA.md` §13. In
+this file it also puts back:
+
+- under FOR THE BUSINESS: "Text Requests: send a review reminder to a phone number with one
+  tap";
+- in the review notes, before BILLING: "TEXT REQUESTS — The Text Requests tab shows texts
+  left and recent requests. The demo business has sending turned off, so no text is sent
+  during review.";
+- in *Data linked to identity*: Phone number — "Yes — uploaded by the owner for Text
+  Requests" — App functionality;
+- screenshot 4: "Text Requests — compose screen or recent sends list";
+- for TestFlight testers: "Try the Text Requests screen", and the known limitation "SMS
+  sending requires a real Twilio account — the demo account has limited credits";
+- in the checklist: "Twilio credentials set in Vercel environment (not in git)";
+- in the release notes: "Tap, scan, or text — your customers leave a review on Google in
+  seconds."

@@ -14,6 +14,7 @@ import {
   previousTokenDigestKey,
   type DeploymentTier,
 } from "@/lib/server/env";
+import { textingEnabled } from "@/lib/features";
 import { EXPECTED_MIGRATIONS } from "@/lib/server/schema-manifest";
 import { getProviderRate, getSmsProvider } from "@/lib/server/sms/provider";
 
@@ -144,10 +145,11 @@ export function checkConfiguration(): ReadinessReport {
         prices.add(price);
       });
     }
-    // Extra texts are part of the price list (docs/MONEY.md §4.2). A pack
-    // price that is missing means owners cannot buy texts; one that repeats a
-    // plan's price would put a subscription and a pack on the same line.
-    for (const pack of ["pack_50", "pack_200", "pack_500"] as const) {
+    // Extra texts are part of the price list (docs/MONEY.md §4.2) once
+    // texting is on. A pack price that is missing means owners cannot buy
+    // texts; one that repeats a plan's price would put a subscription and a
+    // pack on the same line. While texting is off nothing sells a pack.
+    for (const pack of textingEnabled() ? (["pack_50", "pack_200", "pack_500"] as const) : []) {
       const name = `STRIPE_PRICE_SMS_${pack.toUpperCase()}`;
       attempt("stripe", problems, () => {
         const price = stripePackPriceId(pack);
@@ -159,14 +161,18 @@ export function checkConfiguration(): ReadinessReport {
   }
 
   // ------------------------------------------------------------- sms ----
-  attempt("sms", problems, getSmsProvider);
-  attempt("sms", problems, getProviderRate);
-  if (strict) {
-    attempt("sms", problems, () => {
-      if (getProviderRate().perSegmentMicros <= 0) {
-        throw new Error("SMS_RATE_PER_SEGMENT_MICROS must be greater than zero in production");
-      }
-    });
+  // Only once texting is switched on (lib/features.ts): a deployment that
+  // sends no texts needs no provider, and must not be held back by one.
+  if (textingEnabled()) {
+    attempt("sms", problems, getSmsProvider);
+    attempt("sms", problems, getProviderRate);
+    if (strict) {
+      attempt("sms", problems, () => {
+        if (getProviderRate().perSegmentMicros <= 0) {
+          throw new Error("SMS_RATE_PER_SEGMENT_MICROS must be greater than zero in production");
+        }
+      });
+    }
   }
   const country = env("SMS_DEFAULT_COUNTRY_CALLING_CODE");
   if (country && !/^\+?[1-9][0-9]{0,3}$/.test(country)) {

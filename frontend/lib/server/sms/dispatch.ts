@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
+import { textingEnabled } from "@/lib/features";
 import { decrypt } from "@/lib/server/crypto";
 import { logger } from "@/lib/server/logger";
 import { serviceRoleClient } from "@/lib/server/supabase";
@@ -39,6 +40,15 @@ export async function dispatchOnce(options?: {
   leaseSeconds?: number;
   worker?: string;
 }): Promise<DispatchSummary> {
+  // Texting is switched off (lib/features.ts): claim nothing, so nothing can
+  // leave and no provider is needed — the scheduler keeps calling every
+  // minute, and a deployment without Twilio must not report this worker as
+  // failing. Anything queued before the switch went off waits, and health
+  // reports it as outbox_backlog.
+  if (!textingEnabled()) {
+    return { claimed: 0, submitted: 0, suppressed: 0, failed: 0, unknown: 0, deferred: 0, skipped: 0 };
+  }
+
   const svc = serviceRoleClient();
   const provider = getSmsProvider();
   const worker = options?.worker ?? `dispatch-${randomUUID().slice(0, 8)}`;

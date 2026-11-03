@@ -12,6 +12,7 @@ import {
   TRIAL,
   type TextPack,
 } from "@/features/public/pricing-plans";
+import { textingEnabled } from "@/lib/features";
 import { ownerOnly } from "@/lib/owner/permissions";
 import { cn } from "@/lib/utils/cn";
 import { withWriteDeadline } from "@/lib/api/read-deadline";
@@ -494,6 +495,9 @@ export function BillingPanel({
       ? (currentPlan?.tags ?? 0)
       : (billing.usage?.tags.limit ?? 0);
   const monthlyAllowance = onTrial ? 0 : (currentPlan?.monthlyTexts ?? 0);
+  // Texting is switched off (lib/features.ts): no texts are counted, offered
+  // or sold on this page until it is on.
+  const texting = textingEnabled();
 
   // Active is the quietest state: the badge already says it is running, so
   // the card gives the price and the next payment date and nothing else.
@@ -504,6 +508,7 @@ export function BillingPanel({
   // because only the owner can pay. A business on its way out is not sold
   // texts its plan will not be there to send.
   const offerPacks =
+    texting &&
     canManage &&
     quiet &&
     billing.packsAvailable === true;
@@ -533,7 +538,7 @@ export function BillingPanel({
         </InlineNotice>
       ) : null}
 
-      {error ? null : <PackReturnNotice packReturn={packReturn} />}
+      {error || !texting ? null : <PackReturnNotice packReturn={packReturn} />}
 
       <section
         aria-labelledby="plan-heading"
@@ -615,7 +620,7 @@ export function BillingPanel({
           <h2 id="usage-heading" className="text-base font-semibold text-ink">
             {onTrial ? "During your trial" : "This billing period"}
           </h2>
-          <div className="grid items-start gap-3 md:grid-cols-3">
+          <div className={cn("grid items-start gap-3", texting ? "md:grid-cols-3" : "md:grid-cols-2")}>
             <Meter
               label="Locations"
               value={count(
@@ -647,28 +652,30 @@ export function BillingPanel({
                 tagLimitShown ? billing.usage.tags.used / tagLimitShown : 0
               }
             />
-            <Meter
-              label="Texts left"
-              value={
-                onTrial
-                  ? "None during the trial"
-                  : monthlyAllowance
-                    ? `${billing.smsBalance.monthly.toLocaleString("en-US")} of ${monthlyAllowance.toLocaleString("en-US")}`
-                    : billing.smsBalance.monthly.toLocaleString("en-US")
-              }
-              detail={
-                billing.smsBalance.purchased > 0
-                  ? `Plus ${billing.smsBalance.purchased.toLocaleString("en-US")} purchased — ${billing.smsBalance.total.toLocaleString("en-US")} in total.`
-                  : onTrial
-                    ? "Your plan's monthly texts arrive with the first payment."
-                    : undefined
-              }
-              ratio={
-                monthlyAllowance
-                  ? billing.smsBalance.monthly / monthlyAllowance
-                  : 0
-              }
-            />
+            {texting ? (
+              <Meter
+                label="Texts left"
+                value={
+                  onTrial
+                    ? "None during the trial"
+                    : monthlyAllowance
+                      ? `${billing.smsBalance.monthly.toLocaleString("en-US")} of ${monthlyAllowance.toLocaleString("en-US")}`
+                      : billing.smsBalance.monthly.toLocaleString("en-US")
+                }
+                detail={
+                  billing.smsBalance.purchased > 0
+                    ? `Plus ${billing.smsBalance.purchased.toLocaleString("en-US")} purchased — ${billing.smsBalance.total.toLocaleString("en-US")} in total.`
+                    : onTrial
+                      ? "Your plan's monthly texts arrive with the first payment."
+                      : undefined
+                }
+                ratio={
+                  monthlyAllowance
+                    ? billing.smsBalance.monthly / monthlyAllowance
+                    : 0
+                }
+              />
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -755,12 +762,14 @@ export function BillingPanel({
                       {plan.tags}
                     </dd>
                   </div>
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-muted">Texts a month</dt>
-                    <dd className="font-semibold text-ink tabular-nums">
-                      {plan.monthlyTexts.toLocaleString("en-US")}
-                    </dd>
-                  </div>
+                  {texting ? (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted">Texts a month</dt>
+                      <dd className="font-semibold text-ink tabular-nums">
+                        {plan.monthlyTexts.toLocaleString("en-US")}
+                      </dd>
+                    </div>
+                  ) : null}
                 </dl>
               </li>
             ))}

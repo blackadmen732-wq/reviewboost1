@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { OrganizationContext } from "@/lib/server/auth";
 import { KEY_VERSION, decrypt, digestStandToken, encrypt } from "@/lib/server/crypto";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
+import { TEXTING_OFF_MESSAGE, textingEnabled } from "@/lib/features";
 import { canonicalTagUrl } from "@/lib/server/tag-url";
 import { logger } from "@/lib/server/logger";
 import { resolveCustomerPhone } from "@/lib/server/customers/textable";
@@ -392,11 +393,23 @@ export interface PreviewResult {
   consentStatement: string;
 }
 
+/**
+ * Texting is switched off (`lib/features.ts`). The proxy already answers 404
+ * for these APIs; this holds even for a caller that reaches the service some
+ * other way, because sending is the one thing that cannot be taken back.
+ */
+function requireTexting(): void {
+  if (!textingEnabled()) {
+    throw new ApiError(404, ERROR_CODE.notFound, TEXTING_OFF_MESSAGE);
+  }
+}
+
 export async function previewTextRequest(
   context: OrganizationContext,
   input: PreviewInput,
   requestId: string,
 ): Promise<PreviewResult> {
+  requireTexting();
   const normalized = normalizePhone(await recipientPhone(context, input, requestId), phoneOptions());
   const stored = toStoredPhone(normalized);
   const stand = await resolveStand(context, input);
@@ -437,6 +450,7 @@ export async function recordConsentAttestation(
   input: ConsentAttestationInput,
   requestId: string,
 ): Promise<ConsentAttestationResult> {
+  requireTexting();
   const normalized = normalizePhone(await recipientPhone(context, input, requestId), phoneOptions());
   const stored = toStoredPhone(normalized);
   const stand = await resolveStand(context, { standId: input.standId });
@@ -485,6 +499,7 @@ export async function scheduleTextRequest(
   input: ScheduleInput,
   requestId: string,
 ): Promise<ScheduleResult> {
+  requireTexting();
   const normalized = normalizePhone(await recipientPhone(context, input, requestId), phoneOptions());
   const stored = toStoredPhone(normalized);
   const stand = await resolveStand(context, input);

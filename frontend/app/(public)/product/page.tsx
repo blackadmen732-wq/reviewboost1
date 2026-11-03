@@ -1,3 +1,4 @@
+import { textingEnabled } from "@/lib/features";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -24,8 +25,9 @@ import { publicPageMetadata } from "@/lib/site";
 export const metadata: Metadata = publicPageMetadata({
   path: "/product",
   title: "Product",
-  description:
-    "Everything you get: a Tag for your counter (QR code and NFC), a customer page in three languages, and Home, Feedback, Insights and Text Requests for you.",
+  description: textingEnabled()
+    ? "Everything you get: a Tag for your counter (QR code and NFC), a customer page in three languages, and Home, Feedback, Insights and Text Requests for you."
+    : "Everything you get: a Tag for your counter (QR code and NFC), a customer page in three languages, and Home, Feedback and Insights for you.",
 });
 
 const ICONS: Record<(typeof PRODUCT.groups)[number]["features"][number]["icon"], LucideIcon> = {

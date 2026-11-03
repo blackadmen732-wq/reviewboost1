@@ -1,3 +1,4 @@
+import { textingEnabled } from "@/lib/features";
 import { PUBLIC_PLANS, TRIAL } from "@/features/public/pricing-plans";
 
 /**
@@ -72,9 +73,14 @@ export const FAQ: readonly FaqEntry[] = [
     answer:
       "Cancelling stops the next charge. Your Tags keep working until the period you have already paid for ends — after that the page they open stops loading, so take them off the counter.",
   },
-  {
-    question: "Do unused texts roll over?",
-    answer:
-      "No. The monthly allowance is added when each month is paid for and is spent first; anything left at the end of the period expires. Texts you buy separately do not expire.",
-  },
+  // Only while texts are sold (lib/features.ts).
+  ...(textingEnabled()
+    ? [
+        {
+          question: "Do unused texts roll over?",
+          answer:
+            "No. The monthly allowance is added when each month is paid for and is spent first; anything left at the end of the period expires. Texts you buy separately do not expire.",
+        } as const,
+      ]
+    : []),
 ] as const;

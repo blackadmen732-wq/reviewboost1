@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { apiFetch, ApiError } from "./api";
 import { useAuth } from "./auth-context";
+import { FEATURES_OFF, featuresFrom, readSavedFeatures, saveFeatures, type Features } from "./features";
 
 /**
  * The owner's Home: GET /api/v1/home, the website's own Home model and words.
@@ -59,6 +60,8 @@ export interface HomeData {
     hasNote: boolean;
     tagLabel: string | null;
   }>;
+  /** Product switches (`data/features.ts`). Absent from an older server: all off. */
+  features?: { texting?: boolean };
 }
 
 interface HomeState {
@@ -67,6 +70,8 @@ interface HomeState {
   error: string | null;
   /** How many ratings nobody has opened yet, for the Feedback tab's badge. */
   unreadCount: number;
+  /** What the server last said is switched on (texting: Texts tab, texts in Settings). */
+  features: Features;
   refresh: () => Promise<void>;
 }
 
@@ -78,7 +83,19 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const [home, setHome] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [features, setFeatures] = useState<Features>(FEATURES_OFF);
   const generation = useRef(0);
+
+  // The last answer, so the tab bar is right from the first frame.
+  useEffect(() => {
+    let live = true;
+    void readSavedFeatures().then((saved) => {
+      if (live) setFeatures((current) => (current === FEATURES_OFF ? saved : current));
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // A different business is a different Home: nothing of the last one shows.
   useEffect(() => {
@@ -97,6 +114,9 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       const res = await apiFetch<{ data: HomeData }>("/api/v1/home", orgId);
       if (gen !== generation.current) return;
       setHome(res.data);
+      const next = featuresFrom(res.data.features);
+      setFeatures(next);
+      saveFeatures(next);
     } catch (e) {
       if (gen !== generation.current) return;
       // A failed read is said, never shown as an empty Home (AGENTS.md).
@@ -109,7 +129,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const unreadCount = home?.unreadCount ?? 0;
 
   return (
-    <HomeContext.Provider value={{ home, loading, error, unreadCount, refresh }}>{children}</HomeContext.Provider>
+    <HomeContext.Provider value={{ home, loading, error, unreadCount, features, refresh }}>{children}</HomeContext.Provider>
   );
 }
 

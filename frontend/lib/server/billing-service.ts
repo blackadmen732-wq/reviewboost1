@@ -18,6 +18,7 @@ import {
   stripePriceId,
 } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
+import { TEXTING_OFF_MESSAGE, textingEnabled } from "@/lib/features";
 import { logger } from "@/lib/server/logger";
 import {
   PACK_METADATA_KIND,
@@ -418,6 +419,11 @@ export async function createPackCheckoutSession(
   packId: PackId,
   requestId: string,
 ): Promise<{ url: string }> {
+  // Texts are not sold while texting is switched off (lib/features.ts).
+  if (!textingEnabled()) {
+    throw new ApiError(404, ERROR_CODE.notFound, TEXTING_OFF_MESSAGE);
+  }
+
   const { data: entitlement, error } = await context.db
     .from("entitlement_snapshots")
     .select("status, trial_ends_at, cancel_at_period_end")
@@ -1160,6 +1166,9 @@ export async function readBillingState(
     // An active plan that is not ending, with prices configured: the same
     // rule checkout enforces, so the button is never offered and refused.
     packsAvailable:
-      status === "active" && !(row?.cancel_at_period_end ?? false) && stripePackPricesConfigured(),
+      textingEnabled() &&
+      status === "active" &&
+      !(row?.cancel_at_period_end ?? false) &&
+      stripePackPricesConfigured(),
   };
 }
