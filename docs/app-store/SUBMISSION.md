@@ -211,8 +211,9 @@ at any point in the customer flow.
 Required for any app that lets someone create an account, and checked by App
 Review rather than taken on trust.
 
-**Where it is:** Account tab → Delete account. Nothing is hidden behind a
-support email, and it is reachable in three taps from launch.
+**Where it is:** Settings (the gear at the top right of every screen) →
+Delete account. Nothing is hidden behind a support email, and it is reachable
+in two taps from launch.
 
 **What it does:** asks the owner to type their business name, then deletes the
 organization and everything in it — Tags, ratings, phone numbers, team
@@ -267,8 +268,9 @@ does on the same device (`apps/mobile/data/social-sign-in.ts`).
 ReviewBoost is a business service billed on the web through Stripe. The iOS app
 contains **no purchase mechanism and no link to one** — no in-app purchase, no
 checkout, no "upgrade" button, and no external URL that leads to a payment
-page. The Account tab reads the current plan and the remaining message
-allowance; it does not sell anything.
+page. Settings reads the current plan and the remaining text allowance; it
+does not sell anything, and Home never points at Billing (the Home endpoint
+removes every plan or payment link before the app sees it).
 
 This is the posture 3.1.3(b) requires of an app whose subscription is acquired
 elsewhere: showing what someone already bought is permitted, directing them to

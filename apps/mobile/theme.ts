@@ -41,7 +41,9 @@ export const colors = {
   info: "#356d8c",
 
   starFilled: "#B97D0C",
-  starEmpty: "#8F8F8A",
+  // The website's empty star (--rb-border). Filled stars carry the rating,
+  // and every row of stars is read aloud as "N out of 5 stars".
+  starEmpty: "#E2E2E1",
 
   white: "#FFFFFF",
 } as const;
@@ -58,3 +60,37 @@ export const fonts = {
   body: { fontWeight: "400" as const },
   label: { fontWeight: "500" as const },
 } as const;
+
+/**
+ * The type scale, iPhone sizes: a large title per screen, like the website's
+ * page titles and like iOS's own apps, then headline, body and footnote.
+ */
+export const type = {
+  largeTitle: { fontSize: 34, lineHeight: 41, fontWeight: "700" as const, letterSpacing: 0.2 },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: "700" as const },
+  number: { fontSize: 44, lineHeight: 50, fontWeight: "700" as const },
+  headline: { fontSize: 17, lineHeight: 22, fontWeight: "600" as const },
+  body: { fontSize: 17, lineHeight: 24, fontWeight: "400" as const },
+  callout: { fontSize: 16, lineHeight: 22, fontWeight: "400" as const },
+  subhead: { fontSize: 15, lineHeight: 20, fontWeight: "400" as const },
+  footnote: { fontSize: 13, lineHeight: 18, fontWeight: "400" as const },
+} as const;
+
+/**
+ * White cards on the warm canvas, lifted by a soft shadow rather than a hard
+ * outline: the grouped look of iOS Settings and the website's tiles. The
+ * hairline keeps the edge visible where shadows are faint (Android, web).
+ */
+export const card = {
+  backgroundColor: colors.surface,
+  borderRadius: radii.card,
+  borderWidth: 1,
+  borderColor: "#EEEEEC",
+  shadowColor: "#1A1A19",
+  shadowOpacity: 0.06,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 1,
+} as const;
+
+export const space = { gutter: 20, section: 28 } as const;

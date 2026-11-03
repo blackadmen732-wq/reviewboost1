@@ -1,88 +1,71 @@
 import { Tabs } from "expo-router";
-import { SymbolView, type SymbolViewProps } from "expo-symbols";
-import { Text } from "react-native";
-import { colors, fonts } from "@/theme";
+import { Icon, type SFSymbol } from "@/components/icon";
+import { useHome } from "@/data/home";
+import { colors } from "@/theme";
 
 /**
- * Tab icons are SF Symbols on iPhone — the system's own icon set, so they sit
- * at the weight and optical size of the rest of iOS and follow Bold Text.
- * They used to be text glyphs (◉ ✉ ➤ ⬡ ☰), which read as placeholder art.
- * Other platforms keep the glyph as a fallback until they get icons of their
- * own. The label under each icon is what VoiceOver reads.
+ * The four daily places, the same four as the website's bottom bar: Home,
+ * Feedback, Texts, Tags. Settings is secondary (AGENTS.md), so it is the gear
+ * at the top of each screen, not a fifth tab.
+ *
+ * Icons are SF Symbols on iPhone; the active tab is ink, as on the website,
+ * since green is the brand rather than a control colour. The label under each
+ * icon is what VoiceOver reads, and Feedback carries the unread count.
  */
-type SFSymbol = Extract<SymbolViewProps["name"], string>;
-
 const ICONS: Record<string, { outline: SFSymbol; filled: SFSymbol; glyph: string }> = {
-  Feed: { outline: "dot.radiowaves.left.and.right", filled: "dot.radiowaves.left.and.right", glyph: "◉" },
-  Feedback: { outline: "text.bubble", filled: "text.bubble.fill", glyph: "✉" },
+  Home: { outline: "house", filled: "house.fill", glyph: "⌂" },
+  Feedback: { outline: "bubble.left", filled: "bubble.left.fill", glyph: "✉" },
   Texts: { outline: "paperplane", filled: "paperplane.fill", glyph: "➤" },
-  Tags: { outline: "qrcode", filled: "qrcode", glyph: "⬡" },
-  Account: { outline: "person.crop.circle", filled: "person.crop.circle.fill", glyph: "☰" },
+  Tags: { outline: "qrcode", filled: "qrcode", glyph: "▦" },
 };
 
 function TabIcon({ label, focused }: { label: keyof typeof ICONS; focused: boolean }) {
   const icon = ICONS[label]!;
-  const color = focused ? colors.brandText : colors.inkFaint;
   return (
-    <SymbolView
-      name={{ ios: focused ? icon.filled : icon.outline }}
+    <Icon
+      name={focused ? icon.filled : icon.outline}
+      glyph={icon.glyph}
       size={24}
-      tintColor={color}
+      color={focused ? colors.ink : colors.inkMuted}
       weight={focused ? "semibold" : "regular"}
-      fallback={<Text style={{ fontSize: 20, color }}>{icon.glyph}</Text>}
     />
   );
 }
 
 export default function TabLayout() {
+  const { unreadCount } = useHome();
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.brandText,
-        tabBarInactiveTintColor: colors.inkFaint,
-        headerStyle: { backgroundColor: colors.surface },
-        headerTitleStyle: { ...fonts.subheading, color: colors.ink },
+        headerShown: false,
+        tabBarActiveTintColor: colors.ink,
+        tabBarInactiveTintColor: colors.inkMuted,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "500" },
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        tabBarBadgeStyle: { backgroundColor: colors.ink, color: colors.onAction, fontSize: 11 },
       }}
     >
       <Tabs.Screen
-        name="feed"
-        options={{
-          title: "Live Feed",
-          tabBarIcon: ({ focused }) => <TabIcon label="Feed" focused={focused} />,
-        }}
+        name="home"
+        options={{ title: "Home", tabBarIcon: ({ focused }) => <TabIcon label="Home" focused={focused} /> }}
       />
       <Tabs.Screen
         name="feedback"
         options={{
           title: "Feedback",
           tabBarIcon: ({ focused }) => <TabIcon label="Feedback" focused={focused} />,
+          ...(unreadCount > 0 ? { tabBarBadge: unreadCount > 99 ? "99+" : unreadCount } : {}),
         }}
       />
       <Tabs.Screen
         name="text-requests"
-        options={{
-          // The header says the product's name; the bar has room for one word.
-          title: "Text Requests",
-          tabBarLabel: "Texts",
-          tabBarIcon: ({ focused }) => <TabIcon label="Texts" focused={focused} />,
-        }}
+        options={{ title: "Texts", tabBarIcon: ({ focused }) => <TabIcon label="Texts" focused={focused} /> }}
       />
       {/* "Tags" is what the product calls the physical thing on the counter.
           The route stays /stands so existing deep links keep working. */}
       <Tabs.Screen
         name="stands"
-        options={{
-          title: "Tags",
-          tabBarIcon: ({ focused }) => <TabIcon label="Tags" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="account"
-        options={{
-          title: "Account",
-          tabBarIcon: ({ focused }) => <TabIcon label="Account" focused={focused} />,
-        }}
+        options={{ title: "Tags", tabBarIcon: ({ focused }) => <TabIcon label="Tags" focused={focused} /> }}
       />
     </Tabs>
   );

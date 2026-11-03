@@ -17,6 +17,9 @@ vi.mock("@/data/auth-context", () => ({
   useAuth: () => state,
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
+vi.mock("@/data/home", () => ({
+  HomeProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
 vi.mock("@/components/launch-screen", () => ({
   LAUNCH_BACKGROUND: "#005B3E",
   LaunchScreen: ({ onReady }: { onReady?: () => void }) => (
@@ -94,7 +97,7 @@ it("does not redirect before session restoration finishes", () => {
 it.each([
   [false, null, "/login"],
   [true, null, "/select-org"],
-  [true, { orgId: "business" }, "/(tabs)/feed"],
+  [true, { orgId: "business" }, "/(tabs)/home"],
 ])(
   "preserves the existing restored-session route (%s, %s)",
   (loggedIn, org, destination) => {

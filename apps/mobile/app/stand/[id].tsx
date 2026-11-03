@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Image,
   Platform,
   Share,
 } from "react-native";
@@ -12,10 +13,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams } from "expo-router";
 import * as Linking from "expo-linking";
 import { isReviewBoostTagUrl } from "@/lib/tag-url";
-import { Tappable } from "@/components/tappable";
+import { Button } from "@/components/button";
+import { Icon } from "@/components/icon";
+import { stackHeader } from "@/components/screen";
 import { useAuth } from "@/data/auth-context";
-import { apiFetch } from "@/data/api";
-import { colors, radii, fonts } from "@/theme";
+import { apiFetch, authorizedImage } from "@/data/api";
+import { useStands } from "@/data/use-stands";
+import { lastUsedLabel, tagChecks, tagNeedsRewrite } from "@/lib/words";
+import { card, colors, radii, space, type } from "@/theme";
 import { NfcProgramSheet } from "@/components/nfc-program-sheet";
 import {
   DONE_DWELL_MS,
@@ -50,8 +55,13 @@ export default function StandDetailScreen() {
 
   const [standUrl, setStandUrl] = useState<string | null>(null);
   const [standLabel, setStandLabel] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(canProvision);
   const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState<string | null>(null);
+  // The list row for this Tag: its place, when it was last used, and whether
+  // the printed code and the chip are current.
+  const { stands, refresh: refreshStands } = useStands(orgId);
+  const stand = stands.find((item) => item.standId === id) ?? null;
 
   const [nfcSupported, setNfcSupported] = useState<boolean | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -68,7 +78,13 @@ export default function StandDetailScreen() {
   const runRef = useRef(0);
 
   useEffect(() => {
-    if (!orgId || !id) return;
+    void refreshStands();
+  }, [refreshStands]);
+
+  useEffect(() => {
+    // The link and the code are owner/admin at the API; anyone else sees the
+    // Tag's state and is told who can print or program it.
+    if (!orgId || !id || !canProvision) return;
     (async () => {
       setLoading(true);
       setError(null);
@@ -82,13 +98,14 @@ export default function StandDetailScreen() {
         if (!isReviewBoostTagUrl(res.data.standUrl)) throw new Error("not a Tag URL");
         setStandUrl(res.data.standUrl);
         setStandLabel(res.data.label);
+        setCode(await authorizedImage(`/api/v1/review-stands/${id}/qr?format=png&size=600`, orgId).catch(() => null));
       } catch {
         setError("Could not load this Tag. Please try again.");
       } finally {
         setLoading(false);
       }
     })();
-  }, [orgId, id]);
+  }, [orgId, id, canProvision]);
 
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -120,12 +137,13 @@ export default function StandDetailScreen() {
         });
         if (run !== runRef.current) return;
         setWriteState("success");
+        void refreshStands();
       } catch {
         if (run !== runRef.current) return;
         setWriteState("partial");
       }
     },
-    [orgId, id],
+    [orgId, id, refreshStands],
   );
 
   const retryServerRecord = useCallback(() => {
@@ -238,42 +256,121 @@ export default function StandDetailScreen() {
     return () => clearTimeout(timer);
   }, [scene, closeSheet]);
 
-  if (loading) {
+  const title = standLabel || stand?.label || "Tag";
+  const checks = stand ? tagChecks(stand) : null;
+  const nfcLine = !stand
+    ? null
+    : tagNeedsRewrite(stand)
+      ? "The code changed, so the chip still has the old link. Program it again."
+      : stand.nfcProvisionedAt === null
+        ? "Not programmed yet. Write your link to the Tag’s chip and a phone tap opens your page."
+        : "Programmed. A phone tap opens your customer page.";
+
+  if (loading && !stand) {
     return (
       <SafeAreaView style={styles.center}>
-        <Stack.Screen options={{ title: "Tag" }} />
-        <ActivityIndicator size="large" color={colors.brandText} />
+        <Stack.Screen options={stackHeader("")} />
+        <ActivityIndicator size="large" color={colors.inkMuted} />
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: standLabel || "Tag" }} />
+      {/* The large title below names the Tag; the bar only carries Back. */}
+      <Stack.Screen options={stackHeader("")} />
       <ScrollView contentContainerStyle={styles.content}>
+        <View>
+          <Text style={styles.title} accessibilityRole="header">
+            {title}
+          </Text>
+          {stand ? (
+            <Text style={styles.meta}>
+              {[stand.locationName ?? "Place", checks?.nfc.ok ? null : "NFC not programmed", lastUsedLabel(stand.lastOpenedAt)]
+                .filter(Boolean)
+                .join(" · ")}
+            </Text>
+          ) : null}
+        </View>
+
         {error ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
 
+        {/* The printed code: the same link the chip carries. */}
+        {canProvision && standUrl ? (
+          <View style={styles.section}>
+            {code ? (
+              <Image
+                source={{ uri: code }}
+                style={styles.code}
+                resizeMode="contain"
+                accessible
+                accessibilityLabel={`QR code for ${title}`}
+              />
+            ) : null}
+            {checks && !checks.qr.ok ? (
+              <Text style={styles.sectionDesc}>The code changed. Print it again: the old printout opens nothing.</Text>
+            ) : null}
+            <Button
+              label="Preview customer page"
+              variant="secondary"
+              onPress={() => void Linking.openURL(standUrl)}
+              accessibilityHint="Opens in your browser"
+            />
+            <Button
+              label="Share link"
+              variant="secondary"
+              icon={<Icon name="square.and.arrow.up" glyph="⇪" size={17} color={colors.ink} />}
+              onPress={() => {
+                Share.share(Platform.OS === "ios" ? { url: standUrl } : { message: standUrl }).catch(() => {
+                  // react-native-web rejects when the browser has no Web
+                  // Share API, and users can dismiss the native sheet — a
+                  // no-op is the right outcome, not an unhandled rejection.
+                });
+              }}
+            />
+          </View>
+        ) : null}
+
         {/* Programming a Tag. The button only opens the sheet: scanning
             starts when the owner presses Program NFC inside it, holding the
             Tag, and not a moment before. */}
-        {Platform.OS !== "web" && nfcSupported && canProvision && (
+        {canProvision ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>NFC</Text>
+            {nfcLine ? <Text style={styles.sectionDesc}>{nfcLine}</Text> : null}
+            {Platform.OS !== "web" && nfcSupported ? (
+              <Button
+                label={stand && stand.nfcProvisionedAt !== null && !tagNeedsRewrite(stand) ? "Program again" : "Program NFC"}
+                variant={checks && !checks.nfc.ok ? "action" : "secondary"}
+                disabled={!standUrl}
+                onPress={() => setSheetOpen(true)}
+                icon={
+                  <Icon
+                    name="wave.3.right"
+                    glyph="◎"
+                    size={17}
+                    color={checks && !checks.nfc.ok ? colors.onAction : colors.ink}
+                  />
+                }
+              />
+            ) : nfcSupported === null && Platform.OS !== "web" ? null : (
+              // The QR code on the same Tag works without any of this, which is
+              // the useful thing to say — not a list of third-party tools.
+              <Text style={styles.sectionDesc}>
+                This phone can’t program Tags. The QR code still works; to add NFC, program it from an iPhone or an
+                Android phone with NFC.
+              </Text>
+            )}
+          </View>
+        ) : (
+          <View style={styles.section}>
             <Text style={styles.sectionDesc}>
-              Program the chip so customers can tap the Tag instead of scanning it.
+              Only owners and admins can print or program Tags. Ask the account owner for access.
             </Text>
-            <Tappable
-              accessibilityRole="button"
-              style={styles.nfcButton}
-              disabled={!standUrl}
-              onPress={() => setSheetOpen(true)}
-            >
-              <Text style={styles.nfcButtonText}>Program NFC</Text>
-            </Tappable>
           </View>
         )}
 
@@ -285,78 +382,11 @@ export default function StandDetailScreen() {
           onDismiss={closeSheet}
         />
 
-        {Platform.OS !== "web" && nfcSupported === false && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>This phone cannot program Tags</Text>
-            {/* The QR code on the same Tag works without any of this, which is
-                the useful thing to say — not a list of third-party tools. */}
-            <Text style={styles.sectionDesc}>
-              The QR code on this Tag still works. To add NFC, program it from a
-              phone that supports it.
-            </Text>
-          </View>
-        )}
-
-        {!canProvision && (
-          <View style={styles.section}>
-            <Text style={styles.sectionDesc}>
-              Only owners and admins can program Tags. Ask the account owner for
-              access.
-            </Text>
-          </View>
-        )}
-
-        {/* Test Stand */}
-        {standUrl && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Preview customer page</Text>
-            <Text style={styles.sectionDesc}>
-              See exactly what a customer sees when they tap or scan this Tag.
-            </Text>
-            <Tappable
-              style={styles.nfcButton}
-              onPress={() => void Linking.openURL(standUrl)}
-              accessibilityRole="link"
-              accessibilityHint="Opens in your browser"
-            >
-              <Text style={styles.nfcButtonText}>Open customer page</Text>
-            </Tappable>
-          </View>
-        )}
-
-        {/* Share the stand link — the same URL the QR and NFC tag carry */}
-        {standUrl && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Tag link</Text>
-            <Text style={styles.sectionDesc}>
-              The same link the QR code and the NFC chip both carry.
-            </Text>
-            <Tappable
-              style={styles.nfcButton}
-              accessibilityRole="button"
-              onPress={() => {
-                Share.share(
-                  Platform.OS === "ios"
-                    ? { url: standUrl }
-                    : { message: standUrl },
-                ).catch(() => {
-                  // react-native-web rejects when the browser has no Web
-                  // Share API, and users can dismiss the native sheet — a
-                  // no-op is the right outcome, not an unhandled rejection.
-                });
-              }}
-            >
-              <Text style={styles.nfcButtonText}>Share Link</Text>
-            </Tappable>
-          </View>
-        )}
-
         {/* A six-step tutorial for a third-party app used to sit here, on every
             Tag screen, unconditionally. Programming happens above; a phone that
             cannot do it is told so, and the QR code on the same Tag works
             regardless. Sending an owner to another app to hand-enter a URL is
             not a feature of this product. */}
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -364,44 +394,14 @@ export default function StandDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.canvas,
-  },
-  content: { padding: 16, gap: 16 },
-  section: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    color: colors.ink,
-    marginBottom: 6,
-    ...fonts.subheading,
-  },
-  sectionDesc: {
-    fontSize: 14,
-    color: colors.inkMuted,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  nfcButton: {
-    backgroundColor: colors.brand,
-    borderRadius: radii.control,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  nfcButtonText: {
-    color: colors.onBrand,
-    fontSize: 16,
-    ...fonts.subheading,
-  },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.canvas },
+  content: { padding: space.gutter, gap: 20, paddingBottom: 48 },
+  title: { ...type.title, color: colors.ink },
+  meta: { ...type.callout, color: colors.inkMuted, marginTop: 6 },
+  section: { ...card, padding: 16, gap: 12 },
+  code: { width: "100%", aspectRatio: 1, maxWidth: 280, alignSelf: "center" },
+  sectionTitle: { ...type.headline, color: colors.ink },
+  sectionDesc: { ...type.subhead, color: colors.inkMuted },
   errorBanner: {
     backgroundColor: colors.dangerBg,
     borderRadius: radii.control,
@@ -409,8 +409,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.dangerBorder,
   },
-  errorText: {
-    color: colors.danger,
-    fontSize: 14,
-  },
+  errorText: { color: colors.danger, fontSize: 14 },
 });

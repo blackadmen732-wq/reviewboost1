@@ -30,7 +30,8 @@ const ENDPOINT = "/api/v1/account/deletion";
 
 const web = readFileSync(join(ROOT, "features/settings/delete-account-flow.tsx"), "utf8");
 const native = readFileSync(join(MOBILE, "app/delete-account.tsx"), "utf8");
-const nativeAccountTab = readFileSync(join(MOBILE, "app/(tabs)/account.tsx"), "utf8");
+const nativeSettings = readFileSync(join(MOBILE, "app/account.tsx"), "utf8");
+const nativeDailyScreen = readFileSync(join(MOBILE, "components/screen.tsx"), "utf8");
 
 describe("the phone and the browser delete the same way", () => {
   it("finds the mobile app where this test thinks it is", () => {
@@ -86,7 +87,11 @@ describe("the phone and the browser delete the same way", () => {
     expect(native).toContain('router.replace("/login")');
   });
 
-  it("is reachable from the mobile account tab, which is what the store requires", () => {
-    expect(nativeAccountTab).toContain('href="/delete-account"');
+  it("is reachable in the app, which is what the store requires: gear → Settings → Delete account", () => {
+    // Every daily screen's gear opens Settings…
+    expect(nativeDailyScreen).toContain('router.push("/account")');
+    expect(nativeDailyScreen).toContain('accessibilityLabel="Settings"');
+    // …and Settings opens the deletion screen.
+    expect(nativeSettings).toContain('router.push("/delete-account")');
   });
 });

@@ -9,6 +9,8 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
+import { forgetLastBusiness, readLastBusiness, rememberLastBusiness } from "./last-business";
+import { chooseActiveOrg } from "./org-choice";
 import { boundedRead, boundedWrite } from "./read-deadline";
 import { signInForReview } from "./review-sign-in";
 import { sendCodeResult, type SendCodeResult } from "./send-code";
@@ -29,6 +31,8 @@ interface AuthState {
   verifyCode: (email: string, code: string) => Promise<string | null>;
   logout: () => Promise<string | null>;
   selectOrg: (orgId: string) => void;
+  /** Back to the business picker. Only offered with more than one business. */
+  switchBusiness: () => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -130,10 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       });
 
+      // The last business chosen on this phone, if any. A storage failure is
+      // only a missing convenience: the picker still works.
+      const remembered = await readLastBusiness(userId);
+      if (gen !== authGeneration.current) return;
+
       setOrganizations(orgs);
-      setActiveOrg((current) =>
-        current ? (orgs.find((o) => o.orgId === current.orgId) ?? null) : null,
-      );
+      setActiveOrg((current) => chooseActiveOrg(current, orgs, remembered));
       setOrgLoading(false);
     } catch {
       if (gen === authGeneration.current) {
@@ -197,13 +204,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const userId = session?.user.id ?? null;
+
   const selectOrg = useCallback(
     (orgId: string) => {
       const org = organizations.find((o) => o.orgId === orgId) ?? null;
       setActiveOrg(org);
+      if (org && userId) rememberLastBusiness(userId, org.orgId);
     },
-    [organizations],
+    [organizations, userId],
   );
+
+  const switchBusiness = useCallback(() => {
+    if (userId) forgetLastBusiness(userId);
+    setActiveOrg(null);
+  }, [userId]);
 
   const user = session?.user ?? null;
 
@@ -224,6 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         verifyCode,
         logout,
         selectOrg,
+        switchBusiness,
       }}
     >
       {children}

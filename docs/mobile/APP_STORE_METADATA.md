@@ -28,7 +28,7 @@ script on 2026-09-26, not estimated.
 | Field | URL | State |
 |---|---|---|
 | Support URL (required) | https://reviewboost.fit/support | The page is in the repo (`frontend/app/support/page.tsx`). It could not be fetched from this sandbox. Open it once before submitting |
-| Privacy Policy URL (required) | https://reviewboost.fit/privacy | The page is in the repo. The same link is in the app under Account → Privacy |
+| Privacy Policy URL (required) | https://reviewboost.fit/privacy | The page is in the repo. The same link is in the app under Settings → Privacy |
 | Marketing URL (optional) | https://reviewboost.fit | Optional. Leaving it blank is also fine |
 | Account deletion info (not an App Store field, useful in Review notes) | https://reviewboost.fit/delete-account | Public and reachable without signing in |
 
@@ -100,7 +100,7 @@ App Store Connect Help, read 2026-09-26.
 | Capabilities | Unrestricted web access | **No** | No in-app browser or WebView. Privacy, Terms, Support and "Open customer page" open fixed ReviewBoost URLs in Safari, outside the app (`Linking.openURL`) |
 | Capabilities | User-generated content | **No** | Apple defines this as "broad distribution of content created by users". Customers give a star rating and nothing else; there is no box for them to write in. The only free text is a private note a business's own team adds to a rating, seen only by that team. Nothing is published, shared between businesses or discoverable. See the note below the table |
 | Capabilities | Social media | **No** | No feed of other people's content, no likes, no shares |
-| Capabilities | Messaging and chat | **No** | Users of the app cannot message each other. The Texts tab only shows the status of texts sent from the web app. There is no composer in the app |
+| Capabilities | Messaging and chat | **No** | Users of the app cannot message each other, and there is no chat. The Texts tab sends one review request to one customer's phone by SMS, chosen from fixed, approved wording (no free text), only to a number whose consent is recorded; replies are not shown in the app |
 | Capabilities | Advertising | **No** | No ads, no ad SDK |
 | Mature themes | Profanity / crude humour; horror / fear; alcohol, tobacco or drugs | **None** | The app's own content has none. Team notes are private free text (see the note) |
 | Medical or wellness | Medical or treatment information; health or wellness topics | **None** | |
@@ -217,26 +217,26 @@ SIGNING IN
 Sign-in normally uses a six-digit code sent by email. Enter the demo email on the first screen, tap Continue, then type the demo code from the Sign-In Information section where the emailed code would go. That signs in to a demo business with fictional data only. If "Choose your business" appears, choose "Harbor Street Coffee (Demo)".
 
 WHAT TO LOOK AT
-- Feed: ratings as they arrive.
-- Feedback: each rating, with the Tag it came from. Tap a row for detail.
-- Texts: the status of review requests sent by text from the ReviewBoost web app, and the message balance. The app itself sends no messages.
-- Tags: open "Front counter". "Open customer page" shows exactly what a customer sees. "Share Link" shares it.
-- Account: plan status, Privacy, Terms, Support, Sign out, Delete account.
+- Home: what needs the owner now, this week's ratings and the last 30 days' average, unread ratings, and how the Tags are doing.
+- Feedback: "Needs you" and "Everything". Tap a row: the rating, when and from which Tag, "Mark as sorted", and private team notes ("What we did").
+- Texts: send one review request to one customer, with fixed wording, and see the status of recent requests and the text balance.
+- Tags: open "Front counter": its QR code, "Preview customer page" (exactly what a customer sees), "Share link", and "Program NFC".
+- Settings (the gear at the top right): the business, plan status, Privacy, Terms, Support, Sign out, Delete account.
 
 NFC
 "Program NFC" (Tags > Front counter) writes the Tag's web link to a standard NDEF tag using Core NFC. Any blank, unlocked NDEF tag works (NTAG213/215/216). The app reads the tag first, asks before replacing anything already on it, writes, then reads it back to confirm. Without a tag you can still see the system NFC sheet and cancel it. The attached QR code opens the same customer page the tag would.
 
 TEXT REQUESTS
-A Text Request is a single text message a business sends to one customer, asking them to rate their visit. Each request has one recipient and is scheduled from the web app; there is no bulk or broadcast sending. A text is blocked unless consent for that number is recorded. Recipients can reply STOP, after which ReviewBoost will not text that number again, for any business, unless the recipient replies START. The customer is not anonymous to the business that texted them. The demo business has sending turned off.
+A Text Request is a single text message a business sends to one customer, asking them to rate their visit. Each request has one recipient, uses one of two fixed, approved messages (there is no free text), and shows the exact message before it can be sent; there is no bulk or broadcast sending. A text is blocked unless consent for that number is recorded. Recipients can reply STOP, after which ReviewBoost will not text that number again, for any business, unless the recipient replies START. The customer is not anonymous to the business that texted them. The demo business has sending turned off: Preview works, and Send is refused with a message saying why.
 
 PAYMENTS
-The app sells nothing and has no purchase, upgrade or subscribe buttons and no links to buy. Subscriptions are set up and managed by businesses outside the app. The app only shows the current plan's status and message balance, under Guideline 3.1.3(f).
+The app sells nothing and has no purchase, upgrade or subscribe buttons and no links to buy. Subscriptions are set up and managed by businesses outside the app. The app only shows the current plan's status and text balance, under Guideline 3.1.3(f).
 
 RATINGS AND REVIEWS
 Every rating, one star or five, is offered the same review destination. ReviewBoost does not filter or hide reviews, and cannot know whether a customer goes on to post one.
 
 ACCOUNT DELETION
-Account > Delete account works for every account type. An owner deletes the business, its Tags and all its ratings after typing the business name; the subscription is cancelled first, and the login goes too if it was their last business. A team member, or someone who never created a business, deletes their own login after typing "delete"; the business they worked for is untouched. The only owner of a business is asked to delete that business first, so no business is left without an owner. The public page https://reviewboost.fit/delete-account explains the same thing.
+Settings (the gear) > Delete account works for every account type. An owner deletes the business, its Tags and all its ratings after typing the business name; the subscription is cancelled first, and the login goes too if it was their last business. A team member, or someone who never created a business, deletes their own login after typing "delete"; the business they worked for is untouched. The only owner of a business is asked to delete that business first, so no business is left without an owner. The public page https://reviewboost.fit/delete-account explains the same thing.
 
 PRIVACY
 No tracking, no ads, no analytics SDKs. The only data the app collects is the user's email address and account ID, for sign-in.
@@ -259,13 +259,13 @@ not be used. Guideline 2.3.3 requires screenshots that show the app in use.
 
 | # | Screen | State to capture | Optional caption |
 |---|---|---|---|
-| 1 | Feed | Several fresh ratings, mixed stars | See every rating as it arrives |
-| 2 | Feedback list | Unread and read rows, mixed stars | Every rating, from every Tag |
-| 3 | Feedback detail | One rating with its Tag and time | See where each rating came from |
+| 1 | Home | New ratings waiting, the week and 30-day numbers | See what needs you at a glance |
+| 2 | Feedback list | "Needs you", unread and read rows, mixed stars | Every rating, from every Tag |
+| 3 | Feedback detail | One rating with its Tag, time, Mark as sorted and a team note | Sort it, and note what you did |
 | 4 | Tag detail | "Front counter" with Program NFC visible | Program Tags from your iPhone |
 | 5 | NFC sheet | The "Ready to write" sheet over the Tag | Checked before, verified after |
-| 6 | Texts | Balance card and a few statuses. Use a staging business with fictional numbers if the demo business has none | Follow your review requests |
-| 7 | Account | Plan status and the Privacy / Terms / Support rows | |
+| 6 | Texts | The exact-message preview, then a few statuses. Use a staging business with fictional numbers if the demo business has none | Ask one customer for a review |
+| 7 | Settings | Plan status and the Privacy / Terms / Support rows | |
 
 Rules for the captures:
 

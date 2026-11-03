@@ -115,7 +115,7 @@ under circle, squircle, rounded-square and teardrop masks in
 **Shots to capture** (same list as the App Store package, so one session covers
 both):
 
-1. Live Feed — ratings arriving
+1. Home — what needs the owner, this week and the last 30 days
 2. Feedback list
 3. Tags — a Tag with its QR preview
 4. Text Requests
@@ -167,7 +167,7 @@ listings where the URL only explains how to email a request.
 
 | Field | Value |
 |---|---|
-| **In-app path** | Account tab → Delete account |
+| **In-app path** | Settings (gear, top right of every screen) → Delete account |
 | **Deletion URL** | `https://reviewboost.fit/delete-account` |
 | **Requires sign-in to read the URL?** | No |
 

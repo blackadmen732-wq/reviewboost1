@@ -21,7 +21,7 @@ export function Stars({ rating, size = 16 }: { rating: number; size?: number }) 
           key={n}
           importantForAccessibility="no"
           accessibilityElementsHidden
-          style={[styles.star, { fontSize: size, color: n <= rating ? colors.starFilled : colors.starEmpty }]}
+          style={[styles.star, { fontSize: size, lineHeight: Math.round(size * 1.25), color: n <= rating ? colors.starFilled : colors.starEmpty }]}
         >
           {"★"}
         </Text>
@@ -32,5 +32,5 @@ export function Stars({ rating, size = 16 }: { rating: number; size?: number }) 
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 2 },
-  star: { lineHeight: 20 },
+  star: {},
 });

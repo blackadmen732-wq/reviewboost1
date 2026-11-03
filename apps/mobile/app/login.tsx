@@ -22,7 +22,12 @@ import {
   type SocialProvider,
   type SocialResult,
 } from "@/data/social-sign-in";
-import { colors, radii, fonts } from "@/theme";
+import * as Linking from "expo-linking";
+import { PUBLIC_LINKS } from "@/data/public-links";
+import { colors, radii, fonts, type } from "@/theme";
+
+const TERMS_URL = PUBLIC_LINKS.find((link) => link.key === "terms")!.url;
+const PRIVACY_URL = PUBLIC_LINKS.find((link) => link.key === "privacy")!.url;
 
 const RESEND_SECONDS = 30;
 const CODE_LENGTH = 6;
@@ -153,9 +158,10 @@ export default function LoginScreen() {
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View style={styles.inner}>
+        <View style={[styles.inner, { paddingTop: insets.top + 8 }]}>
           <Tappable
-            style={[styles.backButton, { top: insets.top + 8 }]}
+            kind="row"
+            style={styles.backButton}
             onPress={() => {
               setStep("email");
               setError(null);
@@ -166,7 +172,9 @@ export default function LoginScreen() {
             <Text style={styles.backText}>← Use a different email</Text>
           </Tappable>
 
-          <Text style={styles.brand}>Check your email</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            Check your email
+          </Text>
           <Text style={styles.subtitle}>
             We sent a {CODE_LENGTH}-digit code to {email}
           </Text>
@@ -205,7 +213,7 @@ export default function LoginScreen() {
             accessibilityRole="button"
           >
             {submitting ? (
-              <ActivityIndicator color={colors.onBrand} />
+              <ActivityIndicator color={colors.onAction} />
             ) : (
               <Text style={styles.buttonText}>Sign in</Text>
             )}
@@ -238,13 +246,17 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <View style={styles.inner}>
+      <View style={[styles.inner, { paddingTop: insets.top + 12 }]}>
         <View style={styles.brand}>
-          <BrandLockup height={40} />
+          <BrandLockup height={30} />
         </View>
+        {/* The website's sign-in words: one page for new and returning owners. */}
+        <Text style={styles.title} accessibilityRole="header">
+          Get started
+        </Text>
         <Text style={styles.subtitle}>
-          Enter your email and we&apos;ll send you a sign-in code. No password
-          needed.
+          Use your business email. We will send you a code to sign in. No
+          password to remember.
         </Text>
 
         {sessionError && (
@@ -261,8 +273,13 @@ export default function LoginScreen() {
           </View>
         )}
 
+        <Text style={styles.fieldLabel} nativeID="email-label">
+          Email
+        </Text>
         <TextInput
           style={styles.input}
+          accessibilityLabel="Email"
+          accessibilityLabelledBy="email-label"
           placeholder="you@yourbusiness.com"
           placeholderTextColor={colors.inkFaint}
           value={email}
@@ -281,7 +298,7 @@ export default function LoginScreen() {
           accessibilityRole="button"
         >
           {submitting ? (
-            <ActivityIndicator color={colors.onBrand} />
+            <ActivityIndicator color={colors.onAction} />
           ) : (
             <Text style={styles.buttonText}>Continue</Text>
           )}
@@ -332,6 +349,18 @@ export default function LoginScreen() {
 
           </View>
         ) : null}
+
+        <Text style={styles.terms}>
+          By continuing you agree to our{" "}
+          <Text style={styles.termsLink} accessibilityRole="link" onPress={() => void Linking.openURL(TERMS_URL)}>
+            terms
+          </Text>{" "}
+          and{" "}
+          <Text style={styles.termsLink} accessibilityRole="link" onPress={() => void Linking.openURL(PRIVACY_URL)}>
+            privacy policy
+          </Text>
+          .
+        </Text>
       </View>
     </KeyboardAvoidingView>
   );
@@ -339,22 +368,22 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
-  inner: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
-  brand: { alignItems: "center" },
+  inner: { flex: 1, paddingHorizontal: 24 },
+  brand: { alignItems: "flex-start", minHeight: 48, justifyContent: "center" },
+  title: { ...type.largeTitle, color: colors.ink, marginTop: 40 },
   subtitle: {
-    fontSize: 16,
+    ...type.callout,
     color: colors.inkMuted,
-    textAlign: "center",
-    marginTop: 8,
-    marginBottom: 32,
-    lineHeight: 22,
+    marginTop: 10,
+    marginBottom: 28,
   },
+  fieldLabel: { ...type.subhead, fontWeight: "600", color: colors.ink, marginBottom: 8 },
+  terms: { ...type.footnote, color: colors.inkMuted, marginTop: 28 },
+  termsLink: { color: colors.ink, textDecorationLine: "underline" },
   backButton: {
-    position: "absolute",
-    left: 16,
     minHeight: 44,
     justifyContent: "center",
-    paddingHorizontal: 8,
+    alignSelf: "flex-start",
   },
   backText: { fontSize: 15, color: colors.inkMuted },
   errorBox: {
@@ -383,14 +412,15 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   button: {
-    backgroundColor: colors.brand,
+    backgroundColor: colors.action,
     borderRadius: radii.control,
-    padding: 16,
+    minHeight: 52,
+    justifyContent: "center",
     alignItems: "center",
     marginTop: 8,
   },
-  buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: colors.onBrand, fontSize: 16, ...fonts.subheading },
+  buttonDisabled: { opacity: 0.4 },
+  buttonText: { color: colors.onAction, fontSize: 17, ...fonts.subheading },
   resendButton: { alignItems: "center", marginTop: 20, padding: 8 },
   social: { marginTop: 20, gap: 12 },
   divider: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 4 },
@@ -412,6 +442,6 @@ const styles = StyleSheet.create({
   googleLogo: { width: 20, height: 20 },
   googleText: { color: "#1F1F1F", fontSize: 16, ...fonts.subheading },
   appleButton: { width: "100%", height: 52 },
-  resendText: { fontSize: 15, color: colors.brandText },
+  resendText: { fontSize: 15, fontWeight: "500", color: colors.ink },
   resendDisabled: { color: colors.inkFaint },
 });

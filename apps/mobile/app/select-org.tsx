@@ -1,16 +1,13 @@
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { BrandLockup } from "@/components/brand-lockup";
+import { Button } from "@/components/button";
+import { Group, Row } from "@/components/group";
 import { Tappable } from "@/components/tappable";
 import { useAuth } from "@/data/auth-context";
-import { colors, radii, fonts } from "@/theme";
+import { colors, radii, space, type } from "@/theme";
 import type { Organization } from "@/data/types";
 
 export default function SelectOrgScreen() {
@@ -29,7 +26,7 @@ export default function SelectOrgScreen() {
 
   const handleSelect = (orgId: string) => {
     selectOrg(orgId);
-    router.replace("/(tabs)/feed");
+    router.replace("/(tabs)/home");
   };
 
   const handleLogout = async () => {
@@ -45,131 +42,90 @@ export default function SelectOrgScreen() {
     router.replace("/login");
   };
 
+  // "Welcome back, owner@mariospizza.test" wrapped over three lines. A first
+  // name, when there is one, and otherwise just the words.
+  const firstName = name && !name.includes("@") ? name.trim().split(/\s+/)[0] : null;
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerText}>
-            <Text style={styles.greeting}>Welcome back, {name}</Text>
-            <Text style={styles.subtitle}>Choose your business</Text>
-          </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.topBar}>
+          <BrandLockup height={26} />
           <Tappable
+            kind="row"
             style={styles.logoutButton}
             onPress={handleLogout}
             disabled={loggingOut}
             accessibilityRole="button"
           >
-            <Text style={styles.logoutText}>
-              {loggingOut ? "Signing out…" : "Sign out"}
-            </Text>
+            <Text style={styles.logoutText}>{loggingOut ? "Signing out…" : "Sign out"}</Text>
           </Tappable>
         </View>
+        <Text style={styles.greeting} accessibilityRole="header">
+          {firstName ? `Welcome back, ${firstName}` : "Welcome back"}
+        </Text>
+        <Text style={styles.subtitle}>Choose your business</Text>
         {logoutError && <Text style={styles.errorText}>{logoutError}</Text>}
-      </View>
-      <FlatList
-        data={organizations}
-        keyExtractor={(item) => item.orgId}
-        renderItem={({ item }: { item: Organization }) => (
-          <Tappable
-            kind="row"
-            style={styles.card}
-            onPress={() => handleSelect(item.orgId)}
-            accessibilityRole="button"
-          >
-            <Text style={styles.orgName}>{item.name}</Text>
-            <Text style={styles.role}>{item.role}</Text>
-          </Tappable>
-        )}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          orgLoading ? (
-            <ActivityIndicator
-              size="large"
-              color={colors.brand}
-              style={styles.spinner}
-            />
+
+        <View style={styles.list}>
+          {organizations.length > 0 ? (
+            <Group>
+              {organizations.map((item: Organization) => (
+                <Row
+                  key={item.orgId}
+                  onPress={() => handleSelect(item.orgId)}
+                  accessibilityLabel={`${item.name}, ${item.role}`}
+                >
+                  <Text style={styles.orgName}>{item.name}</Text>
+                  <Text style={styles.role}>{item.role}</Text>
+                </Row>
+              ))}
+            </Group>
+          ) : orgLoading ? (
+            <ActivityIndicator size="large" color={colors.inkMuted} style={styles.spinner} />
           ) : orgError ? (
-            <View>
+            <View style={styles.notice}>
               <Text style={styles.errorText}>{orgError}</Text>
-              <Tappable
-                kind="row"
-                onPress={() => void refreshOrganizations()}
-                accessibilityRole="button"
-              >
-                <Text style={styles.logoutText}>Try again</Text>
-              </Tappable>
+              <Button label="Try again" variant="secondary" onPress={() => void refreshOrganizations()} />
             </View>
           ) : (
-            <View>
-              <Text style={styles.empty}>
-                No business on this account yet
-              </Text>
+            <View style={styles.notice}>
+              <Text style={styles.empty}>No business on this account yet</Text>
               {/* Someone with no business must still be able to delete their
                   account in the app (launch gap L1, Apple 5.1.1(v)). */}
-              <Tappable
-                kind="row"
-                onPress={() => router.push("/delete-account")}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.logoutText, styles.deleteLink]}>
-                  Delete my account
-                </Text>
+              <Tappable kind="row" onPress={() => router.push("/delete-account")} accessibilityRole="button">
+                <Text style={[styles.logoutText, styles.deleteLink]}>Delete my account</Text>
               </Tappable>
             </View>
-          )
-        }
-      />
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
-  header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  headerText: { flex: 1 },
-  greeting: { fontSize: 24, ...fonts.heading, color: colors.ink },
-  subtitle: { fontSize: 15, color: colors.inkMuted, marginTop: 4 },
+  content: { paddingHorizontal: space.gutter, paddingBottom: 40 },
+  topBar: { minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  greeting: { ...type.largeTitle, color: colors.ink, marginTop: 16 },
+  subtitle: { ...type.callout, color: colors.inkMuted, marginTop: 6 },
   logoutButton: {
+    minHeight: 36,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    justifyContent: "center",
     borderRadius: radii.badge,
     borderWidth: 1,
-    borderColor: colors.borderLight,
-    marginTop: 4,
-  },
-  logoutText: { fontSize: 13, color: colors.inkMuted, ...fonts.label },
-  list: { padding: 24, gap: 12 },
-  card: {
-    borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.card,
-    padding: 16,
     backgroundColor: colors.surface,
   },
-  orgName: { fontSize: 18, ...fonts.subheading, color: colors.ink },
-  role: {
-    fontSize: 14,
-    color: colors.inkMuted,
-    marginTop: 2,
-    textTransform: "capitalize",
-  },
-  empty: {
-    textAlign: "center",
-    color: colors.inkFaint,
-    marginTop: 40,
-    fontSize: 15,
-  },
-  errorText: {
-    textAlign: "center",
-    color: colors.danger,
-    marginTop: 12,
-    fontSize: 14,
-  },
+  logoutText: { ...type.subhead, fontWeight: "500", color: colors.inkMuted },
+  list: { marginTop: 28 },
+  orgName: { ...type.headline, color: colors.ink },
+  role: { ...type.subhead, color: colors.inkMuted, marginTop: 2, textTransform: "capitalize" },
+  notice: { gap: 16, alignItems: "stretch" },
+  empty: { ...type.callout, textAlign: "center", color: colors.inkMuted, marginTop: 24 },
+  errorText: { ...type.subhead, textAlign: "center", color: colors.danger, marginTop: 12 },
   spinner: { marginTop: 40 },
-  deleteLink: { textAlign: "center", marginTop: 24, textDecorationLine: "underline" },
+  deleteLink: { textAlign: "center", textDecorationLine: "underline", minHeight: 44, paddingTop: 12 },
 });

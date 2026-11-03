@@ -11,5 +11,5 @@ export default function Index() {
 
   if (!isLoggedIn) return <Redirect href="/login" />;
   if (!activeOrg) return <Redirect href="/select-org" />;
-  return <Redirect href="/(tabs)/feed" />;
+  return <Redirect href="/(tabs)/home" />;
 }

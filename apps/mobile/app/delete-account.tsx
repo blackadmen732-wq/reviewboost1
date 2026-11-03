@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, Stack } from "expo-router";
+import { stackHeader } from "@/components/screen";
 
 import { Tappable } from "@/components/tappable";
 import { accountFetch, apiFetch, ApiError } from "@/data/api";
@@ -87,7 +88,7 @@ export default function DeleteAccountScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Delete account" }} />
+      <Stack.Screen options={stackHeader("Delete account")} />
       <ScrollView contentContainerStyle={styles.content}>
         {!isOwner || onlyMe ? (
           <PersonalDeletion hasBusiness={Boolean(activeOrg)} />

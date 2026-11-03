@@ -16,8 +16,19 @@ export interface TextRequestItem {
   createdAt: string;
 }
 
+/**
+ * What a request may say and how a customer can have agreed, from the server's
+ * one copy (lib/sms/text-request-templates): the app never keeps its own.
+ */
+export interface ComposeOptions {
+  templates: Array<{ id: string; text: string }>;
+  defaultTemplateId: string;
+  consentMethods: Array<{ id: string; label: string }>;
+  consentWordingVersion: string;
+}
+
 interface ApiResponse {
-  data: { items: TextRequestItem[]; balance: SmsBalance };
+  data: { items: TextRequestItem[]; balance: SmsBalance; compose?: ComposeOptions };
   requestId: string;
 }
 
@@ -31,6 +42,7 @@ interface ApiResponse {
 export function useTextRequests(orgId: string | undefined) {
   const [items, setItems] = useState<TextRequestItem[]>([]);
   const [balance, setBalance] = useState<SmsBalance | null>(null);
+  const [compose, setCompose] = useState<ComposeOptions | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +62,7 @@ export function useTextRequests(orgId: string | undefined) {
         if (gen !== generationRef.current) return;
         setItems(res.data.items);
         setBalance(res.data.balance);
+        setCompose(res.data.compose ?? null);
       } catch (e) {
         if (gen !== generationRef.current) return;
         setError(e instanceof Error ? e.message : "Failed to load Text Requests");
@@ -67,11 +80,12 @@ export function useTextRequests(orgId: string | undefined) {
     generationRef.current += 1;
     setItems([]);
     setBalance(null);
+    setCompose(null);
     setError(null);
     if (orgId) fetchAll();
   }, [orgId, fetchAll]);
 
   const refresh = useCallback(() => fetchAll(true), [fetchAll]);
 
-  return { items, balance, loading, refreshing, error, refresh };
+  return { items, balance, compose, loading, refreshing, error, refresh };
 }

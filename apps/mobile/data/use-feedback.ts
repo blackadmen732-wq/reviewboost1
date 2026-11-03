@@ -32,7 +32,13 @@ function toFeedbackItem(
   };
 }
 
-export function useFeedback(orgId: string | undefined) {
+/**
+ * `needs` is Feedback's "Needs you": open, and unread or three stars or fewer
+ * (the server applies the website's rule). `all` is Everything.
+ */
+export type FeedbackShow = "needs" | "all";
+
+export function useFeedback(orgId: string | undefined, show: FeedbackShow = "all") {
   const [items, setItems] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -56,7 +62,7 @@ export function useFeedback(orgId: string | undefined) {
     loadingMoreRef.current = false;
     fetchingRef.current = false;
     cursorRef.current = null;
-  }, [orgId]);
+  }, [orgId, show]);
 
   const fetchPage = useCallback(
     async (cursor: string | null, append: boolean, reqId: number) => {
@@ -67,6 +73,7 @@ export function useFeedback(orgId: string | undefined) {
       const params = new URLSearchParams();
       if (cursor) params.set("cursor", cursor);
       params.set("limit", "25");
+      if (show === "needs") params.set("show", "needs");
       const qs = params.toString();
 
       const res = await apiFetch<ApiResponse>(
@@ -83,7 +90,7 @@ export function useFeedback(orgId: string | undefined) {
       setHasMore(res.meta.hasMore);
       cursorRef.current = res.meta.nextCursor;
     },
-    [orgId],
+    [orgId, show],
   );
 
   const load = useCallback(async () => {

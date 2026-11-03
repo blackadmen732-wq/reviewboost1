@@ -16,6 +16,32 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * An image the API serves only to a signed-in member, such as a Tag's code,
+ * as a data URI an Image can show. Fetched with the same Bearer token and
+ * business header as apiFetch: an Image's own request would carry neither
+ * on every platform, and the code is not public.
+ */
+export async function authorizedImage(path: string, orgId: string): Promise<string> {
+  if (!API_URL) throw new ApiError("EXPO_PUBLIC_API_URL is not configured", 0);
+  return boundedRead(async (signal) => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session) throw new ApiError("Not authenticated — please sign in", 401);
+    const res = await fetch(`${API_URL}${path}`, {
+      ...(signal ? { signal } : {}),
+      headers: { Authorization: `Bearer ${data.session.access_token}`, "X-Organization-Id": orgId },
+    });
+    if (!res.ok) throw new ApiError(res.statusText || "Could not load the image", res.status);
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new ApiError("Could not read the image", 0));
+      reader.readAsDataURL(blob);
+    });
+  });
+}
+
 export async function apiFetch<T>(
   path: string,
   orgId: string,

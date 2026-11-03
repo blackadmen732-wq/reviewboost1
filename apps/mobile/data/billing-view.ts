@@ -39,7 +39,10 @@ export function planLabel(planId: BillingState["planId"]): string {
 function formatDate(value: string | null): string | null {
   if (!value) return null;
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toLocaleDateString();
+  // "Nov 22, 2026", as the website writes it, whatever the phone's region.
+  return Number.isNaN(parsed.getTime())
+    ? null
+    : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 export function accountView(

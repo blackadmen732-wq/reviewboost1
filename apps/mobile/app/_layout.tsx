@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { Platform, StatusBar, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import { AuthProvider, useAuth } from "@/data/auth-context";
+import { HomeProvider } from "@/data/home";
 import { LAUNCH_BACKGROUND, LaunchScreen } from "@/components/launch-screen";
 import { colors } from "@/theme";
 
@@ -49,6 +50,7 @@ function RootNavigator() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="feedback/[id]" />
           <Stack.Screen name="stand/[id]" />
+          <Stack.Screen name="account" />
         </Stack.Protected>
       </Stack>
     </View>
@@ -58,7 +60,9 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootNavigator />
+      <HomeProvider>
+        <RootNavigator />
+      </HomeProvider>
     </AuthProvider>
   );
 }

@@ -52,6 +52,14 @@ export interface OwnerContext {
 }
 
 type OrgFields = { name: string; timezone: string };
+
+/**
+ * The database client a read runs as. Pages pass nothing and get the signed-in
+ * browser session (cookies); the iPhone app's API routes pass the RLS client
+ * built from its bearer token (`context.db`). Either way Row Level Security
+ * decides what comes back — the parameter only says whose session it is.
+ */
+export type OwnerDb = Awaited<ReturnType<typeof supabaseServer>>;
 type MembershipRow = {
   id: string;
   org_id: string;
@@ -265,8 +273,9 @@ export async function listReviews(
     submittedFrom?: string | undefined;
     submittedBefore?: string | undefined;
   } = {},
+  db?: OwnerDb,
 ): Promise<Page<Review>> {
-  const supabase = await supabaseServer();
+  const supabase = db ?? (await supabaseServer());
   const limit = clampLimit(options.limit);
 
   let query = supabase
@@ -357,8 +366,8 @@ export interface ActionNote {
  * part that changes the business. Appended to, never edited: something that can
  * be quietly rewritten afterwards is not a record.
  */
-export async function listActionNotes(orgId: string, responseId: string): Promise<ActionNote[]> {
-  const supabase = await supabaseServer();
+export async function listActionNotes(orgId: string, responseId: string, db?: OwnerDb): Promise<ActionNote[]> {
+  const supabase = db ?? (await supabaseServer());
 
   const { data, error } = await supabase
     .from("response_notes")
@@ -468,8 +477,9 @@ export async function getFeedbackInsights(
   orgId: string,
   timezone: string,
   options: { range: InsightRange; locationId?: string | null | undefined },
+  db?: OwnerDb,
 ): Promise<FeedbackInsights> {
-  const supabase = await supabaseServer();
+  const supabase = db ?? (await supabaseServer());
   const periods = insightPeriods(timezone, options.range);
   const locationId = options.locationId ?? null;
 
@@ -698,8 +708,8 @@ export interface Stand {
  * Each stand resolves its own location_id so multi-location businesses
  * display correctly.
  */
-export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
-  const supabase = await supabaseServer();
+export const listStands = cache(async (orgId: string, db?: OwnerDb): Promise<Stand[]> => {
+  const supabase = db ?? (await supabaseServer());
 
   const [standsResult, locationsResult] = await Promise.all([
     supabase
@@ -781,8 +791,8 @@ export const getPrimaryLocation = cache(async (orgId: string): Promise<OwnerLoca
   };
 });
 
-export const listLocations = cache(async (orgId: string): Promise<OwnerLocation[]> => {
-  const supabase = await supabaseServer();
+export const listLocations = cache(async (orgId: string, db?: OwnerDb): Promise<OwnerLocation[]> => {
+  const supabase = db ?? (await supabaseServer());
 
   const { data, error } = await supabase
     .from("locations")
@@ -861,8 +871,8 @@ export interface OwnerCounts {
  * together, and issuing them from separate components would serialise them
  * behind each other's awaits.
  */
-export const getOwnerCounts = cache(async (orgId: string, timezone: string): Promise<OwnerCounts> => {
-  const supabase = await supabaseServer();
+export const getOwnerCounts = cache(async (orgId: string, timezone: string, db?: OwnerDb): Promise<OwnerCounts> => {
+  const supabase = db ?? (await supabaseServer());
 
   const dayStart = startOfLocalDay(timezone);
   const monthStart = startOfLocalMonth(timezone);
@@ -923,7 +933,7 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
       .eq("status", "unmatched")
       .gte("created_at", monthStart.toISOString()),
     supabase.from("review_stands").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "active"),
-    listLocations(orgId),
+    listLocations(orgId, db),
     // Whether anyone has rated yet, for Home's empty state. Ids, not ratings:
     // the one average in the product is the one Insights computes.
     supabase
@@ -985,8 +995,8 @@ export const getUnreadCount = cache(async (orgId: string): Promise<number> => {
  * screens then say nothing about billing rather than guess: the Billing page
  * is where an unreadable plan is reported.
  */
-export const getServiceState = cache(async (orgId: string): Promise<ServiceKind> => {
-  const supabase = await supabaseServer();
+export const getServiceState = cache(async (orgId: string, db?: OwnerDb): Promise<ServiceKind> => {
+  const supabase = db ?? (await supabaseServer());
   const { data, error } = await supabase
     .from("entitlement_snapshots")
     .select("plan_id, status, trial_ends_at")
@@ -1284,8 +1294,8 @@ export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBillin
  * carries a photo. Home uses it for one optional setup step, so a failed read
  * leaves the step out (null) rather than taking Home down with it.
  */
-export const hasPublishedCustomerPhoto = cache(async (orgId: string): Promise<boolean | null> => {
-  const supabase = await supabaseServer();
+export const hasPublishedCustomerPhoto = cache(async (orgId: string, db?: OwnerDb): Promise<boolean | null> => {
+  const supabase = db ?? (await supabaseServer());
   const { data, error } = await supabase
     .from("customer_page_profiles")
     .select("published")

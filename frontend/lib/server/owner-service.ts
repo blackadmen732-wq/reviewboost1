@@ -463,6 +463,12 @@ export async function listCustomerResponses(
   page: Page,
   requestId: string,
   orgId: string,
+  /**
+   * The website's "Needs you": not sorted, and either unread or three stars or
+   * fewer. The same predicate as owner-data's listReviews, so the two lists
+   * agree.
+   */
+  filter: { needsAttention?: boolean } = {},
 ) {
   const limit = pageSize(page.limit);
 
@@ -473,6 +479,7 @@ export async function listCustomerResponses(
     .order("submitted_at", { ascending: false })
     .limit(limit + 1);
 
+  if (filter.needsAttention) query = query.is("resolved_at", null).or("read_at.is.null,rating.lte.3");
   if (page.cursor) query = query.lt("submitted_at", page.cursor);
 
   const { data, error } = await query;
@@ -509,7 +516,7 @@ export async function getCustomerResponse(
 ) {
   const { data, error } = await context.db
     .from("customer_responses")
-    .select("id, location_id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .select("id, location_id, stand_id, rating, note_encrypted, submitted_at, read_at, resolved_at")
     .eq("org_id", orgId)
     .eq("id", responseId)
     .maybeSingle();
@@ -520,11 +527,14 @@ export async function getCustomerResponse(
   return {
     responseId: data.id as string,
     locationId: data.location_id as string,
+    /** The Tag it came from, so the detail can name it. */
+    standId: (data.stand_id as string | null) ?? null,
     rating: data.rating as number,
     note: tryDecrypt(data.note_encrypted as string | null),
     submittedAt: data.submitted_at as string,
     isRead: data.read_at !== null,
     isResolved: data.resolved_at !== null,
+    resolvedAt: (data.resolved_at as string | null) ?? null,
   };
 }
 

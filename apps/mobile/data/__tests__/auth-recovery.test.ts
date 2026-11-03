@@ -35,6 +35,12 @@ vi.mock("../supabase", () => ({
   },
 }));
 vi.mock("../review-sign-in", () => ({ signInForReview: vi.fn() }));
+const lastBusiness = vi.hoisted(() => ({ value: null as string | null }));
+vi.mock("../last-business", () => ({
+  readLastBusiness: vi.fn(async () => lastBusiness.value),
+  rememberLastBusiness: vi.fn(),
+  forgetLastBusiness: vi.fn(),
+}));
 import { AuthProvider, useAuth } from "../auth-context";
 const session = {
   user: { id: "test-owner", email: "test@example.test", user_metadata: {} },
@@ -53,6 +59,7 @@ function Probe() {
         sessionError: auth.sessionError,
         orgError: auth.orgError,
         count: auth.organizations.length,
+        active: auth.activeOrg?.orgId ?? null,
       }),
     ),
     createElement(
@@ -65,6 +72,7 @@ function Probe() {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  lastBusiness.value = null;
   vi.stubGlobal("React", React);
   mocks.getSession.mockResolvedValue({ data: { session }, error: null });
   mocks.query.mockResolvedValue({ data: [], error: null });
@@ -131,4 +139,33 @@ it("ignores a stale organization lookup after signing out", async () => {
     }),
   );
   expect(screen.getByText(/sessionError/).textContent).toContain('"count":0');
+});
+
+const membership = (orgId: string, name: string) => ({
+  org_id: orgId,
+  role: "owner",
+  organizations: { name, timezone: "UTC" },
+});
+it("opens the only business without asking", async () => {
+  mocks.query.mockResolvedValueOnce({ data: [membership("only", "Mario's Pizza")], error: null });
+  render(createElement(AuthProvider, null, createElement(Probe)));
+  await waitFor(() =>
+    expect(screen.getByText(/sessionError/).textContent).toContain('"active":"only"'),
+  );
+});
+it("asks which business when there are several, unless one was chosen on this phone", async () => {
+  mocks.query.mockResolvedValueOnce({ data: [membership("a", "A"), membership("b", "B")], error: null });
+  const first = render(createElement(AuthProvider, null, createElement(Probe)));
+  await waitFor(() =>
+    expect(screen.getByText(/sessionError/).textContent).toContain('"count":2'),
+  );
+  expect(screen.getByText(/sessionError/).textContent).toContain('"active":null');
+  first.unmount();
+
+  lastBusiness.value = "b";
+  mocks.query.mockResolvedValueOnce({ data: [membership("a", "A"), membership("b", "B")], error: null });
+  render(createElement(AuthProvider, null, createElement(Probe)));
+  await waitFor(() =>
+    expect(screen.getByText(/sessionError/).textContent).toContain('"active":"b"'),
+  );
 });
