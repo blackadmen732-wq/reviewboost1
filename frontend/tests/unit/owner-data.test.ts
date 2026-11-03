@@ -152,6 +152,13 @@ describe("relativeDay", () => {
     expect(relativeDay("2026-11-01T10:00:00-05:00", "America/New_York", nextMorning)).toBe("2 days ago");
   });
 
+  it("never throws: a zone the browser doesn't know, or a date that isn't one", () => {
+    // Noon to noon, three days apart, is three days on every zone's calendar,
+    // whichever zone the device falls back to.
+    expect(relativeDay("2026-08-07T12:00:00Z", "Not/AZone", now)).toBe("3 days ago");
+    expect(relativeDay("not a date", "America/New_York", now)).toBe("Invalid Date");
+  });
+
   it("puts the day boundary at the business's midnight, wherever the server is", () => {
     // 01:30 UTC on 3 Nov is still the evening of 2 Nov in New York.
     const morning = new Date("2026-11-03T14:00:00Z").getTime();

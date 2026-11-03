@@ -418,8 +418,11 @@ export function OnboardingFlow({
           loading={qr.downloading}
           onClick={() => qr.download("reviewboost-qr.svg")}
         >
+          {/* "Save code", as on the Tag page. It saves an SVG, which a
+              phone keeps in Downloads, not Photos, so "Save to my phone"
+              pointed an owner at the wrong place to look. */}
           <Download className="size-5" aria-hidden="true" />
-          Save to my phone
+          Save code
         </Button>
         <Button variant="ghost" asChild>
           <a href="/home">Go to my dashboard</a>

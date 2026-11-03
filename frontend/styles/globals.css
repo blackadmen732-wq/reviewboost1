@@ -615,16 +615,12 @@ textarea {
 }
 
 /* "Print this code" (features/tags/print-code-sheet.tsx). On screen the
-   sheet is hidden; on paper it is all there is: the app around it is hidden,
-   the page is white in either theme, and the sheet's page has no margin, so
-   the browser prints no address or date along its edges. Colours are fixed,
-   not theme tokens: paper has one theme. */
+   sheet is hidden; on paper it is all there is: the app around it is hidden
+   and the page is white in either theme. The sheet itself sets the page's
+   margin to 0 while it is mounted. Colours are fixed, not theme tokens:
+   paper has one theme. */
 .print-code {
   display: none;
-}
-
-@page rb-code {
-  margin: 0;
 }
 
 @media print {
@@ -634,16 +630,21 @@ textarea {
     color-scheme: light;
   }
 
+  /* The body's min-height is 100vh on screen. Safari sizes vh to the window
+     when it prints (WebKit bug 126591), so in a tall window the body would be
+     longer than the paper and print a second, blank page. */
+  html:has(> body > .print-code) > body {
+    min-height: 0 !important;
+  }
+
   body:has(> .print-code) > :not(.print-code) {
     display: none !important;
   }
 
-  /* Set from the top, not centred on 100vh: a print engine that sizes vh
-     to the window, not the paper, would make the sheet taller than the page
-     and split the code across two. 36 mm down puts it a little above the
-     middle on Letter and on A4. */
+  /* Set from the top, not centred on 100vh, for the same reason. 36 mm
+     down puts it a little above the middle on Letter and on A4, and with a
+     browser's own margins (older Safari) it still fits on one page. */
   .print-code {
-    page: rb-code;
     display: flex;
     flex-direction: column;
     align-items: center;

@@ -15,12 +15,42 @@ import { localDateOf, localDaysBetween } from "@/lib/utils/local-day";
  */
 export function relativeDay(iso: string, timeZone: string, now: number = Date.now()): string {
   const then = new Date(iso);
-  const days = localDaysBetween(localDateOf(timeZone, then), localDateOf(timeZone, new Date(now)));
+  // As before: a date that isn't one reads "Invalid Date" rather than taking
+  // the page down (Intl throws on it).
+  if (Number.isNaN(then.getTime())) return String(then);
+
+  const zone = knownZone(timeZone);
+  const days = localDaysBetween(localDateOf(zone, then), localDateOf(zone, new Date(now)));
 
   // Clock skew can put a timestamp a moment in the future: that is today.
   if (days <= 0) return "Today";
   if (days === 1) return "Yesterday";
   if (days < 7) return `${days} days ago`;
 
-  return then.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone });
+  return then.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: zone });
+}
+
+const KNOWN_ZONES = new Map<string, string>();
+
+/**
+ * The business's zone if this runtime has it, otherwise the device's own.
+ *
+ * These labels also render in the browser, inside client components. Node
+ * knows every zone sign-up accepts, but a browser with older time-zone data
+ * may not, and Intl throws on a zone it doesn't know: the page failed, and so
+ * did its Try again. The owner's own device is the nearest stand-in, since an
+ * owner is usually where the business is.
+ */
+function knownZone(timeZone: string): string {
+  let zone = KNOWN_ZONES.get(timeZone);
+  if (zone === undefined) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone });
+      zone = timeZone;
+    } catch {
+      zone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+    }
+    KNOWN_ZONES.set(timeZone, zone);
+  }
+  return zone;
 }

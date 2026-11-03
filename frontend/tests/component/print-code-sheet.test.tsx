@@ -84,6 +84,9 @@ describe("the printed code, from a Tag", () => {
       "Front counter, Downtown",
     ]);
     expect(paper!.querySelector("button, a")).toBeNull();
+    // No margin, so no address or date along the edges. In the sheet, not the
+    // stylesheet: only a page that prints the sheet loses its margin.
+    expect(paper!.querySelector("style")?.textContent).toBe("@page { margin: 0; }");
   });
 
   it("names the place only when it is not just the business's name again", () => {
@@ -180,8 +183,15 @@ describe("the print stylesheet", () => {
     expect(print).toMatch(/\.print-code \{[^}]*color: #111827;/);
   });
 
-  it("gives the sheet's page no margin, so no address or date prints along its edges", () => {
-    expect(css).toMatch(/@page rb-code \{\s*margin: 0;\s*\}/);
-    expect(print).toMatch(/\.print-code \{[^}]*page: rb-code;/);
+  it("sets no page margin of its own, so other pages print as they always did", () => {
+    // Safari never matches a named @page, so the zero margin lives in the
+    // mounted sheet instead (see the first test).
+    expect(css).not.toMatch(/@page/);
+  });
+
+  it("lets the body end with the sheet, so a tall window prints no blank second page", () => {
+    expect(print).toMatch(/html:has\(> body > \.print-code\) > body \{\s*min-height: 0 !important;/);
+    // No rule in print sizes anything by the window (comments aside).
+    expect(print.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/\d+d?vh/);
   });
 });

@@ -19,6 +19,13 @@ const noSubscription = () => () => {};
  * paper as the button. Rendered into `<body>` itself, so nothing of the app
  * around it (a padded card, a max width) shapes the printed page.
  *
+ * While it is mounted it also takes the page's margin away, which leaves no
+ * room for the address and date a browser prints along the edges. An
+ * unnamed `@page`, here rather than in the stylesheet, so it holds only on a
+ * page that prints this sheet: Safari never matches a named `@page`, and
+ * applies `@page` margins from Safari 18.2 (older Safari keeps its own
+ * margins, and the sheet still fits).
+ *
  * The question is the customer page's own heading, in English like the page
  * itself (every business is English until a language can be set), so the
  * paper and the page it opens say the same thing.
@@ -46,6 +53,7 @@ export function PrintCodeSheet({
 
   return createPortal(
     <div className="print-code" data-print-code>
+      <style>{"@page { margin: 0; }"}</style>
       {businessName ? <p className="print-code__business">{businessName}</p> : null}
       <p className="print-code__question">{customerMessages.en.ratingHeading}</p>
       {/* eslint-disable-next-line @next/next/no-img-element */}
