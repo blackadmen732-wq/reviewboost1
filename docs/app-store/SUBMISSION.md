@@ -69,7 +69,7 @@ PLANS
 $49, $79 or $129 a month depending on how many locations and Tags you need.
 Starter comes with a seven-day free trial: a card is required to start it and
 nothing is charged until it ends. Growth and Pro are charged when you subscribe. Subscriptions are managed on the web at
-reviewboost.fit — this app shows your plan and what is left of it.
+reviewboost.fit — this app shows your plan's status.
 
 ---
 Requires an internet connection for setup and to receive ratings in real time.
@@ -269,7 +269,7 @@ does on the same device (`apps/mobile/data/social-sign-in.ts`).
 ReviewBoost is a business service billed on the web through Stripe. The iOS app
 contains **no purchase mechanism and no link to one** — no in-app purchase, no
 checkout, no "upgrade" button, and no external URL that leads to a payment
-page. Settings reads the current plan and the remaining text allowance; it
+page. Settings reads the current plan; it
 does not sell anything, and Home never points at Billing (the Home endpoint
 removes every plan or payment link before the app sees it).
 
@@ -430,13 +430,18 @@ this file it also puts back:
 - under FOR THE BUSINESS: "Text Requests: send a review reminder to a phone number with one
   tap";
 - in the review notes, before BILLING: "TEXT REQUESTS — The Text Requests tab shows texts
-  left and recent requests. The demo business has sending turned off, so no text is sent
-  during review.";
+  left and recent requests. The demo business is on its trial, which has no texts, so no
+  text is sent during review." (keep the demo on the trial for this: see
+  `APP_STORE_METADATA.md` §13);
+- in PLANS: "this app shows your plan and what is left of it", and under *Payments and
+  Guideline 3.1*: "Settings reads the current plan and the remaining text allowance";
 - in *Data linked to identity*: Phone number — "Yes — uploaded by the owner for Text
   Requests" — App functionality;
 - screenshot 4: "Text Requests — compose screen or recent sends list";
 - for TestFlight testers: "Try the Text Requests screen", and the known limitation "SMS
   sending requires a real Twilio account — the demo account has limited credits";
-- in the checklist: "Twilio credentials set in Vercel environment (not in git)";
+- in the checklist: replace "Texting stays off: …" with "Twilio credentials set in Vercel
+  environment (not in git)" and "`NEXT_PUBLIC_TEXTING_ENABLED=true` in Vercel, and the
+  build made with `EXPO_PUBLIC_TEXTING_ENABLED=true`";
 - in the release notes: "Tap, scan, or text — your customers leave a review on Google in
   seconds."

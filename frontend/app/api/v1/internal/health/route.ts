@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json } from "@/lib/server/http";
+import { textingEnabled } from "@/lib/features";
 import { checkConfiguration } from "@/lib/server/readiness";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import { workerAuthorized } from "@/lib/server/worker-auth";
@@ -86,9 +87,13 @@ export async function GET(request: NextRequest): Promise<Response> {
     if (deadLetter > 0) problems.push("dead_letters");
     if (stripeWebhooks > 0) problems.push("stripe_webhooks_unprocessed");
     if (smsWebhooks > 0) problems.push("sms_webhooks_unprocessed");
-    if (integrationInboxAge > 900) problems.push("integration_inbox_backlog");
+    // While texting is off, Connections are dormant by design (lib/features.ts):
+    // nothing drains their inbox or syncs them, so neither is a fault. Dead
+    // letters are past failures and still need a look.
+    const connectionsActive = textingEnabled();
+    if (connectionsActive && integrationInboxAge > 900) problems.push("integration_inbox_backlog");
     if (integrationDeadLetters > 0) problems.push("integration_dead_letters");
-    if (connectionsStalled > 0) problems.push("connections_stalled");
+    if (connectionsActive && connectionsStalled > 0) problems.push("connections_stalled");
 
     // The scheduler. A worker that has not succeeded within its cadence
     // (plus slack for one missed run) means nothing is being sent or settled,
@@ -105,8 +110,11 @@ export async function GET(request: NextRequest): Promise<Response> {
     for (const row of workerRows) {
       const age = row.last_success_age_s === null ? null : Number(row.last_success_age_s);
       scheduler[row.worker] = { lastSuccessAgeSeconds: age, failing: Boolean(row.failing) };
+      // While texting is off the send worker has nothing to do
+      // (lib/server/sms/dispatch.ts), so nothing needs to call it.
+      const expected = row.worker !== "sms_dispatch" || textingEnabled();
       const limit = STALE_AFTER_SECONDS[row.worker];
-      if (limit !== undefined && (age === null || age > limit)) problems.push(`${row.worker}_stale`);
+      if (expected && limit !== undefined && (age === null || age > limit)) problems.push(`${row.worker}_stale`);
       if (row.failing) problems.push(`${row.worker}_failing`);
     }
 

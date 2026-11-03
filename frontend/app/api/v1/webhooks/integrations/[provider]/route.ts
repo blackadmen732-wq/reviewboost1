@@ -1,5 +1,6 @@
 import { after, type NextRequest } from "next/server";
 
+import { textingEnabled } from "@/lib/features";
 import { encrypt } from "@/lib/server/crypto";
 import { publicFrontendUrl } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
@@ -46,6 +47,17 @@ export async function POST(
     const url = new URL(`/api/v1/webhooks/integrations/${adapter.id}`, publicFrontendUrl()).toString();
     if (!adapter.verifyWebhook({ rawBody, headers: request.headers, url })) {
       throw new ApiError(403, ERROR_CODE.forbidden, "Signature verification failed.");
+    }
+
+    // Connections are dormant while texting is off (lib/features.ts): a
+    // verified event is acknowledged, so the provider stops retrying, and
+    // dropped unread — no customer data is kept for a feature that is off.
+    // The next reconcile reads the provider again once texting is back on.
+    if (!textingEnabled()) {
+      return json(request, requestId, 200, {
+        data: { received: true, duplicate: false, ignored: true },
+        requestId,
+      });
     }
 
     let event;

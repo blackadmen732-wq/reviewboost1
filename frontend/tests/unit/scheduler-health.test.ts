@@ -202,6 +202,16 @@ describe("health", () => {
     expect(body.data.problems).toContain("sms_dispatch_stale");
   });
 
+  it("does not expect the send worker while texting is off, when it has nothing to send", async () => {
+    results.set("rpc_worker_health", { data: workers(null, 300), error: null });
+    expect((await health()).body.data.problems).toContain("sms_dispatch_stale");
+
+    vi.stubEnv("NEXT_PUBLIC_TEXTING_ENABLED", "false");
+    const { status, body } = await health();
+    expect(body.data.problems).toEqual([]);
+    expect(status).toBe(200);
+  });
+
   it("treats a worker that has never run as stale", async () => {
     results.set("rpc_worker_health", { data: workers(null, null), error: null });
     const { body } = await health();
@@ -211,6 +221,26 @@ describe("health", () => {
   it("is 503 when a worker's last run failed", async () => {
     results.set("rpc_worker_health", { data: workers(30, 300, true), error: null });
     expect((await health()).body.data.problems).toContain("sms_dispatch_failing");
+  });
+
+  it("does not call Connections stalled while texting is off, when they sleep by design", async () => {
+    results.set("rpc_integration_health", {
+      data: [{
+        inbox_pending: 3, oldest_pending_age_s: 7_200, dead_letters: 1,
+        connections_stalled: 2, runs_failed_24h: 0, connections_by_state: {},
+      }],
+      error: null,
+    });
+    expect((await health()).body.data.problems).toEqual(
+      expect.arrayContaining(["integration_inbox_backlog", "integration_dead_letters", "connections_stalled"]),
+    );
+
+    vi.stubEnv("NEXT_PUBLIC_TEXTING_ENABLED", "false");
+    const { body } = await health();
+    expect(body.data.problems).not.toContain("integration_inbox_backlog");
+    expect(body.data.problems).not.toContain("connections_stalled");
+    // A past failure still needs a look, switch or no switch.
+    expect(body.data.problems).toContain("integration_dead_letters");
   });
 
   it("is 503 on an unprocessed Stripe event", async () => {

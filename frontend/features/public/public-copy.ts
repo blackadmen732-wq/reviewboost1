@@ -105,22 +105,26 @@ export const OWNER_SIDE = {
   lede: "Between customers, open ReviewBoost and see what is new: fresh ratings, the low ones that need you, and whether your Tags are working.",
   items: [
     {
+      icon: "new",
       title: "Every rating, as it comes in",
       body: "Home shows what is new and what needs you. Open a rating to see when it came in and at which Tag.",
     },
     {
+      icon: "team",
       title: "The low ones reach you too",
       body: "A two-star visit lands in your Feedback like any other, so you can talk to your team. Mark it sorted when it is.",
     },
     textingEnabled()
-      ? {
+      ? ({
+          icon: "texts",
           title: "Text a customer the link",
           body: "After a visit, send one text with your Tag's link, only to people who said yes to a text.",
-        }
-      : {
+        } as const)
+      : ({
+          icon: "insights",
           title: "See where you stand",
           body: "Insights shows your average over 7, 30 or 90 days, and whether it is moving up or down.",
-        },
+        } as const),
   ],
 } as const;
 

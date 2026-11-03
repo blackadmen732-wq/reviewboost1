@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDown, ArrowUpRight, BellRing, Check, MessageSquareText, QrCode, Star, Users } from "lucide-react";
+import { ArrowDown, ArrowUpRight, BellRing, ChartLine, Check, MessageSquareText, QrCode, Star, Users, type LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { FAQ } from "@/features/public/faq";
@@ -27,7 +27,13 @@ import { cn } from "@/lib/utils/cn";
  * screen with numbers on it is labelled as an example.
  */
 const STEP_ICONS = [QrCode, Star, ArrowUpRight] as const;
-const OWNER_ICONS = [BellRing, Users, MessageSquareText] as const;
+// By name, not position: which items show depends on the texting switch.
+const OWNER_ICONS: Record<(typeof OWNER_SIDE.items)[number]["icon"], LucideIcon> = {
+  new: BellRing,
+  team: Users,
+  texts: MessageSquareText,
+  insights: ChartLine,
+};
 
 export function PublicHome() {
   return (
@@ -94,8 +100,8 @@ export function PublicHome() {
             <h2 className="public-h2">{OWNER_SIDE.headline}</h2>
             <p className="public-lede">{OWNER_SIDE.lede}</p>
             <ul className="mt-8 flex flex-col gap-6">
-              {OWNER_SIDE.items.map((item, index) => {
-                const Icon = OWNER_ICONS[index]!;
+              {OWNER_SIDE.items.map((item) => {
+                const Icon = OWNER_ICONS[item.icon];
                 return (
                   <li key={item.title} className="flex gap-4">
                     <span className="public-step__icon public-step__icon--soft" aria-hidden="true">

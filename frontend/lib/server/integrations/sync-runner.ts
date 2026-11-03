@@ -13,6 +13,7 @@ import {
   type Counts,
 } from "@/lib/server/integrations/pipeline";
 import { ProviderError, type ParsedEvent } from "@/lib/server/integrations/types";
+import { textingEnabled } from "@/lib/features";
 import { logger } from "@/lib/server/logger";
 import { serviceRoleClient } from "@/lib/server/supabase";
 
@@ -380,6 +381,15 @@ export async function processIntegrations(options?: {
     purged: { profiles: 0, visits: 0, customers: 0 },
   };
 
+  // Connections read customers only for texting (lib/features.ts). While it
+  // is off they are dormant: nothing is reconciled, read from the inbox or
+  // synced, and the webhook drops events unread. Expired data is still
+  // purged, because retention does not wait for a switch.
+  if (!textingEnabled()) {
+    await purgeExpired(svc, summary);
+    return summary;
+  }
+
   summary.reconcilesQueued = await queueDueReconciles(svc, now);
 
   const { data: inbox, error: inboxError } = await svc.rpc("rpc_integration_inbox_claim", {
@@ -426,18 +436,23 @@ export async function processIntegrations(options?: {
   }
 
   if (Date.now() < deadline) {
-    const { data: purged, error: purgeError } = await svc.rpc("rpc_integration_purge", { p_limit: 200 });
-    if (purgeError) {
-      logger.warn("integrations.purge_failed", { error: purgeError });
-    } else {
-      const row = firstRow<{ profiles_deleted: number; visits_deleted: number; customers_deleted: number }>(purged);
-      summary.purged = {
-        profiles: Number(row?.profiles_deleted ?? 0),
-        visits: Number(row?.visits_deleted ?? 0),
-        customers: Number(row?.customers_deleted ?? 0),
-      };
-    }
+    await purgeExpired(svc, summary);
   }
 
   return summary;
+}
+
+/** Deletes customer data past its retention, whatever else is switched on. */
+async function purgeExpired(svc: SupabaseClient, summary: ProcessSummary): Promise<void> {
+  const { data: purged, error: purgeError } = await svc.rpc("rpc_integration_purge", { p_limit: 200 });
+  if (purgeError) {
+    logger.warn("integrations.purge_failed", { error: purgeError });
+    return;
+  }
+  const row = firstRow<{ profiles_deleted: number; visits_deleted: number; customers_deleted: number }>(purged);
+  summary.purged = {
+    profiles: Number(row?.profiles_deleted ?? 0),
+    visits: Number(row?.visits_deleted ?? 0),
+    customers: Number(row?.customers_deleted ?? 0),
+  };
 }

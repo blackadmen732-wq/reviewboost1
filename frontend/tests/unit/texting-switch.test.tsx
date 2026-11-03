@@ -12,11 +12,30 @@ vi.mock("@supabase/ssr", () => ({
   },
 }));
 // Nothing switched off may reach the database: every path below must refuse
-// before it would need a client.
+// before it would need a client. The one exception sets `database.client` —
+// the Connections worker, which still deletes expired data.
+const database = vi.hoisted(() => ({
+  client: null as null | { rpc: (name: string, args?: unknown) => Promise<{ data: unknown; error: unknown }> },
+}));
 vi.mock("@/lib/server/supabase", () => ({
   serviceRoleClient: () => {
-    throw new Error("texting is off: nothing should reach the database");
+    if (!database.client) throw new Error("texting is off: nothing should reach the database");
+    return database.client;
   },
+}));
+// A provider whose signature always checks out, and whose events must never
+// be read while texting is off.
+vi.mock("@/lib/server/integrations/adapters", () => ({
+  getAdapter: (id: string) =>
+    id === "square"
+      ? {
+          id: "square",
+          verifyWebhook: () => true,
+          parseWebhook: () => {
+            throw new Error("texting is off: a Connections event must not be read");
+          },
+        }
+      : undefined,
 }));
 vi.mock("@/lib/supabase/browser", () => ({
   supabaseBrowser: () => ({ auth: { getSession: vi.fn() } }),
@@ -26,12 +45,14 @@ import { BillingPanel } from "@/features/dashboard/billing-panel";
 import { TEXTING_OFF_MESSAGE, textingEnabled } from "@/lib/features";
 import { createPackCheckoutSession } from "@/lib/server/billing-service";
 import { ApiError } from "@/lib/server/errors";
+import { processIntegrations } from "@/lib/server/integrations/sync-runner";
 import { dispatchOnce } from "@/lib/server/sms/dispatch";
 import {
   previewTextRequest,
   recordConsentAttestation,
   scheduleTextRequest,
 } from "@/lib/server/sms/text-request-service";
+import { POST as connectionsWebhook } from "@/app/api/v1/webhooks/integrations/[provider]/route";
 import { textingGate } from "@/proxy";
 
 /**
@@ -59,6 +80,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.resetModules();
+  database.client = null;
 });
 
 function request(pathname: string) {
@@ -191,6 +213,43 @@ describe("while texting is off", () => {
       unknown: 0,
       deferred: 0,
       skipped: 0,
+    });
+  });
+
+  it("keeps Connections asleep, and still deletes expired customer data", async () => {
+    const calls: string[] = [];
+    database.client = {
+      rpc: async (name: string) => {
+        calls.push(name);
+        return name === "rpc_integration_purge"
+          ? { data: [{ profiles_deleted: 1, visits_deleted: 0, customers_deleted: 2 }], error: null }
+          : { data: null, error: new Error(`${name} must not run while texting is off`) };
+      },
+    };
+
+    const summary = await processIntegrations({ budgetMs: 5_000 });
+
+    expect(calls).toEqual(["rpc_integration_purge"]);
+    expect(summary).toMatchObject({ reconcilesQueued: 0, inboxProcessed: 0, runsFinished: 0 });
+    expect(summary.purged).toEqual({ profiles: 1, visits: 0, customers: 2 });
+  });
+
+  it("acknowledges a signed Connections webhook and keeps nothing from it", async () => {
+    vi.stubEnv("PUBLIC_FRONTEND_URL", "https://reviewboost.fit");
+    const response = await connectionsWebhook(
+      new NextRequest(new URL("https://reviewboost.fit/api/v1/webhooks/integrations/square"), {
+        method: "POST",
+        body: JSON.stringify({ type: "customer.updated", data: { phone: "+15555550100" } }),
+        headers: { "content-type": "application/json" },
+      }),
+      { params: Promise.resolve({ provider: "square" }) },
+    );
+
+    // 200, so the provider stops retrying; nothing was parsed or stored (the
+    // stand-in database and parser both throw if touched).
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { received: true, duplicate: false, ignored: true },
     });
   });
 

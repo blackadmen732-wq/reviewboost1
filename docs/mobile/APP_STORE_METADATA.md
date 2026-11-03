@@ -79,7 +79,7 @@ ReviewBoost never writes, filters or hides reviews, and never sends unhappy cust
 ### Keywords (100 max, comma-separated, no spaces after commas)
 
 ```text
-ratings,feedback,customer feedback,nfc,nfc tag,qr code,star rating,small business,local business
+feedback,qr code,reviews,get reviews,review page,stars,small business,local business,sticker
 ```
 
 - No competitor names and no "Google" (Guideline 2.3.7 and trademark).
@@ -388,11 +388,11 @@ Not for the first submission. Use this in the release that turns texting on:
 | Field | Change |
 |---|---|
 | Subtitle | **Ratings, Tags, review requests** (30 / 30) |
-| Keywords | `review request` back in place of `star rating` |
+| Keywords | Add `review request`, and drop any word now in the name or subtitle (the §2 rules) |
 | Availability | Only countries where Text Requests are allowed |
 | Age rating → Messaging and chat | Still **No**. Why: "Users of the app cannot message each other, and there is no chat. The Texts tab sends one review request to one customer's phone by SMS, chosen from fixed, approved wording (no free text), only to a number whose consent is recorded; replies are not shown in the app" |
 | App Privacy (§4) | Check it again against that build: the Texts tab sends a customer's phone number to the server |
-| Reviewer account (§6) | Replace the texting line with "Text Requests: leave sending off for this business. No real phone numbers." |
+| Reviewer account (§6) | Keep the demo business on its trial (§6, option a): a trial has no texts, so Preview works and Send is refused with a message saying why. Under option (b) the plan is active, its texts are added, and Send really sends. Fictional data only; no real phone numbers |
 | Screenshots (§7) | Add "Texts — the exact-message preview, then a few statuses", caption "Ask one customer for a review". Use a staging business with fictional numbers if the demo business has none |
 
 Description: add after TAGS.
@@ -409,5 +409,5 @@ end "shows the current plan's status and text balance, under Guideline 3.1.3(f).
 
 ```text
 TEXT REQUESTS
-A Text Request is a single text message a business sends to one customer, asking them to rate their visit. Each request has one recipient, uses one of two fixed, approved messages (there is no free text), and shows the exact message before it can be sent; there is no bulk or broadcast sending. A text is blocked unless consent for that number is recorded. Recipients can reply STOP, after which ReviewBoost will not text that number again, for any business, unless the recipient replies START. The customer is not anonymous to the business that texted them. The demo business has sending turned off: Preview works, and Send is refused with a message saying why.
+A Text Request is a single text message a business sends to one customer, asking them to rate their visit. Each request has one recipient, uses one of two fixed, approved messages (there is no free text), and shows the exact message before it can be sent; there is no bulk or broadcast sending. A text is blocked unless consent for that number is recorded. Recipients can reply STOP, after which ReviewBoost will not text that number again, for any business, unless the recipient replies START. The customer is not anonymous to the business that texted them. The demo business is on its trial, which has no texts: Preview works, and Send is refused with a message saying why.
 ```

@@ -23,8 +23,10 @@ off:
   `/text-requests` and `/settings/connections` redirect, and the text-request,
   customer-list and connection APIs answer 404 (`proxy.ts`);
 - previewing, recording consent and scheduling refuse before reading anything,
-  and the dispatch worker claims nothing, so it needs no provider and stays
-  healthy;
+  and the dispatch worker claims nothing, so it needs no provider and health
+  does not expect it to run;
+- Connections are dormant: their webhooks are acknowledged and dropped unread
+  and nothing syncs, while expired customer data is still purged;
 - prices, plans and Billing say nothing about texts, and no pack can be bought.
   Paid months still mint their included texts in the ledger; nothing shows or
   spends them;
@@ -43,7 +45,8 @@ off:
    `SMS_PUBLIC_WEBHOOK_BASE_URL`, `SMS_RATE_PER_SEGMENT_MICROS`, the three pack
    prices and their webhook events (LAUNCH_GATE.md §4, 2b–2c), then
    `NEXT_PUBLIC_TEXTING_ENABLED=true`, and redeploy. Readiness refuses the
-   candidate until every one of them is right.
+   candidate while any of these variables is missing or malformed. It cannot
+   see the webhook events: check 2c in the Stripe dashboard by hand.
 3. iPhone app: a release built with `EXPO_PUBLIC_TEXTING_ENABLED=true`, with the
    listing changes in `docs/mobile/APP_STORE_METADATA.md` §13. Until that
    release, the store app keeps its three tabs whatever the server says.
@@ -51,7 +54,9 @@ off:
 **To turn it off again:** unset `NEXT_PUBLIC_TEXTING_ENABLED` and redeploy; the
 Texts tab leaves every phone at its next Home load. Texts already queued wait in
 the outbox (health reports `outbox_backlog`), so cancel them or let them send
-first.
+first. Connections go dormant: their webhooks are acknowledged and dropped
+unread, nothing syncs, and expired customer data is still purged on schedule.
+They read their provider again at their next reconcile once texting is back on.
 
 ## Status legend
 

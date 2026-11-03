@@ -88,7 +88,7 @@ PLANS
 $49, $79 or $129 a month depending on how many locations and Tags you need.
 Starter comes with a seven-day free trial: a card is required to start it and
 nothing is charged until it ends. Growth and Pro are charged when you subscribe. Subscriptions are managed at reviewboost.fit; this app shows
-your plan and what is left of it.
+your plan's status.
 
 Requires an internet connection. NFC programming requires a phone with NFC
 hardware; QR codes work everywhere.
@@ -311,4 +311,5 @@ back:
 - screenshot 4: "Text Requests";
 - in *Data collected*: Phone numbers — "Yes — uploaded by the owner for Text Requests" —
   shared with Twilio, to deliver the message — App functionality — optional feature;
-- under Payments: the Account tab also shows the remaining message allowance.
+- under Payments: the Account tab also shows the remaining message allowance, and in the
+  full description: "this app shows your plan and what is left of it".

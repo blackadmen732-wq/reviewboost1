@@ -178,7 +178,7 @@ forward migration before step 6, not an edit.
 | Scheduler cadence (1 min / 15 min) | IMPLEMENTED, not applied — `supabase/ops/production_scheduler.sql` (pg_cron is already installed in production; pg_net is free). Needs `CRON_SECRET` set in Vercel and your go-ahead. Missed runs are detected: TESTED | `worker_heartbeats`, `scheduler-health.test.ts` |
 | Backlog drain after downtime | IMPLEMENTED + TESTED (drain loop, 20×25 per invocation); rate **not measured** on real infrastructure | |
 | Real Stripe test-mode flow | **BLOCKED** — no Stripe credentials or egress | §6 script |
-| Real Twilio flow | **BLOCKED** — no Twilio account, phone, or egress | §6 script |
+| Real Twilio flow | **BLOCKED** — no Twilio account, phone, or egress. Needed only once texting is switched on (TEXT_REQUESTS.md) | §6 script |
 | Webhook retry / out-of-order | TESTED at DB and handler; not against Stripe | |
 | Monitoring and alerts active | **BLOCKED** — thresholds defined (OPERATIONS.md); no monitor exists yet | |
 | Backups active | **FAILED** — LIVE VERIFIED that the Free plan has no automated backups. Needs Pro, or a scheduled off-site `supabase db dump` | OPERATIONS.md |
@@ -195,7 +195,7 @@ forward migration before step 6, not an edit.
 
 **The backend is not production-ready.** Every BLOCKED row above is
 launch-critical and needs hosted access, a provider account, or an owner
-decision.
+decision — except the Twilio row, while texting is switched off.
 
 ## 4. Per-environment setup (production and staging)
 
@@ -209,9 +209,9 @@ decision.
    ```
    A grandfathered price stays in the table with its plan. Removing a price
    stops new grants on it; cancellations still revoke.
-2b. **Text pack prices** — only once texting is switched on (TEXT_REQUESTS.md,
-   *Switched off at launch*); until then readiness does not ask for them.
-   (docs/MONEY.md §4.2): three one-time USD prices in
+2b. **Text pack prices** (docs/MONEY.md §4.2), only once texting is switched
+   on (TEXT_REQUESTS.md, *Switched off at launch*); until then readiness does
+   not ask for them. Three one-time USD prices in
    the same Stripe mode — $4, $16, $40 — set as `STRIPE_PRICE_SMS_PACK_50`,
    `STRIPE_PRICE_SMS_PACK_200`, `STRIPE_PRICE_SMS_PACK_500`. Checkout refuses a
    price whose amount, currency or type differs, and production readiness
@@ -222,8 +222,8 @@ decision.
    `invoice.paid`, `invoice.payment_failed`, `checkout.session.completed`,
    `checkout.session.async_payment_succeeded`, `charge.refunded`,
    `charge.dispute.created`, `.updated`, `.closed`, `.funds_withdrawn`,
-   `.funds_reinstated`. Without the checkout and charge events a pack is paid
-   and not credited until the daily reconciliation heals it (it replays the
+   `.funds_reinstated`. Once texting is on, without the checkout and charge
+   events a pack is paid and not credited until the daily reconciliation heals it (it replays the
    last 30 days of these events), and a refund older than that would never
    be seen.
 3. **Storage:** create public bucket `customer-page`.
