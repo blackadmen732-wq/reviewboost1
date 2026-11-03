@@ -115,7 +115,9 @@ describe("the App Store listing describes this product", () => {
     // round wasted on a question with a written answer.
     expect(submission).toContain("5.1.1(v)");
     expect(submission).toContain("/delete-account");
-    expect(submission.toLowerCase()).toContain("account tab");
+    // The in-app path App Review follows: the gear at the top of every
+    // screen opens Settings, and Delete account is there.
+    expect(submission).toMatch(/Settings \(the gear[^)]*\)\s*→\s*Delete account/);
   });
 
   it("declares no analytics, because there is no analytics SDK", () => {
