@@ -340,7 +340,7 @@ This is the one place an owner programs anything.
 
 - **Status:** "Ready", "Reprint the code", "Tap not set up" or "Code changed: reprint and set up tap" (`tagReadinessLabel`). Owners never read "NFC" or "program" on a button.
 - **Next action:** not set up: "Set up tap" where the phone can write, otherwise "Print this code". Ready: neither is filled.
-- **Print:** one black-on-white page: business, "How was your visit?", the code, "Scan with your phone’s camera", the Tag's name, small. Nothing else.
+- **Print:** one black-on-white page: business, "How was your visit?", the code, "Scan with your phone’s camera"; the place, small, if there are two or more.
 - **Tap sheet:** full screen: "Set up tap" → "Hold near your Tag" → "Keep still" → "Tag ready". A failure says why, e.g. "Couldn’t set up this Tag".
 - **More (…):** "Save code", and "Make a new code" behind a warning.
 

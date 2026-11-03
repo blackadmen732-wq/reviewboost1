@@ -20,7 +20,7 @@
 ### Web Dashboard
 
 - [ ] Open Tags → a Tag — verify the code loads and displays correctly
-- [ ] Press "Print this code" — the preview is one page: the business, "How was your visit?", the code, "Scan with your phone’s camera" and the Tag's name, and nothing of the app. Same in dark mode.
+- [ ] Press "Print this code" — the preview is one page: the business, "How was your visit?", the code and "Scan with your phone’s camera" (plus the place's name, if the business has more than one), and nothing of the app. Same in dark mode.
 - [ ] Print it on a home printer and scan the paper from about 1 m — verify it opens the correct `/q/[token]` URL on the first try
 - [ ] More (…) → "Save code" — verify an SVG downloads and that scanning it opens the same URL
 

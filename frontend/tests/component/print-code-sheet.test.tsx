@@ -26,6 +26,7 @@ const qr = vi.hoisted(() => ({
 vi.mock("@/lib/hooks/use-authenticated-qr", () => ({ useAuthenticatedQr: () => qr.state }));
 
 import { OnboardingFlow } from "@/features/onboarding/onboarding-flow";
+import { printedPlace } from "@/lib/owner/printed-place";
 import { TagDetail } from "@/features/tags/tag-detail";
 import type { Stand } from "@/lib/server/owner-data";
 
@@ -76,25 +77,26 @@ describe("the printed code, from a Tag", () => {
     const paper = sheet();
     expect(paper).not.toBeNull();
     expect(paper!.querySelector("img")?.getAttribute("src")).toBe("blob:code");
+    // One place: every Tag there opens the same page, so no Tag name.
     expect(Array.from(paper!.querySelectorAll("p"), (p) => p.textContent)).toEqual([
       "Mario’s Pizza",
       "How was your visit?",
       "Scan with your phone’s camera",
-      // Which Tag, for an owner with several: each sheet has its own place.
-      "Front counter, Downtown",
     ]);
+    expect(paper!.textContent).not.toContain("Front counter");
     expect(paper!.querySelector("button, a")).toBeNull();
     // No margin, so no address or date along the edges. In the sheet, not the
     // stylesheet: only a page that prints the sheet loses its margin.
     expect(paper!.querySelector("style")?.textContent).toBe("@page { margin: 0; }");
   });
 
-  it("names the place only when it is not just the business's name again", () => {
+  it("names the place at the foot when there is more than one", () => {
+    // Each place can have its own Google link: the sheet says which it is for.
     setQr("ready", "blob:code");
     render(
-      <TagDetail timeZone="UTC" stand={{ ...stand, locationName: "Mario’s Pizza" }} canManage businessName="Mario’s Pizza" />,
+      <TagDetail timeZone="UTC" stand={stand} canManage businessName="Mario’s Pizza" placeName="Downtown" />,
     );
-    expect(sheet()!.lastElementChild?.textContent).toBe("Front counter");
+    expect(sheet()!.lastElementChild?.textContent).toBe("Downtown");
   });
 
   it("prints from the Print tile", () => {
@@ -121,6 +123,16 @@ describe("the printed code, from a Tag", () => {
     setQr("ready", "blob:code");
     render(<TagDetail timeZone="UTC" stand={stand} canManage={false} businessName="Mario’s Pizza" />);
     expect(sheet()).toBeNull();
+  });
+});
+
+describe("the place at the foot", () => {
+  it("is named only when the business has more than one", () => {
+    expect(printedPlace(1, "Downtown")).toBeUndefined();
+    expect(printedPlace(2, "Downtown")).toBe("Downtown");
+    // A count that could not be read: a name too many costs nothing.
+    expect(printedPlace(null, "Downtown")).toBe("Downtown");
+    expect(printedPlace(3, null)).toBeUndefined();
   });
 });
 

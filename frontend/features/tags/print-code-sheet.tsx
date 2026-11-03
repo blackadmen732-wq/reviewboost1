@@ -30,19 +30,19 @@ const noSubscription = () => () => {};
  * itself (every business is English until a language can be set), so the
  * paper and the page it opens say the same thing.
  *
- * At the foot, small and grey, which Tag this is. A business with several
- * Tags must put each sheet where its Tag belongs: a code in the wrong place
- * counts there, and with two places it opens the other place's page.
+ * The foot names the place, for a business with more than one
+ * (`lib/owner/printed-place.ts` says why). No Tag name: every Tag at one
+ * place opens the same page.
  */
 export function PrintCodeSheet({
   src,
   businessName,
-  tagName,
+  placeName,
 }: {
   /** The code image already on screen; it is loaded, so the paper never waits for it. */
   src: string;
   businessName?: string | undefined;
-  tagName?: string | undefined;
+  placeName?: string | undefined;
 }) {
   const mounted = useSyncExternalStore(
     noSubscription,
@@ -59,7 +59,7 @@ export function PrintCodeSheet({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className="print-code__code" src={src} alt="" />
       <p className="print-code__hint">Scan with your phone’s camera</p>
-      {tagName ? <p className="print-code__tag">{tagName}</p> : null}
+      {placeName ? <p className="print-code__place">{placeName}</p> : null}
     </div>,
     document.body,
   );

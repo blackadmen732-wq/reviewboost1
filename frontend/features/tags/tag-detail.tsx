@@ -52,6 +52,7 @@ export function TagDetail({
   canManage,
   organizationId,
   businessName,
+  placeName,
   timeZone,
   closedNotice = null,
 }: {
@@ -60,6 +61,8 @@ export function TagDetail({
   organizationId?: string;
   /** Printed above the code. */
   businessName?: string;
+  /** Printed under the code: only a business with more than one place passes it. */
+  placeName?: string | undefined;
   /** The business's, so "Used yesterday" is the business's yesterday. */
   timeZone: string;
   closedNotice?: ClosedNotice | null;
@@ -86,6 +89,7 @@ export function TagDetail({
           stand={stand}
           organizationId={organizationId}
           businessName={businessName}
+          placeName={placeName}
           timeZone={timeZone}
         />
       ) : (
@@ -132,11 +136,13 @@ function ManagedTagDetail({
   stand,
   organizationId,
   businessName,
+  placeName,
   timeZone,
 }: {
   stand: Stand;
   organizationId: string | undefined;
   businessName: string | undefined;
+  placeName: string | undefined;
   timeZone: string;
 }) {
   const router = useRouter();
@@ -304,15 +310,7 @@ function ManagedTagDetail({
           image is still on screen, dimmed, and printing it would print a
           dead code. */}
       {qr.status === "ready" && qr.objectUrl ? (
-        <PrintCodeSheet
-          src={qr.objectUrl}
-          businessName={businessName}
-          tagName={
-            stand.locationName && stand.locationName !== businessName
-              ? `${stand.label}, ${stand.locationName}`
-              : stand.label
-          }
-        />
+        <PrintCodeSheet src={qr.objectUrl} businessName={businessName} placeName={placeName} />
       ) : null}
 
       <ProgramTagSheet
