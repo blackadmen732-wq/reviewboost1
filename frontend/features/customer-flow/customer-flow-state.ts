@@ -53,6 +53,7 @@ export type CustomerFlowAction =
   | { type: "session-opening"; sessionKey: string; sessionLocale: Locale }
   | { type: "feedback-started"; sessionKey: string; sessionLocale: Locale; responseKey: string }
   | { type: "session-ready"; sessionId: string }
+  | { type: "session-replaced"; sessionKey: string; sessionLocale: Locale; responseKey: string }
   | { type: "feedback-offline" }
   | { type: "feedback-failed" }
   | {
@@ -97,6 +98,15 @@ export function customerFlowReducer(
       };
     case "session-ready":
       return { ...state, sessionId: action.sessionId };
+    case "session-replaced":
+      // The old session expired or is unknown: a new one, with its own keys.
+      return {
+        ...state,
+        sessionId: null,
+        sessionKey: action.sessionKey,
+        sessionLocale: action.sessionLocale,
+        responseKey: action.responseKey,
+      };
     case "feedback-offline":
       return { ...state, feedbackStatus: "offline" };
     case "feedback-failed":

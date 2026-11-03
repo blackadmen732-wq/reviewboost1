@@ -28,12 +28,10 @@ alter table public.public_review_sessions
 comment on column public.public_review_sessions.counts_as_scan is
     'True when a person (not a link preview or crawler) opened the Tag. Home counts these as taps.';
 
--- Owners count a day or a week of one business's opens. The existing
--- (org_id, location_id, created_at) index leads with location; this one
--- answers "this business, since midnight" without a scan.
-create index if not exists public_review_sessions_org_time_idx
-    on public.public_review_sessions (org_id, created_at desc)
-    where counts_as_scan;
+-- No new index: owners count "this business, since a date", which
+-- public_review_sessions_org_created_idx (org_id, created_at desc, from
+-- 20260902000800_dashboard_indexes) already answers. Nearly every row counts,
+-- so a partial copy would only add a write to every page open.
 
 -- ---------------------------------------------------- create session ------
 -- Identical to 20260817005852_token_rotation_write_continuity.sql except that

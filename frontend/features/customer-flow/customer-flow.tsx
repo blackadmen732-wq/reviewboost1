@@ -65,11 +65,47 @@ interface CustomerFlowProps {
 
 interface FeedbackAttempt {
   rating: RatingValue;
+  /** The page's language now: used only if a fresh session has to start. */
+  locale: Locale;
   sessionId: string | null;
   sessionKey: string;
   /** The language the session was (or will be) started in, not the page's now. */
   sessionLocale: Locale;
   responseKey: string;
+}
+
+/** How long the session started at open may take before it is given up. */
+const OPEN_DEADLINE_MS = 8_000;
+/**
+ * How long a star waits for that session before starting it itself, with the
+ * same key: the server then replays it if it was made, or says it is still on
+ * its way, which shows Try again. Without a cap, a request stalled by a phone
+ * switching networks held the star on "Sending…" with nothing to press.
+ */
+const STAR_WAITS_FOR_OPEN_MS = 4_000;
+
+/** A session the server no longer accepts: it expired (a day) or is unknown. */
+function isStaleSession(error: unknown): boolean {
+  return (
+    error instanceof CustomerApiError &&
+    (error.code === "session_expired" || error.code === "session_invalid")
+  );
+}
+
+function within<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    void promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
 }
 
 const noSubscription = () => () => {};
@@ -251,14 +287,17 @@ export function CustomerFlow({
    *
    * Only for someone looking at the rating screen: not a tab that already
    * rated (back from Google), not a prerendered or background tab (it starts
-   * when it is shown), and not while the early form is already submitting.
-   * A failure here costs nothing: the star starts the session itself, with the
+   * when it is shown), not while the early form is already submitting, and
+   * not after an early submit failed (that form already made a session; the
+   * retry star makes its own at the tap, so one customer is one tap). A
+   * failure here costs nothing: the star starts the session itself, with the
    * same key, exactly as it did before.
    */
   const canOpenSession =
     recoveryReady &&
     Boolean(contextQuery.data) &&
     !earlyDone &&
+    !failedRating &&
     state.screen === "rating" &&
     state.sessionId === null;
   const { sessionKey: openKey, sessionLocale: openLocale, locale: pageLocale } = state;
@@ -272,7 +311,11 @@ export function CustomerFlow({
       dispatch({ type: "session-opening", sessionKey, sessionLocale });
       openingSession.current = getCustomerFlowApi()
         .then((api) =>
-          api.createSession(token, { locale: sessionLocale }, { idempotencyKey: sessionKey }),
+          api.createSession(
+            token,
+            { locale: sessionLocale },
+            { idempotencyKey: sessionKey, signal: AbortSignal.timeout(OPEN_DEADLINE_MS) },
+          ),
         )
         .then((session) => {
           dispatch({ type: "session-ready", sessionId: session.sessionId });
@@ -286,35 +329,49 @@ export function CustomerFlow({
     open();
     document.addEventListener("visibilitychange", open);
     return () => document.removeEventListener("visibilitychange", open);
-  }, [canOpenSession, openKey, openLocale, pageLocale, token]);
+  }, [canOpenSession, failedRating, openKey, openLocale, pageLocale, token]);
 
   const feedbackMutation = useMutation({
     networkMode: "always",
     mutationFn: async (attempt: FeedbackAttempt) => {
       const api = await getCustomerFlowApi();
-      // A star tapped while the opening session is still on its way waits for
-      // it rather than starting a second one.
-      let sessionId =
-        attempt.sessionId ?? (openingSession.current ? await openingSession.current : null);
-
-      if (!sessionId) {
+      const start = async (sessionKey: string, sessionLocale: Locale) => {
         const session = await api.createSession(
           token,
-          { locale: attempt.sessionLocale },
-          { idempotencyKey: attempt.sessionKey },
+          { locale: sessionLocale },
+          { idempotencyKey: sessionKey },
         );
-        sessionId = session.sessionId;
-        dispatch({ type: "session-ready", sessionId });
-      }
-
-      const body: SubmitResponseRequest = {
-        sessionId,
-        rating: attempt.rating,
+        dispatch({ type: "session-ready", sessionId: session.sessionId });
+        return session.sessionId;
       };
-      const response = await api.submitResponse(token, body, {
-        idempotencyKey: attempt.responseKey,
-      });
-      return { sessionId, responseId: response.responseId };
+      const rate = async (sessionId: string, responseKey: string) => {
+        const body: SubmitResponseRequest = { sessionId, rating: attempt.rating };
+        const response = await api.submitResponse(token, body, { idempotencyKey: responseKey });
+        return { sessionId, responseId: response.responseId };
+      };
+
+      // A star tapped while the opening session is still on its way waits for
+      // it, for a while, rather than starting a second one.
+      let sessionId =
+        attempt.sessionId ??
+        (openingSession.current
+          ? await within(openingSession.current, STAR_WAITS_FOR_OPEN_MS, null)
+          : null);
+      if (!sessionId) sessionId = await start(attempt.sessionKey, attempt.sessionLocale);
+
+      try {
+        return await rate(sessionId, attempt.responseKey);
+      } catch (error) {
+        if (!isStaleSession(error)) throw error;
+        // The session now starts when the page opens, so a tab left open for
+        // a day (or restored from its saved draft) can hold one the server
+        // has let go. Start a fresh one, once, and rate on that; the old
+        // keys belong to the old session.
+        const sessionKey = createIdempotencyKey("session");
+        const responseKey = createIdempotencyKey("response");
+        dispatch({ type: "session-replaced", sessionKey, sessionLocale: attempt.locale, responseKey });
+        return await rate(await start(sessionKey, attempt.locale), responseKey);
+      }
     },
   });
 
@@ -369,6 +426,7 @@ export function CustomerFlow({
       try {
         const result = await feedbackMutation.mutateAsync({
           rating,
+          locale: previous.locale,
           sessionId: previous.sessionId,
           sessionKey,
           sessionLocale,

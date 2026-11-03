@@ -694,6 +694,8 @@ export async function listLiveFeed(
     .from("public_review_sessions")
     .select("id, location_id, created_at, locations(name)")
     .eq("org_id", orgId)
+    // The same taps Home counts: a link preview or crawler is not a tap.
+    .eq("counts_as_scan", true)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(fetchSize);
