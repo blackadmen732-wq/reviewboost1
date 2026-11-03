@@ -51,6 +51,14 @@ export function tagReadiness(input: TagTimes): TagReadiness {
   return "ready";
 }
 
+/** frontend/lib/owner/tag-readiness.ts tagReadinessLabel: the Tag's state in an owner's words. */
+export function tagReadinessLabel(status: TagReadiness): string {
+  if (status === "ready") return "Ready";
+  if (status === "needs-qr") return "Reprint the code";
+  if (status === "needs-nfc") return "Tap not set up";
+  return "Code changed: reprint and set up tap";
+}
+
 /** The two things an owner checks on a Tag, as the website's Tags list says them. */
 export function tagChecks(input: TagTimes): { qr: { ok: boolean; label: string }; nfc: { ok: boolean; label: string } } {
   const status = tagReadiness(input);

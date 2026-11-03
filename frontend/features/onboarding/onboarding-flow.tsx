@@ -235,7 +235,9 @@ export function OnboardingFlow({
               <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface text-sm font-bold text-ink">
                 {index + 1}
               </span>
-              <span className="pt-0.5 text-base text-ink">{instruction}</span>
+              <span className="pt-0.5 text-base leading-relaxed text-ink">
+                <ButtonWords text={instruction} />
+              </span>
             </li>
           ))}
         </ol>
@@ -450,5 +452,30 @@ function BackButton({ onClick }: { onClick: () => void }) {
       <ArrowLeft className="size-4" aria-hidden="true" />
       Back
     </button>
+  );
+}
+
+/**
+ * Google's button names, drawn as buttons. "Tap “Get more reviews”" is a
+ * sentence to read; the same words in a pill are a thing to look for on the
+ * screen next to this one.
+ */
+function ButtonWords({ text }: { text: string }) {
+  const parts = text.split(/“([^”]+)”/);
+  return (
+    <>
+      {parts.map((part, index) =>
+        index % 2 === 1 ? (
+          <span
+            key={index}
+            className="mx-0.5 inline-flex items-center rounded-full border border-[color:var(--rb-border-strong)] bg-surface px-2.5 py-0.5 text-[0.9375rem] font-semibold text-ink"
+          >
+            {part}
+          </span>
+        ) : (
+          <span key={index}>{part}</span>
+        ),
+      )}
+    </>
   );
 }

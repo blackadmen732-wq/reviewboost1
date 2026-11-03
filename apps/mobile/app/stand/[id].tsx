@@ -19,7 +19,7 @@ import { stackHeader } from "@/components/screen";
 import { useAuth } from "@/data/auth-context";
 import { apiFetch, authorizedImage } from "@/data/api";
 import { useStands } from "@/data/use-stands";
-import { lastUsedLabel, tagChecks, tagNeedsRewrite } from "@/lib/words";
+import { lastUsedLabel, tagChecks, tagNeedsRewrite, tagReadiness, tagReadinessLabel } from "@/lib/words";
 import { card, colors, radii, space, type } from "@/theme";
 import { NfcProgramSheet } from "@/components/nfc-program-sheet";
 import {
@@ -258,13 +258,15 @@ export default function StandDetailScreen() {
 
   const title = standLabel || stand?.label || "Tag";
   const checks = stand ? tagChecks(stand) : null;
-  const nfcLine = !stand
+  // Where tap stands, as a chip on the section instead of a sentence to read.
+  const tapChip = !stand
     ? null
     : tagNeedsRewrite(stand)
-      ? "The code changed, so a tap still opens the old link. Set it up again."
+      ? { text: "Redo", good: false }
       : stand.nfcProvisionedAt === null
-        ? "Not set up yet. Once it is, a phone tap opens your page."
-        : "Set up. A phone tap opens your customer page.";
+        ? { text: "Not set", good: false }
+        : { text: "Done", good: true };
+  const allGood = checks ? checks.qr.ok && checks.nfc.ok : false;
 
   if (loading && !stand) {
     return (
@@ -285,11 +287,13 @@ export default function StandDetailScreen() {
             {title}
           </Text>
           {stand ? (
-            <Text style={styles.meta}>
-              {[stand.locationName ?? "Place", checks?.nfc.ok ? null : "Tap not set up", lastUsedLabel(stand.lastOpenedAt)]
-                .filter(Boolean)
-                .join(" · ")}
-            </Text>
+            // Status first, in a word and a colour; then when it was last used.
+            <View style={styles.metaRow}>
+              <View style={[styles.metaDot, { backgroundColor: allGood ? colors.brand : colors.starFilled }]} />
+              <Text style={styles.metaStatus}>{tagReadinessLabel(tagReadiness(stand))}</Text>
+              <Text style={styles.meta}>{lastUsedLabel(stand.lastOpenedAt)}</Text>
+              {stand.locationName ? <Text style={styles.meta}>{stand.locationName}</Text> : null}
+            </View>
           ) : null}
         </View>
 
@@ -340,8 +344,17 @@ export default function StandDetailScreen() {
             Tag, and not a moment before. */}
         {canProvision ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Tap</Text>
-            {nfcLine ? <Text style={styles.sectionDesc}>{nfcLine}</Text> : null}
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>Tap</Text>
+              {tapChip ? (
+                <View style={[styles.chip, tapChip.good ? styles.chipGood : styles.chipNeeds]}>
+                  <Text style={[styles.chipText, { color: tapChip.good ? colors.brandText : colors.warning }]}>
+                    {tapChip.good ? "✓ " : ""}
+                    {tapChip.text}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
             {Platform.OS !== "web" && nfcSupported ? (
               <Button
                 label={stand && stand.nfcProvisionedAt !== null && !tagNeedsRewrite(stand) ? "Set up tap again" : "Set up tap"}
@@ -397,7 +410,15 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.canvas },
   content: { padding: space.gutter, gap: 20, paddingBottom: 48 },
   title: { ...type.title, color: colors.ink },
-  meta: { ...type.callout, color: colors.inkMuted, marginTop: 6 },
+  meta: { ...type.callout, color: colors.inkMuted },
+  metaRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 12, rowGap: 4, marginTop: 8 },
+  metaDot: { width: 8, height: 8, borderRadius: 4, marginRight: -4 },
+  metaStatus: { ...type.callout, fontWeight: "600", color: colors.ink },
+  sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  chip: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  chipGood: { backgroundColor: "#e3f5ec" },
+  chipNeeds: { backgroundColor: "#fff6e7" },
+  chipText: { ...type.subhead, fontWeight: "600" },
   section: { ...card, padding: 16, gap: 12 },
   code: { width: "100%", aspectRatio: 1, maxWidth: 280, alignSelf: "center" },
   sectionTitle: { ...type.headline, color: colors.ink },

@@ -166,27 +166,17 @@ export default async function SettingsPage() {
             while texting is switched off (lib/features.ts). */}
         <Section title={texting ? "Your page, apps and plan" : "Your page and plan"}>
           <RowList>
-            <Row href="/customer-page" icon={ImageUp} title="Customer page" detail="Your photo, and what customers see when they scan a Tag." />
+            <Row href="/customer-page" icon={ImageUp} title="Customer page" />
             {texting && ownerOrAdminRole ? (
-              <Row href="/settings/connections" icon={Plug} title="Connections" detail="Bring in customers from the apps you already use." />
+              <Row href="/settings/connections" icon={Plug} title="Connections" />
             ) : null}
-            <Row
-              href="/settings/billing"
-              icon={CreditCard}
-              title="Billing"
-              detail={texting ? "Your plan, texts left, and payment." : "Your plan and payment."}
-            />
+            <Row href="/settings/billing" icon={CreditCard} title="Billing" />
           </RowList>
         </Section>
 
         <Section title="Appearance">
           <div className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-base font-medium text-ink">Theme</p>
-              <p className="text-sm text-muted">
-                System follows this device. Your choice is kept on this device only.
-              </p>
-            </div>
+            <p className="text-base font-medium text-ink">Theme</p>
             <ThemeControl />
           </div>
         </Section>
@@ -197,9 +187,9 @@ export default async function SettingsPage() {
             makes an owner comfortable putting the Tag out at all. */}
         <Section title="Help">
           <RowList>
-            <Row href="mailto:help@reviewboost.fit" icon={LifeBuoy} title="Ask us anything" detail="Questions about Tags, billing or your Google link." external />
+            <Row href="mailto:help@reviewboost.fit" icon={LifeBuoy} title="Ask us anything" external />
             <Row href="/stands" icon={Eye} title="See what customers see" detail="Scan your own code to try it." />
-            <Row href="/privacy" icon={Shield} title="Privacy policy" detail="What we collect and how to delete your account." />
+            <Row href="/privacy" icon={Shield} title="Privacy policy" />
           </RowList>
         </Section>
 
@@ -224,7 +214,7 @@ export default async function SettingsPage() {
               a deletion promise is the worst place to be approximately right. */}
           <RowList>
             {can.deleteBusiness ? (
-              <Row href="/settings/delete" icon={Trash2} title="Delete this business" detail="Removes the business, its Tags and ratings. Cancelling is the way to stop billing without losing anything." danger />
+              <Row href="/settings/delete" icon={Trash2} title="Delete this business" detail="Removes the business, its Tags and ratings." danger />
             ) : (
               <Row href="/settings/delete-my-account" icon={Trash2} title="Delete my account" detail={`Removes your sign-in. ${organization.name} and its ratings stay.`} danger />
             )}
@@ -271,7 +261,8 @@ function Row({
   href: string;
   icon: LucideIcon;
   title: string;
-  detail: string;
+  /** Only where the title alone would leave a question: most rows need none. */
+  detail?: string;
   external?: boolean;
   danger?: boolean;
 }) {
@@ -284,7 +275,7 @@ function Row({
         <span className={danger ? "block text-base font-medium text-danger" : "block text-base font-medium text-ink"}>
           {title}
         </span>
-        <span className="block text-sm text-muted">{detail}</span>
+        {detail ? <span className="block text-sm text-muted">{detail}</span> : null}
       </span>
       <ChevronRight className="size-5 shrink-0 text-[color:var(--rb-border-strong)]" aria-hidden="true" />
     </>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clock, lastUsedLabel, plural, relativeDay, tagChecks, tagReadiness, textStatus } from "../../lib/words";
+import { clock, lastUsedLabel, plural, relativeDay, tagChecks, tagReadiness, tagReadinessLabel, textStatus } from "../../lib/words";
 
 /** The iPhone says days, times and Tag states in the website's words. */
 const NOW = Date.parse("2026-11-02T18:00:00Z");
@@ -40,6 +40,15 @@ describe("Tag checks", () => {
     expect(tagChecks(programmed)).toEqual({ qr: { ok: true, label: "QR ready" }, nfc: { ok: true, label: "Tap ready" } });
     expect(tagChecks(rotated)).toEqual({ qr: { ok: false, label: "Reprint QR" }, nfc: { ok: false, label: "Set up tap again" } });
     expect(tagReadiness(rotated)).toBe("both");
+  });
+});
+
+describe("Tag status words", () => {
+  it("says what the website says, status first", () => {
+    expect(tagReadinessLabel("ready")).toBe("Ready");
+    expect(tagReadinessLabel("needs-nfc")).toBe("Tap not set up");
+    expect(tagReadinessLabel("needs-qr")).toBe("Reprint the code");
+    expect(tagReadinessLabel("both")).toBe("Code changed: reprint and set up tap");
   });
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, MoreHorizontal, Printer, Smartphone } from "lucide-react";
+import { Check, Download, MoreHorizontal, Nfc, Printer, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, useSyncExternalStore } from "react";
@@ -107,10 +107,7 @@ function ReadOnlyTagDetail({ stand }: { stand: Stand }) {
         <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
           {stand.label}
         </h1>
-        <p className="mt-2 text-base text-muted">
-          {stand.locationName ?? "Place"} · {tagReadinessLabel(status)} ·{" "}
-          {lastUsedLabel(stand.lastOpenedAt)}
-        </p>
+        <StatusLine stand={stand} status={status} />
       </header>
       <p className="text-base text-muted" data-tag-access="read-only">
         {ownerOrAdmin("print, set up or change this Tag")}
@@ -196,10 +193,7 @@ function ManagedTagDetail({
             <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.03em] text-ink">
               {stand.label}
             </h1>
-            <p className="mt-2 text-base text-muted">
-              {stand.locationName ?? "Place"} · {tagReadinessLabel(status)} ·{" "}
-              {lastUsedLabel(stand.lastOpenedAt)}
-            </p>
+            <StatusLine stand={stand} status={status} />
           </div>
           <button
             type="button"
@@ -251,41 +245,44 @@ function ManagedTagDetail({
           needsReprint={status === "needs-qr" || status === "both"}
           onReload={qr.reload}
         />
-        <div className="mt-5 flex flex-col gap-3">
-          <Button
-            variant={primary === "print" ? "action" : "secondary"}
-            size={primary === "print" ? "lg" : "default"}
-            disabled={qr.status !== "ready"}
-            onClick={() => window.print()}
-          >
-            <Printer className="size-5" aria-hidden="true" />
-            Print this code
-          </Button>
-          <PreviewCustomerPage standId={stand.standId} variant="button" />
-        </div>
       </section>
 
-      <section className="max-w-[28rem]" aria-labelledby="nfc-heading" data-nfc-section>
-        <h2 id="nfc-heading" className="text-base font-semibold text-ink">
-          Tap
-        </h2>
-        <p className="mt-1 text-base leading-relaxed text-muted">{nfcLine(status)}</p>
-        <Button
-          variant={primary === "nfc" ? "action" : "secondary"}
-          size={primary === "nfc" ? "lg" : "default"}
-          className="mt-4"
+      {/* The two things a Tag does, as two big tiles: print the code, set up
+          tap. The one this Tag still needs, and this device can do, is the
+          filled one; a small chip says where each stands. */}
+      <div className="grid max-w-[28rem] grid-cols-2 gap-3" data-tag-actions>
+        <ActionTile
+          icon={Printer}
+          label="Print this code"
+          filled={primary === "print"}
+          chip={status === "needs-qr" || status === "both" ? { text: "Reprint", tone: "needs" } : null}
+          disabled={qr.status !== "ready"}
+          onClick={() => window.print()}
+        />
+        <ActionTile
+          icon={Nfc}
+          label={status === "both" ? "Set up tap again" : "Set up tap"}
+          filled={primary === "nfc"}
+          chip={
+            status === "ready" || status === "needs-qr"
+              ? { text: "Done", tone: "good" }
+              : status === "both"
+                ? { text: "Redo", tone: "needs" }
+                : { text: "Not set", tone: "needs" }
+          }
           onClick={() => setProgram(true)}
-        >
-          <Smartphone className="size-5" aria-hidden="true" />
-          {status === "both" ? "Set up tap again" : "Set up tap"}
-        </Button>
-        {nfcCapable === false ? (
-          <p className="mt-2 text-sm leading-relaxed text-muted" data-nfc-unsupported>
-            This browser can’t set up tap. Use the ReviewBoost iPhone app or
-            Chrome on Android. The printed code works either way.
-          </p>
-        ) : null}
-      </section>
+          data-nfc-section
+        />
+      </div>
+      {nfcCapable === false ? (
+        <p className="-mt-3 max-w-[28rem] text-sm leading-relaxed text-muted" data-nfc-unsupported>
+          This browser can’t set up tap. Use the ReviewBoost iPhone app or
+          Chrome on Android. The printed code works either way.
+        </p>
+      ) : null}
+      <div className="max-w-[28rem]">
+        <PreviewCustomerPage standId={stand.standId} variant="button" />
+      </div>
 
       <ProgramTagSheet
         standId={stand.standId}
@@ -331,11 +328,85 @@ function ManagedTagDetail({
   );
 }
 
-/** What the chip holds, in one sentence. */
-function nfcLine(status: ReturnType<typeof tagReadiness>): string {
-  if (status === "both") return "The code changed, so a tap still opens the old link. Set it up again.";
-  if (status === "needs-nfc") return "Not set up yet. Once it is, a phone tap opens your page.";
-  return "Set up. A phone tap opens your customer page.";
+/**
+ * Where the Tag stands, first, in a word and a colour: green when it works,
+ * amber when it needs the owner. Then when it was last used. The place is
+ * named only when the Tag has one (a business with one place does not need
+ * to read it on every Tag).
+ */
+function StatusLine({
+  stand,
+  status,
+}: {
+  stand: Stand;
+  status: ReturnType<typeof tagReadiness>;
+}) {
+  const good = status === "ready";
+  return (
+    // No dots between the parts: a long status wraps, and a line that starts
+    // with "·" reads as a mistake. The status is ink with its colour; the rest
+    // is quiet.
+    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-muted" data-tag-status={status}>
+      <span className="inline-flex items-center gap-2 font-medium text-ink">
+        <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", good ? "bg-brand" : "bg-star")} />
+        {tagReadinessLabel(status)}
+      </span>
+      <span>{lastUsedLabel(stand.lastOpenedAt)}</span>
+      {stand.locationName ? <span>{stand.locationName}</span> : null}
+    </p>
+  );
+}
+
+/** One of the Tag's two jobs: a big square to press, its word, and where it stands. */
+function ActionTile({
+  icon: Icon,
+  label,
+  filled,
+  chip,
+  disabled = false,
+  onClick,
+  ...rest
+}: {
+  icon: LucideIcon;
+  label: string;
+  filled: boolean;
+  chip: { text: string; tone: "good" | "needs" } | null;
+  disabled?: boolean;
+  onClick: () => void;
+  "data-nfc-section"?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "flex min-h-[8.5rem] flex-col items-start justify-between gap-4 rounded-[var(--radius-card)] p-4 text-left transition-[background-color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]",
+        filled
+          ? "bg-ink text-canvas shadow-[var(--shadow-button)] hover:bg-[color:var(--rb-action-hover)]"
+          : "border border-border bg-surface text-ink hover:bg-quiet",
+      )}
+      {...rest}
+    >
+      <span className="flex w-full items-start justify-between gap-2">
+        <Icon aria-hidden="true" className="size-7" strokeWidth={1.75} />
+        {chip ? (
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold",
+              chip.tone === "good"
+                ? "bg-brand-soft text-brand-text"
+                : "bg-[color:var(--rb-warning-soft)] text-[color:var(--rb-warning)]",
+            )}
+          >
+            {chip.tone === "good" ? <Check aria-hidden="true" className="size-3.5" strokeWidth={3} /> : null}
+            {chip.text}
+          </span>
+        ) : null}
+      </span>
+      <span className="text-base font-semibold leading-snug">{label}</span>
+    </button>
+  );
 }
 
 /**
