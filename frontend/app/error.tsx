@@ -7,8 +7,12 @@ import { PublicShell } from "@/features/public/public-shell";
 
 /**
  * Public error. Quiet. A way back. No owner chrome, no exception text.
+ *
+ * "Try again" is Next's `retry`, which asks the server again. `reset` only
+ * re-renders what already failed, so a page that failed on a server read
+ * failed again on every tap.
  */
-export default function PublicError({ reset }: { reset: () => void }) {
+export default function PublicError({ retry }: { retry: () => void }) {
   return (
     <PublicShell>
       <article className="mx-auto w-full max-w-[40rem] px-5 pb-24 pt-16 sm:px-8 sm:pt-20">
@@ -19,7 +23,7 @@ export default function PublicError({ reset }: { reset: () => void }) {
           Try again. The homepage still is.
         </p>
         <div className="mt-10 flex max-w-xs flex-col gap-3">
-          <Button variant="action" onClick={reset}>
+          <Button variant="action" onClick={() => retry()}>
             Try again
           </Button>
           <Button asChild variant="ghost">
