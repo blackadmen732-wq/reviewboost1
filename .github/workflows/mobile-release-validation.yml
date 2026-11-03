@@ -7,7 +7,9 @@ name: Mobile release validation
 # bundle/package identifiers.
 
 on:
+  # Push only on main: a pull request already runs this once (see ci.yml).
   push:
+    branches: [main]
     paths:
       - "apps/mobile/**"
       - ".github/workflows/mobile-release-validation.yml"

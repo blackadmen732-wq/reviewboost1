@@ -11,7 +11,9 @@ name: Backend database
 # attack.
 
 on:
+  # Push only on main: a pull request already runs this once (see ci.yml).
   push:
+    branches: [main]
     paths:
       - "supabase/**"
       - "scripts/backend/**"
@@ -90,7 +92,10 @@ jobs:
 
   upgrade:
     name: Populated upgrades (hosted schema and pre-destination)
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to Ubuntu 26 on 19 October 2026, whose
+    # archive has no postgresql-16, so this job failed at the install step
+    # before testing anything. 24.04 ships PostgreSQL 16 and its pgTAP.
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4

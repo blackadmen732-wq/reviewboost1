@@ -1,7 +1,11 @@
 name: CI
 
 on:
+  # Pull requests are checked by their pull_request run. A push trigger on
+  # every branch as well ran each check twice per push (two concurrency
+  # groups: refs/heads/... and refs/pull/.../merge), doubling paid minutes.
   push:
+    branches: [main]
   pull_request:
 
 concurrency:
