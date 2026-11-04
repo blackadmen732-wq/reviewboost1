@@ -635,7 +635,7 @@ export function CustomerPageEditor({
           </p>
         ) : null}
         <p className="mt-3 text-sm leading-relaxed text-muted">
-          Your storefront, your team or your best dish. Upright photos fill
+          Your storefront, your team or your work. Upright photos fill
           the top of the page best. Without a photo, the top stays white.
         </p>
         {photoNote ? (

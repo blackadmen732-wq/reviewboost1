@@ -145,7 +145,7 @@ function EmptyHome({ model, seenDone }: { model: HomeModel; seenDone: readonly s
       ) : null}
 
       {model.showPreview && model.previewStandId ? (
-        <PreviewCustomerPage standId={model.previewStandId} />
+        <PreviewCustomerPage standId={model.previewStandId} closed={model.previewClosed === true} />
       ) : null}
     </section>
   );

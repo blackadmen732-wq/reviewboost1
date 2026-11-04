@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, Send } from "lucide-react";
+import { Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -220,7 +220,8 @@ export function ActionThread({
         loadingLabel="Saving…"
         onClick={() => void add()}
       >
-        <Send className="size-5" aria-hidden="true" />
+        {/* No paper plane: nothing is sent. The note stays with the team, and a
+            blind tester paused, afraid it would reach the customer. */}
         Save note
       </Button>
     </section>

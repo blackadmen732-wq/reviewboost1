@@ -221,6 +221,34 @@ describe("a part of a page that failed to load", () => {
   });
 });
 
+describe("the customer page preview while the Tags are off", () => {
+  // The preview opens the real link, which shows the closed screen without a
+  // plan. A blind tester took that for a fault, so the owner is told first.
+  it("says what it will show before the owner taps it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ data: { standUrl: "https://reviewboost.fit/q/tag" } })),
+      ),
+    );
+    render(<PreviewCustomerPage standId="tag-closed" closed />);
+    expect(await screen.findByRole("link", { name: /preview customer page/i })).toBeVisible();
+    expect(screen.getByText(/While your Tags are off, this opens what customers see now/)).toBeVisible();
+  });
+
+  it("says nothing extra while the Tags are on", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ data: { standUrl: "https://reviewboost.fit/q/tag" } })),
+      ),
+    );
+    render(<PreviewCustomerPage standId="tag-open" />);
+    expect(await screen.findByRole("link", { name: /preview customer page/i })).toBeVisible();
+    expect(screen.queryByText(/While your Tags are off/)).not.toBeInTheDocument();
+  });
+});
+
 describe("the page for when ReviewBoost is not answering", () => {
   it("reloads the page asked for after 3 s, counting the try across the reload", async () => {
     const reload = vi.fn();

@@ -82,7 +82,11 @@ export function deriveSetupSteps(input: SetupInput): SetupStepView[] {
       title: "Set up your Tag",
       body: tagDone
         ? "Your Tag is ready. Put it where people pay."
-        : "Print the code, or set up tap with your phone. Either works.",
+        : // ReviewBoost cannot see a printer, so a printed code ticks this off
+          // when it is first scanned. A blind tester printed and waited.
+          input.serving === false
+          ? "Print the code, or set up tap with your phone. Either works. A printed code ticks this off once someone scans it, after you choose a plan."
+          : "Print the code, or set up tap with your phone. Either works. A printed code ticks this off the first time someone scans it.",
       done: tagDone,
       action: tagAction,
       howTo: [

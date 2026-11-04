@@ -72,8 +72,11 @@ export function FeedbackList({
                   </span>
                 ) : null}
 
+                {/* Beside the stars from 640px. On a phone the stars and the
+                    time left it ~40px ("Front D…"), so it takes its own line
+                    below once a business has more than one Tag. */}
                 {item.tagLabel ? (
-                  <span className="min-w-0 truncate text-sm text-muted" data-row-tag>
+                  <span className="hidden min-w-0 truncate text-sm text-muted sm:inline" data-row-tag>
                     {item.tagLabel}
                   </span>
                 ) : null}
@@ -88,6 +91,12 @@ export function FeedbackList({
                   {relativeDayTime(item.submittedAt, timeZone)}
                 </time>
               </div>
+
+              {item.tagLabel ? (
+                <p className="mt-1 truncate text-sm text-muted sm:hidden" data-row-tag>
+                  {item.tagLabel}
+                </p>
+              ) : null}
 
               {/* A rating with no message is one line. Saying "Rating only,
                   no message" on every such row was the same sentence, over

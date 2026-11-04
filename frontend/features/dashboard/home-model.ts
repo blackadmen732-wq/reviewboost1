@@ -93,6 +93,8 @@ export interface HomeModel {
   primary: HomePrimary | null;
   showPreview: boolean;
   previewStandId: string | null;
+  /** The Tags are off for want of a plan, so the preview shows the closed screen. */
+  previewClosed?: boolean;
   tagStatus: TagStatus;
   week: WeekNumbers | null;
 }
@@ -313,6 +315,7 @@ export function deriveHomeModel({
     primary,
     showPreview: hasStand && canManage,
     previewStandId: previewStand?.standId ?? null,
+    previewClosed: !tagsServeCustomers(service),
     tagStatus: tags,
     week: weekNumbers(counts),
   };
