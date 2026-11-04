@@ -12,6 +12,7 @@ import { useHome, type HomeData, type HomeSetupStep } from "@/data/home";
 import { go, opensBrowser } from "@/lib/destinations";
 import { plural, relativeDay } from "@/lib/words";
 import { card, colors, type } from "@/theme";
+import { RetryBlock } from "@/components/retry-block";
 
 /**
  * Home: does anything need me? The website's Home, from the same model and in
@@ -34,10 +35,7 @@ export default function HomeScreen() {
     <TabScreen title={home?.businessName ?? activeOrg?.name ?? "Home"} refreshing={loading && home !== null} onRefresh={() => void refresh()}>
       {home === null ? (
         error ? (
-          <View style={styles.notice}>
-            <Text style={styles.noticeText}>{error}</Text>
-            <Button label="Try again" variant="secondary" onPress={() => void refresh()} />
-          </View>
+          <RetryBlock message={error} retryKey="home" onRetry={() => void refresh()} />
         ) : (
           <ActivityIndicator style={styles.spinner} color={colors.inkMuted} />
         )

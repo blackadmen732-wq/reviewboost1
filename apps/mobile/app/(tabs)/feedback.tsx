@@ -11,6 +11,7 @@ import { useFeedback, type FeedbackShow } from "@/data/use-feedback";
 import { relativeDay } from "@/lib/words";
 import { colors, type } from "@/theme";
 import type { FeedbackItem } from "@/data/types";
+import { RetryBlock } from "@/components/retry-block";
 
 const VIEWS = [
   { value: "needs", label: "Needs you" },
@@ -50,10 +51,7 @@ export default function FeedbackScreen() {
       <Segmented options={VIEWS} value={show} onChange={setShow} />
 
       {error && items.length === 0 ? (
-        <View style={styles.notice}>
-          <Text style={styles.noticeText}>{error}</Text>
-          <Button label="Try again" variant="secondary" onPress={() => void load()} />
-        </View>
+        <RetryBlock message={error} retryKey="feedback" onRetry={() => void load()} />
       ) : loading && items.length === 0 ? (
         <ActivityIndicator style={styles.spinner} color={colors.inkMuted} />
       ) : items.length === 0 ? (

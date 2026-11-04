@@ -19,7 +19,9 @@ export function boundedWrite<T>(
   return deadline(
     write,
     WRITE_TIMEOUT_MS,
-    "Could not confirm this change. Check its current state before trying again.",
+    // Callers find out what happened themselves (data/recovery.ts); this is
+    // never a reason to send the owner off to look.
+    "Could not confirm this change in time.",
     signal,
   );
 }

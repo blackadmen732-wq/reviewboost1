@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
 import {
@@ -97,6 +98,28 @@ export function textingGate(request: NextRequest): NextResponse | null {
   return null;
 }
 
+/**
+ * The auth service did not answer (a network failure or its own 5xx), which
+ * is not the same as being signed out. Still fail closed: nothing of the
+ * owner's is shown. But say what is true and recover by itself, rather than
+ * send an owner to sign in during an outage (they would think they had been
+ * signed out, and signing in would fail too).
+ *
+ * A page load gets `/unavailable`, at the same address, which tries again by
+ * itself. A client navigation or refresh gets a 503, which makes Next load
+ * the page in full, and so reach that page.
+ */
+export function unansweredResponse(request: NextRequest): NextResponse {
+  const headers = { "cache-control": "no-store", "retry-after": "3" };
+  if (request.headers.get("rsc") === "1" || request.headers.has("next-router-prefetch")) {
+    return new NextResponse(null, { status: 503, headers });
+  }
+  const url = request.nextUrl.clone();
+  url.pathname = "/unavailable";
+  url.search = "";
+  return NextResponse.rewrite(url, { headers });
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -115,6 +138,8 @@ export async function proxy(request: NextRequest) {
 
   let response = NextResponse.next({ request });
   let user = null;
+  /** The auth service did not answer: not the same as signed out. */
+  let unanswered = false;
 
   // Fail *closed*: if the session cannot be verified — misconfiguration, the
   // auth service being unreachable, a malformed cookie — the answer is "not
@@ -143,10 +168,13 @@ export async function proxy(request: NextRequest) {
       // an unverified claim is protecting nothing.
       const result = await supabase.auth.getUser();
       user = result.data.user;
+      unanswered = !user && isAuthRetryableFetchError(result.error);
     } catch {
       user = null;
     }
   }
+
+  if (!user && unanswered) return unansweredResponse(request);
 
   if (!user) {
     const url = request.nextUrl.clone();

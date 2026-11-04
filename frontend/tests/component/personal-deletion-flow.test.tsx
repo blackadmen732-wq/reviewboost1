@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 /**
@@ -11,11 +11,13 @@ vi.mock("@/lib/supabase/browser", () => ({
 }));
 
 import { PersonalDeletionFlow } from "@/features/settings/personal-deletion-flow";
+import { forgetAllTries } from "@/lib/recovery/use-auto-retry";
 
 const assign = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
+  forgetAllTries();
   auth.getSession.mockResolvedValue({ data: { session: { access_token: "tok" } } });
   auth.signOut.mockResolvedValue({ error: null });
   vi.stubGlobal("location", { ...window.location, assign, reload: vi.fn() });
@@ -74,17 +76,69 @@ it("deletes, signs out and leaves", async () => {
   expect(JSON.parse((init as RequestInit).body as string)).toEqual({ confirmation: "Delete" });
 });
 
-it("never offers a second delete after a lost response", async () => {
+it("finds out itself whether a lost delete went through, and never deletes twice", async () => {
+  // The check before, the delete (answer lost), then the read that finds the
+  // login gone: a deleted login is refused.
   const fetcher = vi
     .fn()
     .mockResolvedValueOnce(json(200, { data: { allowed: true, blockers: [] } }))
-    .mockRejectedValueOnce(new TypeError("Lost response"));
+    .mockRejectedValueOnce(new TypeError("Lost response"))
+    .mockResolvedValueOnce(json(401, { error: { message: "Sign in." } }));
   vi.stubGlobal("fetch", fetcher);
   render(<PersonalDeletionFlow />);
   fireEvent.change(await screen.findByRole("textbox"), { target: { value: "delete" } });
   fireEvent.click(screen.getByRole("button", { name: "Delete my account" }));
-  await screen.findByText(/couldn't confirm whether your account was deleted/i);
-  expect(screen.queryByRole("button", { name: "Delete my account" })).toBeNull();
-  expect(screen.getByRole("button", { name: "Reload to check" })).toBeInTheDocument();
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  await waitFor(() => expect(assign).toHaveBeenCalledWith("/goodbye"));
+  expect(auth.signOut).toHaveBeenCalled();
+  const methods = fetcher.mock.calls.map(([, init]) => (init as RequestInit | undefined)?.method ?? "GET");
+  expect(methods).toEqual(["GET", "POST", "GET"]);
+  expect(screen.queryByText(/reload/i)).toBeNull();
+});
+
+it("holds Delete while it finds out, and offers it again once it knows nothing was deleted", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(json(200, { data: { allowed: true, blockers: [] } }))
+      .mockRejectedValueOnce(new TypeError("Lost response"))
+      .mockResolvedValue(json(200, { data: { allowed: true, blockers: [] } }));
+    vi.stubGlobal("fetch", fetcher);
+    render(<PersonalDeletionFlow />);
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "delete" } });
+    fireEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+    await screen.findByText("Checking whether that went through…");
+    expect(screen.getByRole("button", { name: "Delete my account" })).toBeDisabled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    await screen.findByText("Your account was not deleted. Nothing changed. Try again.");
+    expect(screen.getByRole("button", { name: "Delete my account" })).toBeEnabled();
+    const posts = fetcher.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === "POST");
+    expect(posts).toHaveLength(1);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("tries the first check again by itself when it could not reach the server", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    const fetcher = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("Offline"))
+      .mockResolvedValue(json(200, { data: { allowed: true, blockers: [] } }));
+    vi.stubGlobal("fetch", fetcher);
+    render(<PersonalDeletionFlow />);
+    await screen.findByText(/Couldn’t check your account\. Nothing was deleted\./);
+    expect(screen.getByText("Trying again in 3 s.")).toBeInTheDocument();
+    for (let second = 0; second < 3; second += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+    }
+    await screen.findByRole("textbox");
+  } finally {
+    vi.useRealTimers();
+  }
 });

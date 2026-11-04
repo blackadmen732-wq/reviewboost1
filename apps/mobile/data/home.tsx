@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { apiFetch, ApiError } from "./api";
 import { useAuth } from "./auth-context";
 import { FEATURES_OFF, featuresFrom, readSavedFeatures, saveFeatures, type Features } from "./features";
+import { loadFailed } from "./recovery";
 
 /**
  * The owner's Home: GET /api/v1/home, the website's own Home model and words.
@@ -121,7 +122,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       if (gen !== generation.current) return;
       // A failed read is said, never shown as an empty Home (AGENTS.md).
-      setError(e instanceof ApiError && e.status !== 0 ? e.message : "Couldn’t load Home. Check your connection and try again.");
+      setError(loadFailed(e, "Home"));
     } finally {
       if (gen === generation.current) setLoading(false);
     }

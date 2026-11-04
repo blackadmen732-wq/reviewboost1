@@ -9,12 +9,14 @@ import {
   RefreshCw,
   Store,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
 import { TestGoogleLinkButton } from "@/features/dashboard/google-link-care";
+import { CodeLoadFailed } from "@/features/tags/code-load-failed";
 import { PrintCodeSheet } from "@/features/tags/print-code-sheet";
 import {
   GOOGLE_LINK_BLAST,
@@ -23,7 +25,10 @@ import {
   GOOGLE_LINK_NOT_REVIEW_LINK,
   googleLinkState,
 } from "@/features/dashboard/google-link-copy";
+import { withWriteDeadline } from "@/lib/api/read-deadline";
 import { useAuthenticatedQr } from "@/lib/hooks/use-authenticated-qr";
+import type { IsDone } from "@/lib/recovery/check-outcome";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 import { isGoogleReviewWritingUrl } from "@/lib/security/google-review-url";
 import { billingForPlan } from "@/lib/owner/plan-choice";
 import { PLAN_CATALOG, type PlanId } from "@/lib/owner/plan-catalog";
@@ -74,6 +79,51 @@ export function OnboardingFlow({
     created?.organizationId,
   );
 
+  // The business as a check found it, after a lost answer.
+  const recovered = useRef<Created | null>(null);
+  const createCheck = useOutcomeCheck({
+    onDone: () => {
+      if (!recovered.current) return;
+      setCreated(recovered.current);
+      setStep("done");
+    },
+    onNotDone: () => setError("Your business wasn’t created. Try again."),
+    onExpired: setError,
+  });
+
+  /**
+   * Was the business made after all? Its owner now has one, with its first
+   * Tag (one transaction makes both). A read, so nothing is made twice: a
+   * second try would also have been told its own name was "already taken".
+   */
+  function isCreated(token: string): IsDone {
+    return async (signal) => {
+      const auth = { Authorization: `Bearer ${token}` };
+      const state = await fetch("/api/v1/onboarding", { signal, headers: auth });
+      if (!state.ok) throw new Error("No answer yet.");
+      const { data } = (await state.json()) as {
+        data: { hasOrganization: boolean; organization: { id: string } | null };
+      };
+      if (!data.hasOrganization || !data.organization) return false;
+      const tags = await fetch("/api/v1/review-stands", {
+        signal,
+        headers: { ...auth, "X-Organization-Id": data.organization.id },
+      });
+      if (!tags.ok) throw new Error("No answer yet.");
+      const { data: stands } = (await tags.json()) as {
+        data: Array<{ standId: string }>;
+      };
+      const first = stands[0];
+      if (!first) throw new Error("No answer yet.");
+      recovered.current = {
+        standId: first.standId,
+        organizationId: data.organization.id,
+        standUrl: "",
+      };
+      return true;
+    };
+  }
+
   const trimmedUrl = googleUrl.trim();
   const urlLooksRight =
     trimmedUrl !== "" && isGoogleReviewWritingUrl(trimmedUrl);
@@ -103,8 +153,10 @@ export function OnboardingFlow({
    * way out was a reload that loses what they typed.
    */
   async function finish(withUrl: string | undefined) {
+    if (createCheck.pending) return;
     setBusy(withUrl ? "link" : "later");
     setError(null);
+    let token: string | null = null;
 
     try {
       const {
@@ -115,28 +167,39 @@ export function OnboardingFlow({
         setError("Your session expired. Please sign in again.");
         return;
       }
+      const sent = session.access_token;
+      token = sent;
 
-      const response = await fetch("/api/v1/onboarding", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          name: name.trim(),
-          slug: slugify(name),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-          defaultLocale: "en",
-          locationName: name.trim(),
-          ...(withUrl ? { googleReviewUrl: withUrl } : {}),
-        }),
-      });
+      const response = await withWriteDeadline(
+        async (signal) =>
+          await fetch("/api/v1/onboarding", {
+            signal,
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${sent}`,
+            },
+            body: JSON.stringify({
+              name: name.trim(),
+              slug: slugify(name),
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+              defaultLocale: "en",
+              locationName: name.trim(),
+              ...(withUrl ? { googleReviewUrl: withUrl } : {}),
+            }),
+          }),
+      );
 
       if (!response.ok) {
+        // A server error can come after the business was made: find out.
+        if (response.status >= 500) {
+          createCheck.start(isCreated(sent), { serverAnswered: true });
+          return;
+        }
         setError(
           response.status === 409
             ? "That name is already taken. Try adding your street or city."
-            : "Something went wrong. Please try again.",
+            : "That didn’t go through. Please try again.",
         );
         return;
       }
@@ -145,6 +208,11 @@ export function OnboardingFlow({
       setCreated(body.data);
       setStep("done");
     } catch {
+      if (token) {
+        // The answer was lost: look for the business rather than make another.
+        createCheck.start(isCreated(token));
+        return;
+      }
       setError(
         "Could not reach ReviewBoost. Check your connection and try again.",
       );
@@ -295,6 +363,7 @@ export function OnboardingFlow({
           ) : null}
 
           {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
+          <OutcomeCheckNotice check={createCheck} />
         </div>
 
         <div className="flex flex-col gap-3">
@@ -302,7 +371,7 @@ export function OnboardingFlow({
             variant="action"
             size="lg"
             loading={busy === "link"}
-            disabled={busy === "later"}
+            disabled={busy === "later" || createCheck.pending}
             loadingLabel="Setting up…"
             onClick={() => {
               if (!urlLooksRight) {
@@ -321,7 +390,7 @@ export function OnboardingFlow({
           <Button
             variant="ghost"
             loading={busy === "later"}
-            disabled={busy === "link"}
+            disabled={busy === "link" || createCheck.pending}
             loadingLabel="Setting up…"
             onClick={() => void finish(undefined)}
           >
@@ -363,14 +432,18 @@ export function OnboardingFlow({
 
       {created ? (
         <div className="w-full rounded-[var(--radius-card)] border border-border bg-surface p-6 shadow-[var(--shadow-card)]">
-          {qr.status === "error" || qr.status === "expired" ? (
+          {qr.status === "error" ? (
+            <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center">
+              <CodeLoadFailed
+                standId={created.standId}
+                failures={qr.failures}
+                onReload={qr.reload}
+              />
+            </div>
+          ) : qr.status === "expired" ? (
             <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center">
               <div className="flex flex-col items-center gap-3">
-                <p className="text-sm text-muted">
-                  {qr.status === "expired"
-                    ? "Please sign in again"
-                    : "Could not load QR code"}
-                </p>
+                <p className="text-sm text-muted">Please sign in again</p>
                 <button
                   type="button"
                   onClick={qr.reload}

@@ -7,9 +7,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogContent, DialogRoot } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
 import { notify } from "@/components/ui/toast";
 import { ownerFetch } from "@/lib/api/owner-fetch";
 import { withWriteDeadline } from "@/lib/api/read-deadline";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -18,35 +20,53 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
  * The plan limit is enforced by `rpc_create_location` under a lock; this
  * button is only offered when the snapshot says there is room, and if the
  * database disagrees its message is shown as it comes back.
+ *
+ * If the answer is lost, it looks for the new place itself (one that was not
+ * among `locationIds`), rather than ask the owner to.
  */
-export function AddLocationButton() {
+export function AddLocationButton({
+  locationIds,
+}: {
+  /** The places there before, so a new one can be told apart. */
+  locationIds: readonly string[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const [uncertain, setUncertain] = useState(false);
-  async function checkPlaces() {
-    setBusy(true);
-    try {
-      const response = await ownerFetch("/api/v1/locations");
-      if (!response.ok) throw new Error("read_failed");
-      setUncertain(false);
-      setOpen(false);
-      router.refresh();
-    } catch {
-      setError(
-        "Could not check your places. Try checking again before adding another.",
-      );
-    } finally {
-      setBusy(false);
-    }
+  const check = useOutcomeCheck({
+    onDone: added,
+    onNotDone: () => setError("That place wasn’t added. Try again."),
+    onExpired: setError,
+  });
+
+  function added() {
+    setOpen(false);
+    setName("");
+    notify.success(
+      "Place added",
+      "Add its Google link so its Tags have somewhere to send people.",
+    );
+    router.refresh();
   }
+
   async function create() {
-    if (busy || uncertain) return;
+    if (busy || check.pending) return;
     let attempted = false;
     const trimmed = name.trim();
+    const before = new Set(locationIds);
+    const isAdded = async (signal: AbortSignal): Promise<boolean> => {
+      const response = await ownerFetch("/api/v1/locations", { signal });
+      if (!response.ok) throw new Error("No answer yet.");
+      const { data } = (await response.json()) as {
+        data: { locations: Array<{ locationId: string; name: string }> };
+      };
+      return data.locations.some(
+        (place) => !before.has(place.locationId) && place.name === trimmed,
+      );
+    };
     if (!trimmed) {
       setError("Give this place a name.");
       return;
@@ -78,6 +98,11 @@ export function AddLocationButton() {
       );
 
       if (!response.ok) {
+        // A server error can come after the place was made: find out.
+        if (response.status >= 500) {
+          check.start(isAdded, { serverAnswered: true });
+          return;
+        }
         const payload = (await response.json().catch(() => null)) as {
           error?: { message?: string };
         } | null;
@@ -88,20 +113,14 @@ export function AddLocationButton() {
         return;
       }
 
-      setOpen(false);
-      setName("");
-      notify.success(
-        "Place added",
-        "Add its Google link so its Tags have somewhere to send people.",
-      );
-      router.refresh();
+      added();
     } catch {
-      setUncertain(attempted);
-      setError(
-        attempted
-          ? "Could not confirm creation. Check your places before adding another."
-          : "Could not verify your session. Sign in again, then try.",
-      );
+      if (!attempted) {
+        setError("Could not verify your session. Sign in again, then try.");
+        return;
+      }
+      // The answer was lost: look for the new place rather than ask.
+      check.start(isAdded);
     } finally {
       setBusy(false);
     }
@@ -132,7 +151,7 @@ export function AddLocationButton() {
             </label>
             <Input
               id="add-location-name"
-              disabled={busy}
+              disabled={busy || check.pending}
               value={name}
               maxLength={160}
               placeholder="e.g. Downtown"
@@ -154,20 +173,11 @@ export function AddLocationButton() {
             ) : null}
           </div>
 
-          {uncertain ? (
-            <Button
-              variant="secondary"
-              loading={busy}
-              loadingLabel="Checking…"
-              onClick={() => void checkPlaces()}
-            >
-              Check your places
-            </Button>
-          ) : null}
+          <OutcomeCheckNotice check={check} />
           <div className="flex flex-col gap-2 sm:flex-row-reverse">
             <Button
               variant="action"
-              disabled={uncertain}
+              disabled={check.pending}
               loading={busy}
               loadingLabel="Adding…"
               onClick={() => void create()}

@@ -3,6 +3,7 @@ import { Settings } from "lucide-react";
 import Link from "next/link";
 
 import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
+import { OfflineNotice } from "@/components/ui/offline-notice";
 import { BottomNav } from "@/features/dashboard/bottom-nav";
 import { DesktopSidebar } from "@/features/dashboard/desktop-sidebar";
 import { PageTransition } from "@/features/dashboard/page-transition";
@@ -37,6 +38,8 @@ export function OwnerShell({
       <DesktopSidebar unreadCount={unreadCount} businessName={businessName} />
 
       <div className="lg:pl-[220px]">
+        {/* Before anything fails, not after: offline, nothing can save. */}
+        <OfflineNotice />
         <header
           className="mx-auto flex max-w-[var(--rb-content)] items-center justify-between px-5 pt-4 lg:hidden"
           aria-label="Account"

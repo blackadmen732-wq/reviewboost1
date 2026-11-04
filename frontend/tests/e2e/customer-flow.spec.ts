@@ -119,8 +119,10 @@ test.describe("ReviewBoost customer flow", () => {
     await openFlow(page, "fixture-response-error", { stayOnPage: true });
     await page.getByRole("radio", { name: spokenRatings[1] }).click();
     await expect(page.locator("#feedback-status")).toContainText("Your rating is still here");
+    // It would go again by itself in 3 s; "Try now" skips the wait.
+    await expect(page.locator("#feedback-status")).toContainText(/Trying again in \d+ s\./);
 
-    await page.getByRole("button", { name: "Try again" }).click();
+    await page.getByRole("button", { name: "Try now" }).click();
     await expect(page.locator("[data-flow-screen='handoff']")).toBeVisible();
 
     const keys = await page.evaluate(() =>

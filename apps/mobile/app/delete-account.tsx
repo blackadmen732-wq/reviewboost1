@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -9,11 +9,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, Stack } from "expo-router";
+import { OfflineBar } from "@/components/offline-bar";
+import { OutcomeCheckNotice } from "@/components/outcome-check-notice";
 import { stackHeader } from "@/components/screen";
 
 import { Tappable } from "@/components/tappable";
 import { accountFetch, apiFetch, ApiError } from "@/data/api";
 import { useAuth } from "@/data/auth-context";
+import { useOutcomeCheck } from "@/data/use-outcome-check";
 import { colors, fonts, radii } from "@/theme";
 
 /**
@@ -33,8 +36,17 @@ export default function DeleteAccountScreen() {
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [uncertain, setUncertain] = useState(false);
   const [onlyMe, setOnlyMe] = useState(false);
+  /** What a check found gone: the whole login, or just this business. */
+  const gone = useRef<"login" | "business">("business");
+  // A lost answer is settled by asking the server whether the business is
+  // still there, never by deleting again or sending the owner to look.
+  const check = useOutcomeCheck({
+    onDone: () => void leave(gone.current === "login"),
+    onNotDone: () => setError("Your business was not deleted. Nothing changed. Try again."),
+    onExpired: setError,
+  });
+  const holding = busy || check.pending;
 
   const businessName = activeOrg?.name ?? "";
   const matches =
@@ -42,47 +54,65 @@ export default function DeleteAccountScreen() {
     typed.trim().toLowerCase() === businessName.trim().toLowerCase();
   const isOwner = activeOrg?.role === "owner";
 
+  async function leave(signInRemoved: boolean) {
+    if (!signInRemoved) {
+      await refreshOrganizations();
+      router.replace("/select-org");
+      return;
+    }
+    const signOutError = await logout();
+    if (signOutError) {
+      setError(
+        "Business deleted. Could not clear your local sign-in. Try signing out from Account.",
+      );
+      return;
+    }
+    router.replace("/login");
+  }
+
   async function remove() {
-    if (!matches || busy || uncertain || !activeOrg) return;
+    if (!matches || holding || !activeOrg) return;
+    const orgId = activeOrg.orgId;
     setBusy(true);
     setError(null);
+
+    /** Gone: its places stop answering for it (404), or the login is gone (401). */
+    const isDeleted = async (signal: AbortSignal): Promise<boolean> => {
+      try {
+        await apiFetch("/api/v1/locations", orgId, { signal });
+        return false;
+      } catch (read) {
+        if (read instanceof ApiError && (read.status === 404 || read.status === 401)) {
+          gone.current = read.status === 401 ? "login" : "business";
+          return true;
+        }
+        throw read;
+      }
+    };
 
     try {
       const result = await apiFetch<{ data: { signInRemoved: boolean } }>(
         "/api/v1/account/deletion",
-        activeOrg.orgId,
+        orgId,
         {
           method: "POST",
           body: JSON.stringify({ confirmation: typed.trim() }),
         },
       );
-      if (!result.data.signInRemoved) {
-        await refreshOrganizations();
-        router.replace("/select-org");
-        return;
-      }
-      const signOutError = await logout();
-      if (signOutError) {
-        setError(
-          "Business deleted. Could not clear your local sign-in. Try signing out from Account.",
-        );
-        return;
-      }
-      router.replace("/login");
+      setBusy(false);
+      await leave(result.data.signInRemoved);
     } catch (caught) {
-      setUncertain(!(caught instanceof ApiError) || caught.status >= 500);
       setBusy(false);
       // The server distinguishes "we could not cancel your subscription" from
       // "that is not the business name", and both are actionable, so its
       // sentence is shown rather than a generic one.
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : "Could not confirm whether deletion finished. Check your businesses before trying again.",
-      );
-      return;
-    } finally {
-      setBusy(false);
+      if (caught instanceof ApiError && caught.status < 500) {
+        setError(caught.message);
+        return;
+      }
+      check.start(isDeleted, {
+        serverAnswered: caught instanceof ApiError && caught.status >= 500,
+      });
     }
   }
 
@@ -90,6 +120,7 @@ export default function DeleteAccountScreen() {
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <Stack.Screen options={stackHeader("Delete account")} />
       <ScrollView contentContainerStyle={styles.content}>
+        <OfflineBar />
         {!isOwner || onlyMe ? (
           <PersonalDeletion hasBusiness={Boolean(activeOrg)} />
         ) : (
@@ -121,7 +152,7 @@ export default function DeleteAccountScreen() {
                 onChangeText={setTyped}
                 autoCapitalize="none"
                 autoCorrect={false}
-                editable={!busy}
+                editable={!holding}
                 accessibilityLabel={`Type ${businessName} to confirm deletion`}
               />
             </View>
@@ -132,29 +163,17 @@ export default function DeleteAccountScreen() {
               </View>
             ) : null}
 
-            {uncertain ? (
-              <Tappable
-                style={styles.cancel}
-                onPress={() => {
-                  void refreshOrganizations().then(() =>
-                    router.replace("/select-org"),
-                  );
-                }}
-                accessibilityRole="button"
-              >
-                <Text style={styles.cancelText}>Check my businesses</Text>
-              </Tappable>
-            ) : null}
+            <OutcomeCheckNotice check={check} />
 
             <Tappable
               style={[
                 styles.destructive,
-                !matches || busy || uncertain ? styles.disabled : null,
+                !matches || holding ? styles.disabled : null,
               ]}
-              disabled={!matches || busy || uncertain}
+              disabled={!matches || holding}
               onPress={() => void remove()}
               accessibilityRole="button"
-              accessibilityState={{ disabled: !matches || busy || uncertain, busy }}
+              accessibilityState={{ disabled: !matches || holding, busy }}
             >
               {busy ? (
                 <ActivityIndicator color={colors.white} />
@@ -200,10 +219,31 @@ function PersonalDeletion({ hasBusiness }: { hasBusiness: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
-  const [uncertain, setUncertain] = useState(false);
+  const check = useOutcomeCheck({
+    onDone: () => void signedOut(),
+    onNotDone: () => setError("Your account was not deleted. Nothing changed. Try again."),
+    onExpired: setError,
+  });
+
+  async function signedOut() {
+    // The login is gone server-side; clearing the local copy can't undo that.
+    await logout();
+    router.replace("/login");
+  }
+
+  /** Is the login gone? A deleted one is refused (401) where it used to be read. */
+  async function isGone(signal: AbortSignal): Promise<boolean> {
+    try {
+      await accountFetch("/api/v1/account/personal-deletion", { signal });
+      return false;
+    } catch (read) {
+      if (read instanceof ApiError && read.status === 401) return true;
+      throw read;
+    }
+  }
 
   async function remove() {
-    if (busy || uncertain) return;
+    if (busy || check.pending) return;
     if (typed.trim().toLowerCase() !== "delete") {
       setError("Type delete to confirm.");
       return;
@@ -216,24 +256,22 @@ function PersonalDeletion({ hasBusiness }: { hasBusiness: boolean }) {
         { method: "POST", body: JSON.stringify({ confirmation: typed.trim() }) },
       );
     } catch (caught) {
+      setBusy(false);
       if (caught instanceof ApiError && caught.code === "owns_business") {
         setBlocked(caught.message);
+      } else if (caught instanceof ApiError && caught.status < 500) {
+        setError(caught.message);
       } else {
-        const unknownOutcome = !(caught instanceof ApiError) || caught.status >= 500;
-        setUncertain(unknownOutcome);
-        setError(
-          caught instanceof ApiError && !unknownOutcome
-            ? caught.message
-            : "We couldn't confirm whether your account was deleted. Sign in again to check before trying again.",
-        );
+        // The answer was lost: ask the server, which refuses a deleted login,
+        // rather than ask the person to sign in again to find out.
+        check.start(isGone, {
+          serverAnswered: caught instanceof ApiError && caught.status >= 500,
+        });
       }
-      setBusy(false);
       return;
     }
-    // The login is gone server-side; clearing the local copy can't undo that.
-    await logout();
     setBusy(false);
-    router.replace("/login");
+    await signedOut();
   }
 
   if (blocked) {
@@ -266,7 +304,7 @@ function PersonalDeletion({ hasBusiness }: { hasBusiness: boolean }) {
           }}
           autoCapitalize="none"
           autoCorrect={false}
-          editable={!busy}
+          editable={!busy && !check.pending}
           accessibilityLabel="Type delete to confirm deleting your account"
         />
       </View>
@@ -277,31 +315,20 @@ function PersonalDeletion({ hasBusiness }: { hasBusiness: boolean }) {
         </View>
       ) : null}
 
-      {uncertain ? (
-        <Tappable
-          style={styles.cancel}
-          onPress={() => {
-            void logout().then(() => router.replace("/login"));
-          }}
-          accessibilityRole="button"
-        >
-          <Text style={styles.cancelText}>Sign in again to check</Text>
-        </Tappable>
-      ) : (
-        <Tappable
-          style={[styles.destructive, busy ? styles.disabled : null]}
-          disabled={busy}
-          onPress={() => void remove()}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: busy, busy }}
-        >
-          {busy ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <Text style={styles.destructiveText}>Delete my account</Text>
-          )}
-        </Tappable>
-      )}
+      <OutcomeCheckNotice check={check} />
+      <Tappable
+        style={[styles.destructive, busy || check.pending ? styles.disabled : null]}
+        disabled={busy || check.pending}
+        onPress={() => void remove()}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: busy || check.pending, busy }}
+      >
+        {busy ? (
+          <ActivityIndicator color={colors.white} />
+        ) : (
+          <Text style={styles.destructiveText}>Delete my account</Text>
+        )}
+      </Tappable>
 
       <Tappable style={styles.cancel} onPress={() => router.back()}>
         <Text style={styles.cancelText}>Keep my account</Text>

@@ -105,7 +105,7 @@ it("clears organization loading after a rejection and supports a successful retr
       error: null,
     });
   render(createElement(AuthProvider, null, createElement(Probe)));
-  await screen.findByText(/Could not load your businesses/);
+  await screen.findByText(/Couldn’t load your businesses/);
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
   await waitFor(() =>
     expect(screen.getByText(/sessionError/).textContent).toContain('"count":1'),

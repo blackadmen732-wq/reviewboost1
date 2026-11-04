@@ -1,7 +1,23 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ActivityIndicator, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { Tappable } from "@/components/tappable";
+import { recoveryWords, STILL_WORKING_AFTER_MS } from "@/data/recovery";
 import { colors, radii } from "@/theme";
+
+/**
+ * True once a busy button has said the same thing for four seconds. A new
+ * busy label ("Uploading… 40%") is progress, so it starts the four again.
+ */
+function useStillWorking(busy: boolean, busyLabel: string | undefined): boolean {
+  const [slowFor, setSlowFor] = useState<string | null>(null);
+  const key = busy ? (busyLabel ?? "") : null;
+  useEffect(() => {
+    if (key === null) return;
+    const timer = setTimeout(() => setSlowFor(key), STILL_WORKING_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [key]);
+  return key !== null && slowFor === key;
+}
 
 /**
  * The website's buttons: one near-black action per screen, white secondary
@@ -32,20 +48,24 @@ export function Button({
 }) {
   const inactive = disabled || busy;
   const fg = variant === "action" ? colors.onAction : colors.ink;
+  // A slow save never looks frozen: after four seconds the words say it is
+  // still going (with Reduce Motion, the words are what changes).
+  const slow = useStillWorking(busy, busyLabel);
+  const busyText = slow ? recoveryWords.stillWorking : busyLabel;
   return (
     <Tappable
       onPress={onPress}
       disabled={inactive}
       accessibilityRole="button"
       accessibilityState={{ disabled: inactive, busy }}
-      accessibilityLabel={busy && busyLabel ? busyLabel : label}
+      accessibilityLabel={busy && busyText ? busyText : label}
       {...(accessibilityHint ? { accessibilityHint } : {})}
       style={[styles.base, styles[variant], disabled && !busy ? styles.disabled : null, style]}
     >
       {busy ? (
         <View style={styles.row}>
           <ActivityIndicator color={fg} />
-          {busyLabel ? <Text style={[styles.label, { color: fg }]}>{busyLabel}</Text> : null}
+          {busyText ? <Text style={[styles.label, { color: fg }]}>{busyText}</Text> : null}
         </View>
       ) : (
         <View style={styles.row}>

@@ -4,6 +4,8 @@ import { Check, ImageUp, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
+import { RetryNotice } from "@/components/ui/retry-notice";
 import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
 import { EditorSkeleton } from "@/features/customer-page/editor-skeleton";
 import { PhoneFrame } from "@/features/customer-page/phone-frame";
@@ -13,6 +15,10 @@ import Link from "next/link";
 import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page";
 import { withWriteDeadline } from "@/lib/api/read-deadline";
 import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
+import { uploadWithProgress } from "@/lib/images/upload-with-progress";
+import { checkOutcome } from "@/lib/recovery/check-outcome";
+import { useAutoRetry } from "@/lib/recovery/use-auto-retry";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 import {
   NormalizePhotoError,
   SOFT_LONG_EDGE,
@@ -74,6 +80,8 @@ export function CustomerPageEditor({
     "idle" | "publishing" | "published" | "error"
   >("idle");
   const [uploadState, setUploadState] = useState<UploadState>("idle");
+  /** How much of the photo has gone up, 0 to 1, while uploading. */
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   /** A quiet word about a photo that worked but will look soft. Never blocks. */
   const [photoNote, setPhotoNote] = useState<string | null>(null);
@@ -162,20 +170,28 @@ export function CustomerPageEditor({
         if (mounted.current) setDraftSaved(true);
         return true;
       } catch (caught) {
-        try {
-          const state = await readPage();
-          if (editableContent(state.draft) === editableContent(content)) {
-            if (mounted.current) setDraftSaved(true);
-            return true;
-          }
-        } catch {
-          /* Preserve the local intent. The live page is unchanged. */
+        if (caught instanceof SessionExpiredError) {
+          if (mounted.current) setDraftSaveError(caught.message);
+          return false;
+        }
+        // The answer was lost. Read the draft back rather than send it again
+        // (a write is never replayed by itself): it says whether it is saved.
+        const outcome = await checkOutcome(
+          async (signal) =>
+            editableContent((await readPage(signal)).draft) ===
+            editableContent(content),
+        ).catch((expired: unknown) => expired);
+        if (outcome === "done") {
+          if (mounted.current) setDraftSaved(true);
+          return true;
         }
         if (mounted.current)
           setDraftSaveError(
-            caught instanceof SessionExpiredError
-              ? caught.message
-              : "Could not confirm your saved photo. Keep this page open and try saving again. Your published page has not changed.",
+            outcome instanceof SessionExpiredError
+              ? outcome.message
+              : outcome === "not-done"
+                ? "Your photo didn’t save. It’s still here. Save it again."
+                : "No answer from ReviewBoost yet. Your photo is still here. Save it again.",
           );
         return false;
       } finally {
@@ -233,15 +249,17 @@ export function CustomerPageEditor({
             data: { assetId: string; path: string; token: string };
           };
           if (!mounted.current) return;
+          setUploadProgress(0);
           setUploadState("uploading");
           const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/customer-page/${ticket.path}?token=${ticket.token}`;
           const sent = await withWriteDeadline(
             async (signal) =>
-              await fetch(url, {
+              await uploadWithProgress(url, photo.blob, {
                 signal,
-                method: "PUT",
                 headers: { "Content-Type": photo.type, "x-upsert": "true" },
-                body: photo.blob,
+                onProgress: (fraction) => {
+                  if (mounted.current) setUploadProgress(fraction);
+                },
               }),
           );
           if (!sent.ok)
@@ -333,46 +351,60 @@ export function CustomerPageEditor({
     [onSaved],
   );
 
-  /** A lost publish response is reconciled with a read, never automatically replayed. */
-  const checkPublication = useCallback(
-    async (failure?: string) => {
+  /** The page as the last check read it, so a "not published" can show what is. */
+  const lastRead = useRef<CustomerPageState | null>(null);
+  /** What the server said, when it answered with an error. */
+  const publishFailure = useRef<string | null>(null);
+  const publishCheck = useOutcomeCheck({
+    onDone: () => {
       const intent = publishIntent.current;
-      if (!intent) return;
-      setPublishState("publishing");
-      try {
-        const state = await readPage();
-        if (
-          state.published &&
-          state.publishedVersion > intent.version &&
-          editableContent(state.published) === editableContent(intent.content)
-        ) {
-          confirmPublished(intent.content, state.publishedVersion);
-          return;
-        }
-        if (!mounted.current) return;
+      const state = lastRead.current;
+      if (intent && state) confirmPublished(intent.content, state.publishedVersion);
+    },
+    onNotDone: () => {
+      const state = lastRead.current;
+      if (!mounted.current) return;
+      if (state) {
         setPublishedDraft(state.published);
         setPublishedVersion(state.publishedVersion);
-        setPendingPublication(false);
-        publishIntent.current = null;
-        setStatusMsg(
-          `${failure ? `${failure} ` : ""}Your published page still shows the earlier version. Your draft is saved; you can try Publish again.`,
-        );
-      } catch (caught) {
-        if (mounted.current)
-          setStatusMsg(
-            caught instanceof SessionExpiredError
-              ? caught.message
-              : "We could not confirm whether publishing finished. Check the published page before trying again.",
-          );
-      } finally {
-        if (mounted.current)
-          setPublishState((state) =>
-            state === "publishing" ? "error" : state,
-          );
       }
+      setPendingPublication(false);
+      publishIntent.current = null;
+      const failure = publishFailure.current;
+      setStatusMsg(
+        `${failure ? `${failure} ` : ""}Your page wasn’t published. Your draft is saved. Publish again.`,
+      );
     },
-    [confirmPublished],
-  );
+    onExpired: (message) => {
+      if (!mounted.current) return;
+      setPendingPublication(false);
+      publishIntent.current = null;
+      setStatusMsg(message);
+    },
+  });
+
+  /**
+   * A lost publish answer is settled by reading the page, never by
+   * publishing again: the read says whether the new version went live.
+   */
+  const startPublishCheck = publishCheck.start;
+  const checkPublication = useCallback((failure?: string) => {
+    if (!publishIntent.current) return;
+    publishFailure.current = failure ?? null;
+    setPendingPublication(true);
+    setStatusMsg(null);
+    startPublishCheck(async (signal) => {
+      const intent = publishIntent.current;
+      const state = await readPage(signal);
+      lastRead.current = state;
+      return Boolean(
+        intent &&
+          state.published &&
+          state.publishedVersion > intent.version &&
+          editableContent(state.published) === editableContent(intent.content),
+      );
+    }, failure ? { serverAnswered: true } : undefined);
+  }, [startPublishCheck]);
 
   const publish = useCallback(async () => {
     if (operation.current || pendingPublication || !draftSaved) return;
@@ -410,8 +442,7 @@ export function CustomerPageEditor({
           setStatusMsg(message);
           return;
         }
-        setPendingPublication(true);
-        await checkPublication(message);
+        checkPublication(message);
         return;
       }
       const { data } = (await response.json()) as {
@@ -420,8 +451,7 @@ export function CustomerPageEditor({
       confirmPublished(draft, data?.publishedVersion ?? publishedVersion);
     } catch (caught) {
       if (publishIntent.current) {
-        setPendingPublication(true);
-        await checkPublication("Could not reach ReviewBoost.");
+        checkPublication();
       } else if (mounted.current)
         setStatusMsg(
           caught instanceof SessionExpiredError
@@ -452,7 +482,7 @@ export function CustomerPageEditor({
     uploadState === "preparing" || uploadState === "signing"
       ? "Preparing photo…"
       : uploadState === "uploading"
-        ? "Uploading…"
+        ? `Uploading… ${Math.round(uploadProgress * 100)}%`
         : uploadState === "confirming"
           ? "Almost done…"
           : heroUrl
@@ -470,21 +500,21 @@ export function CustomerPageEditor({
     !pendingPublication;
 
   if (!loaded) return <EditorSkeleton />;
+  const reload = () => {
+    setLoaded(false);
+    setLoadError(null);
+    setLoadAttempt((attempt) => attempt + 1);
+  };
+  if (loadError && !loadError.includes("session expired")) {
+    return <EditorLoadFailed failure={loadAttempt} onRetry={reload} />;
+  }
   if (loadError) {
     return (
       <div className="max-w-md rounded-[var(--radius-card)] border border-border bg-surface p-5">
         <p role="alert" className="text-sm text-danger">
           {loadError}
         </p>
-        <Button
-          className="mt-4"
-          variant="secondary"
-          onClick={() => {
-            setLoaded(false);
-            setLoadError(null);
-            setLoadAttempt((attempt) => attempt + 1);
-          }}
-        >
+        <Button className="mt-4" variant="secondary" onClick={reload}>
           Try again
         </Button>
         {loadError.includes("session expired") ? (
@@ -544,6 +574,22 @@ export function CustomerPageEditor({
             </Button>
           ) : null}
         </div>
+        {uploadState === "uploading" ? (
+          <div
+            role="progressbar"
+            aria-label="Photo upload"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(uploadProgress * 100)}
+            className="mt-3 h-1.5 overflow-hidden rounded-full bg-quiet"
+            data-upload-progress
+          >
+            <div
+              className="h-full rounded-full bg-action transition-[width] duration-200 motion-reduce:transition-none"
+              style={{ width: `${Math.round(uploadProgress * 100)}%` }}
+            />
+          </div>
+        ) : null}
         <p className="mt-3 text-sm leading-relaxed text-muted">
           Your storefront, your team or your best dish. Upright photos fill
           the top of the page best. Without a photo, the top stays white.
@@ -652,22 +698,13 @@ export function CustomerPageEditor({
               </Link>
             )}
           </div>
+        ) : publishCheck.pending ? (
+          <OutcomeCheckNotice check={publishCheck} className="mt-4" />
         ) : statusMsg ? (
           <div className="mt-4">
             <p role="alert" className="text-sm text-danger">
               {statusMsg}
             </p>
-            {pendingPublication ? (
-              <Button
-                variant="secondary"
-                className="mt-3"
-                loading={publishing}
-                loadingLabel="Checking…"
-                onClick={() => void checkPublication()}
-              >
-                Check published page
-              </Button>
-            ) : null}
           </div>
         ) : null}
       </div>
@@ -737,4 +774,27 @@ function draftPhotoUrl(state: {
     state.draft?.heroAssetId === state.published.heroAssetId
     ? (state.published.heroUrl ?? null)
     : null;
+}
+
+/**
+ * The editor could not load. It tries again by itself (3 s, 10 s, 30 s, or
+ * when the connection is back). Only loading failed: the published page is
+ * whatever it was.
+ */
+function EditorLoadFailed({
+  failure,
+  onRetry,
+}: {
+  failure: number;
+  onRetry: () => void;
+}) {
+  const retry = useAutoRetry({ key: "customer-page-editor", failure, onRetry });
+  return (
+    <div className="max-w-md rounded-[var(--radius-card)] border border-border bg-surface p-5">
+      <RetryNotice
+        retry={retry}
+        what="Your customer page didn’t load."
+      />
+    </div>
+  );
 }

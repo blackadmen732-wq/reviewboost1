@@ -8,7 +8,9 @@ import { useId, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertDialog } from "@/components/ui/dialog";
 import { InlineNotice } from "@/components/ui/inline-notice";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
 import { notify } from "@/components/ui/toast";
+import { CodeLoadFailed } from "@/features/tags/code-load-failed";
 import { PrintCodeSheet } from "@/features/tags/print-code-sheet";
 import { ProgramTagSheet } from "@/features/tags/program-tag-sheet";
 import {
@@ -23,7 +25,8 @@ import {
 import { ownerOrAdmin } from "@/lib/owner/permissions";
 import type { Stand } from "@/lib/server/owner-data";
 import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page";
-import { supabaseBrowser } from "@/lib/supabase/browser";
+import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 import { cn } from "@/lib/utils/cn";
 
 /** The only action that invalidates a printed QR code or a programmed NFC chip. */
@@ -166,42 +169,69 @@ function ManagedTagDetail({
   const primary: "nfc" | "print" | null =
     needsNfc && nfcCapable === true ? "nfc" : status === "ready" ? null : "print";
 
+  function newCodeReady() {
+    setJustProgrammedAt(null);
+    setConfirming(false);
+    router.refresh();
+    qr.reload();
+    notify.success(
+      "New code ready",
+      "The old code no longer works. Print this one and set up tap again.",
+    );
+  }
+
+  const rotateCheck = useOutcomeCheck({
+    onDone: newCodeReady,
+    onNotDone: () => notify.error("Could not make a new code", "Your code is unchanged. Please try again."),
+    onExpired: (message) => notify.error("Please sign in again", message),
+  });
+
   async function rotate() {
+    if (rotateCheck.pending) return;
     setBusy(true);
+    // The code as it was: a new one has a new prefix and a new rotation time.
+    const before = { prefix: stand.tokenPrefix, rotatedAt: stand.tokenRotatedAt };
+    const orgHeaders: Record<string, string> = organizationId
+      ? { "X-Organization-Id": organizationId }
+      : {};
+    const isNewCode = async (signal: AbortSignal): Promise<boolean> => {
+      const response = await ownerFetch("/api/v1/review-stands", {
+        signal,
+        headers: orgHeaders,
+      });
+      if (!response.ok) throw new Error("No answer yet.");
+      const { data } = (await response.json()) as {
+        data: Array<{ standId: string; tokenPrefix: string; tokenRotatedAt: string | null }>;
+      };
+      const now = data.find((row) => row.standId === stand.standId);
+      if (!now) throw new Error("No answer yet.");
+      return now.tokenPrefix !== before.prefix || now.tokenRotatedAt !== before.rotatedAt;
+    };
     try {
-      const {
-        data: { session },
-      } = await supabaseBrowser().auth.getSession();
-      if (!session) {
-        notify.error("Please sign in again", "Your session expired.");
-        return;
-      }
-      const response = await fetch(
+      const response = await ownerFetch(
         `/api/v1/review-stands/${stand.standId}/rotate-token`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        },
+        { method: "POST", headers: orgHeaders },
       );
       if (!response.ok) {
+        if (response.status >= 500) {
+          // It may have happened before the error: find out, don't guess.
+          setConfirming(false);
+          rotateCheck.start(isNewCode, { serverAnswered: true });
+          return;
+        }
         notify.error("Could not make a new code", "Please try again.");
         return;
       }
-      setJustProgrammedAt(null);
+      newCodeReady();
+    } catch (caught) {
+      if (caught instanceof SessionExpiredError) {
+        notify.error("Please sign in again", "Your session expired.");
+        return;
+      }
+      // The answer was lost. Making another code now could replace the new
+      // one too, so look first: the Tag says whether its code changed.
       setConfirming(false);
-      router.refresh();
-      qr.reload();
-      notify.success(
-        "New code ready",
-        "The old code no longer works. Print this one and set up tap again.",
-      );
-    } catch {
-      qr.reload();
-      router.refresh();
-      notify.error(
-        "Could not confirm the new code",
-        "Check this Tag before trying again.",
-      );
+      rotateCheck.start(isNewCode);
     } finally {
       setBusy(false);
     }
@@ -248,12 +278,18 @@ function ManagedTagDetail({
               <Download className="size-5" aria-hidden="true" />
               Save code
             </Button>
-            <Button variant="secondary" onClick={() => setConfirming(true)}>
+            <Button
+              variant="secondary"
+              disabled={rotateCheck.pending}
+              onClick={() => setConfirming(true)}
+            >
               Make a new code
             </Button>
           </div>
         ) : null}
       </header>
+
+      <OutcomeCheckNotice check={rotateCheck} className="max-w-[28rem]" />
 
       <section className="max-w-[28rem] rounded-[var(--radius-card)] border border-border bg-surface p-5">
         {/* The hook already distinguishes loading from expired from failed. The
@@ -261,10 +297,12 @@ function ManagedTagDetail({
             forever, so an owner whose session had expired watched an
             indefinite spinner with nothing to click. */}
         <QrPanel
+          standId={stand.standId}
           status={qr.status}
           objectUrl={qr.objectUrl}
           label={stand.label}
           needsReprint={status === "needs-qr" || status === "both"}
+          failures={qr.failures}
           onReload={qr.reload}
         />
       </section>
@@ -444,16 +482,20 @@ function ActionTile({
  * Every state the code can be in, each with its own way out.
  */
 function QrPanel({
+  standId,
   status,
   objectUrl,
   label,
   needsReprint,
+  failures,
   onReload,
 }: {
+  standId: string;
   status: AuthenticatedQr["status"];
   objectUrl: string | null;
   label: string;
   needsReprint: boolean;
+  failures: number;
   onReload: () => void;
 }) {
   const frame =
@@ -534,10 +576,7 @@ function QrPanel({
         className={`${frame} flex-col gap-3 text-center`}
         data-qr-state="error"
       >
-        <p className="text-sm text-muted">The code could not be loaded.</p>
-        <Button variant="secondary" onClick={onReload}>
-          Try again
-        </Button>
+        <CodeLoadFailed standId={standId} failures={failures} onReload={onReload} />
       </div>
     );
   }

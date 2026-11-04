@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -39,7 +40,10 @@ beforeEach(() => {
     data: { session: { access_token: "local-owner-session" } },
   });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 it("keeps mobile Settings separate from the four daily destinations", () => {
   render(
@@ -69,14 +73,18 @@ it("keeps the email and restores Continue when requesting a code loses the netwo
   expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
 });
 
-it("keeps an unsaved setting editable after a dropped request", async () => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockRejectedValueOnce(new TypeError("Failed to fetch")),
-  );
+it("reads a dropped setting back, and says it saved, without sending it twice", async () => {
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.method === "PATCH") throw new TypeError("Failed to fetch");
+    expect(url).toBe("/api/v1/home");
+    return new Response(JSON.stringify({ data: { businessName: "Mario’s Pizza House" } }), {
+      status: 200,
+    });
+  });
+  vi.stubGlobal("fetch", fetcher);
   render(
     <EditableRow
-      field="organizationName"
+      field="businessName"
       label="Business"
       value="Mario’s Pizza"
     />,
@@ -86,11 +94,45 @@ it("keeps an unsaved setting editable after a dropped request", async () => {
     target: { value: "Mario’s Pizza House" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  await screen.findByRole("alert");
+  await screen.findByText("Saved");
+  const methods = fetcher.mock.calls.map(([, init]) => (init as RequestInit | undefined)?.method ?? "GET");
+  expect(methods).toEqual(["PATCH", "GET"]);
+  expect(refresh).toHaveBeenCalled();
+});
+
+it("keeps an unsaved setting editable when reading it back shows it did not save", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === "PATCH") throw new TypeError("Failed to fetch");
+      return new Response(JSON.stringify({ data: { businessName: "Mario’s Pizza" } }), {
+        status: 200,
+      });
+    }),
+  );
+  render(
+    <EditableRow
+      field="businessName"
+      label="Business"
+      value="Mario’s Pizza"
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Change Business" }));
+  fireEvent.change(screen.getByLabelText("Business"), {
+    target: { value: "Mario’s Pizza House" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await screen.findByText("Checking whether that went through…");
+  // It keeps looking for the ten seconds before it says no.
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10_000);
+  });
+  await screen.findByText("That didn’t save. Your change is still here. Try again.");
   expect(screen.getByLabelText("Business")).toHaveValue("Mario’s Pizza House");
   expect(screen.getByLabelText("Business")).toBeEnabled();
   expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
-  expect(refresh).toHaveBeenCalled();
+  vi.useRealTimers();
 });
 
 it("opens a prepared preview through a native link rather than an async popup", async () => {

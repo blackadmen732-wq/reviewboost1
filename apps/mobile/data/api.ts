@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { isUnreachable, reportReachable, reportUnreachable } from "./connection";
 import { boundedRead, boundedWrite } from "./read-deadline";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
@@ -27,7 +28,7 @@ export async function authorizedImage(path: string, orgId: string): Promise<stri
   return boundedRead(async (signal) => {
     const { data, error } = await supabase.auth.getSession();
     if (error || !data.session) throw new ApiError("Not authenticated — please sign in", 401);
-    const res = await fetch(`${API_URL}${path}`, {
+    const res = await reach(`${API_URL}${path}`, {
       ...(signal ? { signal } : {}),
       headers: { Authorization: `Bearer ${data.session.access_token}`, "X-Organization-Id": orgId },
     });
@@ -40,6 +41,22 @@ export async function authorizedImage(path: string, orgId: string): Promise<stri
       reader.readAsDataURL(blob);
     });
   });
+}
+
+/**
+ * fetch, telling the connection store what it learned: no answer at all is
+ * offline (the bar shows, screens wait for the connection); any answer is
+ * online.
+ */
+async function reach(url: string, init: RequestInit): Promise<Response> {
+  try {
+    const response = await fetch(url, init);
+    reportReachable();
+    return response;
+  } catch (caught) {
+    if (isUnreachable(caught)) reportUnreachable();
+    throw caught;
+  }
 }
 
 export async function apiFetch<T>(
@@ -87,7 +104,7 @@ async function send<T>(
       ...(init?.headers as Record<string, string>),
     };
 
-    const res = await fetch(url, {
+    const res = await reach(url, {
       ...init,
       ...(signal ? { signal } : {}),
       headers,

@@ -6,6 +6,7 @@ import { CustomerFlow } from "@/features/customer-flow/customer-flow";
 import { navigateToDestination } from "@/features/customer-flow/destination-handoff";
 import { EARLY_TAP_MARKER_PREFIX } from "@/features/customer-flow/early-tap";
 import type { CustomerReviewContext } from "@/lib/api/customer-flow-types";
+import { forgetAllTries } from "@/lib/recovery/use-auto-retry";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 import { renderWithProviders } from "@/tests/helpers/render";
 
@@ -41,6 +42,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  forgetAllTries();
   window.__RB_FIXTURE_CALLS__ = [];
   vi.mocked(navigateToDestination).mockClear();
 });
@@ -108,7 +110,8 @@ describe("a customer page that arrives complete", () => {
     expect(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[4] })).toBeChecked();
     expect(screen.getByRole("alert")).toHaveTextContent(customerMessages.en.submitErrorHeading);
 
-    await user.click(screen.getByRole("button", { name: customerMessages.en.tryAgain }));
+    // It would go again by itself; "Try now" skips the wait.
+    await user.click(screen.getByRole("button", { name: customerMessages.en.tryNow }));
     await waitFor(() => expect(navigateToDestination).toHaveBeenCalledWith(DESTINATION));
   });
 

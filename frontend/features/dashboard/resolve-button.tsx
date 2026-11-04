@@ -2,11 +2,13 @@
 
 import { Check, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
 import { notify } from "@/components/ui/toast";
 import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 
 /**
  * "Sorted" — and the way back out of it.
@@ -38,19 +40,29 @@ export function ResolveButton({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const wanted = useRef(false);
+  const check = useOutcomeCheck({
+    onDone: () => {
+      router.refresh();
+      if (wanted.current) notify.success("Sorted", "Nice one.");
+    },
+    onNotDone: () => notify.error("Could not save that", "Please try again."),
+    onExpired: (message) => notify.error("Please sign in again", message),
+  });
+
+  function send(resolved: boolean): Promise<Response> {
+    return ownerFetch(`/api/v1/customer-responses/${responseId}/resolve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resolved }),
+    });
+  }
 
   async function setResolved(resolved: boolean) {
     setBusy(true);
 
     try {
-      const response = await ownerFetch(
-        `/api/v1/customer-responses/${responseId}/resolve`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ resolved }),
-        },
-      );
+      const response = await send(resolved);
       if (!response.ok) {
         notify.error("Could not save that", "Please try again.");
         return;
@@ -58,42 +70,62 @@ export function ResolveButton({
       router.refresh();
       if (resolved) notify.success("Sorted", "Nice one.");
     } catch (caught) {
-      router.refresh();
-      notify.error(
-        "Could not confirm that change",
-        caught instanceof SessionExpiredError
-          ? caught.message
-          : "Check the feedback status before trying again.",
-      );
+      if (caught instanceof SessionExpiredError) {
+        notify.error("Please sign in again", caught.message);
+        return;
+      }
+      // The answer was lost. Read the feedback rather than send it again
+      // (a write is never replayed by itself): it says whether it is sorted.
+      wanted.current = resolved;
+      check.start(async (signal) => {
+        const read = await ownerFetch(`/api/v1/customer-responses/${responseId}`, {
+          signal,
+        });
+        if (!read.ok) throw new Error("No answer yet.");
+        const { data } = (await read.json()) as {
+          data: { isResolved?: boolean };
+        };
+        return data.isResolved === resolved;
+      });
     } finally {
       setBusy(false);
     }
   }
 
+  const holding = busy || check.pending;
+  const notice = <OutcomeCheckNotice check={check} className="mt-3" />;
+
   if (isResolved) {
     return (
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void setResolved(false)}
-        className="animate-fade-in inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] disabled:opacity-50"
-      >
-        <RotateCcw className="size-4" aria-hidden="true" />
-        Not sorted after all
-      </button>
+      <>
+        <button
+          type="button"
+          disabled={holding}
+          onClick={() => void setResolved(false)}
+          className="animate-fade-in inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)] disabled:opacity-50"
+        >
+          <RotateCcw className="size-4" aria-hidden="true" />
+          Not sorted after all
+        </button>
+        {notice}
+      </>
     );
   }
 
   return (
-    <Button
-      variant={quiet ? "secondary" : "action"}
-      className="sm:w-auto"
-      loading={busy}
-      loadingLabel="Saving…"
-      onClick={() => void setResolved(true)}
-    >
-      <Check className="size-5" aria-hidden="true" />
-      Mark as sorted
-    </Button>
+    <>
+      <Button
+        variant={quiet ? "secondary" : "action"}
+        className="sm:w-auto"
+        loading={busy}
+        loadingLabel="Saving…"
+        disabled={check.pending}
+        onClick={() => void setResolved(true)}
+      >
+        <Check className="size-5" aria-hidden="true" />
+        Mark as sorted
+      </Button>
+      {notice}
+    </>
   );
 }

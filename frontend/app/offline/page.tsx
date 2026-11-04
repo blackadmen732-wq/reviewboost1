@@ -18,7 +18,12 @@ export const metadata: Metadata = {
  * Says what happened and what to do, and nothing else. "Something went wrong"
  * would be a lie: the app is fine, the connection is not, and the difference
  * decides whether someone retries or gives up.
+ *
+ * It does not wait for a tap: the moment the connection is back, it loads the
+ * page that was asked for (the address still says which). An inline script,
+ * because this page is cached for offline use and its scripts may not be.
  */
+const RELOAD_WHEN_ONLINE = "addEventListener('online',function(){location.reload()})";
 export default function OfflinePage() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col items-center justify-center gap-6 px-5 text-center">
@@ -31,10 +36,11 @@ export default function OfflinePage() {
           You are offline
         </h1>
         <p className="text-base text-muted">
-          Check your connection. Your saved business data is safe; check pending
-          changes after reconnecting.
+          Check your connection. This page loads by itself when you’re back
+          online.
         </p>
       </div>
+      <script dangerouslySetInnerHTML={{ __html: RELOAD_WHEN_ONLINE }} />
       <Button asChild variant="secondary" className="w-auto">
         <Link href="/home">Try Home again</Link>
       </Button>

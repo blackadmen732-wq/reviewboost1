@@ -12,6 +12,7 @@ import { useBilling } from "@/data/use-billing";
 import { accountView } from "@/data/billing-view";
 import { PUBLIC_LINKS } from "@/data/public-links";
 import { colors, space, type } from "@/theme";
+import { OfflineBar } from "@/components/offline-bar";
 
 /**
  * Settings: which business, the plan and what is left, who is signed in, the
@@ -46,6 +47,7 @@ export default function AccountScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.inkMuted} />}
       >
+        <OfflineBar />
         <Group title="Business">
           <Row>
             <Text style={styles.value}>{activeOrg?.name ?? "—"}</Text>

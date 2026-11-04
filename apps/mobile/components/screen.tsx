@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { BrandLockup } from "@/components/brand-lockup";
 import { Icon } from "@/components/icon";
+import { OfflineBar } from "@/components/offline-bar";
 import { Tappable } from "@/components/tappable";
 import { colors, space, type } from "@/theme";
 
@@ -48,6 +49,8 @@ export function TabScreen({
             <Icon name="gearshape" glyph="⚙" size={22} color={colors.inkMuted} />
           </Tappable>
         </View>
+        {/* Before anything fails, not after: offline, nothing can save. */}
+        <OfflineBar />
         <Text style={styles.title} accessibilityRole="header">
           {title}
         </Text>

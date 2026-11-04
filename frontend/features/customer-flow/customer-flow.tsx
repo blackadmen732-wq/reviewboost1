@@ -10,7 +10,10 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { CustomerBlockingState } from "@/features/customer-flow/customer-blocking-state";
+import {
+  CustomerBlockingState,
+  RetryingBlockingState,
+} from "@/features/customer-flow/customer-blocking-state";
 import { LanguageSelector } from "@/features/customer-flow/language-selector";
 import { CustomerLoading } from "@/features/customer-flow/customer-loading";
 import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
@@ -539,21 +542,28 @@ export function CustomerFlow({
   }
 
   if (initialUnavailable || contextQuery.isError) {
+    // An inactive link stays inactive: nothing to try again. Anything else
+    // tries again by itself, so a customer at the counter never has to.
     return (
       <div ref={contentRef}>
-        <CustomerBlockingState
-          kind={
-            initialUnavailable || isUnavailableReviewLink(contextQuery.error)
-              ? "unavailable"
-              : isOfflineError(contextQuery.error)
-                ? "offline"
-                : "error"
-          }
-          locale={state.locale}
-          messages={messages}
-          onLocaleChange={changeLocale}
-          onRetry={() => void contextQuery.refetch()}
-        />
+        {initialUnavailable || isUnavailableReviewLink(contextQuery.error) ? (
+          <CustomerBlockingState
+            kind="unavailable"
+            locale={state.locale}
+            messages={messages}
+            onLocaleChange={changeLocale}
+          />
+        ) : (
+          <RetryingBlockingState
+            kind={isOfflineError(contextQuery.error) ? "offline" : "error"}
+            locale={state.locale}
+            messages={messages}
+            onLocaleChange={changeLocale}
+            retryKey={`customer-context:${token}`}
+            failure={contextQuery.errorUpdatedAt}
+            onRetry={() => void contextQuery.refetch()}
+          />
+        )}
       </div>
     );
   }

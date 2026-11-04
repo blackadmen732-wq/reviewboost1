@@ -17,6 +17,7 @@ vi.mock("../api", () => ({
 }));
 
 import * as api from "../api";
+
 import { useFeedbackDetail } from "../use-feedback-detail";
 
 const fetchMock = api.apiFetch as ReturnType<typeof vi.fn>;
@@ -68,7 +69,7 @@ describe("a rating's actions", () => {
     expect(result.current.item?.isRead).toBe(true);
   });
 
-  it("sorts it, and checks the server rather than guessing when the answer is lost", async () => {
+  it("sorts it, and reads the rating back when the answer is lost, never sending it twice", async () => {
     fetchMock
       .mockResolvedValueOnce(detail())
       .mockRejectedValueOnce(new TypeError("Network request failed"))
@@ -81,25 +82,34 @@ describe("a rating's actions", () => {
     });
     expect(outcome).toEqual({ ok: true });
     expect(result.current.item?.isResolved).toBe(true);
-    expect(calls().at(-1)).toBe(`GET /api/v1/customer-responses/${ID}`);
+    expect(calls().slice(1)).toEqual([
+      `POST /api/v1/customer-responses/${ID}/resolve`,
+      `GET /api/v1/customer-responses/${ID}`,
+    ]);
   });
 
-  it("never sends a note twice: a lost answer is checked against the saved notes", async () => {
-    fetchMock
-      .mockResolvedValueOnce(detail())
-      .mockRejectedValueOnce(new TypeError("Network request failed"))
-      .mockResolvedValueOnce(detail());
-    const { result } = renderHook(() => useFeedbackDetail("org-a", ID));
-    await act(() => result.current.load());
-    let outcome: { ok: boolean; message?: string } = { ok: true };
-    await act(async () => {
-      outcome = await result.current.addNote("  Refunded them  ");
-    });
-    // Not there after the check: the text stays, and nothing was re-sent.
-    expect(outcome.ok).toBe(false);
-    expect(outcome.message).toMatch(/Check the saved notes/);
-    expect(calls().filter((call) => call.startsWith("POST")).length).toBe(1);
-    expect(JSON.parse((fetchMock.mock.calls[1]![2] as RequestInit).body as string)).toEqual({ body: "Refunded them" });
+  it("never sends a note twice: a lost answer is looked for among the saved notes", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      fetchMock
+        .mockResolvedValueOnce(detail())
+        .mockRejectedValueOnce(new TypeError("Network request failed"))
+        .mockResolvedValue(detail());
+      const { result } = renderHook(() => useFeedbackDetail("org-a", ID));
+      await act(() => result.current.load());
+      let pending: Promise<{ ok: boolean; message?: string }> | undefined;
+      await act(async () => {
+        pending = result.current.addNote("  Refunded them  ");
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      const outcome = await pending!;
+      // Not there after ten seconds of looking: the text stays, nothing was re-sent.
+      expect(outcome).toEqual({ ok: false, message: "That note didn’t save. Your text is still here. Try again." });
+      expect(calls().filter((call) => call.startsWith("POST")).length).toBe(1);
+      expect(JSON.parse((fetchMock.mock.calls[1]![2] as RequestInit).body as string)).toEqual({ body: "Refunded them" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("counts a lost answer as saved when the note is there", async () => {
@@ -118,8 +128,31 @@ describe("a rating's actions", () => {
     expect(outcome.ok).toBe(true);
   });
 
+  it("hands the screen a way to keep checking when ReviewBoost cannot be reached", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      fetchMock.mockResolvedValueOnce(detail());
+      for (let call = 0; call < 5; call += 1) {
+        fetchMock.mockRejectedValueOnce(new TypeError("Network request failed"));
+      }
+      const { result } = renderHook(() => useFeedbackDetail("org-a", ID));
+      await act(() => result.current.load());
+      const pending = result.current.addNote("Called them back");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      const outcome = await pending;
+      expect(outcome.ok).toBe(false);
+      expect(outcome.ok === false && typeof outcome.stillUnknown).toBe("function");
+      expect(outcome.ok === false && outcome.message).not.toMatch(/check|before/i);
+      expect(calls().filter((call) => call.startsWith("POST")).length).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("says a refused write plainly, without a second try", async () => {
-    fetchMock.mockResolvedValueOnce(detail()).mockRejectedValueOnce(new ApiError("Please try again shortly.", 503));
+    fetchMock.mockResolvedValueOnce(detail()).mockRejectedValueOnce(new ApiError("Too long.", 422));
     const { result } = renderHook(() => useFeedbackDetail("org-a", ID));
     await act(() => result.current.load());
     let outcome: { ok: boolean; message?: string } = { ok: true };
@@ -128,5 +161,21 @@ describe("a rating's actions", () => {
     });
     expect(outcome).toEqual({ ok: false, message: "Could not save that. Your text is still here." });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("after a server error, one read settles whether the note was kept", async () => {
+    // The server finished with the note before it answered: nothing to wait out.
+    fetchMock
+      .mockResolvedValueOnce(detail())
+      .mockRejectedValueOnce(new ApiError("Please try again shortly.", 503))
+      .mockResolvedValueOnce(detail());
+    const { result } = renderHook(() => useFeedbackDetail("org-a", ID));
+    await act(() => result.current.load());
+    let outcome: { ok: boolean; message?: string } = { ok: true };
+    await act(async () => {
+      outcome = await result.current.addNote("Spoke to the team");
+    });
+    expect(outcome).toEqual({ ok: false, message: "That note didn’t save. Your text is still here. Try again." });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

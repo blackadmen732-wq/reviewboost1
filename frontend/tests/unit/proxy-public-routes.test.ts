@@ -85,7 +85,7 @@ afterEach(() => {
 });
 
 describe("public routes survive an unusable auth client", () => {
-  const PUBLIC = ["/", "/privacy", "/terms", "/pricing", "/product", "/security", "/how-it-works", "/integrity", "/support", "/login", "/offline"];
+  const PUBLIC = ["/", "/privacy", "/terms", "/pricing", "/product", "/security", "/how-it-works", "/integrity", "/support", "/login", "/offline", "/unavailable"];
 
   it("serves every public route when Supabase is not configured at all", async () => {
     withEnv(false);
@@ -158,6 +158,45 @@ describe("owner routes still fail closed", () => {
     const response = await proxy(request("/feedback/abc"));
     const location = new URL(response.headers.get("location") ?? "");
     expect(location.searchParams.get("next")).toBe("/feedback/abc");
+  });
+
+  it("keeps an owner off the sign-in page when the auth service did not answer", async () => {
+    // Not signed out: ReviewBoost could not check. Still fails closed (no
+    // owner page), but the page at this address says so and tries again.
+    withEnv(true);
+    const { AuthRetryableFetchError } = await import("@supabase/supabase-js");
+    createServerClient.mockReturnValue({
+      auth: {
+        getUser: async () => ({
+          data: { user: null },
+          error: new AuthRetryableFetchError("Failed to fetch", 0),
+        }),
+      },
+    });
+
+    const page = await proxy(request("/home"));
+    expect(isRedirectToLogin(page)).toBe(false);
+    expect(new URL(page.headers.get("x-middleware-rewrite") ?? "").pathname).toBe("/unavailable");
+    expect(page.headers.get("cache-control")).toBe("no-store");
+
+    // A client navigation gets a 503, so Next loads the page in full.
+    const navigation = new NextRequest(new URL("/home", "https://reviewboost.fit"), {
+      headers: { RSC: "1" },
+    });
+    const answer = await proxy(navigation);
+    expect(answer.status).toBe(503);
+    expect(isRedirectToLogin(answer)).toBe(false);
+  });
+
+  it("still sends a signed-out visitor to sign in", async () => {
+    withEnv(true);
+    const { AuthSessionMissingError } = await import("@supabase/supabase-js");
+    createServerClient.mockReturnValue({
+      auth: {
+        getUser: async () => ({ data: { user: null }, error: new AuthSessionMissingError() }),
+      },
+    });
+    expect(isRedirectToLogin(await proxy(request("/home")))).toBe(true);
   });
 
   it("lets a verified owner through", async () => {

@@ -17,7 +17,9 @@
  * Everything else goes to the network, every time.
  */
 
-const VERSION = "rb-v1";
+// A new version re-caches the offline page (v2: it reloads itself when the
+// connection is back).
+const VERSION = "rb-v2";
 const STATIC_CACHE = `${VERSION}-static`;
 const OFFLINE_URL = "/offline";
 

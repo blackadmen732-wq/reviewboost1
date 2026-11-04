@@ -10,6 +10,7 @@ import { useStands } from "@/data/use-stands";
 import { lastUsedLabel, tagChecks } from "@/lib/words";
 import { colors, radii, type } from "@/theme";
 import type { StandItem } from "@/data/types";
+import { RetryBlock } from "@/components/retry-block";
 
 /**
  * Tags: the things on the counter. Each row leads with a small dark tile that
@@ -36,10 +37,7 @@ export default function StandsScreen() {
       onRefresh={() => void refresh()}
     >
       {error && stands.length === 0 ? (
-        <View style={styles.notice}>
-          <Text style={styles.noticeText}>{error}</Text>
-          <Button label="Try again" variant="secondary" onPress={() => void refresh()} />
-        </View>
+        <RetryBlock message={error} retryKey="stands" onRetry={() => void refresh()} />
       ) : loading && stands.length === 0 ? (
         <ActivityIndicator style={styles.spinner} color={colors.inkMuted} />
       ) : stands.length === 0 ? (

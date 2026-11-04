@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { CustomerPicker, type PickerCustomer } from "@/features/dashboard/customer-picker";
@@ -24,6 +25,8 @@ import {
   type TextRequestTemplateId,
 } from "@/lib/sms/text-request-templates";
 import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
+import { isServerError } from "@/lib/recovery/check-outcome";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 
 /** A failed fetch says "Failed to fetch" or "Load failed"; an owner gets this. */
 function reachError(caught: unknown): string {
@@ -130,8 +133,13 @@ export function TextRequestComposer({
   const [consentMethod, setConsentMethod] = useState<ConsentMethod | "">("");
   const [consentConfirmed, setConsentConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [sendUncertain, setSendUncertain] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const check = useOutcomeCheck({
+    onDone: scheduled,
+    onNotDone: () =>
+      setError("That text request didn’t go through. Nothing was sent. Try again."),
+    onExpired: setError,
+  });
   /** What is missing before a preview can be asked for, said on the tap. */
   const [missing, setMissing] = useState<string | null>(null);
 
@@ -194,10 +202,33 @@ export function TextRequestComposer({
     }
   }
 
+  function scheduled() {
+    setPhone("");
+    setCustomer(null);
+    setPreview(null);
+    // The same word the row under Recent shows, so the two never disagree.
+    notify.success("Scheduled", "It goes out shortly. Its status shows under Recent.");
+    router.refresh();
+  }
+
   async function send() {
-    if (!canSend || busy) return;
+    if (!canSend || busy || !preview) return;
     setBusy(true);
     setError(null);
+    // What Recent held before, and who this is for: a new row for that number
+    // is this request. Read, never sent again, so nobody gets two texts.
+    const before = new Set(recent.map((request) => request.id));
+    const lastFour = preview.recipientLastFour;
+    const isScheduled = async (signal: AbortSignal): Promise<boolean> => {
+      const response = await ownerFetch("/api/v1/text-requests?limit=10", { signal });
+      if (!response.ok) throw new Error("No answer yet.");
+      const { data } = (await response.json()) as {
+        data: { items: Array<{ id: string; recipientLastFour: string | null }> };
+      };
+      return data.items.some(
+        (item) => !before.has(item.id) && item.recipientLastFour === lastFour,
+      );
+    };
     try {
       const response = await authorizedFetch("/api/v1/text-requests", {
         ...recipient(),
@@ -206,21 +237,23 @@ export function TextRequestComposer({
       });
 
       if (!response.ok) {
+        // A server error can come after the request was scheduled: find out.
+        if (isServerError(response)) {
+          check.start(isScheduled, { serverAnswered: true });
+          return;
+        }
         setError(await readError(response));
         return;
       }
 
-      setPhone("");
-      setCustomer(null);
-      setPreview(null);
-      // The same word the row under Recent shows, so the two never disagree.
-      notify.success("Scheduled", "It goes out shortly. Its status shows under Recent.");
-      router.refresh();
+      scheduled();
     } catch (caught) {
-      // The notice above says what to do; the cause is only worth naming when
-      // it is the session.
-      setSendUncertain(true);
-      setError(caught instanceof SessionExpiredError ? caught.message : null);
+      if (caught instanceof SessionExpiredError) {
+        setError(caught.message);
+        return;
+      }
+      // The answer was lost: look under Recent for it, rather than ask.
+      check.start(isScheduled);
     } finally {
       setBusy(false);
     }
@@ -271,7 +304,7 @@ export function TextRequestComposer({
 
   const canSend =
     canSendRequests &&
-    !sendUncertain &&
+    !check.pending &&
     preview !== null &&
     preview.eligibility.allowed &&
     standId !== "" &&
@@ -283,22 +316,7 @@ export function TextRequestComposer({
 
   return (
     <div className="flex flex-col gap-6">
-      {sendUncertain ? (
-        <InlineNotice kind="info">
-          <p>Could not confirm sending. Check Recent before trying again.</p>
-          <Button
-            variant="secondary"
-            className="mt-3"
-            onClick={() => {
-              router.refresh();
-              clearPreview();
-              setSendUncertain(false);
-            }}
-          >
-            Check recent requests
-          </Button>
-        </InlineNotice>
-      ) : null}
+      <OutcomeCheckNotice check={check} />
       <div>
         <BalanceLine balance={balance} planStatus={planStatus} />
         {balance.total === 0 ? (

@@ -150,7 +150,7 @@ export default async function SettingsPage() {
           </div>
 
           {can.editSettings && entitlements.canCreateLocation ? (
-            <AddLocationButton />
+            <AddLocationButton locationIds={locations.map((location) => location.locationId)} />
           ) : can.editSettings && locations.length > 0 ? (
             <p className="text-sm text-muted">
               Your plan includes {entitlements.locationLimit}{" "}

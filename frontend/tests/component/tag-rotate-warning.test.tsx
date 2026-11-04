@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 const notify = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
@@ -20,8 +20,15 @@ vi.mock("@/lib/hooks/use-authenticated-qr", () => ({
   }),
 }));
 vi.mock("@/features/tags/program-tag-sheet", () => ({ ProgramTagSheet: () => null }));
+const page = () =>
+  new Response(JSON.stringify({ data: { standUrl: "https://reviewboost.fit/q/test" } }));
+const ownerFetch = vi.hoisted(() =>
+  vi.fn<(path: string, init?: RequestInit) => Promise<Response>>(
+    async () => new Response("{}"),
+  ),
+);
 vi.mock("@/lib/api/owner-fetch", () => ({
-  ownerFetch: async () => new Response(JSON.stringify({ data: { standUrl: "https://reviewboost.fit/q/test" } })),
+  ownerFetch,
   SessionExpiredError: class extends Error {},
 }));
 
@@ -56,6 +63,10 @@ async function openWarning(tag: Stand = stand) {
 }
 
 describe("Make a new code", () => {
+  beforeEach(() => {
+    ownerFetch.mockImplementation(async () => page());
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.clearAllMocks();
@@ -102,16 +113,40 @@ describe("Make a new code", () => {
   });
 
   it("rotates exactly once on confirm, and says the old code no longer works", async () => {
-    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
+    ownerFetch.mockImplementation(async (path: string) =>
+      path.endsWith("/rotate-token") ? new Response("{}", { status: 200 }) : page(),
+    );
     const { user, dialog } = await openWarning();
     await user.click(within(dialog).getByRole("button", { name: "Make a new code" }));
     await waitFor(() => expect(notify.success).toHaveBeenCalled());
-    const calls = fetchMock.mock.calls.map((call) => String((call as unknown[])[0]));
+    const calls = ownerFetch.mock.calls.map((call) => String(call[0]));
     expect(calls.filter((url) => url.endsWith("/rotate-token"))).toHaveLength(1);
     expect(notify.success).toHaveBeenCalledWith(
       "New code ready",
       "The old code no longer works. Print this one and set up tap again.",
     );
+  });
+
+  it("after a lost answer, looks at the Tag instead of making a second code", async () => {
+    ownerFetch.mockImplementation(async (path: string) => {
+      if (path.endsWith("/rotate-token")) throw new TypeError("Lost response");
+      if (path === "/api/v1/review-stands") {
+        // The new code is there: a new prefix.
+        return new Response(
+          JSON.stringify({
+            data: [{ standId: "stand-1", tokenPrefix: "new12345", tokenRotatedAt: "2026-11-03T00:00:00Z" }],
+          }),
+        );
+      }
+      return page();
+    });
+    const { user, dialog } = await openWarning();
+    await user.click(within(dialog).getByRole("button", { name: "Make a new code" }));
+    await waitFor(() =>
+      expect(notify.success).toHaveBeenCalledWith("New code ready", expect.any(String)),
+    );
+    const calls = ownerFetch.mock.calls.map((call) => String(call[0]));
+    expect(calls.filter((url) => url.endsWith("/rotate-token"))).toHaveLength(1);
+    expect(notify.error).not.toHaveBeenCalled();
   });
 });

@@ -6,7 +6,11 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
+import { RetryNotice } from "@/components/ui/retry-notice";
 import { withReadDeadline, withWriteDeadline } from "@/lib/api/read-deadline";
+import { useAutoRetry } from "@/lib/recovery/use-auto-retry";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -68,7 +72,11 @@ export function PersonalDeletionFlow() {
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [uncertain, setUncertain] = useState(false);
+  const outcome = useOutcomeCheck({
+    onDone: () => void goodbye(),
+    onNotDone: () => setError("Your account was not deleted. Nothing changed. Try again."),
+    onExpired: setError,
+  });
 
   useEffect(() => {
     let alive = true;
@@ -85,8 +93,31 @@ export function PersonalDeletionFlow() {
     void fetchCheck().then(setCheck);
   }, []);
 
+  async function goodbye() {
+    try {
+      await supabaseBrowser().auth.signOut();
+    } catch {
+      /* The deleted login is unusable server-side. */
+    }
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign("/goodbye");
+  }
+
+  /** Is the login gone? A deleted one is refused (401) where it used to be read. */
+  function isGone(token: string) {
+    return async (signal: AbortSignal): Promise<boolean> => {
+      const response = await fetch("/api/v1/account/personal-deletion", {
+        signal,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.status === 401) return true;
+      if (!response.ok) throw new Error("No answer yet.");
+      return false;
+    };
+  }
+
   async function remove() {
-    if (busy || uncertain) return;
+    if (busy || outcome.pending) return;
     if (typed.trim().toLowerCase() !== WORD) {
       setError("Type delete to confirm.");
       return;
@@ -94,14 +125,14 @@ export function PersonalDeletionFlow() {
     setBusy(true);
     setError(null);
 
-    let attempted = false;
+    let token: string | null = null;
     try {
-      const token = await accessToken();
+      token = await accessToken();
       if (!token) {
         setError("Your session expired. Sign in again, then delete.");
         return;
       }
-      attempted = true;
+      const sent = token;
       const response = await withWriteDeadline(
         async (signal) =>
           await fetch("/api/v1/account/personal-deletion", {
@@ -109,12 +140,17 @@ export function PersonalDeletionFlow() {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${sent}`,
             },
             body: JSON.stringify({ confirmation: typed.trim() }),
           }),
       );
       if (!response.ok) {
+        // A server error can come after the login was deleted: find out.
+        if (response.status >= 500) {
+          outcome.start(isGone(sent), { serverAnswered: true });
+          return;
+        }
         const body = (await response.json().catch(() => null)) as {
           error?: { code?: string; message?: string; details?: Array<{ message: string }> };
         } | null;
@@ -125,26 +161,18 @@ export function PersonalDeletionFlow() {
           });
           return;
         }
-        if (response.status >= 500) setUncertain(true);
         setError(body?.error?.message ?? "Your account was not deleted. Try again shortly.");
         return;
       }
-      try {
-        await supabaseBrowser().auth.signOut();
-      } catch {
-        /* The deleted login is unusable server-side. */
-      }
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.assign("/goodbye");
+      await goodbye();
     } catch {
-      // A lost response: the login may or may not be gone. Reloading answers
-      // it, because a deleted login can no longer load this page.
-      setUncertain(attempted);
-      setError(
-        attempted
-          ? "We couldn't confirm whether your account was deleted. Reload this page to check before trying again."
-          : "Could not verify your session. Sign in again, then try.",
-      );
+      if (!token) {
+        setError("Could not verify your session. Sign in again, then try.");
+        return;
+      }
+      // A lost response: the login may or may not be gone. Ask the server,
+      // which refuses a deleted login, rather than ask the person to reload.
+      outcome.start(isGone(token));
     } finally {
       setBusy(false);
     }
@@ -159,16 +187,7 @@ export function PersonalDeletionFlow() {
   }
 
   if (check.kind === "error") {
-    return (
-      <div className="flex flex-col gap-4">
-        <InlineNotice kind="error" blocking>
-          We couldn&rsquo;t check your account. Nothing was deleted.
-        </InlineNotice>
-        <Button variant="secondary" onClick={retry}>
-          Try again
-        </Button>
-      </div>
-    );
+    return <AccountCheckFailed failure={check} onRetry={retry} />;
   }
 
   if (check.kind === "blocked") {
@@ -218,7 +237,7 @@ export function PersonalDeletionFlow() {
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
-          disabled={busy}
+          disabled={busy || outcome.pending}
           {...(error ? { "aria-invalid": true, "aria-describedby": errorId } : {})}
         />
       </div>
@@ -229,20 +248,35 @@ export function PersonalDeletionFlow() {
         </InlineNotice>
       ) : null}
 
+      <OutcomeCheckNotice check={outcome} />
+
       <div className="flex flex-col gap-3">
-        {uncertain ? (
-          <Button variant="secondary" onClick={() => window.location.reload()}>
-            Reload to check
-          </Button>
-        ) : (
-          <Button variant="destructive" loading={busy} loadingLabel="Deleting…" onClick={remove}>
-            Delete my account
-          </Button>
-        )}
+        <Button
+          variant="destructive"
+          loading={busy}
+          loadingLabel="Deleting…"
+          disabled={outcome.pending}
+          onClick={remove}
+        >
+          Delete my account
+        </Button>
         <Button variant="secondary" asChild>
           <Link href="/settings">Keep my account</Link>
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * The first check could not reach the server. Nothing was deleted, and it
+ * tries again by itself (3 s, 10 s, 30 s, or when the connection is back).
+ */
+function AccountCheckFailed({ failure, onRetry }: { failure: Check; onRetry: () => void }) {
+  const retry = useAutoRetry({ key: "personal-deletion-check", failure, onRetry });
+  return (
+    <InlineNotice kind="error" blocking>
+      <RetryNotice retry={retry} what="Couldn’t check your account. Nothing was deleted." />
+    </InlineNotice>
   );
 }

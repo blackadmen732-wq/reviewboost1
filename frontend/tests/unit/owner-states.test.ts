@@ -27,18 +27,48 @@ describe("owner empty, error, offline, permission language", () => {
     expect(feedback).toContain("Nothing yet");
   });
 
-  it("errors say what to do and do not dump the exception", () => {
+  it("errors say what is happening, try again by themselves, and do not dump the exception", () => {
     const owner = code("app/(owner)/error.tsx");
     const ownerMissing = code("app/(owner)/not-found.tsx");
     const publicError = code("app/error.tsx");
+    const words = code("lib/recovery/words.ts");
 
-    expect(owner).toContain("That did not work");
-    expect(owner).toContain("Try again");
+    // The words live in one place; both pages count down with the same hook.
+    expect(owner).toContain("useAutoRetry");
+    expect(owner).toContain("retryCopy");
     expect(owner).toContain("OwnerShell");
     expect(owner).not.toMatch(/error\.message|stack|Something went wrong/i);
     expect(ownerMissing).toContain("We could not find that");
-    expect(publicError).toContain("That did not work");
+    expect(publicError).toContain("useAutoRetry");
     expect(publicError).not.toMatch(/error\.message|Something went wrong/i);
+    expect(words).toContain("That didn’t load");
+    expect(words).toContain("Try now");
+    expect(words).toContain("Try again");
+    expect(words).not.toMatch(/Something went wrong/i);
+  });
+
+  it("never asks the owner to go and check whether something went through", () => {
+    // The app checks for itself (useOutcomeCheck) and says what it found.
+    const files = [
+      "features/customer-page/customer-page-editor.tsx",
+      "features/settings/delete-account-flow.tsx",
+      "features/settings/personal-deletion-flow.tsx",
+      "features/settings/add-location-button.tsx",
+      "features/dashboard/settings-form.tsx",
+      "features/dashboard/action-thread.tsx",
+      "features/dashboard/add-stand-button.tsx",
+      "features/dashboard/resolve-button.tsx",
+      "features/dashboard/text-request-composer.tsx",
+      "features/tags/tag-detail.tsx",
+      "lib/api/read-deadline.ts",
+      "lib/recovery/words.ts",
+      "app/offline/page.tsx",
+    ];
+    for (const file of files) {
+      expect(code(file), file).not.toMatch(
+        /before trying again|before adding another|before creating another|before sending it again|Check Recent|Check this Tag|Check your (Tags|places|businesses)|Check the (published page|feedback status|saved notes)|check the current value|Reload (this page )?to check|check pending/i,
+      );
+    }
   });
 
   it("offline names the connection, not a broken app", () => {

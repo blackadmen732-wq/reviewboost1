@@ -69,6 +69,8 @@ describe("RatingScreen", () => {
 
     rerender(<RatingScreen {...sharedProps} status="error" />);
     expect(screen.getByRole("alert")).toHaveTextContent("Your rating is still here");
-    expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+    // It sends the rating again by itself, and says when; "Try now" skips the wait.
+    expect(screen.getByRole("alert")).toHaveTextContent("Trying again in 3 s.");
+    expect(screen.getByRole("button", { name: "Try now" })).toBeEnabled();
   });
 });

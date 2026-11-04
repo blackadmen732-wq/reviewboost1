@@ -5,6 +5,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CustomerFlow } from "@/features/customer-flow/customer-flow";
 import { navigateToDestination } from "@/features/customer-flow/destination-handoff";
 import { customerMessages, type RatingValue } from "@/lib/i18n/customer-messages";
+import { forgetAllTries } from "@/lib/recovery/use-auto-retry";
 import { renderWithProviders } from "@/tests/helpers/render";
 
 vi.mock("@/features/customer-flow/destination-handoff", () => ({
@@ -23,6 +24,7 @@ beforeAll(() => {
 beforeEach(() => {
   navigate.mockClear();
   window.__RB_FIXTURE_CALLS__ = [];
+  forgetAllTries();
 });
 
 async function openRating(token = "fixture-valid") {
@@ -147,13 +149,32 @@ describe("one-tap customer flow", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Your rating is still here");
+    // It will send it again by itself, and says when.
+    expect(alert).toHaveTextContent(customerMessages.en.submitRetryingIn(3));
     // The phone was online and the server failed, so the connection is not the cause.
     expect(alert).not.toHaveTextContent(/connection/i);
     expect(navigate).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: customerMessages.en.tryAgain }));
+    await user.click(screen.getByRole("button", { name: customerMessages.en.tryNow }));
     await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
 
+    const responseKeys = window.__RB_FIXTURE_CALLS__
+      ?.filter(({ operation }) => operation === "response")
+      .map(({ idempotencyKey }) => idempotencyKey);
+    expect(responseKeys).toHaveLength(2);
+    expect(new Set(responseKeys).size).toBe(1);
+  });
+
+  it("sends a rating that failed again by itself, with the same key", async () => {
+    const user = await openRating("fixture-response-error");
+    await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[4] }));
+    await screen.findByRole("alert");
+    // No tap: three seconds later it goes again, and this time it lands.
+    await screen.findByRole(
+      "heading",
+      { name: customerMessages.en.thanksHeading },
+      { timeout: 5_000 },
+    );
     const responseKeys = window.__RB_FIXTURE_CALLS__
       ?.filter(({ operation }) => operation === "response")
       .map(({ idempotencyKey }) => idempotencyKey);
@@ -182,15 +203,19 @@ describe("one-tap customer flow", () => {
     // The context query retries once before giving up, so allow for its backoff.
     renderWithProviders(<CustomerFlow token="fixture-api-error" />);
     await screen.findByRole("heading", { name: customerMessages.en.loadErrorHeading }, { timeout: 4000 });
-    expect(screen.getByText(customerMessages.en.serverErrorBody)).toBeVisible();
-    expect(screen.queryByText(/check your connection/i)).toBeNull();
+    // Our trouble: it tries again by itself, and says nothing about signal.
+    expect(screen.getByText(customerMessages.en.retryingIn(3))).toBeVisible();
+    expect(screen.getByRole("button", { name: customerMessages.en.tryNow })).toBeVisible();
+    expect(screen.queryByText(/check your connection|offline/i)).toBeNull();
     cleanup();
 
     Object.defineProperty(window.navigator, "onLine", { configurable: true, value: false });
     try {
       renderWithProviders(<CustomerFlow token="fixture-valid" />);
       await screen.findByRole("heading", { name: customerMessages.en.loadErrorHeading }, { timeout: 4000 });
-      expect(screen.getByText(customerMessages.en.loadErrorBody)).toBeVisible();
+      // No connection: it waits for one instead of counting down.
+      expect(screen.getByText(customerMessages.en.offline)).toBeVisible();
+      expect(screen.queryByText(customerMessages.en.retryingIn(3))).toBeNull();
     } finally {
       Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
     }

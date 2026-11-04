@@ -6,8 +6,11 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
 import { notify } from "@/components/ui/toast";
+import { ownerFetch } from "@/lib/api/owner-fetch";
 import { withWriteDeadline } from "@/lib/api/read-deadline";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils/cn";
 
@@ -68,9 +71,71 @@ export function EditableRow({
   const [error, setError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
 
+  function saved() {
+    setEditing(false);
+    setJustSaved(true);
+    // Long enough to be seen by someone who looked away, short enough not to
+    // become permanent furniture.
+    setTimeout(() => setJustSaved(false), 4000);
+    router.refresh();
+    notify.success("Saved", `${label} updated.`);
+  }
+
+  const check = useOutcomeCheck({
+    onDone: saved,
+    onNotDone: () =>
+      setError("That didn’t save. Your change is still here. Try again."),
+    onExpired: setError,
+  });
+
+  /** What the server holds now for this row, for checking a lost save. */
+  async function currentValue(signal: AbortSignal): Promise<string | null> {
+    if (field === "locationName" && context?.["locationId"]) {
+      const response = await ownerFetch("/api/v1/locations", { signal });
+      if (!response.ok) throw new Error("No answer yet.");
+      const { data } = (await response.json()) as {
+        data: { locations: Array<{ locationId: string; name: string }> };
+      };
+      const place = data.locations.find(
+        (location) => location.locationId === context["locationId"],
+      );
+      if (!place) throw new Error("No answer yet.");
+      return place.name;
+    }
+    if (field === "businessName") {
+      const response = await ownerFetch("/api/v1/home", { signal });
+      if (!response.ok) throw new Error("No answer yet.");
+      const { data } = (await response.json()) as {
+        data: { businessName: string };
+      };
+      return data.businessName;
+    }
+    // A row this cannot read back: no answer, so nothing is assumed.
+    throw new Error("No answer yet.");
+  }
+
+  function patch(
+    token: string,
+    next: string,
+    signal: AbortSignal,
+  ): Promise<Response> {
+    return fetch("/api/v1/settings", {
+      signal,
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ ...context, [field]: next }),
+    });
+  }
+
   async function save() {
+    if (check.pending) return;
     setBusy(true);
     setError(null);
+    const next = draft.trim();
+    let token: string | null = null;
 
     try {
       const {
@@ -81,18 +146,11 @@ export function EditableRow({
         notify.error("Please sign in again", "Your session expired.");
         return;
       }
+      const sent = session.access_token;
+      token = sent;
 
       const response = await withWriteDeadline(
-        async (signal) =>
-          await fetch("/api/v1/settings", {
-            signal,
-            method: "PATCH",
-            headers: {
-              "content-type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({ ...context, [field]: draft.trim() }),
-          }),
+        async (signal) => await patch(sent, next, signal),
       );
 
       if (!response.ok) {
@@ -111,18 +169,15 @@ export function EditableRow({
         return;
       }
 
-      setEditing(false);
-      setJustSaved(true);
-      // Long enough to be seen by someone who looked away, short enough not to
-      // become permanent furniture.
-      setTimeout(() => setJustSaved(false), 4000);
-      router.refresh();
-      notify.success("Saved", `${label} updated.`);
+      saved();
     } catch {
-      setError(
-        "Could not confirm saving. Your change is still here; check the current value before trying again.",
-      );
-      router.refresh();
+      if (token === null) {
+        setError("Could not verify your session. Sign in again, then try.");
+        return;
+      }
+      // The answer was lost. Read the value back rather than send it again
+      // (a write is never replayed by itself): it says whether it is saved.
+      check.start(async (signal) => (await currentValue(signal)) === next);
     } finally {
       setBusy(false);
     }
@@ -184,7 +239,7 @@ export function EditableRow({
         type={type === "url" ? "url" : "text"}
         inputMode={type === "url" ? "url" : "text"}
         value={draft}
-        disabled={busy}
+        disabled={busy || check.pending}
         invalid={error !== null}
         placeholder={placeholder ?? ""}
         onChange={(event) => setDraft(event.target.value)}
@@ -204,18 +259,20 @@ export function EditableRow({
         <p className="mt-2 text-sm leading-relaxed text-muted">{help}</p>
       ) : null}
 
+      <OutcomeCheckNotice check={check} className="mt-3" />
       <div className="mt-3 flex gap-2">
         <Button
           variant="action"
           loading={busy}
           loadingLabel="Saving…"
+          disabled={check.pending}
           onClick={() => void save()}
         >
           Save
         </Button>
         <Button
           variant="secondary"
-          disabled={busy}
+          disabled={busy || check.pending}
           onClick={() => {
             // Restores rather than clears: backing out of an edit must never
             // destroy what was already there.

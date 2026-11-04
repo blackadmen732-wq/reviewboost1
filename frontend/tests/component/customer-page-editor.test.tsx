@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/browser", () => ({
@@ -27,6 +27,34 @@ const normalizePhoto = vi.hoisted(() =>
 vi.mock("@/lib/images/normalize-photo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/images/normalize-photo")>()),
   normalizePhoto,
+}));
+
+// The photo goes up through XMLHttpRequest, for its progress; jsdom would
+// really send it. Here it goes through the stubbed fetch instead, so each
+// test's storage answer still decides, and reports it all went in one step.
+type UploadOptions = {
+  headers: Record<string, string>;
+  signal?: AbortSignal;
+  onProgress: (fraction: number) => void;
+};
+/** A test can take the upload over, to hold it part-way. */
+const upload = vi.hoisted(() => ({
+  takeover: null as
+    | null
+    | ((url: string, body: Blob, options: UploadOptions) => Promise<{ ok: boolean; status: number }>),
+}));
+vi.mock("@/lib/images/upload-with-progress", () => ({
+  uploadWithProgress: async (url: string, body: Blob, options: UploadOptions) => {
+    if (upload.takeover) return upload.takeover(url, body, options);
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: options.headers,
+      body,
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
+    options.onProgress(1);
+    return { ok: response.ok, status: response.status };
+  },
 }));
 
 import { CustomerPageEditor } from "@/features/customer-page/customer-page-editor";
@@ -409,12 +437,14 @@ describe("Customer page recovery and publication state", () => {
       );
     vi.stubGlobal("fetch", fetcher);
     render(<CustomerPageEditor businessName="Mario’s Pizza" />);
-    await screen.findByRole("alert");
+    // It says what failed, that it will try again by itself, and when.
+    await screen.findByText(/Your customer page didn’t load\./);
+    expect(screen.getByText("Trying again in 3 s.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^publish/i })).toBeNull();
     expect(
       screen.queryByRole("button", { name: /add photo|replace photo/i }),
     ).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try now" }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Published" })).toBeDisabled(),
     );
@@ -575,6 +605,66 @@ describe("Customer Page saved-photo recovery", () => {
     expect(document.querySelector("[data-hero-layer] img")).toBeNull();
   });
 
+  it("shows how much of the photo has gone up, as a percentage and a bar", async () => {
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: () => "blob:local-photo",
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init?: RequestInit) => {
+        const path = String(input);
+        const method = init?.method ?? "GET";
+        if (method === "GET")
+          return new Response(
+            JSON.stringify({ data: { draft: {}, published: null, publishedVersion: 0 } }),
+            { status: 200 },
+          );
+        if (path.endsWith("/assets") && method === "POST")
+          return new Response(
+            JSON.stringify({ data: { assetId: "new", path: "new.jpg", token: "local" } }),
+            { status: 200 },
+          );
+        if (path.endsWith("/assets"))
+          return new Response(
+            JSON.stringify({ data: { publicUrl: "https://example.test/new.jpg" } }),
+            { status: 200 },
+          );
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    let finish: (() => void) | null = null;
+    upload.takeover = (_url, _body, options) => {
+      options.onProgress(0.42);
+      return new Promise((resolve) => {
+        finish = () => {
+          options.onProgress(1);
+          resolve({ ok: true, status: 200 });
+        };
+      });
+    };
+    try {
+      render(<CustomerPageEditor businessName="Test business" />);
+      await screen.findByRole("button", { name: "Add photo" });
+      fireEvent.change(document.querySelector('input[type="file"]')!, {
+        target: { files: [new File(["x"], "new.jpg", { type: "image/jpeg" })] },
+      });
+      await screen.findByRole("button", { name: "Uploading… 42%" });
+      expect(screen.getByRole("progressbar", { name: "Photo upload" })).toHaveAttribute(
+        "aria-valuenow",
+        "42",
+      );
+      finish!();
+      await screen.findByText(/Photo saved/);
+      expect(screen.queryByRole("progressbar")).toBeNull();
+    } finally {
+      upload.takeover = null;
+    }
+  });
+
   it("saves a confirmed upload before declaring the photo saved and restores it on mount", async () => {
     let draft: { heroAssetId?: string } = {};
     let photoSaved = false;
@@ -730,33 +820,84 @@ describe("Customer Page saved-photo recovery", () => {
     expect(screen.getByRole("button", { name: "Published" })).toBeDisabled();
   });
 
-  it("blocks republishing while the lost response cannot be reconciled, then checks without replay", async () => {
-    let reads = 0,
-      posts = 0,
-      readable = false;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (_input, init?: RequestInit) => {
-        if (init?.method === "PUT") return new Response("{}", { status: 200 });
-        if (init?.method === "POST") {
-          posts++;
-          throw new TypeError("Lost response");
-        }
-        reads++;
-        if (reads > 1 && !readable) throw new TypeError("Offline");
-        return state({}, readable ? {} : null, readable ? 2 : 1);
-      }),
-    );
-    render(<CustomerPageEditor businessName="Test business" />);
-    await screen.findByRole("button", { name: "Publish page" });
-    fireEvent.click(screen.getByRole("button", { name: "Publish page" }));
-    await screen.findByRole("button", { name: "Check published page" });
-    expect(screen.getByRole("button", { name: "Publish page" })).toBeDisabled();
-    readable = true;
-    fireEvent.click(
-      screen.getByRole("button", { name: "Check published page" }),
-    );
-    await screen.findByText("Customer page published");
-    expect(posts).toBe(1);
+  it("blocks republishing while the lost response cannot be reconciled, then checks again by itself, without replay", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let reads = 0,
+        posts = 0,
+        readable = false;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (_input, init?: RequestInit) => {
+          if (init?.method === "PUT") return new Response("{}", { status: 200 });
+          if (init?.method === "POST") {
+            posts++;
+            throw new TypeError("Lost response");
+          }
+          reads++;
+          if (reads > 1 && !readable) throw new TypeError("Offline");
+          return state({}, readable ? {} : null, readable ? 2 : 1);
+        }),
+      );
+      render(<CustomerPageEditor businessName="Test business" />);
+      await screen.findByRole("button", { name: "Publish page" });
+      fireEvent.click(screen.getByRole("button", { name: "Publish page" }));
+
+      // It looks for itself: no button asks the owner to.
+      await screen.findByText("Checking whether that went through…");
+      expect(screen.getByRole("button", { name: "Publish page" })).toBeDisabled();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(11_000);
+      });
+      // Ten seconds with no answer: it says so and counts down to the next look.
+      await screen.findByText("No answer yet. Checking again in 10 s.");
+      expect(screen.getByRole("button", { name: "Check now" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Publish page" })).toBeDisabled();
+
+      readable = true;
+      for (let second = 0; second < 10; second += 1) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1_000);
+        });
+      }
+      await screen.findByText("Customer page published");
+      expect(posts).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("checks at once on Check now", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let reads = 0,
+        posts = 0,
+        readable = false;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (_input, init?: RequestInit) => {
+          if (init?.method === "PUT") return new Response("{}", { status: 200 });
+          if (init?.method === "POST") {
+            posts++;
+            throw new TypeError("Lost response");
+          }
+          reads++;
+          if (reads > 1 && !readable) throw new TypeError("Offline");
+          return state({}, readable ? {} : null, readable ? 2 : 1);
+        }),
+      );
+      render(<CustomerPageEditor businessName="Test business" />);
+      await screen.findByRole("button", { name: "Publish page" });
+      fireEvent.click(screen.getByRole("button", { name: "Publish page" }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(11_000);
+      });
+      readable = true;
+      fireEvent.click(await screen.findByRole("button", { name: "Check now" }));
+      await screen.findByText("Customer page published");
+      expect(posts).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -2,12 +2,14 @@
 
 import { Lock, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
 import { Textarea } from "@/components/ui/textarea";
 import type { ActionNote } from "@/lib/server/owner-data";
 import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 import { relativeDay } from "@/lib/utils/relative-day";
 
 /**
@@ -48,58 +50,58 @@ export function ActionThread({
   const [busy, setBusy] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
-  const [uncertain, setUncertain] = useState(false);
-  const [checking, setChecking] = useState(false);
+  /** The note on its way, and the notes there before it. */
   const intent = useRef<{ text: string; ids: Set<string> } | null>(null);
-  const previousActions = useRef(actions);
-  useEffect(() => {
-    if (!uncertain || !checking || actions === previousActions.current) return;
-    const saved =
-      intent.current &&
-      actions.some(
-        (action) =>
-          action.body === intent.current?.text &&
-          !intent.current.ids.has(action.noteId),
-      );
-    if (saved) {
+  const check = useOutcomeCheck({
+    onDone: () => {
+      intent.current = null;
       setBody("");
       setError(null);
-    } else
-      setError(
-        "The refreshed thread does not show this note. Your text is still here; you can try saving again.",
-      );
-    setUncertain(false);
-    setChecking(false);
-    intent.current = null;
-  }, [actions, checking, uncertain]);
-  useEffect(() => {
-    if (!checking) return;
-    const timer = setTimeout(() => {
-      setChecking(false);
-      setError(
-        "Could not check the thread. Your text is still here. Try checking again before saving.",
-      );
-    }, 20_000);
-    return () => clearTimeout(timer);
-  }, [checking]);
-  const canSubmit = body.trim().length > 0 && !busy && !uncertain;
+      router.refresh();
+    },
+    onNotDone: () => {
+      intent.current = null;
+      setError("That note didn’t save. Your text is still here. Try again.");
+    },
+    onExpired: (message) => {
+      intent.current = null;
+      setError(message);
+    },
+  });
+
+  /** Is the note in the thread now? A read, so nothing is saved twice. */
+  async function isSaved(signal: AbortSignal): Promise<boolean> {
+    const wanted = intent.current;
+    if (!wanted) return false;
+    const response = await ownerFetch(
+      `/api/v1/customer-responses/${responseId}`,
+      { signal },
+    );
+    if (!response.ok) throw new Error("No answer yet.");
+    const { data } = (await response.json()) as {
+      data: { notes?: Array<{ noteId: string; body: string }> };
+    };
+    return (data.notes ?? []).some(
+      (note) => note.body === wanted.text && !wanted.ids.has(note.noteId),
+    );
+  }
+
+  const canSubmit = body.trim().length > 0 && !busy && !check.pending;
 
   async function add() {
     // Never a dead button: an empty note says what is missing.
-    if (body.trim().length === 0 && !busy && !uncertain) {
+    if (body.trim().length === 0 && !busy && !check.pending) {
       setError("Write what you did first, then save it.");
       return;
     }
     if (!canSubmit) return;
     setBusy(true);
     setError(null);
-    let submitted = false;
+    intent.current = {
+      text: body.trim(),
+      ids: new Set(actions.map((action) => action.noteId)),
+    };
     try {
-      intent.current = {
-        text: body.trim(),
-        ids: new Set(actions.map((action) => action.noteId)),
-      };
-      submitted = true;
       const response = await ownerFetch(
         `/api/v1/customer-responses/${responseId}/notes`,
         {
@@ -109,10 +111,15 @@ export function ActionThread({
         },
       );
       if (!response.ok) {
+        // A server error may have come after the note was kept: find out.
+        if (response.status >= 500) {
+          check.start(isSaved, { serverAnswered: true });
+          return;
+        }
         const payload = (await response.json().catch(() => null)) as {
           error?: { message?: string };
         } | null;
-        if (response.status >= 500) setUncertain(true);
+        intent.current = null;
         setError(
           payload?.error?.message ??
             "Could not save that. Your text is still here.",
@@ -123,12 +130,13 @@ export function ActionThread({
       intent.current = null;
       router.refresh();
     } catch (caught) {
-      setUncertain(submitted && !(caught instanceof SessionExpiredError));
-      setError(
-        caught instanceof SessionExpiredError
-          ? caught.message
-          : "Could not confirm saving. Your text is still here. Check the saved notes before sending it again.",
-      );
+      if (caught instanceof SessionExpiredError) {
+        intent.current = null;
+        setError(caught.message);
+        return;
+      }
+      // The answer was lost on the way back. Look rather than ask.
+      check.start(isSaved);
     } finally {
       setBusy(false);
     }
@@ -174,28 +182,14 @@ export function ActionThread({
           {error}
         </p>
       ) : null}
-      {uncertain ? (
-        <Button
-          variant="secondary"
-          className="mb-3"
-          loading={checking}
-          loadingLabel="Checking…"
-          onClick={() => {
-            previousActions.current = actions;
-            setChecking(true);
-            router.refresh();
-          }}
-        >
-          Check saved notes
-        </Button>
-      ) : null}
+      <OutcomeCheckNotice check={check} className="mb-3" />
       <Textarea
         value={body}
         onChange={(event) => {
           setBody(event.target.value);
-          if (error && !uncertain) setError(null);
+          if (error) setError(null);
         }}
-        disabled={busy}
+        disabled={busy || check.pending}
         rows={3}
         maxLength={2000}
         aria-label="Write what you did about this"
@@ -206,7 +200,7 @@ export function ActionThread({
       <Button
         variant="secondary"
         className="mt-3 sm:w-auto"
-        disabled={uncertain}
+        disabled={check.pending}
         loading={busy}
         loadingLabel="Saving…"
         onClick={() => void add()}

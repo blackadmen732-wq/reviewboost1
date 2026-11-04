@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { apiFetch, ApiError } from "./api";
 import type { FeedbackItem } from "./types";
+import { loadFailed } from "./recovery";
 
 interface ApiResponse {
   data: Array<{
@@ -108,7 +109,7 @@ export function useFeedback(orgId: string | undefined, show: FeedbackShow = "all
     } catch (e) {
       if (gen !== generationRef.current) return;
       if (reqId !== requestIdRef.current) return;
-      setError(e instanceof ApiError ? e.message : "Failed to load feedback");
+      setError(loadFailed(e, "feedback"));
     } finally {
       if (gen === generationRef.current && reqId === requestIdRef.current) {
         fetchingRef.current = false;
@@ -132,7 +133,7 @@ export function useFeedback(orgId: string | undefined, show: FeedbackShow = "all
     } catch (e) {
       if (gen !== generationRef.current) return;
       if (reqId !== requestIdRef.current) return;
-      setError(e instanceof ApiError ? e.message : "Failed to refresh");
+      setError(loadFailed(e, "feedback"));
     } finally {
       if (gen === generationRef.current && reqId === requestIdRef.current) {
         fetchingRef.current = false;

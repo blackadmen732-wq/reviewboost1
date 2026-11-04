@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { apiFetch } from "./api";
 import type { StandItem } from "./types";
+import { loadFailed } from "./recovery";
 
 interface ApiResponse {
   data: Array<{
@@ -44,7 +45,7 @@ export function useStands(orgId: string | undefined) {
         setStands(res.data);
       } catch (e) {
         if (gen !== generationRef.current) return;
-        setError(e instanceof Error ? e.message : "Failed to load stands");
+        setError(loadFailed(e, "your Tags"));
       } finally {
         if (gen === generationRef.current) {
           setLoading(false);

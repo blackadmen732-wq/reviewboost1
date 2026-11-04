@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as Crypto from "expo-crypto";
 import { apiFetch, ApiError } from "./api";
+import { useOutcomeCheck } from "./use-outcome-check";
 
 /**
  * One Text Request, the website's way (features/dashboard/text-request-
@@ -43,11 +44,33 @@ function messageOf(error: unknown): string {
   return "Could not reach ReviewBoost. Check your connection and try again.";
 }
 
-export function useTextComposer(orgId: string | undefined) {
+export function useTextComposer(
+  orgId: string | undefined,
+  {
+    onSentAfterCheck,
+  }: {
+    /** A send whose answer was lost turned out to have gone through. */
+    onSentAfterCheck?: () => void;
+  } = {},
+) {
   const [preview, setPreview] = useState<TextPreview | null>(null);
   const [busy, setBusy] = useState<"preview" | "consent" | "send" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sendUncertain, setSendUncertain] = useState(false);
+  const sentAfterCheck = useRef(onSentAfterCheck);
+  useEffect(() => {
+    sentAfterCheck.current = onSentAfterCheck;
+  });
+  // A lost answer is settled by looking under Recent, never by sending again,
+  // and Send is held meanwhile: nobody gets two texts.
+  const sendCheck = useOutcomeCheck({
+    onDone: () => {
+      setPreview(null);
+      setSendKey(null);
+      sentAfterCheck.current?.();
+    },
+    onNotDone: () => setError("That text request didn’t go through. Nothing was sent. Try again."),
+    onExpired: setError,
+  });
   // One key per preview: a deliberate second press of the same Send is the
   // same request to the server, never a second text.
   const [sendKey, setSendKey] = useState<string | null>(null);
@@ -109,11 +132,14 @@ export function useTextComposer(orgId: string | undefined) {
     [orgId],
   );
 
+  const startSendCheck = sendCheck.start;
   const send = useCallback(
-    async (draft: Draft): Promise<boolean> => {
+    /** `before`: the requests under Recent before this one, to tell it apart. */
+    async (draft: Draft, before: ReadonlySet<string> = new Set()): Promise<boolean> => {
       if (!orgId || !preview || !preview.eligibility.allowed || !sendKey) return false;
       setBusy("send");
       setError(null);
+      const lastFour = preview.recipientLastFour;
       try {
         await apiFetch("/api/v1/text-requests", orgId, {
           method: "POST",
@@ -128,21 +154,30 @@ export function useTextComposer(orgId: string | undefined) {
         setSendKey(null);
         return true;
       } catch (e) {
-        if (e instanceof ApiError && e.status > 0) setError(messageOf(e));
-        else setSendUncertain(true);
+        if (e instanceof ApiError && e.status > 0 && e.status < 500) {
+          setError(messageOf(e));
+          return false;
+        }
+        // The answer was lost (or the server failed after starting): a new
+        // row under Recent for this number is this request.
+        startSendCheck(
+          async (signal) => {
+            const res = await apiFetch<{ data: { items: Array<{ id: string; recipientLastFour: string | null }> } }>(
+              "/api/v1/text-requests?limit=10",
+              orgId,
+              { signal },
+            );
+            return res.data.items.some((item) => !before.has(item.id) && item.recipientLastFour === lastFour);
+          },
+          { serverAnswered: e instanceof ApiError && e.status >= 500 },
+        );
         return false;
       } finally {
         setBusy(null);
       }
     },
-    [orgId, preview, sendKey],
+    [orgId, preview, sendKey, startSendCheck],
   );
 
-  const resolveUncertain = useCallback(() => {
-    setSendUncertain(false);
-    setPreview(null);
-    setSendKey(null);
-  }, []);
-
-  return { preview, busy, error, sendUncertain, runPreview, recordConsent, send, clear, resolveUncertain };
+  return { preview, busy, error, sendCheck, runPreview, recordConsent, send, clear };
 }

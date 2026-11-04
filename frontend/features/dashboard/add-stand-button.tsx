@@ -6,14 +6,18 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { DialogRoot, DialogContent } from "@/components/ui/dialog";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
 import { notify } from "@/components/ui/toast";
 import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 
 interface AddStandButtonProps {
   locations: Array<{ locationId: string; name: string }>;
+  /** The Tags there before, so a new one can be told apart if the answer is lost. */
+  standIds: readonly string[];
 }
 
-export function AddStandButton({ locations }: AddStandButtonProps) {
+export function AddStandButton({ locations, standIds }: AddStandButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -23,28 +27,38 @@ export function AddStandButton({ locations }: AddStandButtonProps) {
   const [label, setLabel] = useState("");
 
   const [error, setError] = useState<string | null>(null);
-  const [uncertain, setUncertain] = useState(false);
-  async function checkTags() {
-    setBusy(true);
-    try {
-      const response = await ownerFetch("/api/v1/review-stands");
-      if (!response.ok) throw new Error("read_failed");
-      setOpen(false);
-      setUncertain(false);
-      setError(null);
-      router.refresh();
-    } catch {
-      setError(
-        "Could not check your Tags. Try checking again before creating another.",
-      );
-    } finally {
-      setBusy(false);
-    }
+  const check = useOutcomeCheck({
+    onDone: created,
+    onNotDone: () => setError("That Tag wasn’t created. Try again."),
+    onExpired: setError,
+  });
+
+  function created() {
+    setOpen(false);
+    setLabel("");
+    notify.success(
+      "Tag created",
+      "Print the code or program the tag, then put it where people pay.",
+    );
+    router.refresh();
   }
+
   async function handleCreate() {
-    if (!selectedLocation || busy || uncertain) return;
+    if (!selectedLocation || busy || check.pending) return;
     setBusy(true);
     setError(null);
+    const before = new Set(standIds);
+    const place = selectedLocation;
+    const isCreated = async (signal: AbortSignal): Promise<boolean> => {
+      const response = await ownerFetch("/api/v1/review-stands", { signal });
+      if (!response.ok) throw new Error("No answer yet.");
+      const { data } = (await response.json()) as {
+        data: Array<{ standId: string; locationId: string }>;
+      };
+      return data.some(
+        (tag) => !before.has(tag.standId) && tag.locationId === place,
+      );
+    };
     try {
       const response = await ownerFetch("/api/v1/review-stands", {
         method: "POST",
@@ -58,27 +72,25 @@ export function AddStandButton({ locations }: AddStandButtonProps) {
         const payload = (await response.json().catch(() => null)) as {
           error?: { message?: string };
         } | null;
+        // A server error can come after the Tag was made: find out.
+        if (response.status >= 500) {
+          check.start(isCreated, { serverAnswered: true });
+          return;
+        }
         setError(
           payload?.error?.message ??
             "Could not create a Tag. Please try again.",
         );
-        if (response.status >= 500) setUncertain(true);
         return;
       }
-      setOpen(false);
-      setLabel("");
-      notify.success(
-        "Tag created",
-        "Print the code or program the tag, then put it where people pay.",
-      );
-      router.refresh();
+      created();
     } catch (caught) {
-      setUncertain(!(caught instanceof SessionExpiredError));
-      setError(
-        caught instanceof SessionExpiredError
-          ? caught.message
-          : "Could not confirm creation. Check your Tags before creating another.",
-      );
+      if (caught instanceof SessionExpiredError) {
+        setError(caught.message);
+        return;
+      }
+      // The answer was lost: look for the new Tag rather than ask.
+      check.start(isCreated);
     } finally {
       setBusy(false);
     }
@@ -145,20 +157,11 @@ export function AddStandButton({ locations }: AddStandButtonProps) {
               {error}
             </p>
           ) : null}
-          {uncertain ? (
-            <Button
-              variant="secondary"
-              loading={busy}
-              loadingLabel="Checking…"
-              onClick={() => void checkTags()}
-            >
-              Check your Tags
-            </Button>
-          ) : null}
+          <OutcomeCheckNotice check={check} />
           <div className="flex flex-col gap-2 sm:flex-row-reverse">
             <Button
               variant="action"
-              disabled={uncertain}
+              disabled={check.pending}
               loading={busy}
               onClick={() => void handleCreate()}
               className="sm:flex-1"

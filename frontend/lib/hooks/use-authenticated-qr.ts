@@ -26,6 +26,8 @@ export interface AuthenticatedQr {
   reload: () => void;
   download: (filename: string) => void;
   downloading: boolean;
+  /** Failed loads so far; it changes with each, so a retry can count them. */
+  failures: number;
 }
 
 export function useAuthenticatedQr(
@@ -35,6 +37,7 @@ export function useAuthenticatedQr(
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<QrStatus>(standId ? "loading" : "idle");
   const [downloading, setDownloading] = useState(false);
+  const [failures, setFailures] = useState(0);
   const objectUrlRef = useRef<string | null>(null);
   const generationRef = useRef(0);
   const alive = useRef(true);
@@ -69,6 +72,7 @@ export function useAuthenticatedQr(
             ? "expired"
             : "error",
         );
+        setFailures((count) => count + 1);
       }
     })();
 
@@ -106,6 +110,7 @@ export function useAuthenticatedQr(
           ? "expired"
           : "error",
       );
+      setFailures((count) => count + 1);
     }
   }, [standId, organizationId]);
 
@@ -138,5 +143,6 @@ export function useAuthenticatedQr(
     reload: () => void reload(),
     download: (filename: string) => void download(filename),
     downloading,
+    failures,
   };
 }

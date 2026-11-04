@@ -21,6 +21,13 @@ export interface CustomerMessages {
   /** The page could not load or save because of us, not the phone. */
   serverErrorBody: string;
   tryAgain: string;
+  /** The page failed to load and tries again by itself, counting down. */
+  retryingIn: (seconds: number) => string;
+  /** The same, said once to a screen reader instead of every second. */
+  retryingSoon: string;
+  retrying: string;
+  /** Skip the countdown. */
+  tryNow: string;
   ratingHeading: string;
   ratingSupport: string;
   ratingGroup: string;
@@ -29,6 +36,10 @@ export interface CustomerMessages {
   sending: string;
   submitErrorHeading: string;
   submitErrorBody: string;
+  /** The rating did not save and is sent again by itself, counting down. */
+  submitRetryingIn: (seconds: number) => string;
+  /** The same, said once to a screen reader instead of every second. */
+  submitRetryingSoon: string;
   offline: string;
   thanksHeading: string;
   feedbackSent: (businessName: string) => string;
@@ -55,6 +66,10 @@ const en: CustomerMessages = {
   loadErrorBody: "Check your connection and try again.",
   serverErrorBody: "Try again in a moment.",
   tryAgain: "Try again",
+  retryingIn: (seconds) => `Trying again in ${seconds} s.`,
+  retryingSoon: "Trying again in a few seconds.",
+  retrying: "Trying again…",
+  tryNow: "Try now",
   ratingHeading: "How was your visit?",
   ratingSupport: "Tap a star to continue to Google",
   ratingGroup: "Rate your visit from 1 to 5 stars",
@@ -75,6 +90,8 @@ const en: CustomerMessages = {
   sending: "Sending…",
   submitErrorHeading: "That didn’t go through.",
   submitErrorBody: "Your rating is still here. Try again in a moment.",
+  submitRetryingIn: (seconds) => `Your rating is still here. Trying again in ${seconds} s.`,
+  submitRetryingSoon: "Your rating is still here. Trying again in a few seconds.",
   offline: "You’re offline. We’ll try when you reconnect.",
   thanksHeading: "Thanks for sharing.",
   feedbackSent: (businessName) => `Your rating was sent to ${businessName}.`,
@@ -95,6 +112,10 @@ const es: CustomerMessages = {
   loadErrorBody: "Revisa tu conexión e inténtalo de nuevo.",
   serverErrorBody: "Inténtalo de nuevo en un momento.",
   tryAgain: "Intentar de nuevo",
+  retryingIn: (seconds) => `Reintentando en ${seconds} s.`,
+  retryingSoon: "Reintentando en unos segundos.",
+  retrying: "Reintentando…",
+  tryNow: "Intentar ahora",
   ratingHeading: "¿Cómo estuvo tu visita?",
   ratingSupport: "Toca una estrella para continuar a Google",
   ratingGroup: "Califica tu visita de 1 a 5 estrellas",
@@ -115,6 +136,8 @@ const es: CustomerMessages = {
   sending: "Enviando…",
   submitErrorHeading: "No se pudo enviar.",
   submitErrorBody: "Tu calificación sigue aquí. Inténtalo de nuevo en un momento.",
+  submitRetryingIn: (seconds) => `Tu calificación sigue aquí. Reintentando en ${seconds} s.`,
+  submitRetryingSoon: "Tu calificación sigue aquí. Reintentando en unos segundos.",
   offline: "No tienes conexión. Lo intentaremos cuando vuelvas a conectarte.",
   thanksHeading: "Gracias por compartir.",
   feedbackSent: (businessName) => `Tu calificación se envió a ${businessName}.`,
@@ -135,6 +158,10 @@ const ht: CustomerMessages = {
   loadErrorBody: "Verifye koneksyon ou epi eseye ankò.",
   serverErrorBody: "Eseye ankò nan yon ti moman.",
   tryAgain: "Eseye ankò",
+  retryingIn: (seconds) => `N ap eseye ankò nan ${seconds} s.`,
+  retryingSoon: "N ap eseye ankò nan kèk segonn.",
+  retrying: "N ap eseye ankò…",
+  tryNow: "Eseye kounye a",
   ratingHeading: "Kijan vizit ou te ye?",
   ratingSupport: "Peze yon etwal pou kontinye sou Google",
   ratingGroup: "Bay vizit ou ant 1 ak 5 etwal",
@@ -155,6 +182,8 @@ const ht: CustomerMessages = {
   sending: "N ap voye…",
   submitErrorHeading: "Sa pa t pase.",
   submitErrorBody: "Nòt ou bay la toujou la. Eseye ankò nan yon ti moman.",
+  submitRetryingIn: (seconds) => `Nòt ou bay la toujou la. N ap eseye ankò nan ${seconds} s.`,
+  submitRetryingSoon: "Nòt ou bay la toujou la. N ap eseye ankò nan kèk segonn.",
   offline: "Ou pa konekte. N ap eseye lè ou rekonekte.",
   thanksHeading: "Mèsi paske ou pataje.",
   feedbackSent: (businessName) => `Nòt ou bay la te voye bay ${businessName}.`,

@@ -214,7 +214,7 @@ States:
 - Hover.
 - Pressed: darker, with a 1px press.
 - Focus: a 2px focus ring.
-- Loading: keeps its label (or `loadingLabel`), shows a spinner, and ignores repeat taps.
+- Loading: keeps its label (or `loadingLabel`), shows a spinner, and ignores repeat taps. At 4 s: "Still working…".
 - Disabled: used only when something truly can't be done, with the reason shown next to it.
 
 Don't pre-disable a submit button. Let the owner tap it, then say exactly what's missing.
@@ -279,7 +279,7 @@ Used only to confirm something that already happened ("Page published"). Toasts 
 ### 6.10 InlineNotice and StatePanel
 
 - InlineNotice shows a message next to the thing it is about (info, warning or error), with a recovery action.
-- StatePanel is used for whole-page loading, error and offline states, always with "Try again".
+- StatePanel: whole-page loading, error and offline states. A failed load retries itself (3, 10, 30 s), with [Try now].
 
 ### 6.11 Skeleton
 
@@ -321,7 +321,7 @@ Each screen follows the same pattern: what it's for, its status line, its one ne
   - *New owner, no ratings:* the three setup steps, small, with "See all steps".
   - *Active:* the content above.
   - *Google link is a listing, not a review link:* a warning card with "Fix link".
-  - *Error:* "Home didn't load." with [Try again].
+  - *Error:* as §7.12.
 
 ### 7.2 Tags `/stands`
 
@@ -436,8 +436,8 @@ Saving shows "Saved" inline. A failed save says "Didn't save. Try again." and ke
 ### 7.12 System pages
 
 - **Not found:** "That page doesn't exist." with [Go to Home].
-- **Error:** "Something went wrong." with [Try again].
-- **Offline:** "You're offline. ReviewBoost will reload when you're back."
+- **Error:** "That didn't load. Trying again in 3 s." with [Try now].
+- **Offline:** "You are offline." Reloads itself when back online.
 
 ---
 

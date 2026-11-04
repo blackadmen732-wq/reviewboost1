@@ -54,7 +54,10 @@ export default async function SetupPage() {
   const canManage = can.manageTags;
   const canCreate = canManage && locations.length > 0 && entitlements.canCreateTag;
   const addButton = canCreate ? (
-    <AddStandButton locations={locations.map((l) => ({ locationId: l.locationId, name: l.name }))} />
+    <AddStandButton
+      locations={locations.map((l) => ({ locationId: l.locationId, name: l.name }))}
+      standIds={stands.map((stand) => stand.standId)}
+    />
   ) : null;
 
   const steps = deriveSetupSteps({

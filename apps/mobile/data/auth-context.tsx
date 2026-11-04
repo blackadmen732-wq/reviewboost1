@@ -15,6 +15,7 @@ import { boundedRead, boundedWrite } from "./read-deadline";
 import { signInForReview } from "./review-sign-in";
 import { sendCodeResult, type SendCodeResult } from "./send-code";
 import { parseMemberRole, type Organization } from "./types";
+import { loadFailed } from "./recovery";
 
 interface AuthState {
   isLoggedIn: boolean;
@@ -115,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error || !data) {
         setOrganizations([]);
-        setOrgError(error?.message ?? "Failed to load organizations");
+        setOrgError("Couldn’t load your businesses.");
         setOrgLoading(false);
         return;
       }
@@ -146,9 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (gen === authGeneration.current) {
         setOrganizations([]);
         setActiveOrg(null);
-        setOrgError(
-          "Could not load your businesses. Check your connection and try again.",
-        );
+        setOrgError("Couldn’t load your businesses.");
       }
     } finally {
       if (gen === authGeneration.current) setOrgLoading(false);

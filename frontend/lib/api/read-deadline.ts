@@ -11,9 +11,9 @@ export class ReadTimeoutError extends Error {
 export const OWNER_WRITE_TIMEOUT_MS = 30_000;
 export class WriteTimeoutError extends Error {
   constructor() {
-    super(
-      "Could not confirm this change. Check its current state before trying again.",
-    );
+    // Callers find out what happened themselves (lib/recovery); this is
+    // never a reason to send the owner off to look.
+    super("Could not confirm this change in time.");
     this.name = "WriteTimeoutError";
   }
 }

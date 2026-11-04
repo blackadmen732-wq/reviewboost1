@@ -29,6 +29,7 @@ vi.mock("@/features/tags/program-tag-sheet", () => ({
 }));
 
 import { TagDetail } from "@/features/tags/tag-detail";
+import { forgetAllTries } from "@/lib/recovery/use-auto-retry";
 import type { Stand } from "@/lib/server/owner-data";
 
 const stand = {
@@ -52,6 +53,7 @@ function setQr(status: typeof qrState.status, objectUrl: string | null = null) {
 describe("Tag detail code states", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    forgetAllTries();
     capturedOnReady = null;
   });
 
@@ -90,13 +92,27 @@ describe("Tag detail code states", () => {
     expect(document.querySelector("[data-qr-state='loading']")).toBeNull();
   });
 
-  it("offers a retry when the code failed to load", () => {
-    setQr("error");
-    render(<TagDetail timeZone="UTC" stand={stand} canManage />);
+  it("tries again by itself when the code failed to load, with Try now", () => {
+    vi.useFakeTimers();
+    try {
+      setQr("error");
+      render(<TagDetail timeZone="UTC" stand={stand} canManage />);
 
-    expect(document.querySelector("[data-qr-state='error']")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /try again/i })).toBeVisible();
-    expect(document.querySelector("[data-qr-state='loading']")).toBeNull();
+      expect(document.querySelector("[data-qr-state='error']")).toBeTruthy();
+      expect(screen.getByText(/The code didn’t load\./)).toBeVisible();
+      expect(screen.getByText("Trying again in 3 s.")).toBeVisible();
+      expect(screen.getByRole("button", { name: "Try now" })).toBeVisible();
+      expect(document.querySelector("[data-qr-state='loading']")).toBeNull();
+
+      for (let second = 0; second < 3; second += 1) {
+        act(() => {
+          vi.advanceTimersByTime(1000);
+        });
+      }
+      expect(qrState.reload).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows the code once it is ready, and no spinner", () => {

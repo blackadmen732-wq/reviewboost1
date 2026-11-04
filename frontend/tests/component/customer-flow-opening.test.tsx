@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CustomerFlow } from "@/features/customer-flow/customer-flow";
 import { navigateToDestination } from "@/features/customer-flow/destination-handoff";
 import { CustomerApiError } from "@/lib/api/customer-api-error";
+import { forgetAllTries } from "@/lib/recovery/use-auto-retry";
 import { customerMessages } from "@/lib/i18n/customer-messages";
 import { renderWithProviders } from "@/tests/helpers/render";
 
@@ -61,6 +62,7 @@ const CONTEXT = {
 const calls = (op: "session" | "response") => h.calls.filter((call) => call.op === op);
 
 beforeEach(() => {
+  forgetAllTries();
   h.calls.length = 0;
   vi.mocked(navigateToDestination).mockClear();
   window.sessionStorage.clear();
@@ -121,7 +123,8 @@ describe("a session started as the page opens", () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(calls("session")).toHaveLength(0);
 
-    await user.click(screen.getByRole("button", { name: customerMessages.en.tryAgain }));
+    // It would go again by itself; "Try now" skips the wait.
+    await user.click(screen.getByRole("button", { name: customerMessages.en.tryNow }));
     await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
     expect(calls("session")).toHaveLength(1);
     expect(calls("response")).toHaveLength(1);

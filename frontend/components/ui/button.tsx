@@ -3,6 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { LoaderCircle } from "lucide-react";
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
+import { StillWorking } from "@/components/ui/still-working";
 import { cn } from "@/lib/utils/cn";
 
 export const buttonVariants = cva(
@@ -83,15 +84,21 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {loading ? (
-          <>
-            <LoaderCircle
-              className="size-5 animate-spin motion-reduce:animate-none"
-              aria-hidden="true"
-            />
-            {/* Keep saying what is happening: the given label ("Sending…"),
-                otherwise the button's own words, never a generic "Loading". */}
+          // Keep saying what is happening: the given label ("Sending…"),
+          // otherwise the button's own words, never a generic "Loading";
+          // "Still working…" once it has taken four seconds. A new label
+          // ("Uploading… 40%") is progress, so it starts the four again.
+          <StillWorking
+            key={loadingLabel}
+            icon={
+              <LoaderCircle
+                className="size-5 shrink-0 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+            }
+          >
             {loadingLabel ? <span>{loadingLabel}</span> : children}
-          </>
+          </StillWorking>
         ) : (
           children
         )}

@@ -9,6 +9,7 @@ import { Tappable } from "@/components/tappable";
 import { useAuth } from "@/data/auth-context";
 import { colors, radii, space, type } from "@/theme";
 import type { Organization } from "@/data/types";
+import { RetryBlock } from "@/components/retry-block";
 
 export default function SelectOrgScreen() {
   const {
@@ -84,10 +85,7 @@ export default function SelectOrgScreen() {
           ) : orgLoading ? (
             <ActivityIndicator size="large" color={colors.inkMuted} style={styles.spinner} />
           ) : orgError ? (
-            <View style={styles.notice}>
-              <Text style={styles.errorText}>{orgError}</Text>
-              <Button label="Try again" variant="secondary" onPress={() => void refreshOrganizations()} />
-            </View>
+            <RetryBlock message={orgError} retryKey="select-org" onRetry={() => void refreshOrganizations()} />
           ) : (
             <View style={styles.notice}>
               <Text style={styles.empty}>No business on this account yet</Text>

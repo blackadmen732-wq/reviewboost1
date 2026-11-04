@@ -7,6 +7,7 @@ import { CustomerFrame } from "@/features/customer-flow/customer-frame";
 import { LanguageSelector } from "@/features/customer-flow/language-selector";
 import { supportedLocales, type Locale } from "@/lib/i18n/config";
 import type { CustomerMessages } from "@/lib/i18n/customer-messages";
+import { useAutoRetry, type AutoRetry } from "@/lib/recovery/use-auto-retry";
 
 interface CustomerBlockingStateProps {
   /**
@@ -18,6 +19,12 @@ interface CustomerBlockingStateProps {
   messages: CustomerMessages;
   onLocaleChange: (locale: Locale) => void;
   onRetry?: () => void;
+  /**
+   * When given, the page tries again by itself (`useAutoRetry`): it counts
+   * down to the next try, "Try now" skips the wait, and offline it waits for
+   * the connection. Without it, "Try again" is the customer's alone.
+   */
+  retry?: AutoRetry | undefined;
 }
 
 export function CustomerBlockingState({
@@ -26,8 +33,11 @@ export function CustomerBlockingState({
   messages,
   onLocaleChange,
   onRetry,
+  retry,
 }: CustomerBlockingStateProps) {
   const unavailable = kind === "unavailable";
+  const settledBody =
+    kind === "offline" ? messages.loadErrorBody : messages.serverErrorBody;
   return (
     <CustomerFrame poweredBy={messages.poweredBy}>
       <div className="blocking-state-toolbar">
@@ -49,14 +59,36 @@ export function CustomerBlockingState({
               : messages.loadErrorHeading}
           </h1>
           <p className="customer-support">
-            {unavailable
-              ? messages.unavailableBody
-              : kind === "offline"
-                ? messages.loadErrorBody
-                : messages.serverErrorBody}
+            {unavailable ? (
+              messages.unavailableBody
+            ) : !retry || retry.phase === "stopped" ? (
+              settledBody
+            ) : retry.phase === "offline" ? (
+              messages.offline
+            ) : retry.phase === "retrying" ? (
+              messages.retrying
+            ) : (
+              // An alert region: a number changing every second would be
+              // read out every second, so a screen reader hears one sentence.
+              <>
+                <span aria-hidden="true">
+                  {messages.retryingIn(retry.secondsLeft)}
+                </span>
+                <span className="sr-only">{messages.retryingSoon}</span>
+              </>
+            )}
           </p>
         </div>
-        {!unavailable && onRetry ? (
+        {unavailable ? null : retry ? (
+          <Button
+            size="lg"
+            loading={retry.phase === "retrying"}
+            loadingLabel={messages.retrying}
+            onClick={retry.retryNow}
+          >
+            {retry.phase === "stopped" ? messages.tryAgain : messages.tryNow}
+          </Button>
+        ) : onRetry ? (
           <Button size="lg" onClick={onRetry}>
             {messages.tryAgain}
           </Button>
@@ -64,4 +96,25 @@ export function CustomerBlockingState({
       </section>
     </CustomerFrame>
   );
+}
+
+/**
+ * The page could not load, and tries again by itself: 3 s, 10 s, 30 s, or
+ * the moment the phone is back online.
+ */
+export function RetryingBlockingState({
+  retryKey,
+  failure,
+  onRetry,
+  ...props
+}: Omit<CustomerBlockingStateProps, "retry" | "onRetry" | "kind"> & {
+  kind: "offline" | "error";
+  /** What failed, so the count of tries survives a re-render. */
+  retryKey: string;
+  /** Changes with each failed try. */
+  failure: unknown;
+  onRetry: () => void;
+}) {
+  const retry = useAutoRetry({ key: retryKey, failure, onRetry });
+  return <CustomerBlockingState {...props} retry={retry} />;
 }

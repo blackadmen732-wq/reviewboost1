@@ -42,6 +42,8 @@ import {
   isNfcSupported,
   programTag,
 } from "@/lib/nfc";
+import { OfflineBar } from "@/components/offline-bar";
+import { RetryBlock } from "@/components/retry-block";
 
 const PLATFORM: NfcPlatform = Platform.OS === "ios" ? "ios" : "android";
 
@@ -57,6 +59,8 @@ export default function StandDetailScreen() {
   const [standLabel, setStandLabel] = useState<string>("");
   const [loading, setLoading] = useState(canProvision);
   const [error, setError] = useState<string | null>(null);
+  /** Bumped to load the Tag again after a failure. */
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [code, setCode] = useState<string | null>(null);
   // The list row for this Tag: its place, when it was last used, and whether
   // the printed code and the chip are current.
@@ -100,12 +104,12 @@ export default function StandDetailScreen() {
         setStandLabel(res.data.label);
         setCode(await authorizedImage(`/api/v1/review-stands/${id}/qr?format=png&size=600`, orgId).catch(() => null));
       } catch {
-        setError("Could not load this Tag. Please try again.");
+        setError("Could not load this Tag.");
       } finally {
         setLoading(false);
       }
     })();
-  }, [orgId, id, canProvision]);
+  }, [orgId, id, canProvision, loadAttempt]);
 
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -282,6 +286,7 @@ export default function StandDetailScreen() {
       {/* The large title below names the Tag; the bar only carries Back. */}
       <Stack.Screen options={stackHeader("")} />
       <ScrollView contentContainerStyle={styles.content}>
+        <OfflineBar />
         <View>
           <Text style={styles.title} accessibilityRole="header">
             {title}
@@ -298,9 +303,12 @@ export default function StandDetailScreen() {
         </View>
 
         {error ? (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
+          // Tries again by itself (3 s, 10 s, 30 s, or when back online).
+          <RetryBlock
+            message={error}
+            retryKey={`tag:${id}`}
+            onRetry={() => setLoadAttempt((attempt) => attempt + 1)}
+          />
         ) : null}
 
         {/* The printed code: the same link the chip carries. */}

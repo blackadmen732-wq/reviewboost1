@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { RetryNotice } from "@/components/ui/retry-notice";
 import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
+import { useAutoRetry } from "@/lib/recovery/use-auto-retry";
 
 /** Resolve the owner's link before the click, so a normal link opens on mobile. */
 export function PreviewCustomerPage({
@@ -17,6 +19,8 @@ export function PreviewCustomerPage({
     standId: string;
     url?: string;
     error?: string;
+    /** The session ran out: trying again on its own would not help. */
+    expired?: boolean;
   } | null>(null);
   const url = result?.standId === standId ? result.url : null;
   const error = result?.standId === standId ? result.error : null;
@@ -45,6 +49,7 @@ export function PreviewCustomerPage({
               caught instanceof SessionExpiredError
                 ? caught.message
                 : "Could not load the customer page link. Try again.",
+            expired: caught instanceof SessionExpiredError,
           });
       }
     })();
@@ -67,6 +72,14 @@ export function PreviewCustomerPage({
           Preview customer page{" "}
           <span className="sr-only">(opens in a new tab)</span>
         </a>
+      ) : error && !result?.expired ? (
+        <PreviewLinkFailed
+          standId={standId}
+          onRetry={() => {
+            setResult(null);
+            setAttempt((value) => value + 1);
+          }}
+        />
       ) : error ? (
         <>
           <p role="alert" className="text-sm text-danger">
@@ -89,5 +102,22 @@ export function PreviewCustomerPage({
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The link could not be prepared. It tries again by itself (3 s, 10 s, 30 s,
+ * or when the connection is back), so the owner never has to keep tapping.
+ */
+function PreviewLinkFailed({
+  standId,
+  onRetry,
+}: {
+  standId: string;
+  onRetry: () => void;
+}) {
+  const retry = useAutoRetry({ key: `preview:${standId}`, failure: null, onRetry });
+  return (
+    <RetryNotice retry={retry} what="The customer page link didn’t load." />
   );
 }

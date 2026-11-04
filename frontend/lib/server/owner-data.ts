@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import type { User } from "@supabase/supabase-js";
+import { isAuthRetryableFetchError, type User } from "@supabase/supabase-js";
 
 import { tryDecrypt } from "@/lib/server/crypto";
 import { effectiveStatus, locationLimit, tagLimit, type EntitlementStatus } from "@/lib/server/entitlements";
@@ -151,8 +151,13 @@ export const requireOwner = cache(async (nextPath: string): Promise<OwnerContext
 
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
 
+  // The auth service did not answer: that is not a signed-out owner. The
+  // error page says so and tries again by itself; sending them to sign in
+  // would fail as well, and read as having been signed out.
+  if (!user && isAuthRetryableFetchError(error)) dataFailure("auth.get_user", error);
   if (!user) redirect(`/login?next=${encodeURIComponent(nextPath)}`);
 
   const { active, all, needsSelection } = await getActiveOrganization();

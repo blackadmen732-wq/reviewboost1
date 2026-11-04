@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { apiFetch, ApiError } from "./api";
+import { checkOutcome, isServerError, type IsDone } from "./recovery";
 import type { FeedbackItem, OwnerNote } from "./types";
+import { loadFailed } from "./recovery";
 
 interface ApiResponse {
   data: {
@@ -21,6 +23,36 @@ interface ApiResponse {
 export interface FeedbackDetail extends FeedbackItem {
   tagLabel: string | null;
   notes: OwnerNote[];
+}
+
+/**
+ * How an action ended. `stillUnknown`: ReviewBoost could not be reached to
+ * find out, so the screen keeps checking with it (`OutcomeCheckNotice`) and
+ * holds the action meanwhile.
+ */
+export type ActionResult =
+  | { ok: true }
+  | { ok: false; message: string; stillUnknown?: IsDone };
+
+function toDetail(orgId: string, d: ApiResponse["data"]): FeedbackDetail {
+  return {
+    id: d.responseId,
+    orgId,
+    locationId: d.locationId,
+    rating: d.rating,
+    note: d.note,
+    submittedAt: d.submittedAt,
+    isRead: d.isRead,
+    isResolved: d.isResolved,
+    tagLabel: d.tagLabel ?? null,
+    notes: (d.notes ?? []).map((note) => ({
+      id: note.noteId,
+      feedbackId: d.responseId,
+      body: note.body,
+      authorName: note.authorName,
+      createdAt: note.createdAt,
+    })),
+  };
 }
 
 /**
@@ -62,25 +94,7 @@ export function useFeedbackDetail(
         orgId,
       );
       if (reqId !== requestIdRef.current) return null;
-      const d = res.data;
-      const next: FeedbackDetail = {
-        id: d.responseId,
-        orgId,
-        locationId: d.locationId,
-        rating: d.rating,
-        note: d.note,
-        submittedAt: d.submittedAt,
-        isRead: d.isRead,
-        isResolved: d.isResolved,
-        tagLabel: d.tagLabel ?? null,
-        notes: (d.notes ?? []).map((note) => ({
-          id: note.noteId,
-          feedbackId: d.responseId,
-          body: note.body,
-          authorName: note.authorName,
-          createdAt: note.createdAt,
-        })),
-      };
+      const next = toDetail(orgId, res.data);
       setItem(next);
       return next;
     } catch (e) {
@@ -88,9 +102,7 @@ export function useFeedbackDetail(
       if (e instanceof ApiError && e.status === 404) {
         setNotFound(true);
       } else {
-        setError(
-          e instanceof ApiError ? e.message : "Failed to load feedback",
-        );
+        setError(loadFailed(e, "this rating"));
       }
       return null;
     }
@@ -123,12 +135,27 @@ export function useFeedbackDetail(
   }, [orgId, responseId]);
 
   /**
-   * Sorted, or not after all. Setting a state is safe to repeat, but an
-   * unanswered request is still checked against the server rather than
-   * assumed: the screen shows what is actually stored.
+   * Read the rating for a check: what is stored now, shown as it is. Throws
+   * when ReviewBoost cannot be reached, so the check knows it got no answer.
+   */
+  const readForCheck = useCallback(
+    async (signal: AbortSignal): Promise<FeedbackDetail> => {
+      if (!orgId || !responseId) throw new Error("No rating to read.");
+      const res = await apiFetch<ApiResponse>(`/api/v1/customer-responses/${responseId}`, orgId, { signal });
+      const next = toDetail(orgId, res.data);
+      setItem(next);
+      return next;
+    },
+    [orgId, responseId],
+  );
+
+  /**
+   * Sorted, or not after all. When the answer is lost, the rating is read
+   * back rather than the change sent again (a write is never replayed by
+   * itself): the screen shows what is actually stored.
    */
   const setResolved = useCallback(
-    async (resolved: boolean): Promise<{ ok: true } | { ok: false; message: string }> => {
+    async (resolved: boolean): Promise<ActionResult> => {
       if (!orgId || !responseId) return { ok: false, message: "Please try again." };
       try {
         await apiFetch(`/api/v1/customer-responses/${responseId}/resolve`, orgId, {
@@ -138,25 +165,27 @@ export function useFeedbackDetail(
         setItem((current) => (current && current.id === responseId ? { ...current, isResolved: resolved } : current));
         return { ok: true };
       } catch (e) {
-        if (answered(e)) return { ok: false, message: "Could not save that. Please try again." };
-        const now = await fetchDetail();
-        if (now && now.isResolved === resolved) return { ok: true };
-        return { ok: false, message: "Could not confirm that change. Check the rating before trying again." };
+        if (answered(e) && !isServerError(e)) return { ok: false, message: "Could not save that. Please try again." };
+        const stored: IsDone = async (signal) => (await readForCheck(signal)).isResolved === resolved;
+        const outcome = await checkOutcome(stored, { serverAnswered: isServerError(e) }).catch(() => "unknown" as const);
+        if (outcome === "done") return { ok: true };
+        if (outcome === "not-done") return { ok: false, message: "Could not save that. Please try again." };
+        return { ok: false, message: "No answer from ReviewBoost yet.", stillUnknown: stored };
       }
     },
-    [orgId, responseId, fetchDetail],
+    [orgId, responseId, readForCheck],
   );
 
   /**
    * "What we did": a note only the team sees. Append-only, so a request whose
-   * answer was lost is reconciled against the saved notes, never sent twice.
+   * answer was lost is looked for among the saved notes, never sent twice.
    */
   const addNote = useCallback(
-    async (body: string): Promise<{ ok: true } | { ok: false; message: string }> => {
+    async (body: string): Promise<ActionResult> => {
       const text = body.trim();
       if (!text) return { ok: false, message: "Write what you did first, then save it." };
       if (!orgId || !responseId) return { ok: false, message: "Please try again." };
-      const before = item?.notes.length ?? 0;
+      const before = new Set((item?.notes ?? []).map((note) => note.id));
       try {
         await apiFetch(`/api/v1/customer-responses/${responseId}/notes`, orgId, {
           method: "POST",
@@ -165,16 +194,20 @@ export function useFeedbackDetail(
         await fetchDetail();
         return { ok: true };
       } catch (e) {
-        if (answered(e)) return { ok: false, message: "Could not save that. Your text is still here." };
-        const now = await fetchDetail();
-        if (now && now.notes.length > before && now.notes.some((note) => note.body === text)) return { ok: true };
-        return {
-          ok: false,
-          message: "Could not confirm saving. Your text is still here. Check the saved notes before sending it again.",
+        if (answered(e) && !isServerError(e)) return { ok: false, message: "Could not save that. Your text is still here." };
+        const saved: IsDone = async (signal) => {
+          const now = await readForCheck(signal);
+          return now.notes.some((note) => note.body === text && !before.has(note.id));
         };
+        const outcome = await checkOutcome(saved, { serverAnswered: isServerError(e) }).catch(() => "unknown" as const);
+        if (outcome === "done") return { ok: true };
+        if (outcome === "not-done") {
+          return { ok: false, message: "That note didn’t save. Your text is still here. Try again." };
+        }
+        return { ok: false, message: "No answer from ReviewBoost yet.", stillUnknown: saved };
       }
     },
-    [orgId, responseId, item?.notes.length, fetchDetail],
+    [orgId, responseId, item?.notes, fetchDetail, readForCheck],
   );
 
   return { item, loading, error, notFound, load, markRead, setResolved, addNote };

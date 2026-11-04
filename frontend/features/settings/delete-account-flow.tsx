@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
 import { withReadDeadline, withWriteDeadline } from "@/lib/api/read-deadline";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -39,7 +41,14 @@ export function DeleteAccountFlow({
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [uncertain, setUncertain] = useState(false);
+  /** What a check found gone: the whole login, or just this business. */
+  const gone = useRef<"login" | "business">("business");
+  const check = useOutcomeCheck({
+    onDone: () => void leave(gone.current === "login"),
+    onNotDone: () =>
+      setError("Your business was not deleted. Nothing changed. Try again."),
+    onExpired: setError,
+  });
 
   const matches =
     typed.trim().toLowerCase() === businessName.trim().toLowerCase();
@@ -63,12 +72,29 @@ export function DeleteAccountFlow({
     );
   }
 
+  async function leave(signInRemoved: boolean) {
+    if (!signInRemoved) {
+      // Another membership survives. Keep its valid session and discard only
+      // the deleted business's cached document through a full navigation.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign("/select-org");
+      return;
+    }
+    try {
+      await supabaseBrowser().auth.signOut();
+    } catch {
+      /* The deleted login is unusable server-side. */
+    }
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign("/goodbye");
+  }
+
   async function remove() {
-    if (!matches || busy || uncertain) return;
+    if (!matches || busy || check.pending) return;
     setBusy(true);
     setError(null);
 
-    let attempted = false;
+    let token: string | null = null;
     try {
       const {
         data: { session },
@@ -79,7 +105,8 @@ export function DeleteAccountFlow({
         setError("Your session expired. Sign in again, then delete.");
         return;
       }
-      attempted = true;
+      const sent = session.access_token;
+      token = sent;
       const response = await withWriteDeadline(
         async (signal) =>
           await fetch("/api/v1/account/deletion", {
@@ -93,43 +120,54 @@ export function DeleteAccountFlow({
           }),
       );
       if (!response.ok) {
+        // A server error can come after the deletion finished: find out.
+        if (response.status >= 500) {
+          check.start(isDeleted(sent), { serverAnswered: true });
+          return;
+        }
         const body = (await response.json().catch(() => null)) as {
           error?: { message?: string };
         } | null;
-        if (response.status >= 500) setUncertain(true);
         setError(
           body?.error?.message ??
-            "Could not confirm deletion. Check your businesses before trying again.",
+            "Your business was not deleted. Nothing changed. Try again.",
         );
         return;
       }
       const result = (await response.json()) as {
         data?: { signInRemoved?: boolean };
       };
-      if (result.data?.signInRemoved === false) {
-        // Another membership survives. Keep its valid session and discard only
-        // the deleted business's cached document through a full navigation.
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-        window.location.assign("/select-org");
+      await leave(result.data?.signInRemoved !== false);
+    } catch {
+      if (token === null) {
+        setError("Could not verify your session. Sign in again, then try.");
         return;
       }
-      try {
-        await supabaseBrowser().auth.signOut();
-      } catch {
-        /* The deleted login is unusable server-side. */
-      }
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.assign("/goodbye");
-    } catch {
-      setUncertain(attempted);
-      setError(
-        attempted
-          ? "Could not confirm whether deletion finished. Check your businesses before trying again."
-          : "Could not verify your session. Sign in again, then try.",
-      );
+      // The answer was lost. Ask the server whether the business is still
+      // there, rather than send the owner to look.
+      check.start(isDeleted(token));
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * Is the business gone? Its places stop answering for it (404), or, when it
+   * was the last one, the login itself is gone (401).
+   */
+  function isDeleted(token: string) {
+    return async (signal: AbortSignal): Promise<boolean> => {
+      const response = await fetch("/api/v1/locations", {
+        signal,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.status === 401 || response.status === 404) {
+        gone.current = response.status === 401 ? "login" : "business";
+        return true;
+      }
+      if (!response.ok) throw new Error("No answer yet.");
+      return false;
+    };
   }
 
   return (
@@ -173,7 +211,7 @@ export function DeleteAccountFlow({
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
-          disabled={busy}
+          disabled={busy || check.pending}
           {...(error
             ? { "aria-invalid": true, "aria-describedby": errorId }
             : {})}
@@ -186,15 +224,11 @@ export function DeleteAccountFlow({
         </InlineNotice>
       ) : null}
 
-      {uncertain ? (
-        <Button variant="secondary" asChild>
-          <Link href="/select-org">Check my businesses</Link>
-        </Button>
-      ) : null}
+      <OutcomeCheckNotice check={check} />
       <div className="flex flex-col gap-3">
         <Button
           variant="destructive"
-          disabled={!matches || uncertain}
+          disabled={!matches || check.pending}
           loading={busy}
           loadingLabel="Deleting…"
           onClick={remove}

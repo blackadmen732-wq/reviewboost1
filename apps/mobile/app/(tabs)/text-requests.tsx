@@ -13,6 +13,8 @@ import { useTextComposer, type Draft } from "@/data/text-composer";
 import { useTextRequests, type ComposeOptions, type TextRequestItem } from "@/data/use-text-requests";
 import { plural, relativeDay, textStatus } from "@/lib/words";
 import { card, colors, radii, type } from "@/theme";
+import { RetryBlock } from "@/components/retry-block";
+import { OutcomeCheckNotice } from "@/components/outcome-check-notice";
 
 /**
  * Text Requests: send one customer the link to your Tag, the website's way.
@@ -65,10 +67,7 @@ function TextRequestsComposer() {
       {view.kind === "loading" ? (
         // Zero is a real state; it is never shown before it is known.
         error ? (
-          <View style={styles.notice}>
-            <Text style={styles.noticeText}>{error}</Text>
-            <Button label="Try again" variant="secondary" onPress={refresh} />
-          </View>
+          <RetryBlock message={error} retryKey="text-requests" onRetry={refresh} />
         ) : (
           <ActivityIndicator color={colors.inkMuted} style={styles.spinner} />
         )
@@ -95,6 +94,7 @@ function TextRequestsComposer() {
                 label: sendable.length > 1 && stand.locationName ? `${stand.label} — ${stand.locationName}` : stand.label,
               }))}
               balance={view.total}
+              recentIds={items.map((item) => item.id)}
               onSent={refresh}
             />
           ) : sendable.length === 0 && stands.length > 0 ? (
@@ -115,12 +115,15 @@ function Composer({
   compose,
   tags,
   balance,
+  recentIds,
   onSent,
 }: {
   orgId: string | undefined;
   compose: ComposeOptions;
   tags: Array<{ standId: string; label: string }>;
   balance: number;
+  /** What Recent shows now, so a lost send can be found there afterwards. */
+  recentIds: string[];
   onSent: () => void;
 }) {
   const [phone, setPhone] = useState("");
@@ -130,7 +133,14 @@ function Composer({
   const [confirmed, setConfirmed] = useState(false);
   const [missing, setMissing] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
-  const composer = useTextComposer(orgId);
+  const afterSent = () => {
+    setPhone("");
+    setMethod(null);
+    setConfirmed(false);
+    setSent(true);
+    onSent();
+  };
+  const composer = useTextComposer(orgId, { onSentAfterCheck: afterSent });
   const { preview, busy } = composer;
 
   // A Tag that went away (retired, another business) is never the one sent.
@@ -152,7 +162,7 @@ function Composer({
   const needsConsent = preview !== null && !preview.eligibility.allowed && preview.eligibility.reason === "no_consent";
   const blocked = preview !== null && !preview.eligibility.allowed && !needsConsent;
   const short = preview !== null && balance < preview.segments;
-  const canSendNow = preview !== null && preview.eligibility.allowed && !short && !composer.sendUncertain;
+  const canSendNow = preview !== null && preview.eligibility.allowed && !short && !composer.sendCheck.pending;
 
   return (
     <View style={styles.composer}>
@@ -160,19 +170,7 @@ function Composer({
         Send a request
       </Text>
 
-      {composer.sendUncertain ? (
-        <View style={styles.info}>
-          <Text style={styles.infoText}>Could not confirm sending. Check Recent before trying again.</Text>
-          <Button
-            label="Check recent requests"
-            variant="secondary"
-            onPress={() => {
-              onSent();
-              composer.resolveUncertain();
-            }}
-          />
-        </View>
-      ) : null}
+      <OutcomeCheckNotice check={composer.sendCheck} />
 
       {sent ? (
         <View style={styles.success} accessibilityLiveRegion="polite">
@@ -338,13 +336,8 @@ function Composer({
           busy={busy === "send"}
           busyLabel="Sending…"
           onPress={() => {
-            void composer.send(draft).then((ok) => {
-              if (!ok) return;
-              setPhone("");
-              setMethod(null);
-              setConfirmed(false);
-              setSent(true);
-              onSent();
+            void composer.send(draft, new Set(recentIds)).then((ok) => {
+              if (ok) afterSent();
             });
           }}
         />

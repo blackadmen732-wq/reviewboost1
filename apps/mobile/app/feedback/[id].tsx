@@ -13,13 +13,17 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { Icon } from "@/components/icon";
+import { OfflineBar } from "@/components/offline-bar";
+import { OutcomeCheckNotice } from "@/components/outcome-check-notice";
 import { stackHeader } from "@/components/screen";
 import { Stars } from "@/components/stars";
 import { useAuth } from "@/data/auth-context";
 import { useHome } from "@/data/home";
 import { useFeedbackDetail } from "@/data/use-feedback-detail";
+import { useOutcomeCheck } from "@/data/use-outcome-check";
 import { clock, relativeDay } from "@/lib/words";
 import { card, colors, radii, space, type } from "@/theme";
+import { RetryBlock } from "@/components/retry-block";
 
 const MAX_NOTE = 2000;
 
@@ -41,6 +45,24 @@ export default function FeedbackDetailScreen() {
   const [saving, setSaving] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
   const markedFor = useRef<string | null>(null);
+  // When ReviewBoost could not be reached to find out whether a change went
+  // through, these keep checking (and hold the action) instead of asking.
+  const sortCheck = useOutcomeCheck({
+    onDone: () => {
+      setSortError(null);
+      void refreshHome();
+    },
+    onNotDone: () => setSortError("Could not save that. Please try again."),
+    onExpired: setSortError,
+  });
+  const noteCheck = useOutcomeCheck({
+    onDone: () => {
+      setNote("");
+      setNoteError(null);
+    },
+    onNotDone: () => setNoteError("That note didn’t save. Your text is still here. Try again."),
+    onExpired: setNoteError,
+  });
 
   useEffect(() => {
     void load();
@@ -70,8 +92,7 @@ export default function FeedbackDetailScreen() {
         <Stack.Screen options={stackHeader("Rating")} />
         {error ? (
           <View style={styles.centered}>
-            <Text style={styles.errorText}>{error}</Text>
-            <Button label="Try again" variant="secondary" onPress={() => void load()} />
+            <RetryBlock message={error} retryKey={`feedback:${id}`} onRetry={() => void load()} />
           </View>
         ) : (
           <ActivityIndicator style={styles.spinner} color={colors.inkMuted} />
@@ -91,8 +112,9 @@ export default function FeedbackDetailScreen() {
     setSortError(null);
     const result = await setResolved(resolved);
     setSorting(false);
-    if (!result.ok) setSortError(result.message);
-    else void refreshHome();
+    if (result.ok) void refreshHome();
+    else if (result.stillUnknown) sortCheck.start(result.stillUnknown, { waitFirst: true });
+    else setSortError(result.message);
   };
 
   const save = async () => {
@@ -101,6 +123,7 @@ export default function FeedbackDetailScreen() {
     const result = await addNote(note);
     setSaving(false);
     if (result.ok) setNote("");
+    else if (result.stillUnknown) noteCheck.start(result.stillUnknown, { waitFirst: true });
     else setNoteError(result.message);
   };
 
@@ -109,6 +132,7 @@ export default function FeedbackDetailScreen() {
       <Stack.Screen options={stackHeader("Rating")} />
       <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={96}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <OfflineBar />
           <Stars rating={item.rating} size={32} />
           <Text style={styles.meta}>
             {when}
@@ -133,6 +157,7 @@ export default function FeedbackDetailScreen() {
                 variant="quiet"
                 busy={sorting}
                 busyLabel="Saving…"
+                disabled={sortCheck.pending}
                 onPress={() => void sort(false)}
                 icon={<Icon name="arrow.uturn.backward" glyph="↺" size={15} color={colors.inkMuted} />}
               />
@@ -142,6 +167,7 @@ export default function FeedbackDetailScreen() {
                 variant={needsAction ? "action" : "secondary"}
                 busy={sorting}
                 busyLabel="Saving…"
+                disabled={sortCheck.pending}
                 onPress={() => void sort(true)}
                 style={styles.sortButton}
                 icon={<Icon name="checkmark" glyph="✓" size={17} color={needsAction ? colors.onAction : colors.ink} weight="semibold" />}
@@ -153,6 +179,7 @@ export default function FeedbackDetailScreen() {
               {sortError}
             </Text>
           ) : null}
+          <OutcomeCheckNotice check={sortCheck} />
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle} accessibilityRole="header">
@@ -188,13 +215,14 @@ export default function FeedbackDetailScreen() {
                 {noteError}
               </Text>
             ) : null}
+            <OutcomeCheckNotice check={noteCheck} />
             <TextInput
               value={note}
               onChangeText={(value) => {
                 setNote(value);
                 if (noteError) setNoteError(null);
               }}
-              editable={!saving}
+              editable={!saving && !noteCheck.pending}
               multiline
               maxLength={MAX_NOTE}
               placeholder="Checked with the team and agreed what to change…"
@@ -208,7 +236,7 @@ export default function FeedbackDetailScreen() {
               variant="secondary"
               busy={saving}
               busyLabel="Saving…"
-              disabled={note.trim().length === 0}
+              disabled={note.trim().length === 0 || noteCheck.pending}
               onPress={() => void save()}
               style={styles.saveButton}
               icon={<Icon name="paperplane" glyph="➤" size={16} color={colors.ink} />}

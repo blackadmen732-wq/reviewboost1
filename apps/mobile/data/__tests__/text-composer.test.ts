@@ -87,14 +87,49 @@ describe("sending one text request", () => {
     expect(result.current.preview?.eligibility.allowed).toBe(true);
   });
 
-  it("never re-sends when the answer to a send is lost; it asks to check Recent", async () => {
-    fetchMock.mockResolvedValueOnce(preview(true)).mockRejectedValueOnce(new TypeError("Network request failed"));
-    const { result } = renderHook(() => useTextComposer("org-a"));
+  it("never re-sends when the answer to a send is lost: it finds the request under Recent", async () => {
+    fetchMock
+      .mockResolvedValueOnce(preview(true))
+      .mockRejectedValueOnce(new TypeError("Network request failed"))
+      .mockResolvedValueOnce({ data: { items: [{ id: "new", recipientLastFour: "0199" }, { id: "old", recipientLastFour: "0199" }] } });
+    const sentLater = vi.fn();
+    const { result } = renderHook(() => useTextComposer("org-a", { onSentAfterCheck: sentLater }));
     await act(() => result.current.runPreview(draft));
     await act(async () => {
-      expect(await result.current.send(draft)).toBe(false);
+      expect(await result.current.send(draft, new Set(["old"]))).toBe(false);
     });
-    expect(result.current.sendUncertain).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(sentLater).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
+      "/api/v1/text-requests/preview",
+      "/api/v1/text-requests",
+      "/api/v1/text-requests?limit=10",
+    ]);
+    expect(result.current.sendCheck.pending).toBe(false);
+    expect(result.current.preview).toBeNull();
+  });
+
+  it("holds Send while it looks, and says nothing was sent once it knows", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      fetchMock
+        .mockResolvedValueOnce(preview(true))
+        .mockRejectedValueOnce(new TypeError("Network request failed"))
+        .mockResolvedValue({ data: { items: [{ id: "old", recipientLastFour: "0199" }] } });
+      const { result } = renderHook(() => useTextComposer("org-a"));
+      await act(() => result.current.runPreview(draft));
+      await act(async () => {
+        await result.current.send(draft, new Set(["old"]));
+      });
+      expect(result.current.sendCheck.pending).toBe(true);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      expect(result.current.sendCheck.pending).toBe(false);
+      expect(result.current.error).toBe("That text request didn’t go through. Nothing was sent. Try again.");
+      const posts = fetchMock.mock.calls.filter(([, , init]) => (init as RequestInit | undefined)?.method === "POST");
+      expect(posts.map(([path]) => path)).toEqual(["/api/v1/text-requests/preview", "/api/v1/text-requests"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
