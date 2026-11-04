@@ -123,7 +123,7 @@ truth; apply it with `supabase config push`, or set each value in the dashboard
 | Email OTP length | `6` | The code inputs accept exactly 6 digits. An 8-digit code cannot be entered. |
 | Email OTP expiration | `3600` seconds | One hour; matches `otp_expiry`. |
 | Confirm email | **OFF** | Passwordless OTP proves control of the address already. With it ON, a first-time user also receives a separate "Confirm your email address" email, which does not match the sign-in screen. |
-| Site URL | `https://reviewboost.fit` | Used for the email fallback link. Keep localhost only in *additional redirect URLs* for dev. |
+| Site URL | `https://reviewboost.fit` | Supabase's fallback when a redirect is not allowed. The sign-in email's link returns through `/auth/callback` (in Redirect URLs above), which exchanges its code; `/` does not. Keep localhost only in *additional redirect URLs* for dev. |
 | Magic Link template | subject `Your ReviewBoost sign-in code`, body leads with `{{ .Token }}` | The sign-in email. See `supabase/templates/magic-link.html`. |
 | Confirm signup template | same code-first wording | So first sign-in looks identical if confirmations are ever enabled. See `supabase/templates/confirmation.html`. |
 | Custom SMTP | Resend, sender `ReviewBoost <no-reply@reviewboost.fit>` | The verified `reviewboost.fit` domain (DKIM + SPF). |

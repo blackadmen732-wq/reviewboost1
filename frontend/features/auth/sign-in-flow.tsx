@@ -23,6 +23,20 @@ type Step = "email" | "verify";
 const NO_CONNECTION = "No connection. Check your signal and try again.";
 
 /**
+ * Where the email's sign-in link returns: the same /auth/callback Google and
+ * Apple use, carrying where the person was going. The callback checks `next`
+ * is an internal path. Opened on another device the code cannot be exchanged
+ * (PKCE keeps its verifier in this browser), and the callback sends them to
+ * sign-in, where the six digits in the same email still work.
+ */
+export function emailLinkReturn(next: string): string {
+  const callback = new URL("/auth/callback", window.location.origin);
+  callback.searchParams.set("next", next);
+  callback.searchParams.set("provider", "email");
+  return callback.toString();
+}
+
+/**
  * The sign-in service could not be reached (Supabase's AuthRetryableFetchError:
  * a dropped connection, or its own 502–504). Checked by name: importing the
  * helper from supabase-js would put the whole client in this page's first
@@ -105,7 +119,14 @@ export function SignInFlow({
         (async () =>
           (await loadSupabaseBrowser()).auth.signInWithOtp({
             email: address,
-            options: { shouldCreateUser: true },
+            options: {
+              shouldCreateUser: true,
+              // The email's "tap here" link returns with a one-time code that
+              // only /auth/callback exchanges. Without this it fell back to
+              // the Site URL, `/`, which shows the public homepage, signed
+              // out, with the unused code in the address bar.
+              emailRedirectTo: emailLinkReturn(next),
+            },
           }))(),
       );
       if (sendError) {

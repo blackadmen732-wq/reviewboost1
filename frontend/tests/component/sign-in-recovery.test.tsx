@@ -57,3 +57,21 @@ describe("signing in when something goes wrong", () => {
     await waitFor(() => expect(screen.getByLabelText("Digit 6")).toHaveValue("6"));
   });
 });
+
+describe("the link in the sign-in email", () => {
+  it("returns through /auth/callback, which signs the owner in, to where they were going", async () => {
+    // Without a redirect the link fell back to the Site URL, `/`, which never
+    // exchanges the one-time code: the owner landed on the homepage, signed out.
+    auth.signInWithOtp.mockResolvedValue({ data: {}, error: null });
+    render(<SignInFlow next="/onboarding" intent="start" />);
+    typeEmail("tony@barber.com");
+    await screen.findByLabelText("Digit 1");
+
+    const [{ options }] = auth.signInWithOtp.mock.calls[0] as [{ options: { emailRedirectTo: string } }];
+    const back = new URL(options.emailRedirectTo);
+    expect(back.origin).toBe(window.location.origin);
+    expect(back.pathname).toBe("/auth/callback");
+    expect(back.searchParams.get("next")).toBe("/onboarding");
+    expect(back.searchParams.get("provider")).toBe("email");
+  });
+});
