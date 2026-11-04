@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { PRODUCT, PUBLIC_HERO, START_HREF } from "@/features/public/public-copy";
 import { PublicArticle } from "@/features/public/public-article";
-import { ProductDemo } from "@/features/public/product-demo";
+import { OwnerPreview } from "@/features/public/owner-preview";
 import { publicPageMetadata } from "@/lib/site";
 
 export const metadata: Metadata = publicPageMetadata({
@@ -57,7 +57,9 @@ export default function ProductPage() {
       breadcrumb="/product"
       title={PRODUCT.headline}
       lede={PRODUCT.lede}
-      media={<ProductDemo hero />}
+      // The homepage already leads with the customer's side and its sample
+      // stars; this page leads with the owner's, so the two do not repeat.
+      media={<OwnerPreview />}
       actions={
         <>
           <Button asChild variant="action" className="w-auto">

@@ -66,7 +66,6 @@ export default async function HomePage() {
 
   return (
     <OwnerShell unreadCount={counts.unread} businessName={organization.name}>
-      <InstallPrompt />
       <OwnerHome
         businessName={organization.name}
         timeZone={organization.timezone}
@@ -84,6 +83,7 @@ export default async function HomePage() {
           tagLabel: tagLabel(item.standId),
         }))}
       />
+      <InstallPrompt />
     </OwnerShell>
   );
 }
