@@ -1,166 +1,173 @@
-import { useEffect } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  Pressable,
-  ActivityIndicator,
-  StyleSheet,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { useAuth } from "@/data/auth-context";
-import { useFeedback } from "@/data/use-feedback";
+import { useCallback, useEffect, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { Button } from "@/components/button";
+import { Group, Row } from "@/components/group";
+import { TabScreen } from "@/components/screen";
+import { Segmented } from "@/components/segmented";
 import { Stars } from "@/components/stars";
-import { relativeTime } from "@/components/relative-time";
-import { colors, radii, fonts } from "@/theme";
+import { LoadingBlock } from "@/components/loading-block";
+import { apiFetch } from "@/data/api";
+import { useAuth, useBusinessTimeZone } from "@/data/auth-context";
+import { useFeedback, type FeedbackShow } from "@/data/use-feedback";
+import { dayAndTime } from "@/lib/words";
+import { colors, type } from "@/theme";
 import type { FeedbackItem } from "@/data/types";
+import { RetryBlock } from "@/components/retry-block";
 
-function FeedbackRow({ item }: { item: FeedbackItem }) {
-  const router = useRouter();
+/**
+ * Whether the business has any rating at all, asked only when "Needs you" is
+ * empty: "All caught up" said to an owner who has never had a rating told
+ * them they had dealt with ratings that never came. Null until known.
+ */
+function useHasAnyRating(orgId: string | undefined, ask: boolean): boolean | null {
+  const [hasAny, setHasAny] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!orgId || !ask) return;
+    let live = true;
+    apiFetch<{ data: unknown[] }>("/api/v1/customer-responses?limit=1", orgId)
+      .then((res) => {
+        if (live) setHasAny(res.data.length > 0);
+      })
+      .catch(() => {
+        // Unknown: the usual "All caught up" stands.
+      });
+    return () => {
+      live = false;
+    };
+  }, [orgId, ask]);
+  return hasAny;
+}
+
+const VIEWS = [
+  { value: "needs", label: "Needs you" },
+  { value: "all", label: "Everything" },
+] as const;
+
+/**
+ * Feedback: the website's inbox. "Needs you" is what is waiting on the
+ * business (anything unread, and any 3 stars or fewer nobody has sorted);
+ * "Everything" is every rating. Rows say the stars and the day, a dot for
+ * unread, and the customer's words when they left any.
+ */
+export default function FeedbackScreen() {
+  const { activeOrg } = useAuth();
+  const params = useLocalSearchParams<{ show?: string }>();
+  const [show, setShow] = useState<FeedbackShow>(params.show === "all" ? "all" : "needs");
+
+  // Home's number tiles open Everything.
+  useEffect(() => {
+    if (params.show === "all") setShow("all");
+  }, [params.show]);
+
+  const { items, loading, refreshing, error, hasMore, loadingMore, load, refresh, loadMore } = useFeedback(
+    activeOrg?.orgId,
+    show,
+  );
+  const emptyNeeds = show === "needs" && !loading && !error && items.length === 0;
+  const hasAnyRating = useHasAnyRating(activeOrg?.orgId, emptyNeeds);
+
+  // Back from a rating, the list shows what changed (read, sorted).
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   return (
-    <Pressable
-      style={[
-        styles.card,
-        !item.isRead && styles.cardUnread,
-        item.isResolved && styles.cardResolved,
-      ]}
-      onPress={() => router.push(`/feedback/${item.id}`)}
-    >
-      <View style={styles.topRow}>
-        <View style={styles.statusRow}>
-          {!item.isRead && <View style={styles.unreadDot} />}
-          {item.isResolved && <Text style={styles.resolvedCheck}>{"✓"}</Text>}
-          <Stars rating={item.rating} size={14} />
-        </View>
-        <Text style={styles.time}>{relativeTime(item.submittedAt)}</Text>
-      </View>
+    <TabScreen title="Feedback" subtitle="Ratings from your customers." refreshing={refreshing} onRefresh={() => void refresh()}>
+      <Segmented options={VIEWS} value={show} onChange={setShow} />
 
-      {item.note && (
-        <Text style={styles.note} numberOfLines={2}>
-          {item.note}
-        </Text>
+      {error && items.length === 0 ? (
+        <RetryBlock message={error} retryKey="feedback" onRetry={() => void load()} />
+      ) : loading && items.length === 0 ? (
+        <LoadingBlock label="Loading ratings…" />
+      ) : items.length === 0 ? (
+        show === "needs" && hasAnyRating !== false ? (
+          <Empty title="All caught up." body="Nothing is waiting on you. Every rating, sorted or read, is under Everything." />
+        ) : (
+          <Empty title="No ratings yet." body="Ratings show up here after customers tap or scan your Tag." />
+        )
+      ) : (
+        <View style={styles.listArea}>
+          {/* A refresh that failed keeps the ratings that were here. */}
+          {error ? <RetryBlock compact message={error} retryKey="feedback-stale" onRetry={() => void load()} /> : null}
+          <Group>
+            {items.map((item) => (
+              <FeedbackRow key={item.id} item={item} />
+            ))}
+          </Group>
+          {hasMore ? (
+            <Button
+              label="Show more"
+              variant="secondary"
+              busy={loadingMore}
+              busyLabel="Loading…"
+              onPress={() => void loadMore()}
+              style={styles.more}
+            />
+          ) : null}
+        </View>
       )}
-    </Pressable>
+    </TabScreen>
   );
 }
 
-export default function FeedbackListScreen() {
-  const { activeOrg } = useAuth();
-  const {
-    items,
-    loading,
-    refreshing,
-    error,
-    hasMore,
-    loadingMore,
-    load,
-    refresh,
-    loadMore,
-  } = useFeedback(activeOrg?.orgId);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  if (loading && items.length === 0) {
-    return (
-      <SafeAreaView style={styles.centered} edges={["bottom"]}>
-        <ActivityIndicator size="large" color={colors.brand} />
-      </SafeAreaView>
-    );
-  }
-
-  if (error && items.length === 0) {
-    return (
-      <SafeAreaView style={styles.centered} edges={["bottom"]}>
-        <Text style={styles.errorText}>{error}</Text>
-        <Pressable style={styles.retryButton} onPress={load}>
-          <Text style={styles.retryText}>Retry</Text>
-        </Pressable>
-      </SafeAreaView>
-    );
-  }
-
+function FeedbackRow({ item }: { item: FeedbackItem }) {
+  // "Today at 2:30 PM": when it came in, without opening it.
+  const when = dayAndTime(item.submittedAt, useBusinessTimeZone());
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <FeedbackRow item={item} />}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={<Text style={styles.empty}>No feedback yet</Text>}
-        refreshing={refreshing}
-        onRefresh={refresh}
-        onEndReached={hasMore ? loadMore : undefined}
-        onEndReachedThreshold={0.3}
-        ListFooterComponent={
-          loadingMore ? (
-            <ActivityIndicator
-              style={styles.footer}
-              size="small"
-              color={colors.brand}
-            />
-          ) : null
-        }
-      />
-    </SafeAreaView>
+    <Row
+      onPress={() => router.push(`/feedback/${item.id}`)}
+      accessibilityLabel={[
+        `${item.rating} out of 5 stars`,
+        !item.isRead ? "Unread" : null,
+        item.isResolved ? "Sorted" : null,
+        item.note ?? null,
+        when,
+      ]
+        .filter(Boolean)
+        .join(". ")}
+      accessibilityHint="Opens this rating"
+    >
+      <View style={styles.top}>
+        <View style={[styles.dot, item.isRead ? styles.dotRead : null]} />
+        <Stars rating={item.rating} size={20} />
+        <Text style={[styles.when, item.isRead ? styles.whenRead : null]} numberOfLines={1}>
+          {item.isResolved ? "Sorted · " : ""}
+          {when}
+        </Text>
+      </View>
+      {item.note ? (
+        <Text style={styles.note} numberOfLines={2}>
+          {item.note}
+        </Text>
+      ) : null}
+    </Row>
+  );
+}
+
+function Empty({ title, body }: { title: string; body: string }) {
+  return (
+    <View style={styles.empty}>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptyBody}>{body}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.canvas },
-  centered: {
-    flex: 1,
-    backgroundColor: colors.canvas,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  list: { padding: 16, gap: 10 },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  cardUnread: { borderColor: colors.brand, backgroundColor: "#f2faf6" },
-  cardResolved: { opacity: 0.7 },
-  topRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.brand,
-  },
-  resolvedCheck: { fontSize: 14, color: colors.success, ...fonts.heading },
-  time: { fontSize: 12, color: colors.inkFaint },
-  note: { fontSize: 14, color: colors.ink, marginTop: 8, lineHeight: 20 },
-  empty: {
-    textAlign: "center",
-    color: colors.inkFaint,
-    marginTop: 40,
-    fontSize: 15,
-  },
-  errorText: {
-    fontSize: 15,
-    color: colors.danger,
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: colors.brand,
-    borderRadius: radii.control,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  retryText: { color: colors.onBrand, fontSize: 15, ...fonts.subheading },
-  footer: { paddingVertical: 16 },
+  notice: { gap: 16 },
+  noticeText: { ...type.callout, color: colors.ink },
+  top: { flexDirection: "row", alignItems: "center", gap: 10 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.ink },
+  dotRead: { backgroundColor: "transparent" },
+  when: { ...type.subhead, color: colors.ink, flex: 1, textAlign: "right" },
+  whenRead: { color: colors.inkMuted },
+  note: { ...type.subhead, color: colors.ink, marginTop: 6, marginLeft: 18 },
+  more: {},
+  listArea: { gap: 12 },
+  empty: { paddingVertical: 24, gap: 6 },
+  emptyTitle: { ...type.headline, color: colors.ink },
+  emptyBody: { ...type.callout, color: colors.inkMuted },
 });

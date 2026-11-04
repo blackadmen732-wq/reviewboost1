@@ -2,9 +2,14 @@
 
 Private feedback and honest Google reviews for local businesses.
 
-A physical stand (QR/NFC) that a customer taps after a visit. Every rating
+A physical Tag (QR or NFC) that a customer taps after a visit. Every rating
 from 1 through 5 is stored, and every customer receives the same neutral
 Google review opportunity regardless of the rating they selected.
+
+"Tag" is the product's word for it, everywhere a person reads. The database
+still says `review_stands` and the routes still say `/stands`, because renaming
+a table with live tokens in it is a migration with no user-visible benefit —
+but nothing shown to an owner or a customer says "stand".
 
 ## Repository layout
 
@@ -53,7 +58,7 @@ npm start
 
 Both applications are implemented, but the full live flow has not been
 live-verified. The mobile application uses Supabase OTP authentication and
-organization loading. Its Live Feed, Feedback, and Stands screens call the
+organization loading. Its Live Feed, Feedback, and Tags screens call the
 authenticated APIs rather than mock data. Native NFC writing and store
 release are not live-verified. It is not a production-complete mobile product.
 
@@ -83,7 +88,7 @@ npx eslint .
 - FOR UPDATE row locking on concurrent state transitions
 - Audit events on every state change, append-only
 - Customer-facing routes require no authentication cookies
-- Stand tokens stored as keyed digests; reprinting uses AES-256-GCM ciphertext
+- Tag tokens stored as keyed digests; reprinting uses AES-256-GCM ciphertext
 
 See `docs/backend/ARCHITECTURE.md` for details.
 
@@ -93,6 +98,6 @@ See `docs/backend/ARCHITECTURE.md` for details.
 - Every rating receives the same neutral Google review opportunity
 - No rating threshold, no review gating
 - Never claim a Google review was posted
-- Unknown and inactive stand tokens produce indistinguishable public responses
+- Unknown and inactive Tag tokens produce indistinguishable public responses
 - Public customer endpoints do not require authentication cookies
 - Customer-facing routes never leak org IDs, location IDs, database IDs, or ciphertext

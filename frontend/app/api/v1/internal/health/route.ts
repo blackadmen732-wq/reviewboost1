@@ -2,7 +2,10 @@ import type { NextRequest } from "next/server";
 
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json } from "@/lib/server/http";
+import { textingEnabled } from "@/lib/features";
+import { checkConfiguration } from "@/lib/server/readiness";
 import { serviceRoleClient } from "@/lib/server/supabase";
+import { tagKeyProblems, tagKeyRows } from "@/lib/server/tag-keys";
 import { workerAuthorized } from "@/lib/server/worker-auth";
 
 /**
@@ -23,18 +26,50 @@ export const dynamic = "force-dynamic";
 
 const ROUTE = "/api/v1/internal/health";
 
+// Cadence plus one missed run of slack: dispatch every minute, maintenance
+// every fifteen. See docs/backend/OPERATIONS.md for the alert table.
+const STALE_AFTER_SECONDS: Record<string, number> = {
+  sms_dispatch: 5 * 60,
+  maintenance: 45 * 60,
+};
+
+// Pack reconciliation runs once a day with maintenance; two days allows one
+// missed run before a missed webhook can sit unhealed unnoticed.
+const PACK_RECONCILE_STALE_AFTER_SECONDS = 2 * 24 * 60 * 60;
+
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
     if (!workerAuthorized(request)) {
       throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
     }
 
-    const { data, error } = await serviceRoleClient().rpc("rpc_sms_health");
+    const service = serviceRoleClient();
+    const [{ data, error }, workers] = await Promise.all([
+      service.rpc("rpc_sms_health"),
+      service.rpc("rpc_worker_health"),
+    ]);
     if (error) {
       throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Health is unavailable.");
     }
 
     const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
+
+    // Connections: the same idea. A webhook inbox that is not draining, events
+    // that gave up, and switched-on connections that have not read anything
+    // in a day are each silent until an owner notices missing customers.
+    const { data: integrationData, error: integrationError } = await serviceRoleClient().rpc("rpc_integration_health");
+    if (integrationError) {
+      throw new ApiError(503, ERROR_CODE.serviceUnavailable, "Health is unavailable.");
+    }
+    const integration = Array.isArray(integrationData)
+      ? (integrationData[0] as Record<string, unknown> | undefined)
+      : undefined;
+    const integrationInboxPending = Number(integration?.["inbox_pending"] ?? 0);
+    const integrationInboxAge = Number(integration?.["oldest_pending_age_s"] ?? 0);
+    const integrationDeadLetters = Number(integration?.["dead_letters"] ?? 0);
+    const connectionsStalled = Number(integration?.["connections_stalled"] ?? 0);
+    const runsFailed24h = Number(integration?.["runs_failed_24h"] ?? 0);
+    const connectionsByState = (integration?.["connections_by_state"] ?? {}) as Record<string, number>;
 
     const outboxPending = Number(row?.["outbox_pending"] ?? 0);
     const oldestPendingAge = Number(row?.["oldest_pending_age_s"] ?? 0);
@@ -53,14 +88,124 @@ export async function GET(request: NextRequest): Promise<Response> {
     if (deadLetter > 0) problems.push("dead_letters");
     if (stripeWebhooks > 0) problems.push("stripe_webhooks_unprocessed");
     if (smsWebhooks > 0) problems.push("sms_webhooks_unprocessed");
+    // While texting is off, Connections are dormant by design (lib/features.ts):
+    // nothing drains their inbox or syncs them, so neither is a fault. Dead
+    // letters are past failures and still need a look.
+    const connectionsActive = textingEnabled();
+    if (connectionsActive && integrationInboxAge > 900) problems.push("integration_inbox_backlog");
+    if (integrationDeadLetters > 0) problems.push("integration_dead_letters");
+    if (connectionsActive && connectionsStalled > 0) problems.push("connections_stalled");
 
-    return json(request, requestId, 200, {
+    // The scheduler. A worker that has not succeeded within its cadence
+    // (plus slack for one missed run) means nothing is being sent or settled,
+    // even while every queue above still looks empty.
+    const workerRows = workers.error
+      ? []
+      : ((workers.data ?? []) as Array<{
+          worker: string;
+          last_success_age_s: number | null;
+          failing: boolean;
+        }>);
+    if (workers.error) problems.push("worker_health_unavailable");
+    const scheduler: Record<string, { lastSuccessAgeSeconds: number | null; failing: boolean }> = {};
+    for (const row of workerRows) {
+      const age = row.last_success_age_s === null ? null : Number(row.last_success_age_s);
+      scheduler[row.worker] = { lastSuccessAgeSeconds: age, failing: Boolean(row.failing) };
+      // While texting is off the send worker has nothing to do
+      // (lib/server/sms/dispatch.ts), so nothing needs to call it.
+      const expected = row.worker !== "sms_dispatch" || textingEnabled();
+      const limit = STALE_AFTER_SECONDS[row.worker];
+      if (expected && limit !== undefined && (age === null || age > limit)) problems.push(`${row.worker}_stale`);
+      if (row.failing) problems.push(`${row.worker}_failing`);
+    }
+
+    // Text packs. Each count is money that moved without the credit matching
+    // it — paid with nothing granted, refunded after it was spent, a refund
+    // for a payment never seen — and none of them raises an error by itself.
+    // A paid pack with no reconciliation run in two days means a missed
+    // webhook would go unhealed.
+    const packHealth = await serviceRoleClient().rpc("rpc_billing_pack_health");
+    const pack = Array.isArray(packHealth.data)
+      ? (packHealth.data[0] as Record<string, unknown> | undefined)
+      : undefined;
+    const packsPaid = Number(pack?.["purchases_paid"] ?? 0);
+    const packsPaidWithoutCredit = Number(pack?.["paid_without_credit"] ?? 0);
+    const packsNeedReview = Number(pack?.["needs_review"] ?? 0);
+    const packsNeedReviewSegments = Number(pack?.["needs_review_segments"] ?? 0);
+    const packsRefundWithoutPayment = Number(pack?.["refund_without_payment"] ?? 0);
+    const reconcileAge =
+      pack?.["last_reconcile_age_s"] === null || pack?.["last_reconcile_age_s"] === undefined
+        ? null
+        : Number(pack["last_reconcile_age_s"]);
+    const reconcileOk = pack?.["last_reconcile_ok"] === undefined ? null : (pack["last_reconcile_ok"] as boolean | null);
+    if (packHealth.error) problems.push("pack_health_unavailable");
+    if (packsPaidWithoutCredit > 0) problems.push("packs_paid_without_credit");
+    if (packsNeedReview > 0) problems.push("packs_need_review");
+    if (packsRefundWithoutPayment > 0) problems.push("packs_refund_without_payment");
+    if (packsPaid > 0 && (reconcileAge === null || reconcileAge > PACK_RECONCILE_STALE_AFTER_SECONDS)) {
+      problems.push("packs_reconcile_stale");
+    }
+    if (reconcileOk === false) problems.push("packs_reconcile_not_ok");
+
+    // The keys still open the Tags in the field. A key changed in the
+    // dashboard passes every presence check and stops every Tag at once, with
+    // nothing else turning red (lib/server/tag-keys.ts). Counts only here.
+    const tagKeys = await serviceRoleClient().rpc("rpc_tag_key_sample", { p_per_version: 2 });
+    const tagKeySample = tagKeyRows(tagKeys.data);
+    let tagKeyIssues = 0;
+    if (tagKeys.error) {
+      problems.push("tag_key_check_unavailable");
+    } else {
+      try {
+        tagKeyIssues = tagKeyProblems(tagKeySample).length;
+      } catch {
+        // A missing or malformed key: config_not_ready below names it.
+      }
+      if (tagKeyIssues > 0) problems.push("tag_keys_mismatch");
+    }
+
+    // Configuration drift after deploy (a variable removed in the dashboard)
+    // is as fatal as a dead queue, so the gate's cheap half runs here too.
+    const config = checkConfiguration();
+    if (!config.ok) problems.push("config_not_ready");
+
+    const ok = problems.length === 0;
+    // 503 when unhealthy, so a monitor that only reads the status code is
+    // not told "fine" about a product that is not sending.
+    return json(request, requestId, ok ? 200 : 503, {
       data: {
-        ok: problems.length === 0,
+        ok,
         problems,
+        scheduler,
+        config: { tier: config.tier, problems: config.problems.map((p) => p.subsystem) },
         outbox: { pending: outboxPending, deadLetter, oldestPendingAgeSeconds: oldestPendingAge },
         providerUnknown: { count: providerUnknown, oldestAgeSeconds: oldestUnknownAge },
         webhooks: { sms: smsWebhooks, stripe: stripeWebhooks },
+        packs: {
+          paid: packsPaid,
+          paidWithoutCredit: packsPaidWithoutCredit,
+          needsReview: packsNeedReview,
+          needsReviewSegments: packsNeedReviewSegments,
+          refundWithoutPayment: packsRefundWithoutPayment,
+          lastReconcileAgeSeconds: reconcileAge,
+          lastReconcileOk: reconcileOk,
+        },
+        tagKeys: {
+          versions: tagKeySample
+            .filter((row, index, all) => all.findIndex((other) => other.key_version === row.key_version) === index)
+            .map((row) => ({ version: Number(row.key_version), tags: Number(row.tags) })),
+          problems: tagKeyIssues,
+        },
+        connections: {
+          byState: connectionsByState,
+          stalled: connectionsStalled,
+          runsFailed24h,
+          inbox: {
+            pending: integrationInboxPending,
+            deadLetter: integrationDeadLetters,
+            oldestPendingAgeSeconds: integrationInboxAge,
+          },
+        },
       },
       requestId,
     });

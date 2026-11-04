@@ -2,7 +2,8 @@ import type { NextRequest } from "next/server";
 
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json } from "@/lib/server/http";
-import { dispatchOnce } from "@/lib/server/sms/dispatch";
+import { withHeartbeat } from "@/lib/server/heartbeat";
+import { type DispatchSummary, dispatchOnce } from "@/lib/server/sms/dispatch";
 import { workerAuthorized } from "@/lib/server/worker-auth";
 
 /**
@@ -21,6 +22,33 @@ export const dynamic = "force-dynamic";
 
 const ROUTE = "/api/v1/internal/sms/dispatch";
 
+// One invocation keeps claiming batches while there is work and time. A
+// single 25-message batch per minute caps throughput at 1,500 an hour, so a
+// backlog left by a scheduler outage would take hours to clear. The budget
+// stays well inside the platform's function timeout and the 90-second lease,
+// so a batch is always finished (or its lease still held) before another
+// invocation could claim the same job.
+const BATCH = 25;
+const LEASE_SECONDS = 90;
+const TIME_BUDGET_MS = 40_000;
+const MAX_BATCHES = 20;
+
+export const maxDuration = 60;
+
+async function drain(): Promise<DispatchSummary & { batches: number }> {
+  const started = Date.now();
+  const total: DispatchSummary & { batches: number } = {
+    claimed: 0, submitted: 0, suppressed: 0, failed: 0, unknown: 0, deferred: 0, skipped: 0, batches: 0,
+  };
+  while (total.batches < MAX_BATCHES && Date.now() - started < TIME_BUDGET_MS) {
+    const batch = await dispatchOnce({ limit: BATCH, leaseSeconds: LEASE_SECONDS });
+    total.batches += 1;
+    for (const key of Object.keys(batch) as Array<keyof DispatchSummary>) total[key] += batch[key];
+    if (batch.claimed < BATCH) break;
+  }
+  return total;
+}
+
 export async function POST(request: NextRequest): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
     if (!workerAuthorized(request)) {
@@ -28,7 +56,10 @@ export async function POST(request: NextRequest): Promise<Response> {
       throw new ApiError(404, ERROR_CODE.notFound, "Not found.");
     }
 
-    const summary = await dispatchOnce({ limit: 25, leaseSeconds: 90 });
+    const summary = await withHeartbeat("sms_dispatch", async () => ({
+      result: await drain(),
+      failure: null,
+    }));
     return json(request, requestId, 200, { data: summary, requestId });
   });
 }

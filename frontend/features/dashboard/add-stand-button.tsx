@@ -6,76 +6,120 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { DialogRoot, DialogContent } from "@/components/ui/dialog";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
 import { notify } from "@/components/ui/toast";
-import { supabaseBrowser } from "@/lib/supabase/browser";
+import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 
 interface AddStandButtonProps {
   locations: Array<{ locationId: string; name: string }>;
+  /** The Tags there before, so a new one can be told apart if the answer is lost. */
+  standIds: readonly string[];
 }
 
-export function AddStandButton({ locations }: AddStandButtonProps) {
+export function AddStandButton({ locations, standIds }: AddStandButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState(locations[0]?.locationId ?? "");
+  const [selectedLocation, setSelectedLocation] = useState(
+    locations[0]?.locationId ?? "",
+  );
   const [label, setLabel] = useState("");
 
-  async function handleCreate() {
-    if (!selectedLocation) return;
-    setBusy(true);
+  const [error, setError] = useState<string | null>(null);
+  const check = useOutcomeCheck({
+    onDone: created,
+    onNotDone: () => setError("That Tag wasn’t created. Try again."),
+    onExpired: setError,
+  });
 
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
-
-    if (!session) {
-      setBusy(false);
-      notify.error("Please sign in again", "Your session expired.");
-      return;
-    }
-
-    const response = await fetch("/api/v1/review-stands", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        locationId: selectedLocation,
-        label: label.trim() || undefined,
-      }),
-    });
-
-    setBusy(false);
-
-    if (!response.ok) {
-      notify.error("Could not create stand", "Please try again.");
-      return;
-    }
-
+  function created() {
     setOpen(false);
     setLabel("");
-    notify.success("Stand created", "Print the new code and place it where customers pay.");
+    notify.success(
+      "Tag created",
+      "Print the code or program the tag, then put it where people pay.",
+    );
     router.refresh();
+  }
+
+  async function handleCreate() {
+    if (!selectedLocation || busy || check.pending) return;
+    setBusy(true);
+    setError(null);
+    const before = new Set(standIds);
+    const place = selectedLocation;
+    const isCreated = async (signal: AbortSignal): Promise<boolean> => {
+      const response = await ownerFetch("/api/v1/review-stands", { signal });
+      if (!response.ok) throw new Error("No answer yet.");
+      const { data } = (await response.json()) as {
+        data: Array<{ standId: string; locationId: string }>;
+      };
+      return data.some(
+        (tag) => !before.has(tag.standId) && tag.locationId === place,
+      );
+    };
+    try {
+      const response = await ownerFetch("/api/v1/review-stands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          locationId: selectedLocation,
+          label: label.trim() || undefined,
+        }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        // A server error can come after the Tag was made: find out.
+        if (response.status >= 500) {
+          check.start(isCreated, { serverAnswered: true });
+          return;
+        }
+        setError(
+          payload?.error?.message ??
+            "Could not create a Tag. Please try again.",
+        );
+        return;
+      }
+      created();
+    } catch (caught) {
+      if (caught instanceof SessionExpiredError) {
+        setError(caught.message);
+        return;
+      }
+      // The answer was lost: look for the new Tag rather than ask.
+      check.start(isCreated);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
+      <Button variant="action" className="w-auto" onClick={() => setOpen(true)}>
         <Plus className="size-5" aria-hidden="true" />
-        Add stand
+        Create a Tag
       </Button>
 
       <DialogRoot open={open} onOpenChange={setOpen}>
-        <DialogContent title="Add a new stand" description="Create a new QR code for customers to scan.">
+        <DialogContent
+          title="Create a Tag"
+          description="A printed code or an NFC tag customers can use."
+        >
           <div className="flex flex-col gap-4 py-2">
             {locations.length > 1 && (
               <div>
-                <label htmlFor="add-stand-location" className="mb-1 block text-sm font-medium text-ink">
-                  Location
+                <label
+                  htmlFor="add-stand-location"
+                  className="mb-1 block text-sm font-medium text-ink"
+                >
+                  Place
                 </label>
                 <select
                   id="add-stand-location"
+                  disabled={busy}
                   value={selectedLocation}
                   onChange={(e) => setSelectedLocation(e.target.value)}
                   className="h-11 w-full rounded-[var(--radius-control)] border border-border bg-surface px-3 text-sm text-ink"
@@ -89,11 +133,15 @@ export function AddStandButton({ locations }: AddStandButtonProps) {
               </div>
             )}
             <div>
-              <label htmlFor="add-stand-label" className="mb-1 block text-sm font-medium text-ink">
+              <label
+                htmlFor="add-stand-label"
+                className="mb-1 block text-sm font-medium text-ink"
+              >
                 Label (optional)
               </label>
               <input
                 id="add-stand-label"
+                disabled={busy}
                 type="text"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
@@ -104,11 +152,28 @@ export function AddStandButton({ locations }: AddStandButtonProps) {
             </div>
           </div>
 
+          {error ? (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          ) : null}
+          <OutcomeCheckNotice check={check} />
           <div className="flex flex-col gap-2 sm:flex-row-reverse">
-            <Button variant="primary" loading={busy} onClick={() => void handleCreate()} className="sm:flex-1">
-              Create stand
+            <Button
+              variant="action"
+              disabled={check.pending}
+              loading={busy}
+              onClick={() => void handleCreate()}
+              className="sm:flex-1"
+            >
+              Create a Tag
             </Button>
-            <Button variant="secondary" onClick={() => setOpen(false)} className="sm:flex-1">
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={() => setOpen(false)}
+              className="sm:flex-1"
+            >
               Cancel
             </Button>
           </div>

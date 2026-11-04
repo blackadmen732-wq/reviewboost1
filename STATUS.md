@@ -2,6 +2,27 @@
 
 Last updated: 2026-09-05 (main `7c3473f`)
 
+> **Scope, and what this is not.** This describes the *foundation* as it stood
+> on `main` at `7c3473f`. It is not the current state of the product and has
+> not been updated since. The current head is 85 commits beyond `7c3473f`,
+> and 54 of those are ahead of what is on `main` today.
+>
+> For what exists now, read **`docs/V1_COMPLETION_REPORT.md`**, which is kept
+> current and uses the fuller status vocabulary (IMPLEMENTED, CI-TESTED,
+> HOSTED-VERIFIED, LIVE-VERIFIED, DEVICE-VERIFIED, TESTFLIGHT-VERIFIED,
+> PLAY-VERIFIED, EXTERNAL-BLOCKED).
+>
+> Two documents answering "what is done" with different answers is how a status
+> file becomes something nobody trusts. This one is kept as the record of the
+> foundation rather than being edited into a second, competing present tense —
+> so where it disagrees with the completion report, the completion report is
+> right and this is history.
+>
+> Known to be out of date below, among other things: it says "stands" where the
+> product now says "Tags"; it lists Praise screens that are no longer primary
+> navigation; and it describes an NFC flow with visible technical stages that
+> has since been collapsed to one operation.
+
 State labels used here:
 
 | Label | Means |

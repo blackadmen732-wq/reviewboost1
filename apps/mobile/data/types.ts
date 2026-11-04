@@ -33,18 +33,6 @@ export interface FeedbackItem {
   isResolved: boolean;
 }
 
-export interface LiveFeedEntry {
-  id: string;
-  orgId: string;
-  locationId: string;
-  type: "tap" | "feedback";
-  rating: number | null;
-  submittedAt: string;
-  // The backend join may return null for locations the caller can see the
-  // event for but not the row for; the UI substitutes a fallback label.
-  locationName: string | null;
-}
-
 export interface OwnerNote {
   id: string;
   feedbackId: string;
@@ -67,4 +55,9 @@ export interface StandItem {
   lastOpenedAt: string | null;
   tokenRotatedAt: string | null;
   nfcProvisionedAt: string | null;
+  /**
+   * False when this Tag's place has no Google link, so a scan shows "This
+   * review link isn't active". Absent from an older server: unknown.
+   */
+  placeHasGoogleLink?: boolean;
 }

@@ -5,7 +5,7 @@ import { requireOrganizationContext, requireRole } from "@/lib/server/auth";
 import { readEntitlement, locationLimit } from "@/lib/server/entitlements";
 import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
 import { createLocation } from "@/lib/server/owner-service";
-import { listLocations } from "@/lib/server/owner-data";
+import { listLocations, type OwnerDb } from "@/lib/server/owner-data";
 import { parseOrThrow } from "@/lib/server/validation";
 
 /**
@@ -32,7 +32,9 @@ export async function GET(request: NextRequest): Promise<Response> {
   return handle(request, ROUTE, async (requestId) => {
     const context = await requireOrganizationContext(request);
     const [locations, entitlement] = await Promise.all([
-      listLocations(context.orgId),
+      // The request's own client (its bearer token), as /api/v1/home does:
+      // the cookie client sees nothing for the app, which sends no cookie.
+      listLocations(context.orgId, context.db as OwnerDb),
       readEntitlement(context, context.orgId, requestId),
     ]);
 

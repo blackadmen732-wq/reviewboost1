@@ -27,7 +27,40 @@ That file is gitignored; never commit real values.
 
 | Variable | Required | Description |
 |---|---|---|
-| `PUBLIC_FRONTEND_URL` | yes (production) | Origin used in QR codes and NFC tags (`{PUBLIC_FRONTEND_URL}/q/{token}`). Production refuses to start without it. In production this MUST be `https://reviewboost.fit` — never `http://localhost:3000` or a `*.vercel.app` preview URL, because a stand printed against the wrong origin cannot be recalled. Use `http://localhost:3000` only in development. |
+| `PUBLIC_FRONTEND_URL` | yes (production and preview) | Origin used in QR codes and NFC tags (`{PUBLIC_FRONTEND_URL}/q/{token}`). Production refuses to start without it. In production this MUST be `https://reviewboost.fit` — never `http://localhost:3000` or a `*.vercel.app` preview URL, because a stand printed against the wrong origin cannot be recalled. Use `http://localhost:3000` only in development. Vercel previews also run with `NODE_ENV=production`, so the Preview environment needs its own HTTPS value (per branch in Vercel, or a fixed preview domain), used with Preview's separate Supabase project below; without it every preview answers `/login` with a 500. |
+| `GOOGLE_SITE_VERIFICATION` | no (production only) | The `content` value of Google Search Console's HTML-tag verification for `https://reviewboost.fit/` (only the code, not the whole `<meta>` tag). Read at build time, so redeploy after setting it. Unset prints no tag. |
+
+## Sign in with Google and Apple
+
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_AUTH_PROVIDERS` | no | Comma list of "Continue with …" buttons on `/login`: `google,apple`. Empty shows email only. List a provider only after it is on in Supabase. Google is never shown without Apple (App Store Guideline 4.8). |
+| `APPLE_TEAM_ID` | with Apple | Apple Developer team ID. |
+| `APPLE_SIGN_IN_KEY_ID` | with Apple | Key ID of a "Sign in with Apple" key. |
+| `APPLE_SIGN_IN_PRIVATE_KEY` | with Apple | That key's `.p8` contents (`\n` escapes allowed). Server-only. Lets account deletion revoke Sign in with Apple, which Apple requires (`lib/server/apple-sign-in.ts`). |
+| `APPLE_BUNDLE_ID` | no | iPhone app client ID, default `fit.reviewboost.app`. |
+| `APPLE_SERVICES_ID` | with web Apple | The website's Services ID, used to revoke tokens from web sign-ins. |
+
+Switching them on, in order:
+
+1. **Google.** Google Cloud console → APIs & Services → Credentials: on the existing "ReviewBoost web" OAuth client, add the redirect URI `https://<project>.supabase.co/auth/v1/callback`. In Supabase → Authentication → Providers → Google, paste the client ID and secret.
+2. **Apple.** Apple Developer → Identifiers: turn on Sign in with Apple for `fit.reviewboost.app`; create a Services ID (for example `fit.reviewboost.web`) with return URL `https://<project>.supabase.co/auth/v1/callback`; create a key with Sign in with Apple. In Supabase → Providers → Apple: Client IDs `fit.reviewboost.web,fit.reviewboost.app` and the secret generated from that key.
+3. **Supabase → Authentication → URL Configuration → Redirect URLs:** add `https://reviewboost.fit/auth/callback` and `reviewboost://auth/callback`.
+4. **Vercel (Production):** set the Apple variables above and `NEXT_PUBLIC_AUTH_PROVIDERS=google,apple`, then redeploy. **EAS:** set `EXPO_PUBLIC_AUTH_PROVIDERS=apple,google` and build a new iPhone app (the Sign in with Apple capability needs a new build).
+
+## Connections
+
+| Variable | Required | Description |
+|---|---|---|
+| `INTEGRATION_CREDENTIAL_KEY` | to connect an app | base64, 32 bytes. Encrypts provider tokens at rest, separate from `CUSTOMER_NOTE_ENCRYPTION_KEY`. Generate with `openssl rand -base64 32`. Without it nothing can be connected. |
+| `INTEGRATION_CREDENTIAL_KEY_VERSION` | no | Integer, default `1`. Increment when rotating the key. |
+| `INTEGRATION_CREDENTIAL_KEY_PREVIOUS` | no | The key being rotated away from, during a rotation only. |
+| `INTEGRATIONS_FAKE_PROVIDER` | no | `enabled` lists the pretend "Test provider" for trying Connections. Ignored in production (`VERCEL_ENV=production`, or `NODE_ENV=production` off Vercel). |
+| `FAKE_PROVIDER_WEBHOOK_KEY` | no | Signs and verifies the test provider's webhooks. Unset, every test webhook is rejected. |
+
+The Connections worker (`/api/v1/internal/integrations/process`) uses the same
+`SMS_WORKER_SECRET` / `CRON_SECRET` guard as the SMS dispatcher. It is not on a
+schedule yet.
 
 ## Development-only
 

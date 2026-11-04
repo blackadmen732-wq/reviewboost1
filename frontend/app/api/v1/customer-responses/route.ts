@@ -37,6 +37,8 @@ export async function GET(request: NextRequest): Promise<Response> {
       },
       requestId,
       context.orgId,
+      // ?show=needs is the website's "Needs you"; anything else is everything.
+      { needsAttention: url.searchParams.get("show") === "needs" },
     );
 
     return json(request, requestId, 200, { ...page, requestId });

@@ -14,9 +14,10 @@ import {
   assertCanCreateTag,
   entitlementApiError,
 } from "@/lib/server/entitlements";
-import { publicFrontendUrl, tokenDigestKeyVersion } from "@/lib/server/env";
+import { tokenDigestKeyVersion } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
-import { isValidGoogleReviewUrl, standUrl } from "@/lib/server/google-review-url";
+import { isGoogleReviewWritingUrl } from "@/lib/server/google-review-url";
+import { canonicalTagUrl } from "@/lib/server/tag-url";
 import { logger } from "@/lib/server/logger";
 
 /**
@@ -91,7 +92,7 @@ export async function createOrganization(
   input: CreateOrganizationInput,
   requestId: string,
 ): Promise<CreatedOrganization> {
-  if (input.googleReviewUrl !== undefined && !isValidGoogleReviewUrl(input.googleReviewUrl)) {
+  if (input.googleReviewUrl !== undefined && !isGoogleReviewWritingUrl(input.googleReviewUrl)) {
     // Refused at the door rather than stored and failed later: an invalid
     // destination means the stand serves a page the customer's browser rejects,
     // and the owner would have no idea why.
@@ -140,7 +141,7 @@ export async function createOrganization(
     organizationId: row.org_id,
     locationId: row.location_id,
     standId: row.stand_id,
-    standUrl: standUrl(publicFrontendUrl(), token),
+    standUrl: canonicalTagUrl(token),
     standToken: token,
   };
 }
@@ -207,23 +208,26 @@ export async function getOnboardingState(context: AuthenticatedContext, requestI
 export async function listStands(context: AuthenticatedContext, requestId: string, orgId: string) {
   const { data, error } = await context.db
     .from("review_stands")
-    .select("id, org_id, location_id, label, stand_type, status, public_token_prefix, created_at, last_opened_at, token_rotated_at, nfc_provisioned_at, locations(name)")
+    .select("id, org_id, location_id, label, stand_type, status, public_token_prefix, created_at, last_opened_at, token_rotated_at, nfc_provisioned_at, locations(name, destination_provider, destination_url)")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false })
     .limit(MAX_PAGE_SIZE);
 
   if (error) databaseFailure("list_stands", error, requestId);
 
-  return (data ?? []).map((stand) => ({
-    standId: stand.id as string,
-    locationId: stand.location_id as string,
+  return (data ?? []).map((stand) => {
     // The embed is an object for this many-to-one join, but PostgREST types
     // it loosely; null when RLS hides the location row.
-    locationName: (() => {
-      const embedded = stand.locations as { name?: string } | { name?: string }[] | null;
-      const row = Array.isArray(embedded) ? embedded[0] : embedded;
-      return row?.name ?? null;
-    })(),
+    type Place = { name?: string; destination_provider?: unknown; destination_url?: unknown };
+    const embedded = stand.locations as Place | Place[] | null;
+    const place = Array.isArray(embedded) ? embedded[0] : embedded;
+    return {
+    standId: stand.id as string,
+    locationId: stand.location_id as string,
+    locationName: place?.name ?? null,
+    /** No Google link at the place: a scan shows "This review link isn't active". */
+    placeHasGoogleLink:
+      typeof place?.destination_provider === "string" && typeof place?.destination_url === "string",
     label: stand.label as string,
     standType: stand.stand_type as string,
     status: stand.status as string,
@@ -232,7 +236,8 @@ export async function listStands(context: AuthenticatedContext, requestId: strin
     lastOpenedAt: (stand.last_opened_at as string | null) ?? null,
     tokenRotatedAt: (stand.token_rotated_at as string | null) ?? null,
     nfcProvisionedAt: (stand.nfc_provisioned_at as string | null) ?? null,
-  }));
+    };
+  });
 }
 
 /**
@@ -272,7 +277,7 @@ export async function rotateStandToken(
 
   return {
     standId,
-    standUrl: standUrl(publicFrontendUrl(), token),
+    standUrl: canonicalTagUrl(token),
     standToken: token,
   };
 }
@@ -306,7 +311,7 @@ export async function getStandTokenForReprint(
   const token = tryDecrypt(data.public_token_encrypted as string | null);
   if (token === null) return null;
 
-  return { token, standUrl: standUrl(publicFrontendUrl(), token), label: data.label as string };
+  return { token, standUrl: canonicalTagUrl(token), label: data.label as string };
 }
 
 // ------------------------------------------------- NFC provisioning --
@@ -388,7 +393,7 @@ export async function createStand(
 
   return {
     standId,
-    standUrl: standUrl(publicFrontendUrl(), token),
+    standUrl: canonicalTagUrl(token),
     standToken: token,
   };
 }
@@ -462,6 +467,12 @@ export async function listCustomerResponses(
   page: Page,
   requestId: string,
   orgId: string,
+  /**
+   * The website's "Needs you": not sorted, and either unread or three stars or
+   * fewer. The same predicate as owner-data's listReviews, so the two lists
+   * agree.
+   */
+  filter: { needsAttention?: boolean } = {},
 ) {
   const limit = pageSize(page.limit);
 
@@ -472,6 +483,7 @@ export async function listCustomerResponses(
     .order("submitted_at", { ascending: false })
     .limit(limit + 1);
 
+  if (filter.needsAttention) query = query.is("resolved_at", null).or("read_at.is.null,rating.lte.3");
   if (page.cursor) query = query.lt("submitted_at", page.cursor);
 
   const { data, error } = await query;
@@ -508,7 +520,7 @@ export async function getCustomerResponse(
 ) {
   const { data, error } = await context.db
     .from("customer_responses")
-    .select("id, location_id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .select("id, location_id, stand_id, rating, note_encrypted, submitted_at, read_at, resolved_at")
     .eq("org_id", orgId)
     .eq("id", responseId)
     .maybeSingle();
@@ -519,11 +531,14 @@ export async function getCustomerResponse(
   return {
     responseId: data.id as string,
     locationId: data.location_id as string,
+    /** The Tag it came from, so the detail can name it. */
+    standId: (data.stand_id as string | null) ?? null,
     rating: data.rating as number,
     note: tryDecrypt(data.note_encrypted as string | null),
     submittedAt: data.submitted_at as string,
     isRead: data.read_at !== null,
     isResolved: data.resolved_at !== null,
+    resolvedAt: (data.resolved_at as string | null) ?? null,
   };
 }
 
@@ -683,6 +698,8 @@ export async function listLiveFeed(
     .from("public_review_sessions")
     .select("id, location_id, created_at, locations(name)")
     .eq("org_id", orgId)
+    // The same taps Home counts: a link preview or crawler is not a tap.
+    .eq("counts_as_scan", true)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(fetchSize);

@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { requireOrganizationContext } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json, preflight } from "@/lib/server/http";
+import { listActionNotes, type OwnerDb } from "@/lib/server/owner-data";
 import { getCustomerResponse } from "@/lib/server/owner-service";
 
 export const runtime = "nodejs";
@@ -31,7 +32,29 @@ export async function GET(
       throw new ApiError(404, ERROR_CODE.notFound, "That feedback could not be found.");
     }
 
-    return json(request, requestId, 200, { data, requestId });
+    // What the team did about it, and which Tag it came from: the iPhone app
+    // shows the same detail as the website's. Both read as the caller (RLS).
+    const db = context.db as OwnerDb;
+    const [notes, stand] = await Promise.all([
+      listActionNotes(context.orgId, responseId, db),
+      data.standId
+        ? db.from("review_stands").select("label").eq("org_id", context.orgId).eq("id", data.standId).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    return json(request, requestId, 200, {
+      data: {
+        ...data,
+        tagLabel: (stand.data as { label?: string } | null)?.label ?? null,
+        notes: notes.map((note) => ({
+          noteId: note.noteId,
+          body: note.body,
+          authorName: note.authorName,
+          createdAt: note.createdAt,
+        })),
+      },
+      requestId,
+    });
   });
 }
 

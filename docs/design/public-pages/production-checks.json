@@ -1,0 +1,15 @@
+{
+  "pages": [
+    "/product",
+    "/how-it-works",
+    "/pricing"
+  ],
+  "productionBuild": true,
+  "loadedFontsAndProductImage": true,
+  "interactiveSample": true,
+  "activeNavigation": true,
+  "planPreserved": true,
+  "keyboardMobileMenu": true,
+  "galleryImages": 22,
+  "pageErrors": []
+}

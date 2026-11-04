@@ -62,6 +62,8 @@ function parseStoredDraft(value: string): CustomerFlowState | null {
       sessionId: draft.sessionId,
       responseId: draft.responseId,
       sessionKey: draft.sessionKey,
+      // Absent from drafts saved before sessions started at open.
+      sessionLocale: isLocale(draft.sessionLocale) ? draft.sessionLocale : null,
       responseKey: draft.responseKey,
       destinationKey: draft.destinationKey,
       destinationPending: draft.destinationPending,

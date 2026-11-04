@@ -1,0 +1,23 @@
+[
+  {
+    "path": "/reviews",
+    "destination": "/feedback/insights"
+  },
+  {
+    "path": "/customers",
+    "destination": "/feedback"
+  },
+  {
+    "path": "/praise",
+    "destination": "/feedback"
+  },
+  {
+    "path": "/onboarding",
+    "destination": "/home"
+  },
+  {
+    "expiredSessionPreservesPlan": true,
+    "qrScopedAndCookiesOmitted": true,
+    "qrAxeScans": 2
+  }
+]

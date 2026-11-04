@@ -63,7 +63,7 @@ Commit that `app.json` change. Confirm ownership with `eas project:info`
 the `development` / `preview` / `production` environments that each `eas.json`
 build profile is bound to via its `environment` field.
 
-Only three variables exist, all `EXPO_PUBLIC_*` and therefore **compiled into
+All variables are `EXPO_PUBLIC_*` and therefore **compiled into
 the client bundle — not secrets**:
 
 | Variable | Value | Where set |
@@ -71,6 +71,8 @@ the client bundle — not secrets**:
 | `EXPO_PUBLIC_SUPABASE_URL` | `https://zoyqikgqfqulwkihjbev.supabase.co` | inline in `eas.json` (all profiles) |
 | `EXPO_PUBLIC_API_URL` | `https://reviewboost.fit` | inline in `eas.json` (all profiles) |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | production anon (publishable) key | EAS env var per environment |
+| `EXPO_PUBLIC_AUTH_PROVIDERS` | `apple,google` once both are on in Supabase; empty until then | EAS env var per environment |
+| `EXPO_PUBLIC_TEXTING_ENABLED` | unset — texting ships off and the Texts tab never shows. `true` only in the release that launches texting (`docs/mobile/APP_STORE_METADATA.md` §13) | inline in `eas.json` (`production`), when that release is made |
 
 The anon key is kept out of git and supplied per environment **[EXTERNAL]**:
 

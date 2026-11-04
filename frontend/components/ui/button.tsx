@@ -3,6 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { LoaderCircle } from "lucide-react";
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
+import { StillWorking } from "@/components/ui/still-working";
 import { cn } from "@/lib/utils/cn";
 
 export const buttonVariants = cva(
@@ -17,26 +18,35 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          // Dark ink on brand green, never white. White on #00A86B is 3.08:1 —
-          // large-text only — so a white label on a normal-size button fails
-          // AA. The token flips with the theme; the hardcoded value did not.
-          "border-brand bg-brand text-on-brand shadow-[var(--shadow-button)] hover:border-brand-hover hover:bg-brand-hover hover:shadow-[var(--shadow-button-hover)] active:bg-brand-active",
+          // Nothing uses this: green is never a button background (DESIGN.md
+          // §3), and brand green cannot carry a white label (3.08:1). Buttons
+          // are `action`, the default, on the customer page too.
+          "border-brand bg-brand text-on-brand shadow-[var(--shadow-button)] hover:border-brand-hover hover:bg-brand-hover hover:shadow-[var(--shadow-button-hover)] active:bg-brand-active disabled:border-border disabled:bg-quiet disabled:text-muted disabled:shadow-none disabled:opacity-100",
+        action:
+          // Disabled is neutral grey, not faded green: a washed-out green
+          // reads as broken, grey reads as "not yet".
+          // The action colour: near-black #1A1A19 with a white label (17:1)
+          // in light mode, near-white with a dark label in dark mode. Brand
+          // green (#00A86B) is never used here.
+          "border-action bg-action text-on-action shadow-[var(--shadow-button)] hover:border-action-hover hover:bg-action-hover hover:shadow-[var(--shadow-button-hover)] active:bg-action-pressed focus-visible:ring-[color:var(--rb-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:border-border disabled:bg-quiet disabled:text-muted disabled:shadow-none disabled:opacity-100",
         secondary:
           "border-border bg-surface text-ink shadow-[var(--shadow-control)] hover:border-[color:var(--rb-border-strong)] hover:bg-quiet",
         outline:
           "border-[color:var(--rb-border-strong)] bg-transparent text-ink hover:border-brand hover:bg-brand-soft",
         ghost: "border-transparent bg-transparent text-ink hover:bg-quiet",
         destructive:
-          "border-danger bg-danger text-white shadow-[var(--shadow-control)] hover:brightness-95",
+          // White on the light theme's red; dark on the dark theme's lighter
+          // red, where white could not be read (2.19:1).
+          "border-danger bg-danger text-on-danger shadow-[var(--shadow-control)] hover:brightness-95",
       },
       size: {
         sm: "min-h-11 px-4 text-sm",
         default: "min-h-14 text-base",
-        lg: "min-h-16 rounded-[16px] px-6 text-[1.0625rem]",
+        lg: "min-h-16 rounded-[var(--radius-control)] px-6 text-[1.0625rem]",
         icon: "h-12 min-h-12 w-12 px-0",
       },
     },
-    defaultVariants: { variant: "primary", size: "default" },
+    defaultVariants: { variant: "action", size: "default" },
   },
 );
 
@@ -77,13 +87,21 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {loading ? (
-          <>
-            <LoaderCircle
-              className="size-5 animate-spin motion-reduce:animate-none"
-              aria-hidden="true"
-            />
-            <span>{loadingLabel ?? "Loading…"}</span>
-          </>
+          // Keep saying what is happening: the given label ("Sending…"),
+          // otherwise the button's own words, never a generic "Loading";
+          // "Still working…" once it has taken four seconds. A new label
+          // ("Uploading… 40%") is progress, so it starts the four again.
+          <StillWorking
+            key={loadingLabel}
+            icon={
+              <LoaderCircle
+                className="size-5 shrink-0 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+            }
+          >
+            {loadingLabel ? <span>{loadingLabel}</span> : children}
+          </StillWorking>
         ) : (
           children
         )}

@@ -1,0 +1,90 @@
+name: Uptime
+
+# Every Tag at every business depends on one site answering. This checks it
+# from outside Vercel and Supabase every fifteen minutes, and a failed run is
+# the alert: GitHub emails the account that last changed this schedule
+# (GitHub → Settings → Notifications → Actions: "failed workflows").
+#
+#   1. The site answers.
+#   2. A Tag lookup reaches the database: a made-up code must come back as
+#      "this review link is not active" (404, review_link_inactive). A 5xx or
+#      a timeout here means no Tag anywhere can open.
+#   3. Optional, repository variable MONITOR_TAG_URL — one real Tag's link:
+#      it opens end to end (keys, plan, Google link).
+#   4. Optional, repository secret MONITOR_SECRET — the value of CRON_SECRET
+#      in Vercel: /api/v1/internal/health, which also proves the keys still
+#      open the Tags already in the field. Set it once the production
+#      scheduler runs (docs/SCHEDULING.md), or health reports its workers
+#      stale and this fails every run.
+#
+# This repository is public, so the log says only what passed or failed:
+# status codes, never a response body, a link or a secret.
+#
+# Runbook: docs/backend/OPERATIONS.md, "What can stop every Tag at once".
+
+on:
+  schedule:
+    - cron: "4,19,34,49 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SITE: https://reviewboost.fit
+    steps:
+      - name: The site answers
+        run: |
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 \
+            --retry 2 --retry-delay 10 "$SITE/") || true
+          echo "home page: $status"
+          test "$status" = 200
+
+      - name: A Tag lookup reaches the database
+        run: |
+          body=$(mktemp)
+          code="uptime$(openssl rand -hex 20)"
+          status=$(curl -sS -o "$body" -w '%{http_code}' --max-time 20 \
+            --retry 2 --retry-delay 10 "$SITE/api/v1/public/q/$code") || true
+          echo "tag lookup: $status"
+          test "$status" = 404
+          grep -q '"review_link_inactive"' "$body"
+
+      - name: A real Tag opens
+        env:
+          TAG_URL: ${{ vars.MONITOR_TAG_URL }}
+        run: |
+          if [ -z "$TAG_URL" ]; then
+            echo "MONITOR_TAG_URL is not set: skipped."
+            exit 0
+          fi
+          code="${TAG_URL##*/q/}"
+          code="${code%%[?#/]*}"
+          body=$(mktemp)
+          status=$(curl -sS -o "$body" -w '%{http_code}' --max-time 20 \
+            --retry 2 --retry-delay 10 "$SITE/api/v1/public/q/$code") || true
+          echo "real tag: $status"
+          test "$status" = 200
+          grep -q '"destination"' "$body"
+
+      - name: Health
+        env:
+          MONITOR_SECRET: ${{ secrets.MONITOR_SECRET }}
+        run: |
+          if [ -z "$MONITOR_SECRET" ]; then
+            echo "MONITOR_SECRET is not set: skipped."
+            exit 0
+          fi
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+            --retry 2 --retry-delay 10 \
+            -H "Authorization: Bearer $MONITOR_SECRET" "$SITE/api/v1/internal/health") || true
+          echo "health: $status"
+          test "$status" = 200

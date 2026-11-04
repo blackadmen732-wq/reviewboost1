@@ -2,13 +2,14 @@
 
 import { Lock, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
 import { Textarea } from "@/components/ui/textarea";
-import { notify } from "@/components/ui/toast";
 import type { ActionNote } from "@/lib/server/owner-data";
-import { supabaseBrowser } from "@/lib/supabase/browser";
+import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
+import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 import { relativeDay } from "@/lib/utils/relative-day";
 
 /**
@@ -37,50 +38,123 @@ import { relativeDay } from "@/lib/utils/relative-day";
 export function ActionThread({
   responseId,
   actions,
+  timeZone,
 }: {
   responseId: string;
   actions: ActionNote[];
+  /** The business's, so "Yesterday" is the business's yesterday. */
+  timeZone: string;
 }) {
   const router = useRouter();
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const canSubmit = body.trim().length > 0 && !busy;
+  const [error, setError] = useState<string | null>(null);
+  /** When a note last saved: a second tap right after is not an empty note. */
+  const savedAt = useRef(0);
+  /** The note on its way, and the notes there before it. */
+  const intent = useRef<{ text: string; ids: Set<string> } | null>(null);
+  const check = useOutcomeCheck({
+    onDone: () => {
+      intent.current = null;
+      setBody("");
+      setError(null);
+      router.refresh();
+    },
+    onNotDone: () => {
+      intent.current = null;
+      setError("That note didn’t save. Your text is still here. Try again.");
+    },
+    onExpired: (message) => {
+      intent.current = null;
+      setError(message);
+    },
+  });
+
+  // Typed and not saved, or on its way: leaving would lose it, so the
+  // browser asks first, as the customer page editor does.
+  const unsaved = body.trim().length > 0 || busy || check.pending;
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsaved]);
+
+  /** Is the note in the thread now? A read, so nothing is saved twice. */
+  async function isSaved(signal: AbortSignal): Promise<boolean> {
+    const wanted = intent.current;
+    if (!wanted) return false;
+    const response = await ownerFetch(
+      `/api/v1/customer-responses/${responseId}`,
+      { signal },
+    );
+    if (!response.ok) throw new Error("No answer yet.");
+    const { data } = (await response.json()) as {
+      data: { notes?: Array<{ noteId: string; body: string }> };
+    };
+    return (data.notes ?? []).some(
+      (note) => note.body === wanted.text && !wanted.ids.has(note.noteId),
+    );
+  }
+
+  const canSubmit = body.trim().length > 0 && !busy && !check.pending;
 
   async function add() {
+    // Never a dead button: an empty note says what is missing. Not right
+    // after a save, though: that is a double tap, and the note is saved.
+    if (body.trim().length === 0 && !busy && !check.pending) {
+      if (Date.now() - savedAt.current < 2_000) return;
+      setError("Write what you did first, then save it.");
+      return;
+    }
     if (!canSubmit) return;
     setBusy(true);
-
-    const {
-      data: { session },
-    } = await supabaseBrowser().auth.getSession();
-
-    if (!session) {
+    setError(null);
+    intent.current = {
+      text: body.trim(),
+      ids: new Set(actions.map((action) => action.noteId)),
+    };
+    try {
+      const response = await ownerFetch(
+        `/api/v1/customer-responses/${responseId}/notes`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: body.trim() }),
+        },
+      );
+      if (!response.ok) {
+        // A server error may have come after the note was kept: find out.
+        if (response.status >= 500) {
+          check.start(isSaved, { serverAnswered: true });
+          return;
+        }
+        const payload = (await response.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        intent.current = null;
+        setError(
+          payload?.error?.message ??
+            "Could not save that. Your text is still here.",
+        );
+        return;
+      }
+      setBody("");
+      savedAt.current = Date.now();
+      intent.current = null;
+      router.refresh();
+    } catch (caught) {
+      if (caught instanceof SessionExpiredError) {
+        intent.current = null;
+        setError(caught.message);
+        return;
+      }
+      // The answer was lost on the way back. Look rather than ask.
+      check.start(isSaved);
+    } finally {
       setBusy(false);
-      notify.error("Please sign in again", "Your session expired.");
-      return;
     }
-
-    const response = await fetch(`/api/v1/customer-responses/${responseId}/notes`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ body: body.trim() }),
-    });
-
-    setBusy(false);
-
-    if (!response.ok) {
-      // The text stays in the box. Losing what someone just typed because of a
-      // dropped connection is the fastest way to lose their trust in the app.
-      notify.error("Could not save that", "Your note is still here — try again.");
-      return;
-    }
-
-    setBody("");
-    router.refresh();
   }
 
   return (
@@ -96,21 +170,18 @@ export function ActionThread({
       </p>
 
       {actions.length > 0 ? (
-        <ol className="mb-4 flex flex-col gap-3">
+        <ol className="mb-6 divide-y divide-border border-y border-border">
           {actions.map((action) => (
-            <li
-              key={action.noteId}
-              className="rounded-[var(--radius-card)] border border-border bg-surface p-4"
-            >
+            <li key={action.noteId} className="py-4">
               <div className="mb-1.5 flex items-center gap-2">
-                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-text">
-                  {action.authorName.slice(0, 1).toUpperCase()}
-                </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
                   {action.authorName}
                 </span>
-                <time dateTime={action.createdAt} className="shrink-0 text-sm text-muted">
-                  {relativeDay(action.createdAt)}
+                <time
+                  dateTime={action.createdAt}
+                  className="shrink-0 text-sm text-muted"
+                >
+                  {relativeDay(action.createdAt, timeZone)}
                 </time>
               </div>
               <p className="whitespace-pre-wrap text-base leading-relaxed text-ink">
@@ -121,17 +192,34 @@ export function ActionThread({
         </ol>
       ) : null}
 
+      {error ? (
+        <p role="alert" className="mb-3 text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
+      <OutcomeCheckNotice check={check} className="mb-3" />
       <Textarea
         value={body}
-        onChange={(event) => setBody(event.target.value)}
-        disabled={busy}
+        onChange={(event) => {
+          setBody(event.target.value);
+          if (error) setError(null);
+        }}
+        disabled={busy || check.pending}
         rows={3}
         maxLength={2000}
         aria-label="Write what you did about this"
-        placeholder="Called them back and said sorry…"
+        placeholder="Add a note for your team…"
       />
 
-      <Button className="mt-3" disabled={!canSubmit} loading={busy} loadingLabel="Saving…" onClick={() => void add()}>
+      {/* Secondary: "Mark as sorted" above is this screen's one black button. */}
+      <Button
+        variant="secondary"
+        className="mt-3 sm:w-auto"
+        disabled={check.pending}
+        loading={busy}
+        loadingLabel="Saving…"
+        onClick={() => void add()}
+      >
         <Send className="size-5" aria-hidden="true" />
         Save note
       </Button>

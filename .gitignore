@@ -39,3 +39,9 @@ npm-debug.log*
 web-build/
 ios/
 android/
+
+# User-requested upstream design references, installed locally.
+design-kit/
+.agents/skills/impeccable
+.agents/skills/awesome-design-md
+.agents/skills/ui-design-agent

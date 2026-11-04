@@ -1,0 +1,41 @@
+{
+  "iosNativeGeneration": true,
+  "centeredX": true,
+  "centeredY": true,
+  "containMode": true,
+  "backgroundRGB": [
+    0,
+    91,
+    62
+  ],
+  "lightStatusBar": true,
+  "iosAssets": [
+    {
+      "name": "image.png",
+      "width": 320,
+      "height": 320,
+      "alpha": true
+    },
+    {
+      "name": "image@2x.png",
+      "width": 640,
+      "height": 640,
+      "alpha": true
+    },
+    {
+      "name": "image@3x.png",
+      "width": 960,
+      "height": 960,
+      "alpha": true
+    }
+  ],
+  "androidGenerated": true,
+  "androidSystemMaskWidthDp": 180,
+  "sourcePNG": {
+    "width": 1964,
+    "height": 801,
+    "transparent": true
+  },
+  "nativeBuildOrDeviceVerified": false,
+  "remainingGeneratedWarning": "Existing Android compileSdkVersion auto-detection warning; Android signed build unverified"
+}

@@ -22,6 +22,7 @@ import {
 } from "@/lib/server/crypto";
 import { tokenDigestKeyVersion } from "@/lib/server/env";
 import { ApiError, ERROR_CODE, rateLimited, reviewLinkInactive } from "@/lib/server/errors";
+import { customerAssetUrl } from "@/lib/server/customer-asset-url";
 import { resolveDestination } from "@/lib/server/destination";
 import { logger } from "@/lib/server/logger";
 import { serviceRoleClient } from "@/lib/server/supabase";
@@ -553,8 +554,8 @@ function publishedPage(value: unknown): CustomerReviewContext["page"] {
         ? templateId
         : "classic",
     tagline: typeof tagline === "string" && tagline.length <= 120 ? tagline : null,
-    logoUrl: typeof logoUrl === "string" && logoUrl.startsWith("https://") ? logoUrl : null,
-    heroUrl: typeof heroUrl === "string" && heroUrl.startsWith("https://") ? heroUrl : null,
+    logoUrl: customerAssetUrl(logoUrl),
+    heroUrl: customerAssetUrl(heroUrl),
   };
 }
 

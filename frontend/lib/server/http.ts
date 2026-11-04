@@ -128,7 +128,7 @@ export function errorResponse(request: Request, requestId: string, error: ApiErr
 }
 
 /** Body parsing that fails as a validation error rather than an unhandled throw. */
-export async function readJsonBody(request: Request): Promise<unknown> {
+export async function readJsonBody(request: Request, options?: { maxBytes?: number }): Promise<unknown> {
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().includes("application/json")) {
     throw new ApiError(400, ERROR_CODE.validationFailed, "The request could not be accepted.", {
@@ -137,9 +137,10 @@ export async function readJsonBody(request: Request): Promise<unknown> {
   }
 
   // Bounded before parsing. An unbounded body is a trivial memory exhaustion,
-  // and nothing this API accepts is anywhere near this size.
+  // and nothing this API accepts is anywhere near this size. The one larger
+  // body (a customer list) raises the bound for its own route only.
   const raw = await request.text();
-  if (raw.length > 64 * 1024) {
+  if (raw.length > (options?.maxBytes ?? 64 * 1024)) {
     throw new ApiError(400, ERROR_CODE.validationFailed, "The request could not be accepted.", {
       details: [{ field: "body", message: "Request body is too large." }],
     });

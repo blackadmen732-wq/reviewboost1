@@ -1,0 +1,44 @@
+{
+  "task": "ReviewBoost PR67 \u2014 audit for the next visual pass",
+  "revision": "PR67-next-pass-proposal",
+  "updatedOn": "2026-10-12",
+  "note": "Existing authorized repairs are verified separately. This diagram tracks the latest requested visual proposal; no approval of a new palette is invented.",
+  "stages": {
+    "brief": {
+      "status": "passed",
+      "evidence": "docs/design/PR67_ROUTE_PLAN.md",
+      "note": "User supplied the audience/scope and authorized the existing PR67 workflow."
+    },
+    "reference": {
+      "status": "gated",
+      "evidence": "docs/design/PR67_VISUAL_SYSTEM_AUDIT.md",
+      "note": "References inspected; exact files and recommended palette/font decision are ready for the user's requested review."
+    },
+    "contract": {
+      "status": "pending",
+      "evidence": "DESIGN.md",
+      "note": "Existing contract recorded; proposed new homepage treatment not approved."
+    },
+    "build": {
+      "status": "pending",
+      "note": "No new palette implementation. Existing repair results are a separate completed implementation pass."
+    },
+    "verify": {
+      "status": "pending",
+      "note": "New hero screenshots follow implementation; current repair evidence is already captured."
+    },
+    "deliver": {
+      "status": "pending",
+      "note": "User reviews the first new visual pass before rollout."
+    }
+  },
+  "gates": {
+    "A": "passed",
+    "B": "gated",
+    "C": "pending",
+    "D": "pending",
+    "E": "pending",
+    "F": "pending"
+  },
+  "blockedReason": null
+}

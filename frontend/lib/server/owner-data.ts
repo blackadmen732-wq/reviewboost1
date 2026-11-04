@@ -3,13 +3,25 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import type { User } from "@supabase/supabase-js";
+import { isAuthRetryableFetchError, type User } from "@supabase/supabase-js";
 
 import { tryDecrypt } from "@/lib/server/crypto";
+import { effectiveStatus, locationLimit, tagLimit, type EntitlementStatus } from "@/lib/server/entitlements";
+import { textingEnabled } from "@/lib/features";
+import { stripePackPricesConfigured } from "@/lib/server/env";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
+import { isGoogleReviewWritingUrl, isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
+import {
+  insightPeriods,
+  summarizeInsights,
+  type FeedbackInsights,
+  type InsightRange,
+  type InsightRow,
+} from "@/lib/owner/insights";
 import { logger } from "@/lib/server/logger";
+import { serviceKind, type ServiceKind } from "@/lib/owner/service-state";
 import { supabaseServer } from "@/lib/supabase/server";
-import { startOfLocalDay, startOfLocalMonth } from "@/lib/utils/local-day";
+import { localDay, startOfLocalDay, startOfLocalMonth, startOfLocalWeek } from "@/lib/utils/local-day";
 
 export { localHour, startOfLocalDay, startOfLocalMonth } from "@/lib/utils/local-day";
 
@@ -42,6 +54,14 @@ export interface OwnerContext {
 }
 
 type OrgFields = { name: string; timezone: string };
+
+/**
+ * The database client a read runs as. Pages pass nothing and get the signed-in
+ * browser session (cookies); the iPhone app's API routes pass the RLS client
+ * built from its bearer token (`context.db`). Either way Row Level Security
+ * decides what comes back — the parameter only says whose session it is.
+ */
+export type OwnerDb = Awaited<ReturnType<typeof supabaseServer>>;
 type MembershipRow = {
   id: string;
   org_id: string;
@@ -131,8 +151,13 @@ export const requireOwner = cache(async (nextPath: string): Promise<OwnerContext
 
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
 
+  // The auth service did not answer: that is not a signed-out owner. The
+  // error page says so and tries again by itself; sending them to sign in
+  // would fail as well, and read as having been signed out.
+  if (!user && isAuthRetryableFetchError(error)) dataFailure("auth.get_user", error);
   if (!user) redirect(`/login?next=${encodeURIComponent(nextPath)}`);
 
   const { active, all, needsSelection } = await getActiveOrganization();
@@ -217,6 +242,8 @@ export interface Review {
   isResolved: boolean;
   resolvedAt: string | null;
   noteCount: number;
+  /** The Tag it came from. A business with more than one Tag is told which. */
+  standId: string;
 }
 
 /**
@@ -240,14 +267,27 @@ export async function listReviews(
     unreadOnly?: boolean | undefined;
     withNotesOnly?: boolean | undefined;
     openOnly?: boolean | undefined;
+    /**
+     * Feedback's "Needs you": not sorted, and either unread or three stars or
+     * fewer. A 5-star an owner has already read is not waiting on anything,
+     * and making them "sort" praise to clear it turned the list into chores.
+     * A low rating stays until somebody marks it sorted.
+     */
+    needsAttention?: boolean | undefined;
+    /** One of the organization's own locations; the caller validates it. */
+    locationId?: string | undefined;
+    /** Inclusive start and exclusive end instants, from local calendar days. */
+    submittedFrom?: string | undefined;
+    submittedBefore?: string | undefined;
   } = {},
+  db?: OwnerDb,
 ): Promise<Page<Review>> {
-  const supabase = await supabaseServer();
+  const supabase = db ?? (await supabaseServer());
   const limit = clampLimit(options.limit);
 
   let query = supabase
     .from("customer_responses")
-    .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at, stand_id")
     .eq("org_id", orgId)
     .order("submitted_at", { ascending: false })
     .order("id", { ascending: false })
@@ -263,6 +303,10 @@ export async function listReviews(
   if (options.unreadOnly) query = query.is("read_at", null);
   if (options.withNotesOnly) query = query.not("note_encrypted", "is", null);
   if (options.openOnly) query = query.is("resolved_at", null);
+  if (options.needsAttention) query = query.is("resolved_at", null).or("read_at.is.null,rating.lte.3");
+  if (options.locationId) query = query.eq("location_id", options.locationId);
+  if (options.submittedFrom) query = query.gte("submitted_at", options.submittedFrom);
+  if (options.submittedBefore) query = query.lt("submitted_at", options.submittedBefore);
 
   const { data, error } = await query;
   if (error) dataFailure("list_reviews", error);
@@ -300,6 +344,7 @@ export async function listReviews(
       isResolved: row.resolved_at !== null,
       resolvedAt: (row.resolved_at as string | null) ?? null,
       noteCount: noteCounts.get(row.id as string) ?? 0,
+      standId: row.stand_id as string,
     }),
     "submitted_at",
   );
@@ -311,7 +356,8 @@ export interface ActionNote {
   noteId: string;
   body: string;
   authorName: string;
-  authorId: string;
+  /** Null once the writer deleted their own account; the note stays. */
+  authorId: string | null;
   createdAt: string;
 }
 
@@ -327,8 +373,8 @@ export interface ActionNote {
  * part that changes the business. Appended to, never edited: something that can
  * be quietly rewritten afterwards is not a record.
  */
-export async function listActionNotes(orgId: string, responseId: string): Promise<ActionNote[]> {
-  const supabase = await supabaseServer();
+export async function listActionNotes(orgId: string, responseId: string, db?: OwnerDb): Promise<ActionNote[]> {
+  const supabase = db ?? (await supabaseServer());
 
   const { data, error } = await supabase
     .from("response_notes")
@@ -339,7 +385,13 @@ export async function listActionNotes(orgId: string, responseId: string): Promis
 
   if (error) dataFailure("list_action_notes", error);
   const rows = data ?? [];
-  const authorIds = [...new Set(rows.map((row) => row.author_id as string))];
+  const authorIds = [
+    ...new Set(
+      rows
+        .map((row) => row.author_id as string | null)
+        .filter((id): id is string => id !== null),
+    ),
+  ];
 
   // A separate lookup rather than an embed: `author_id` references auth.users,
   // which PostgREST cannot traverse to public.profiles, so there is no
@@ -364,8 +416,13 @@ export async function listActionNotes(orgId: string, responseId: string): Promis
     // "Someone on your team" rather than a blank byline. A profile can be
     // missing a display name, and an empty name next to an action reads as a
     // rendering bug rather than as missing data.
-    authorName: names.get(row.author_id as string) || "Someone on your team",
-    authorId: row.author_id as string,
+    // A null author deleted their own account (migration 20261018000100);
+    // the business keeps what they wrote.
+    authorName:
+      row.author_id === null
+        ? "Former team member"
+        : names.get(row.author_id as string) || "Someone on your team",
+    authorId: (row.author_id as string | null) ?? null,
     createdAt: row.created_at as string,
   }));
 }
@@ -379,7 +436,7 @@ export async function getReview(
 
   const { data, error } = await supabase
     .from("customer_responses")
-    .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at")
+    .select("id, rating, note_encrypted, submitted_at, read_at, resolved_at, stand_id")
     .eq("org_id", orgId)
     .eq("id", responseId)
     .maybeSingle();
@@ -399,45 +456,68 @@ export async function getReview(
       isResolved: data.resolved_at !== null,
       resolvedAt: (data.resolved_at as string | null) ?? null,
       noteCount: actions.length,
+      standId: data.stand_id as string,
     },
     actions,
   };
 }
 
-/** How many responses sit at each star value — the Reviews page breakdown. */
-export async function getRatingBreakdown(orgId: string): Promise<{
-  counts: Record<1 | 2 | 3 | 4 | 5, number>;
-  total: number;
-  average: number | null;
-}> {
-  const supabase = await supabaseServer();
+// ------------------------------------------------------------- insights ----
 
-  const results = await Promise.all(
-    ([1, 2, 3, 4, 5] as const).map((rating) =>
-      supabase
-        .from("customer_responses")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .eq("rating", rating),
-    ),
-  );
+/**
+ * Feedback → Insights for one period view, one read.
+ *
+ * The periods are local calendar days in the business's zone, computed in
+ * lib/owner/insights.ts; the database only counts ratings of each star value
+ * between those boundaries (rpc_feedback_insights, which runs as the caller
+ * under row level security). No rating rows leave the database.
+ *
+ * `locationId` must already be one of this organization's own locations — the
+ * page checks it against listLocations. The function would return nothing for
+ * anyone else's anyway, but an unchecked id would make that look like a quiet
+ * month rather than a mistake.
+ *
+ * Only when the periods hold nothing at all is a second, one-row probe made, to
+ * tell a quiet stretch from a business that has never had a rating.
+ */
+export async function getFeedbackInsights(
+  orgId: string,
+  timezone: string,
+  options: { range: InsightRange; locationId?: string | null | undefined },
+  db?: OwnerDb,
+): Promise<FeedbackInsights> {
+  const supabase = db ?? (await supabaseServer());
+  const periods = insightPeriods(timezone, options.range);
+  const locationId = options.locationId ?? null;
 
-  for (const r of results) {
-    if (r.error) dataFailure("rating_breakdown", r.error);
+  const { data, error } = await supabase.rpc("rpc_feedback_insights", {
+    p_org_id: orgId,
+    p_bounds: periods.bounds,
+    p_location_id: locationId,
+  });
+  if (error) dataFailure("feedback_insights", error);
+
+  const rows: InsightRow[] = ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+    bucket: Number(row.bucket),
+    rating: Number(row.rating),
+    responses: Number(row.responses),
+  }));
+
+  let hasEarlier = false;
+  if (rows.length === 0) {
+    let probe = supabase
+      .from("customer_responses")
+      .select("id")
+      .eq("org_id", orgId)
+      .lt("submitted_at", periods.previous.start)
+      .limit(1);
+    if (locationId) probe = probe.eq("location_id", locationId);
+    const earlier = await probe;
+    if (earlier.error) dataFailure("feedback_insights.earlier", earlier.error);
+    hasEarlier = (earlier.data ?? []).length > 0;
   }
 
-  const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<1 | 2 | 3 | 4 | 5, number>;
-  let total = 0;
-  let weighted = 0;
-
-  ([1, 2, 3, 4, 5] as const).forEach((rating, index) => {
-    const count = results[index]?.count ?? 0;
-    counts[rating] = count;
-    total += count;
-    weighted += count * rating;
-  });
-
-  return { counts, total, average: total > 0 ? weighted / total : null };
+  return summarizeInsights(periods, rows, hasEarlier);
 }
 
 // --------------------------------------------------------------- praise ----
@@ -624,6 +704,13 @@ export interface Stand {
   locationName: string | null;
   tokenRotatedAt: string | null;
   nfcProvisionedAt: string | null;
+  lastOpenedAt: string | null;
+  /**
+   * Whether the Tag's place has somewhere to send a customer. Without it the
+   * Tag is a closed door ("This review link isn't active"), whatever its
+   * code and chip say.
+   */
+  placeHasGoogleLink: boolean;
 }
 
 /**
@@ -634,26 +721,28 @@ export interface Stand {
  * Each stand resolves its own location_id so multi-location businesses
  * display correctly.
  */
-export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
-  const supabase = await supabaseServer();
+export const listStands = cache(async (orgId: string, db?: OwnerDb): Promise<Stand[]> => {
+  const supabase = db ?? (await supabaseServer());
 
   const [standsResult, locationsResult] = await Promise.all([
     supabase
       .from("review_stands")
-      .select("id, location_id, label, stand_type, status, public_token_prefix, token_rotated_at, nfc_provisioned_at")
+      .select("id, location_id, label, stand_type, status, public_token_prefix, token_rotated_at, nfc_provisioned_at, last_opened_at")
       .eq("org_id", orgId)
       .order("created_at", { ascending: true }),
     supabase
       .from("locations")
-      .select("id, name")
+      .select("id, name, destination_provider, destination_url")
       .eq("org_id", orgId),
   ]);
   if (standsResult.error) dataFailure("list_stands", standsResult.error);
   if (locationsResult.error) dataFailure("list_stands_locations", locationsResult.error);
 
   const locationMap = new Map<string, string>();
+  const linked = new Set<string>();
   for (const loc of locationsResult.data ?? []) {
     locationMap.set(loc.id as string, loc.name as string);
+    if (locationDestination(loc)) linked.add(loc.id as string);
   }
 
   return (standsResult.data ?? []).map((row) => ({
@@ -666,7 +755,14 @@ export const listStands = cache(async (orgId: string): Promise<Stand[]> => {
     locationName: locationMap.get(row.location_id as string) ?? null,
     tokenRotatedAt: (row.token_rotated_at as string | null) ?? null,
     nfcProvisionedAt: (row.nfc_provisioned_at as string | null) ?? null,
+    lastOpenedAt: (row.last_opened_at as string | null) ?? null,
+    placeHasGoogleLink: linked.has(row.location_id as string),
   }));
+});
+
+export const getStand = cache(async (orgId: string, standId: string): Promise<Stand | null> => {
+  const stands = await listStands(orgId);
+  return stands.find((stand) => stand.standId === standId) ?? null;
 });
 
 export interface OwnerLocation {
@@ -711,8 +807,8 @@ export const getPrimaryLocation = cache(async (orgId: string): Promise<OwnerLoca
   };
 });
 
-export const listLocations = cache(async (orgId: string): Promise<OwnerLocation[]> => {
-  const supabase = await supabaseServer();
+export const listLocations = cache(async (orgId: string, db?: OwnerDb): Promise<OwnerLocation[]> => {
+  const supabase = db ?? (await supabaseServer());
 
   const { data, error } = await supabase
     .from("locations")
@@ -729,16 +825,65 @@ export const listLocations = cache(async (orgId: string): Promise<OwnerLocation[
   }));
 });
 
+/**
+ * The worst link across every place. Any wrong link reads as wrong, then any
+ * missing one as missing; no places at all is missing.
+ *
+ * A legacy link — a Maps listing or short link saved before review links were
+ * required — still counts as set: its Tags work. It is flagged separately so
+ * Home can ask for the upgrade without calling a working setup broken.
+ */
+export function ownerGoogleLinkFlagsForAll(urls: ReadonlyArray<string | null | undefined>): GoogleLinkFlags {
+  if (urls.length === 0) return { hasGoogleLink: false, googleLinkInvalid: false, googleLinkNeedsUpgrade: false };
+  const flags = urls.map(ownerGoogleLinkFlags);
+  const googleLinkNeedsUpgrade = flags.some((flag) => flag.googleLinkNeedsUpgrade);
+  if (flags.some((flag) => flag.googleLinkInvalid)) {
+    return { hasGoogleLink: false, googleLinkInvalid: true, googleLinkNeedsUpgrade };
+  }
+  return { hasGoogleLink: flags.every((flag) => flag.hasGoogleLink), googleLinkInvalid: false, googleLinkNeedsUpgrade };
+}
+
+export interface GoogleLinkFlags {
+  hasGoogleLink: boolean;
+  googleLinkInvalid: boolean;
+  /** Works today, but is a listing or short link rather than a review link. */
+  googleLinkNeedsUpgrade: boolean;
+}
+
+export function ownerGoogleLinkFlags(url: string | null | undefined): GoogleLinkFlags {
+  const trimmed = url?.trim() ?? "";
+  if (!trimmed) return { hasGoogleLink: false, googleLinkInvalid: false, googleLinkNeedsUpgrade: false };
+  const valid = isValidGoogleReviewUrl(trimmed);
+  return {
+    hasGoogleLink: valid,
+    googleLinkInvalid: !valid,
+    googleLinkNeedsUpgrade: valid && !isGoogleReviewWritingUrl(trimmed),
+  };
+}
+
 // ------------------------------------------------------------- counters ----
 
 export interface OwnerCounts {
   ratingsToday: number;
+  ratingsThisWeek: number;
+  ratingsLastWeek: number;
+  /**
+   * People who opened a Tag this week, by tap or by scan: what Home leads
+   * with, beside the ratings they left. Link previews and crawlers are not
+   * counted (`counts_as_scan`).
+   */
+  tapsThisWeek: number;
   unread: number;
+  /** Of `unread`, how many are three stars or fewer. */
+  unreadLow: number;
+  /** Three stars or fewer and not sorted, read or not. */
+  openLow: number;
   unmatchedPraise: number;
   activeStands: number;
-  recentAverage: number | null;
   recentCount: number;
   hasGoogleLink: boolean;
+  googleLinkInvalid: boolean;
+  googleLinkNeedsUpgrade: boolean;
 }
 
 /**
@@ -748,13 +893,18 @@ export interface OwnerCounts {
  * together, and issuing them from separate components would serialise them
  * behind each other's awaits.
  */
-export const getOwnerCounts = cache(async (orgId: string, timezone: string): Promise<OwnerCounts> => {
-  const supabase = await supabaseServer();
+export const getOwnerCounts = cache(async (orgId: string, timezone: string, db?: OwnerDb): Promise<OwnerCounts> => {
+  const supabase = db ?? (await supabaseServer());
 
   const dayStart = startOfLocalDay(timezone);
   const monthStart = startOfLocalMonth(timezone);
+  const weekStart = startOfLocalWeek(timezone);
+  // Thirteen calendar days back, not the week start minus 7 × 24h: a week that
+  // contains a daylight-saving change is 167 or 169 hours long, and the
+  // subtraction put the boundary at 23:00 or 01:00 on the wrong day.
+  const priorWeekStart = localDay(timezone, -13).start;
 
-  const [today, unread, praise, stands, location, recent] = await Promise.all([
+  const [today, thisWeek, lastWeek, tapsWeek, unread, unreadLow, openLow, praise, stands, locations, recent] = await Promise.all([
     supabase
       .from("customer_responses")
       .select("id", { count: "exact", head: true })
@@ -764,7 +914,47 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
       .from("customer_responses")
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
-      .is("read_at", null),
+      .gte("submitted_at", weekStart.toISOString()),
+    supabase
+      .from("customer_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .gte("submitted_at", priorWeekStart.toISOString())
+      .lt("submitted_at", weekStart.toISOString()),
+    // Every session is an open: the customer page starts one as it loads.
+    supabase
+      .from("public_review_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("counts_as_scan", true)
+      .gte("created_at", weekStart.toISOString()),
+    // Unread *and* unresolved, matching the list Home and Feedback actually
+    // show. Counting every unread row meant a rating a teammate had already
+    // resolved still said "1 message needs you" above a list with nothing in
+    // it — the owner goes looking for work that is not there.
+    supabase
+      .from("customer_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("read_at", null)
+      .is("resolved_at", null),
+    // The part of that which is three stars or fewer, so Home can say how
+    // many of the new ratings are the ones worth reading first.
+    supabase
+      .from("customer_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("read_at", null)
+      .is("resolved_at", null)
+      .lte("rating", 3),
+    // Three stars or fewer, read or not, that nobody has marked sorted: what
+    // Feedback's "Needs you" keeps after it has been read.
+    supabase
+      .from("customer_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("resolved_at", null)
+      .lte("rating", 3),
     supabase
       .from("praise_safe_view")
       .select("id", { count: "exact", head: true })
@@ -772,35 +962,84 @@ export const getOwnerCounts = cache(async (orgId: string, timezone: string): Pro
       .eq("status", "unmatched")
       .gte("created_at", monthStart.toISOString()),
     supabase.from("review_stands").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "active"),
-    getPrimaryLocation(orgId),
+    listLocations(orgId, db),
+    // Whether anyone has rated yet, for Home's empty state. Ids, not ratings:
+    // the one average in the product is the one Insights computes.
     supabase
       .from("customer_responses")
-      .select("rating")
+      .select("id")
       .eq("org_id", orgId)
       .order("submitted_at", { ascending: false })
       .limit(50),
   ]);
 
   if (today.error) dataFailure("owner_counts.today", today.error);
+  if (thisWeek.error) dataFailure("owner_counts.week", thisWeek.error);
+  if (lastWeek.error) dataFailure("owner_counts.last_week", lastWeek.error);
+  if (tapsWeek.error) dataFailure("owner_counts.taps_week", tapsWeek.error);
   if (unread.error) dataFailure("owner_counts.unread", unread.error);
+  if (unreadLow.error) dataFailure("owner_counts.unread_low", unreadLow.error);
+  if (openLow.error) dataFailure("owner_counts.open_low", openLow.error);
   if (praise.error) dataFailure("owner_counts.praise", praise.error);
   if (stands.error) dataFailure("owner_counts.stands", stands.error);
   if (recent.error) dataFailure("owner_counts.recent", recent.error);
 
-  const ratings = (recent.data ?? []).map((row) => row.rating as number);
 
   return {
     ratingsToday: today.count ?? 0,
+    ratingsThisWeek: thisWeek.count ?? 0,
+    ratingsLastWeek: lastWeek.count ?? 0,
+    tapsThisWeek: tapsWeek.count ?? 0,
     unread: unread.count ?? 0,
+    unreadLow: unreadLow.count ?? 0,
+    openLow: openLow.count ?? 0,
     unmatchedPraise: praise.count ?? 0,
     activeStands: stands.count ?? 0,
-    recentAverage:
-      ratings.length > 0
-        ? ratings.reduce((total, rating) => total + rating, 0) / ratings.length
-        : null,
-    recentCount: ratings.length,
-    hasGoogleLink: location?.destination != null,
+    recentCount: (recent.data ?? []).length,
+    // Every place, not the first: a second location with no link has Tags
+    // that send nobody to Google, and Home has to say so.
+    ...ownerGoogleLinkFlagsForAll(locations.map((location) => location.destination?.url ?? null)),
   };
+});
+
+/**
+ * The Feedback badge, for screens that need nothing else from getOwnerCounts.
+ * The same predicate as its `unread`: unread and not yet sorted.
+ */
+export const getUnreadCount = cache(async (orgId: string): Promise<number> => {
+  const supabase = await supabaseServer();
+  const { count, error } = await supabase
+    .from("customer_responses")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .is("read_at", null)
+    .is("resolved_at", null);
+  if (error) dataFailure("owner_unread_count", error);
+  return count ?? 0;
+});
+
+/**
+ * Whether this business's Tags are open to customers right now.
+ *
+ * Read from the same entitlement row the database's door check reads, with the
+ * same trial clock (`effectiveStatus`). A failed read is "unknown", and the
+ * screens then say nothing about billing rather than guess: the Billing page
+ * is where an unreadable plan is reported.
+ */
+export const getServiceState = cache(async (orgId: string, db?: OwnerDb): Promise<ServiceKind> => {
+  const supabase = db ?? (await supabaseServer());
+  const { data, error } = await supabase
+    .from("entitlement_snapshots")
+    .select("plan_id, status, trial_ends_at")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error) {
+    logger.warn("owner.service_state_read_failed", { orgId, error });
+    return "unknown";
+  }
+  if (!data) return "unknown";
+  const row = data as { plan_id: string | null; status: EntitlementStatus; trial_ends_at: string | null };
+  return serviceKind(effectiveStatus(row.status, row.trial_ends_at), row.plan_id);
 });
 
 // ------------------------------------------------------------ customers ----
@@ -1009,6 +1248,22 @@ export interface OwnerBilling {
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
   smsBalance: SmsBalance;
+  /**
+   * What the business is using against what its entitlement allows, counted
+   * the way the database counts when it enforces the cap: Tags that are not
+   * retired, locations that are active. Null when there is no entitlement to
+   * measure against.
+   */
+  usage: {
+    locations: { used: number; limit: number };
+    tags: { used: number; limit: number };
+  } | null;
+  /**
+   * Whether this business can buy extra texts now: its plan is active and not
+   * set to end (never during a trial, never past due) and this deployment has
+   * the pack prices. The same rule checkout enforces.
+   */
+  packsAvailable: boolean;
 }
 
 /**
@@ -1021,16 +1276,28 @@ export interface OwnerBilling {
 export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBilling> => {
   const supabase = await supabaseServer();
 
-  const [entitlement, balance] = await Promise.all([
+  const [entitlement, balance, tags, locations] = await Promise.all([
     supabase
       .from("entitlement_snapshots")
       .select("plan_id, status, cancel_at_period_end, trial_ends_at, current_period_end")
       .eq("org_id", orgId)
       .maybeSingle(),
     readSmsBalance(orgId),
+    supabase
+      .from("review_stands")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .neq("status", "retired"),
+    supabase
+      .from("locations")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "active"),
   ]);
 
   if (entitlement.error) dataFailure("owner_billing", entitlement.error);
+  if (tags.error) dataFailure("owner_billing.tags", tags.error);
+  if (locations.error) dataFailure("owner_billing.locations", locations.error);
 
   const row = entitlement.data as {
     plan_id: OwnerBilling["planId"];
@@ -1047,5 +1314,42 @@ export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBillin
     trialEndsAt: row?.trial_ends_at ?? null,
     currentPeriodEnd: row?.current_period_end ?? null,
     smsBalance: balance,
+    usage: row?.status
+      ? {
+          locations: {
+            used: locations.count ?? 0,
+            limit: locationLimit(row.plan_id, row.status),
+          },
+          tags: { used: tags.count ?? 0, limit: tagLimit(row.plan_id, row.status) },
+        }
+      : null,
+    packsAvailable:
+      textingEnabled() &&
+      row?.status === "active" &&
+      !row.cancel_at_period_end &&
+      stripePackPricesConfigured(),
   };
+});
+
+/**
+ * Whether any published Customer Page — the business's own or one place's —
+ * carries a photo. Home uses it for one optional setup step, so a failed read
+ * leaves the step out (null) rather than taking Home down with it.
+ */
+export const hasPublishedCustomerPhoto = cache(async (orgId: string, db?: OwnerDb): Promise<boolean | null> => {
+  const supabase = db ?? (await supabaseServer());
+  const { data, error } = await supabase
+    .from("customer_page_profiles")
+    .select("published")
+    .eq("org_id", orgId)
+    .not("published", "is", null);
+
+  if (error) {
+    logger.warn("owner.customer_photo_read_failed", { orgId, error });
+    return null;
+  }
+
+  return (data ?? []).some(
+    (row) => typeof (row.published as { heroUrl?: unknown } | null)?.heroUrl === "string",
+  );
 });

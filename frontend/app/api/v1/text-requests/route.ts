@@ -6,6 +6,14 @@ import { handle, json, preflight, readJsonBody } from "@/lib/server/http";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import { parseOrThrow } from "@/lib/server/validation";
 import {
+  CONSENT_ATTESTATION_VERSION,
+  CONSENT_METHOD_IDS,
+  CONSENT_METHODS,
+  DEFAULT_TEXT_REQUEST_TEMPLATE_ID,
+  TEXT_REQUEST_TEMPLATE_IDS,
+  TEXT_REQUEST_TEMPLATES,
+} from "@/lib/sms/text-request-templates";
+import {
   listTextRequests,
   scheduleSchema,
   scheduleTextRequest,
@@ -74,7 +82,8 @@ export async function GET(request: NextRequest): Promise<Response> {
     // says is left, by source, or it shows nothing.
     const [items, balance] = await Promise.all([
       listTextRequests(context, limit),
-      serviceRoleClient().rpc("rpc_sms_balance", { p_org_id: context.orgId }),
+      // As the signed-in owner, so the function's own membership check applies.
+      context.db.rpc("rpc_sms_balance", { p_org_id: context.orgId }),
     ]);
 
     if (balance.error) {
@@ -92,6 +101,15 @@ export async function GET(request: NextRequest): Promise<Response> {
           monthly: Number(row?.monthly ?? 0),
           purchased: Number(row?.purchased ?? 0),
           total: Number(row?.total ?? 0),
+        },
+        // The approved words and the ways a customer can agree, from the one
+        // file that defines them, so the iPhone app offers exactly what the
+        // website offers and never a copy that has drifted.
+        compose: {
+          templates: TEXT_REQUEST_TEMPLATE_IDS.map((id) => ({ id, text: TEXT_REQUEST_TEMPLATES[id] })),
+          defaultTemplateId: DEFAULT_TEXT_REQUEST_TEMPLATE_ID,
+          consentMethods: CONSENT_METHOD_IDS.map((id) => ({ id, label: CONSENT_METHODS[id] })),
+          consentWordingVersion: CONSENT_ATTESTATION_VERSION,
         },
       },
       requestId,

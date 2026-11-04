@@ -20,6 +20,7 @@ interface RpcCall {
 const rpcCalls: RpcCall[] = [];
 let rpcResult: { data: unknown; error: { message: string } | null } = { data: null, error: null };
 let profileRow: Record<string, unknown> | null = null;
+let assetRow: Record<string, unknown> | null = null;
 let storageObjects: Array<{ name: string; metadata: Record<string, unknown> }> = [];
 let signedUpload: { data: { token: string } | null; error: unknown } = {
   data: { token: "signed-token" },
@@ -42,7 +43,14 @@ function fakeClient() {
   return {
     auth: { getUser: () => Promise.resolve({ data: { user: { id: "user-1" } }, error: null }) },
     from: (table: string) => ({
-      select: () => queryBuilder(table === "customer_page_profiles" && profileRow ? [profileRow] : []),
+      select: () =>
+        queryBuilder(
+          table === "customer_page_profiles" && profileRow
+            ? [profileRow]
+            : table === "customer_page_assets" && assetRow
+              ? [assetRow]
+              : [],
+        ),
       update: () => queryBuilder([]),
       insert: () => queryBuilder([]),
     }),
@@ -79,6 +87,7 @@ beforeEach(() => {
   rpcCalls.length = 0;
   rpcResult = { data: null, error: null };
   profileRow = null;
+  assetRow = null;
   storageObjects = [];
   signedUpload = { data: { token: "signed-token" }, error: null };
 });
@@ -93,7 +102,13 @@ describe("reading the page", () => {
     const { readCustomerPage } = await import("@/lib/server/customer-page-service");
     const page = await readCustomerPage(await context(), ORG, null, "req-1");
 
-    expect(page).toEqual({ draft: {}, published: null, publishedVersion: 0, publishedAt: null });
+    expect(page).toEqual({
+      draft: {},
+      published: null,
+      draftHeroUrl: null,
+      publishedVersion: 0,
+      publishedAt: null,
+    });
   });
 
   it("keeps the draft and the published snapshot as separate things", async () => {
@@ -109,6 +124,38 @@ describe("reading the page", () => {
     expect(page.draft.tagline).toBe("Being edited");
     expect(page.published?.tagline).toBe("What customers see");
     expect(page.publishedVersion).toBe(3);
+  });
+});
+
+describe("previewing the draft", () => {
+  it("gives the owner the draft's photo, not the one that is live", async () => {
+    profileRow = {
+      draft: { heroAssetId: "33333333-3333-3333-3333-333333333333" },
+      published: { heroAssetId: "44444444-4444-4444-4444-444444444444", heroUrl: "https://assets.test/live.jpg" },
+      published_version: 1,
+      published_at: "2026-09-15T00:00:00Z",
+    };
+    assetRow = { public_url: "https://assets.test/draft.jpg" };
+
+    const { readCustomerPage } = await import("@/lib/server/customer-page-service");
+    const page = await readCustomerPage(await context(), ORG, null, "req-draft");
+
+    expect(page.draftHeroUrl).toBe("https://assets.test/draft.jpg");
+    expect(page.published?.heroUrl).toBe("https://assets.test/live.jpg");
+  });
+
+  it("has no draft photo when the upload never finished", async () => {
+    profileRow = {
+      draft: { heroAssetId: "33333333-3333-3333-3333-333333333333" },
+      published: null,
+      published_version: 0,
+      published_at: null,
+    };
+
+    const { readCustomerPage } = await import("@/lib/server/customer-page-service");
+    const page = await readCustomerPage(await context(), ORG, null, "req-draft-2");
+
+    expect(page.draftHeroUrl).toBeNull();
   });
 });
 

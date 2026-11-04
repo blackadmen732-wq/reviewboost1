@@ -13,7 +13,7 @@ create extension if not exists pgtap with schema extensions;
 
 create schema if not exists tests;
 
-select plan(36);
+select plan(37);
 
 -- ------------------------------------------------------------- fixtures ----
 
@@ -256,6 +256,15 @@ select throws_ok(
         'admin'::public.member_role) $$,
     'P0001', null,
     'member cannot self-promote to admin');
+
+-- Member cannot promote a *different* account. This catches the lateral
+-- escalation which the existing self-promotion tests did not cover.
+select throws_ok(
+    $$ select public.rpc_change_member_role(
+        'b0000000-0000-0000-0000-000000000004',
+        'admin'::public.member_role) $$,
+    'P0001', null,
+    'ordinary member cannot promote another member to admin');
 
 -- ============================================================
 -- 7. VIEWER EXCLUSION — triage operations

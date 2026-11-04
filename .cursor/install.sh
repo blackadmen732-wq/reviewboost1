@@ -39,6 +39,11 @@ echo "== Web dependencies =="
 echo "== Mobile dependencies =="
 ( cd "$REPO_ROOT/apps/mobile" && npm ci )
 
+# These public email templates are read by Kong as its own container user.
+# Restricted cloud checkouts may create them mode 600, which makes Kong
+# return 403 and Auth fall back to a link-only email instead of the code.
+chmod 644 "$REPO_ROOT/supabase/templates/magic-link.html" "$REPO_ROOT/supabase/templates/confirmation.html"
+
 echo "== Pre-pull Supabase images (CLI ${SUPABASE_CLI_VERSION}) =="
 # Start the stack once so every image lands in the snapshot, then stop it: no
 # process started here survives into a later boot. This doubles as the

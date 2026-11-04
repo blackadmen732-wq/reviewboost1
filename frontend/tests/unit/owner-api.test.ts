@@ -32,6 +32,8 @@ const perTableRows: Record<string, unknown[]> = {};
 let membershipRows: unknown[] = [{ org_id: "org-1", role: "owner" }];
 let rpcResult: { data: unknown; error: unknown } = { data: null, error: null };
 let serviceRoleUsed = false;
+/** Row filters a query asked for (`.is` / `.or`), so a test can see what was filtered. */
+const filters: string[] = [];
 
 /**
  * Parse the composite `.or()` cursor filter the live-feed endpoint emits.
@@ -53,10 +55,15 @@ function queryBuilder(columns: string, rows?: unknown[]) {
   let orFilter: string | null = null;
   const chain = () => builder;
 
-  for (const method of ["eq", "lt", "order", "limit", "update", "select"]) {
+  for (const method of ["eq", "lt", "neq", "in", "order", "limit", "update", "select"]) {
     builder[method] = chain;
   }
+  builder["is"] = (column: string, value: unknown) => {
+    filters.push(`is ${column} ${String(value)}`);
+    return builder;
+  };
   builder["or"] = (filter: string) => {
+    filters.push(`or ${filter}`);
     orFilter = filter;
     return builder;
   };
@@ -159,6 +166,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   recorded.length = 0;
+  filters.length = 0;
   authUser = { id: "user-1" };
   tableRows = [];
   for (const key of Object.keys(perTableRows)) delete perTableRows[key];
@@ -178,6 +186,7 @@ describe("authentication", () => {
       ["@/app/api/v1/team-praise/route", "GET", "/api/v1/team-praise"],
       ["@/app/api/v1/review-stands/route", "GET", "/api/v1/review-stands"],
       ["@/app/api/v1/live-feed/route", "GET", "/api/v1/live-feed"],
+      ["@/app/api/v1/home/route", "GET", "/api/v1/home"],
     ] as const;
 
     for (const [module, method, path] of routes) {
@@ -390,6 +399,17 @@ describe("listing safety", () => {
     expect(body.meta).toHaveProperty("hasMore");
     expect(body.meta).toHaveProperty("nextCursor");
   });
+
+  it("filters to what needs the owner only when asked, with the website's rule", async () => {
+    const { GET } = await import("@/app/api/v1/customer-responses/route");
+    await GET(request("GET", "/api/v1/customer-responses"));
+    expect(filters).toEqual([]);
+
+    await GET(request("GET", "/api/v1/customer-responses?show=needs"));
+    // Open, and either unread or three stars or fewer: the same "Needs you"
+    // the website's Feedback page shows, so the two lists agree.
+    expect(filters).toEqual(["is resolved_at null", "or read_at.is.null,rating.lte.3"]);
+  });
 });
 
 describe("stand token rotation", () => {
@@ -446,8 +466,15 @@ describe("GET /api/v1/customer-responses/[responseId]", () => {
         submitted_at: "2026-01-01T00:00:00Z",
         read_at: "2026-01-02T00:00:00Z",
         resolved_at: null,
+        stand_id: "stand-1",
       },
     ];
+    const { encrypt } = await import("@/lib/server/crypto");
+    perTableRows["review_stands"] = [{ label: "Front counter" }];
+    perTableRows["response_notes"] = [
+      { id: "note-1", body_encrypted: encrypt("Called them back"), author_id: "user-1", created_at: "2026-01-02T10:00:00Z" },
+    ];
+    perTableRows["profiles"] = [{ id: "user-1", display_name: "Mark" }];
 
     const { GET } = await import(
       "@/app/api/v1/customer-responses/[responseId]/route"
@@ -458,10 +485,26 @@ describe("GET /api/v1/customer-responses/[responseId]", () => {
     );
 
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { data: { responseId: string; isRead: boolean; isResolved: boolean } };
+    const body = (await response.json()) as {
+      data: {
+        responseId: string;
+        isRead: boolean;
+        isResolved: boolean;
+        tagLabel: string | null;
+        notes: Array<{ body: string; authorName: string }>;
+      };
+    };
     expect(body.data.responseId).toBe(VALID_UUID);
     expect(body.data.isRead).toBe(true);
     expect(body.data.isResolved).toBe(false);
+    // The iPhone app shows the same rating screen as the website: which Tag,
+    // and the team's notes, decrypted for the caller.
+    expect(body.data.tagLabel).toBe("Front counter");
+    expect(body.data.notes).toEqual([
+      expect.objectContaining({ body: "Called them back", authorName: "Mark" }),
+    ]);
+    // Read with the caller's client, never the service role.
+    expect(serviceRoleUsed).toBe(false);
   });
 
   it("rejects a non-UUID responseId before touching the database", async () => {

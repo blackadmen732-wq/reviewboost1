@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { Toaster } from "@/components/ui/toast";
+
 /**
  * The owner side of the product.
  *
@@ -9,5 +11,11 @@ import type { ReactNode } from "react";
  * layout between them would compromise both.
  */
 export default function OwnerLayout({ children }: { children: ReactNode }) {
-  return <div className="min-h-dvh bg-canvas text-ink">{children}</div>;
+  return (
+    <div className="min-h-dvh bg-canvas text-ink">
+      {children}
+      {/* Owner screens are the only ones that confirm with a toast. */}
+      <Toaster />
+    </div>
+  );
 }

@@ -1,81 +1,139 @@
 "use client";
 
-import { ArrowLeft, Check, Mail } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Wordmark } from "@/components/brand/wordmark";
 import { Button } from "@/components/ui/button";
 import { CodeInput } from "@/components/ui/code-input";
 import { InlineNotice } from "@/components/ui/inline-notice";
+import { SocialSignIn } from "@/features/auth/social-sign-in";
+import type { SignInProvider } from "@/lib/auth/sign-in-providers";
 import { Input } from "@/components/ui/input";
-import { supabaseBrowser } from "@/lib/supabase/browser";
+import { loadSupabaseBrowser, warmSupabaseBrowser } from "@/lib/supabase/lazy-browser";
 
 /**
  * Sign in, in two taps and no password.
  *
- * There is one field on screen at a time and one button under it. Every extra
- * choice is a place where a busy owner stops, and the cost of stopping is that
- * they never come back.
- *
- * Deliberately absent: a password field, a "create account" link, a "remember
- * me" checkbox, and terms copy above the button. Signing in and signing up are
- * the same action here — if the email is new, an account is created. Asking
- * someone to know which of two doors they belong to is a decision that serves
- * the database, not them.
+ * Login and Get started are the same door. Verify is the code on the next
+ * screen. No Wordmark here — the page chrome already shows ReviewBoostLogo.
  */
 
-type Step = "email" | "code";
+type Step = "email" | "verify";
+
+const NO_CONNECTION = "No connection. Check your signal and try again.";
+
+/**
+ * The sign-in service could not be reached (Supabase's AuthRetryableFetchError:
+ * a dropped connection, or its own 502–504). Checked by name: importing the
+ * helper from supabase-js would put the whole client in this page's first
+ * bundle, which loads it lazily on purpose.
+ */
+function unreachable(error: unknown): boolean {
+  return (error as { name?: unknown } | null)?.name === "AuthRetryableFetchError";
+}
+
+class AuthDeadlineError extends Error {
+  constructor() {
+    super("That’s taking too long. Check your connection and try again.");
+    this.name = "AuthDeadlineError";
+  }
+}
+
+/**
+ * The sign-in service has no deadline of its own, so a request on a dead
+ * connection spun forever. After 20 s the owner is told and can try again
+ * (a code that arrives late still works; the newest one wins).
+ */
+function withinAuthDeadline<T>(request: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new AuthDeadlineError()), 20_000);
+    request.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (caught: unknown) => {
+        clearTimeout(timer);
+        reject(caught);
+      },
+    );
+  });
+}
 
 const RESEND_SECONDS = 30;
 
-export function SignInFlow({ next }: { next: string }) {
+export function SignInFlow({
+  next,
+  intent = "signin",
+  providers = [],
+  initialError = null,
+}: {
+  next: string;
+  intent?: "signin" | "start";
+  /** "Continue with …" buttons under the email form (lib/auth/sign-in-providers). */
+  providers?: readonly SignInProvider[];
+  /** A message from a sign-in that came back unfinished (/auth/callback). */
+  initialError?: string | null;
+}) {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [resetToken, setResetToken] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const emailField = useRef<HTMLInputElement>(null);
 
+  // Supabase is only needed once a button is pressed; fetch it while the
+  // owner is typing rather than before the page can show.
+  useEffect(() => warmSupabaseBrowser(), []);
+
   useEffect(() => {
     if (secondsLeft <= 0) return;
-    const timer = window.setTimeout(() => setSecondsLeft((value) => value - 1), 1000);
+    const timer = window.setTimeout(
+      () => setSecondsLeft((value) => value - 1),
+      1000,
+    );
     return () => window.clearTimeout(timer);
   }, [secondsLeft]);
 
-  const sendCode = useCallback(
-    async (address: string) => {
-      setBusy(true);
-      setError(null);
+  const sendCode = useCallback(async (address: string) => {
+    setBusy(true);
+    setError(null);
 
-      const { error: sendError } = await supabaseBrowser().auth.signInWithOtp({
-        email: address,
-        options: { shouldCreateUser: true },
-      });
-
-      setBusy(false);
-
+    try {
+      const { error: sendError } = await withinAuthDeadline(
+        (async () =>
+          (await loadSupabaseBrowser()).auth.signInWithOtp({
+            email: address,
+            options: { shouldCreateUser: true },
+          }))(),
+      );
       if (sendError) {
-        // Never surfaces the provider's wording, which is written for
-        // developers and often mentions rate limits or internal states.
-        setError("We could not send the code. Check the address and try again.");
+        // No connection is not a wrong address: say which it is.
+        setError(
+          unreachable(sendError)
+            ? NO_CONNECTION
+            : "We could not send the code. Check the address and try again.",
+        );
         return;
       }
-
-      setStep("code");
+      setStep("verify");
       setSecondsLeft(RESEND_SECONDS);
-    },
-    [],
-  );
+    } catch (caught) {
+      setError(caught instanceof AuthDeadlineError ? caught.message : NO_CONNECTION);
+    } finally {
+      setBusy(false);
+    }
+  }, []);
 
   async function handleEmailSubmit(event: React.FormEvent) {
     event.preventDefault();
     const address = email.trim().toLowerCase();
 
-    // Deliberately loose. A stricter pattern rejects real addresses, and the
-    // authoritative test is whether the code arrives.
-    if (!address.includes("@") || address.length < 5) {
-      setError("That does not look like an email address.");
+    // Something@somewhere.end: "tony@barber" was accepted, and the code
+    // went nowhere.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@.]{2,}$/.test(address)) {
+      setError("Check the email address. It needs a dot, like name@shop.com.");
       emailField.current?.focus();
       return;
     }
@@ -89,31 +147,42 @@ export function SignInFlow({ next }: { next: string }) {
       setBusy(true);
       setError(null);
 
-      const { error: verifyError } = await supabaseBrowser().auth.verifyOtp({
-        email,
-        token: code,
-        type: "email",
-      });
-
-      if (verifyError) {
+      try {
+        const { error: verifyError } = await withinAuthDeadline(
+          (async () =>
+            (await loadSupabaseBrowser()).auth.verifyOtp({
+              email,
+              token: code,
+              type: "email",
+            }))(),
+        );
+        if (verifyError) {
+          // Offline, the code was never checked: it is still good, so keep it.
+          if (unreachable(verifyError)) {
+            setError(`${NO_CONNECTION} Your code still works.`);
+            return;
+          }
+          setError("That code didn’t work. Use the newest code we sent.");
+          setResetToken((value) => value + 1);
+          return;
+        }
+        window.location.assign(next);
+      } catch (caught) {
+        setError(
+          caught instanceof AuthDeadlineError
+            ? caught.message
+            : `${NO_CONNECTION} Your code still works.`,
+        );
+      } finally {
         setBusy(false);
-        setError("That code is not right. Check it and type it again.");
-        // Clears the boxes and refocuses, so the next attempt needs no tidying
-        // up first.
-        setResetToken((value) => value + 1);
-        return;
       }
-
-      // A full navigation rather than a client push, so every Server Component
-      // re-renders with the new session already in place.
-      window.location.assign(next);
     },
     [email, next],
   );
 
-  if (step === "code") {
+  if (step === "verify") {
     return (
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8" data-auth-step="verify">
         <button
           type="button"
           onClick={() => {
@@ -126,15 +195,10 @@ export function SignInFlow({ next }: { next: string }) {
           Back
         </button>
 
-        <div className="flex flex-col gap-3 text-center">
-          <div className="mx-auto grid size-16 place-items-center rounded-full bg-brand-soft">
-            <Mail className="size-8 text-brand-text" aria-hidden="true" />
-          </div>
-          <h1 className="text-[1.75rem] font-semibold tracking-[-0.02em] text-ink">
+        <div className="flex flex-col gap-3">
+          <h1 className="text-[length:var(--rb-text-display)] font-semibold tracking-[-0.02em] text-ink">
             Check your email
           </h1>
-          {/* The address is repeated because the most common failure here is a
-              typo two screens ago, and seeing it is faster than going back. */}
           <p className="text-base text-muted">
             We sent a 6-digit code to
             <br />
@@ -151,7 +215,7 @@ export function SignInFlow({ next }: { next: string }) {
 
         {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
 
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col gap-3">
           {secondsLeft > 0 ? (
             <p className="text-sm text-muted" aria-live="polite">
               Send again in {secondsLeft}s
@@ -168,11 +232,7 @@ export function SignInFlow({ next }: { next: string }) {
             </Button>
           )}
 
-          {/* The single most common reason someone gets stuck here, said before
-              they conclude it is broken and close the tab. A first message from
-              a new sender lands in spam often enough that not mentioning it
-              costs real signups. */}
-          <p className="max-w-[30ch] text-center text-sm leading-relaxed text-muted">
+          <p className="max-w-[30ch] text-sm leading-relaxed text-muted">
             Not there? Check your spam folder.
           </p>
         </div>
@@ -181,19 +241,23 @@ export function SignInFlow({ next }: { next: string }) {
   }
 
   return (
-    <form onSubmit={handleEmailSubmit} className="flex flex-col gap-8" noValidate>
-      {/* The brand comes first, because someone landing here cold — or an owner
-          handed a phone mid-demo — needs to know what this is before they type
-          anything into it. */}
+    <form
+      onSubmit={handleEmailSubmit}
+      className="flex flex-col gap-8"
+      noValidate
+      data-auth-step="login"
+      data-auth-intent={intent}
+    >
       <div className="flex flex-col gap-3">
-        <Wordmark size="lg" />
-        <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
-          More Google reviews, without the work
+        <h1 className="text-[length:var(--rb-text-display)] font-semibold leading-tight tracking-[-0.02em] text-ink">
+          {intent === "start" ? "Get started" : "Sign in"}
         </h1>
-        {/* One sentence, concrete, no adjectives. A busy owner reads exactly
-            this much before deciding whether to continue. */}
         <p className="text-base leading-relaxed text-muted">
-          Customers scan a code on your counter. You get more reviews.
+          Use your business email. We will send you a code to sign in. No
+          password to remember.
+          {/* Sign in and Get started are the same door, and the screen says
+              so: someone new should not wonder whether they need an account. */}
+          {intent === "signin" ? " New here? The same code creates your account." : null}
         </p>
       </div>
 
@@ -223,31 +287,34 @@ export function SignInFlow({ next }: { next: string }) {
         {error ? <InlineNotice kind="error">{error}</InlineNotice> : null}
       </div>
 
-      <Button type="submit" size="lg" loading={busy} loadingLabel="Sending…">
+      <Button
+        type="submit"
+        variant="action"
+        size="lg"
+        loading={busy}
+        loadingLabel="Sending…"
+      >
         Continue
       </Button>
 
-      {/* Three facts that answer what a skeptical owner is actually thinking:
-          is this a commitment, do I have to learn something, and is it going to
-          cost me. Stated flatly — no ticks, no badges, no "trusted by 10,000
-          businesses" nobody believes. */}
-      <ul className="flex flex-col gap-2.5">
-        {[
-          "No password to remember",
-          "Set up in about two minutes",
-          "Nothing to install for your customers",
-        ].map((fact) => (
-          <li key={fact} className="flex items-center gap-2.5 text-sm text-muted">
-            <Check className="size-4 shrink-0 text-brand-text" aria-hidden="true" />
-            {fact}
-          </li>
-        ))}
-      </ul>
+      <SocialSignIn next={next} providers={providers} />
 
-      {/* Below the button, small, and not a checkbox. Nobody is blocked by it,
-          and pretending a tick box means informed consent helps no one. */}
-      <p className="text-center text-sm leading-relaxed text-muted">
-        By continuing you agree to our terms and privacy policy.
+      <p className="text-sm leading-relaxed text-muted">
+        By continuing you agree to our{" "}
+        <a
+          href="/terms"
+          className="font-medium text-ink underline underline-offset-4 hover:no-underline"
+        >
+          terms
+        </a>{" "}
+        and{" "}
+        <a
+          href="/privacy"
+          className="font-medium text-ink underline underline-offset-4 hover:no-underline"
+        >
+          privacy policy
+        </a>
+        .
       </p>
     </form>
   );

@@ -46,7 +46,16 @@ const SENSITIVE_KEYS = new Set([
   "phone",
   "ip",
   "ipaddress",
+  // PostgREST / Postgres errors put row contents here ("Failing row contains
+  // (...)", "Key (phone_hash)=(...)"). The message and code are enough to act on.
+  "details",
 ]);
+
+/**
+ * Value-level backstop for the one piece of PII that travels as free text:
+ * an E.164 phone number inside some error message nobody expected to carry it.
+ */
+const E164 = /\+[1-9]\d{7,14}\b/g;
 
 function isSensitive(key: string): boolean {
   return SENSITIVE_KEYS.has(key.toLowerCase().replace(/[_-]/g, ""));
@@ -68,6 +77,8 @@ function redact(value: unknown, depth = 0): unknown {
     }
     return result;
   }
+
+  if (typeof value === "string") return value.replace(E164, "[phone]");
 
   return value;
 }

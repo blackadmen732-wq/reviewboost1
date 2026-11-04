@@ -1,0 +1,92 @@
+[
+  {
+    "name": "public-home",
+    "width": 390,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "product",
+    "width": 390,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "editor",
+    "width": 390,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "texts",
+    "width": 390,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "customer",
+    "width": 390,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "public-home",
+    "width": 768,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "product",
+    "width": 768,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "editor",
+    "width": 768,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "texts",
+    "width": 768,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "customer",
+    "width": 768,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "public-home",
+    "width": 1280,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "product",
+    "width": 1280,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "editor",
+    "width": 1280,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "texts",
+    "width": 1280,
+    "axe": 0,
+    "overflow": false
+  },
+  {
+    "name": "customer",
+    "width": 1280,
+    "axe": 0,
+    "overflow": false
+  }
+]

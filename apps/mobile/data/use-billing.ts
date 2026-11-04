@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { apiFetch } from "./api";
+import { loadFailed } from "./recovery";
 
 export type PlanId = "starter" | "growth" | "pro";
 export type BillingStatus =
@@ -53,7 +54,7 @@ export function useBilling(orgId: string | undefined) {
         setBilling(res.data);
       } catch (e) {
         if (gen !== generationRef.current) return;
-        setError(e instanceof Error ? e.message : "Failed to load billing");
+        setError(loadFailed(e, "billing"));
       } finally {
         if (gen === generationRef.current) {
           setLoading(false);

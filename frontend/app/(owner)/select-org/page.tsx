@@ -8,7 +8,7 @@ import { listUserOrganizations } from "@/lib/server/owner-data";
 import { currentUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Choose your business — ReviewBoost",
+  title: "Choose your business",
   robots: { index: false, follow: false },
 };
 

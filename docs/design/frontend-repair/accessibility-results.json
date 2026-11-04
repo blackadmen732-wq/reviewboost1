@@ -1,0 +1,386 @@
+[
+  {
+    "step": "public-home",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "pricing",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "how",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "product",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "integrity",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "security",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "privacy",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "terms",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "support",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "deletion",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "login",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "goodbye",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "offline",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "delete-owner",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "owner-home",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "feedback",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "insights",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "texts",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "tags",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "tag-detail",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "editor",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "settings",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "billing",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "customer",
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "public-home",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "pricing",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "how",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "product",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "integrity",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "security",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "privacy",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "terms",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "support",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "deletion",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "login",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "goodbye",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "offline",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "delete-owner",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "owner-home",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "feedback",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "insights",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "texts",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "tags",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "tag-detail",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "editor",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "settings",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "billing",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "step": "customer",
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "errors": [],
+    "violations": []
+  }
+]

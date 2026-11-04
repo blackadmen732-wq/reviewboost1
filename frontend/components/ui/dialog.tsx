@@ -199,6 +199,7 @@ export function AlertDialog({
   cancelLabel = "Cancel",
   onConfirm,
   loading = false,
+  details,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -208,6 +209,8 @@ export function AlertDialog({
   cancelLabel?: string;
   onConfirm: () => void;
   loading?: boolean;
+  /** What exactly happens next, under the description. */
+  details?: ReactNode;
 }) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -230,6 +233,7 @@ export function AlertDialog({
             <DialogPrimitive.Description className="text-base leading-relaxed text-muted">
               {description}
             </DialogPrimitive.Description>
+            {details ? <div className="text-base leading-relaxed text-ink">{details}</div> : null}
           </div>
 
           {/* Cancel sits below on a phone — nearest the thumb — so the easiest

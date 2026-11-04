@@ -1,161 +1,295 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
-  Pressable,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
-import { useLocalSearchParams, Stack } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "@/data/auth-context";
-import { useFeedbackDetail } from "@/data/use-feedback-detail";
+import { Button } from "@/components/button";
+import { Icon } from "@/components/icon";
+import { OfflineBar } from "@/components/offline-bar";
+import { OutcomeCheckNotice } from "@/components/outcome-check-notice";
+import { stackHeader } from "@/components/screen";
 import { Stars } from "@/components/stars";
-import { relativeTime } from "@/components/relative-time";
-import { colors, radii, fonts } from "@/theme";
+import { useAuth } from "@/data/auth-context";
+import { useHome } from "@/data/home";
+import { useFeedbackDetail } from "@/data/use-feedback-detail";
+import { useOutcomeCheck } from "@/data/use-outcome-check";
+import { clock, relativeDay } from "@/lib/words";
+import { card, colors, radii, space, type } from "@/theme";
+import { LoadingBlock } from "@/components/loading-block";
+import { RetryBlock } from "@/components/retry-block";
 
+const MAX_NOTE = 2000;
+
+/**
+ * One rating, as the website's rating page shows it: the stars, when and from
+ * which Tag, the customer's words, Mark as sorted, and "What we did", the
+ * team's own notes. Opening it marks it read.
+ */
 export default function FeedbackDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activeOrg } = useAuth();
+  const { refresh: refreshHome } = useHome();
   const orgId = activeOrg?.orgId;
-  const { item, loading, error, notFound, load } = useFeedbackDetail(
-    orgId,
-    id,
-  );
+  const { item, loading, error, notFound, load, markRead, setResolved, addNote } = useFeedbackDetail(orgId, id);
+
+  const [sorting, setSorting] = useState(false);
+  const [sortError, setSortError] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [noteError, setNoteError] = useState<string | null>(null);
+  const markedFor = useRef<string | null>(null);
+  // When ReviewBoost could not be reached to find out whether a change went
+  // through, these keep checking (and hold the action) instead of asking.
+  const sortCheck = useOutcomeCheck({
+    onDone: () => {
+      setSortError(null);
+      void refreshHome();
+    },
+    onNotDone: () => setSortError("Could not save that. Please try again."),
+    onExpired: setSortError,
+  });
+  const noteCheck = useOutcomeCheck({
+    onDone: () => {
+      setNote("");
+      setNoteError(null);
+    },
+    onNotDone: () => setNoteError("That note didn’t save. Your text is still here. Try again."),
+    onExpired: setNoteError,
+  });
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
+
+  // Opening it is reading it. Once per rating, and Home's count follows.
+  useEffect(() => {
+    if (!item || item.isRead || markedFor.current === item.id) return;
+    markedFor.current = item.id;
+    void markRead().then((ok) => {
+      if (ok) void refreshHome();
+    });
+  }, [item, markRead, refreshHome]);
 
   if (notFound) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Stack.Screen options={{ title: "Not found", headerShown: true }} />
-        <Text style={styles.empty}>Feedback not found</Text>
+      <SafeAreaView style={styles.screen} edges={["bottom"]}>
+        <Stack.Screen options={stackHeader("Rating")} />
+        <Text style={styles.empty}>That rating could not be found.</Text>
       </SafeAreaView>
     );
   }
 
-  if (loading || !item) {
+  if (!item) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Stack.Screen
-          options={{
-            title: "Feedback",
-            headerShown: true,
-            headerStyle: { backgroundColor: colors.surface },
-            headerTitleStyle: { ...fonts.subheading, color: colors.ink },
-            headerTintColor: colors.brandText,
-          }}
-        />
+      <SafeAreaView style={styles.screen} edges={["bottom"]}>
+        <Stack.Screen options={stackHeader("Rating")} />
         {error ? (
           <View style={styles.centered}>
-            <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retryButton} onPress={load}>
-              <Text style={styles.retryText}>Retry</Text>
-            </Pressable>
+            <RetryBlock message={error} retryKey={`feedback:${id}`} onRetry={() => void load()} />
           </View>
         ) : (
-          <ActivityIndicator
-            style={styles.spinner}
-            size="large"
-            color={colors.brandText}
-          />
+          <LoadingBlock label="Loading this rating…" />
         )}
       </SafeAreaView>
     );
   }
 
-  return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen
-        options={{
-          title: "Feedback",
-          headerShown: true,
-          headerStyle: { backgroundColor: colors.surface },
-          headerTitleStyle: { ...fonts.subheading, color: colors.ink },
-          headerTintColor: colors.brandText,
-        }}
-      />
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.ratingSection}>
-          <Stars rating={item.rating} size={24} />
-          <Text style={styles.time}>{relativeTime(item.submittedAt)}</Text>
-        </View>
+  const timeZone = activeOrg?.timezone ?? "UTC";
+  const when = `${relativeDay(item.submittedAt, timeZone)} at ${clock(item.submittedAt, timeZone)}`;
+  // A low rating is the one that may need doing something about; praise can
+  // still be marked sorted, quietly.
+  const needsAction = item.rating <= 3 && !item.isResolved;
 
-        <View style={styles.statusRow}>
-          {!item.isRead && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Unread</Text>
-            </View>
-          )}
-          {item.isResolved && (
-            <View style={[styles.badge, styles.badgeResolved]}>
-              <Text style={[styles.badgeText, styles.badgeResolvedText]}>
-                Resolved
+  const sort = async (resolved: boolean) => {
+    setSorting(true);
+    setSortError(null);
+    const result = await setResolved(resolved);
+    setSorting(false);
+    if (result.ok) void refreshHome();
+    else if (result.stillUnknown) sortCheck.start(result.stillUnknown, { waitFirst: true });
+    else setSortError(result.message);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setNoteError(null);
+    const result = await addNote(note);
+    setSaving(false);
+    if (result.ok) setNote("");
+    else if (result.stillUnknown) noteCheck.start(result.stillUnknown, { waitFirst: true });
+    else setNoteError(result.message);
+  };
+
+  return (
+    <SafeAreaView style={styles.screen} edges={["bottom"]}>
+      <Stack.Screen options={stackHeader("Rating")} />
+      <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={96}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <OfflineBar />
+          <Stars rating={item.rating} size={32} />
+          <Text style={styles.meta}>
+            {when}
+            {item.tagLabel ? ` · ${item.tagLabel}` : ""}
+          </Text>
+
+          {/* The customer's words, when a rating has any. Customers are not
+              asked for a message, so "A rating with no message." was said of
+              every rating. */}
+          {item.note ? (
+            <Text style={styles.customerNote} selectable>
+              {item.note}
+            </Text>
+          ) : null}
+
+          <View style={styles.sortBar}>
+            {item.isResolved || needsAction ? (
+              <Text style={styles.sortState}>{item.isResolved ? "Sorted" : "Not sorted yet"}</Text>
+            ) : null}
+            {item.isResolved ? (
+              <Button
+                label="Not sorted after all"
+                variant="quiet"
+                busy={sorting}
+                busyLabel="Saving…"
+                disabled={sortCheck.pending}
+                onPress={() => void sort(false)}
+                icon={<Icon name="arrow.uturn.backward" glyph="↺" size={15} color={colors.inkMuted} />}
+              />
+            ) : (
+              <Button
+                label="Mark as sorted"
+                variant={needsAction ? "action" : "secondary"}
+                busy={sorting}
+                busyLabel="Saving…"
+                disabled={sortCheck.pending}
+                onPress={() => void sort(true)}
+                style={styles.sortButton}
+                icon={<Icon name="checkmark" glyph="✓" size={17} color={needsAction ? colors.onAction : colors.ink} weight="semibold" />}
+              />
+            )}
+          </View>
+          {sortError ? (
+            <Text style={styles.errorInline} accessibilityLiveRegion="polite">
+              {sortError}
+            </Text>
+          ) : null}
+          <OutcomeCheckNotice check={sortCheck} />
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle} accessibilityRole="header">
+              What we did
+            </Text>
+            <View style={styles.privateLine}>
+              <Icon name="lock" glyph="🔒" size={14} color={colors.inkMuted} />
+              <Text style={styles.privateText}>
+                Only your team sees this. The customer stays anonymous, so there is no way to write back to them.
               </Text>
             </View>
-          )}
-        </View>
 
-        {item.note && (
-          <View style={styles.noteSection}>
-            <Text style={styles.sectionTitle}>Customer note</Text>
-            <Text style={styles.noteText}>{item.note}</Text>
+            {item.notes.length > 0 ? (
+              <View style={styles.notes}>
+                {item.notes.map((entry, index) => (
+                  <View key={entry.id} style={[styles.noteRow, index > 0 ? styles.noteDivider : null]}>
+                    <View style={styles.noteHead}>
+                      <Text style={styles.noteAuthor} numberOfLines={1}>
+                        {entry.authorName}
+                      </Text>
+                      <Text style={styles.noteWhen}>{relativeDay(entry.createdAt, timeZone)}</Text>
+                    </View>
+                    <Text style={styles.noteBody} selectable>
+                      {entry.body}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {noteError ? (
+              <Text style={styles.errorInline} accessibilityLiveRegion="polite">
+                {noteError}
+              </Text>
+            ) : null}
+            <OutcomeCheckNotice check={noteCheck} />
+            <TextInput
+              value={note}
+              onChangeText={(value) => {
+                setNote(value);
+                if (noteError) setNoteError(null);
+              }}
+              editable={!saving && !noteCheck.pending}
+              multiline
+              maxLength={MAX_NOTE}
+              placeholder="Add a note for your team…"
+              placeholderTextColor={colors.inkMuted}
+              accessibilityLabel="Write what you did about this"
+              style={styles.input}
+              textAlignVertical="top"
+            />
+            <Button
+              label="Save note"
+              variant="secondary"
+              busy={saving}
+              busyLabel="Saving…"
+              disabled={note.trim().length === 0 || noteCheck.pending}
+              onPress={() => void save()}
+              style={styles.saveButton}
+              icon={<Icon name="paperplane" glyph="➤" size={16} color={colors.ink} />}
+            />
           </View>
-        )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
-  content: { padding: 20 },
-  ratingSection: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  screen: { flex: 1, backgroundColor: colors.canvas },
+  fill: { flex: 1 },
+  content: { padding: space.gutter, paddingBottom: 48 },
+  centered: { padding: space.gutter, gap: 16 },
+  empty: { ...type.callout, color: colors.inkMuted, textAlign: "center", marginTop: 40 },
+  errorText: { ...type.callout, color: colors.danger },
+  meta: { ...type.callout, color: colors.inkMuted, marginTop: 12 },
+  customerNote: { ...type.body, fontSize: 19, lineHeight: 28, color: colors.ink, marginTop: 20 },
+  sortBar: {
+    marginTop: 24,
+    paddingVertical: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    gap: 12,
   },
-  time: { fontSize: 13, color: colors.inkFaint },
-  statusRow: { flexDirection: "row", gap: 8, marginTop: 12 },
-  badge: {
-    backgroundColor: colors.infoBg,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radii.badge,
-  },
-  badgeText: { fontSize: 12, ...fonts.subheading, color: colors.info },
-  badgeResolved: { backgroundColor: colors.successBg },
-  badgeResolvedText: { color: colors.success },
-  noteSection: { marginTop: 24 },
-  sectionTitle: {
-    fontSize: 14,
-    ...fonts.subheading,
-    color: colors.inkMuted,
-    marginBottom: 8,
-  },
-  noteText: { fontSize: 16, color: colors.ink, lineHeight: 24 },
-  empty: {
-    textAlign: "center",
-    color: colors.inkFaint,
-    marginTop: 40,
-    fontSize: 15,
-  },
-  spinner: { marginTop: 60 },
-  centered: { alignItems: "center", marginTop: 40, paddingHorizontal: 20 },
-  errorText: {
-    fontSize: 15,
-    color: colors.danger,
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: colors.brandText,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
+  sortState: { ...type.subhead, color: colors.inkMuted },
+  sortButton: { alignSelf: "stretch" },
+  errorInline: { ...type.subhead, color: colors.danger, marginTop: 10 },
+  section: { marginTop: 28 },
+  sectionTitle: { ...type.headline, fontSize: 20, lineHeight: 25, color: colors.ink },
+  privateLine: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 8 },
+  privateText: { ...type.subhead, color: colors.inkMuted, flex: 1 },
+  notes: { ...card, marginTop: 16, paddingHorizontal: 16 },
+  noteRow: { paddingVertical: 14 },
+  noteDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  noteHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
+  noteAuthor: { ...type.subhead, fontWeight: "600", color: colors.ink, flex: 1 },
+  noteWhen: { ...type.subhead, color: colors.inkMuted },
+  noteBody: { ...type.callout, color: colors.ink },
+  input: {
+    marginTop: 16,
+    minHeight: 112,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     borderRadius: radii.control,
+    backgroundColor: colors.surface,
+    padding: 14,
+    ...type.callout,
+    color: colors.ink,
   },
-  retryText: { color: "#fff", ...fonts.subheading, fontSize: 14 },
+  saveButton: { marginTop: 12 },
 });

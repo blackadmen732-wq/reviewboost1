@@ -1,0 +1,161 @@
+[
+  {
+    "theme": "light",
+    "width": 320,
+    "errors": [],
+    "violations": [],
+    "overflow": false,
+    "phone": {
+      "x": 172.875,
+      "y": 495.296875,
+      "bottom": 721.046875
+    },
+    "ratingPanel": {
+      "y": 633.6599731445312,
+      "bottom": 714.8867797851562
+    },
+    "height": 900,
+    "menuInViewport": true
+  },
+  {
+    "theme": "light",
+    "width": 390,
+    "errors": [],
+    "violations": [],
+    "overflow": false,
+    "phone": {
+      "x": 182.921875,
+      "y": 495.71875,
+      "bottom": 811.515625
+    },
+    "ratingPanel": {
+      "y": 689.9676513671875,
+      "bottom": 804.013427734375
+    },
+    "height": 900,
+    "menuInViewport": true
+  },
+  {
+    "theme": "light",
+    "width": 768,
+    "errors": [],
+    "violations": [],
+    "overflow": false,
+    "phone": {
+      "x": 370.5,
+      "y": 562.40625,
+      "bottom": 1023.4375
+    },
+    "ratingPanel": {
+      "y": 846.0849609375,
+      "bottom": 1012.6409301757812
+    },
+    "height": 900,
+    "menuInViewport": true
+  },
+  {
+    "theme": "light",
+    "width": 1280,
+    "errors": [],
+    "violations": [],
+    "overflow": false,
+    "phone": {
+      "x": 629.5,
+      "y": 643.84375,
+      "bottom": 1144.96875
+    },
+    "ratingPanel": {
+      "y": 952.6609497070312,
+      "bottom": 1133.9853515625
+    },
+    "height": 900,
+    "menuInViewport": true
+  },
+  {
+    "theme": "dark",
+    "width": 320,
+    "errors": [],
+    "violations": [],
+    "overflow": false,
+    "phone": {
+      "x": 172.875,
+      "y": 495.296875,
+      "bottom": 721.046875
+    },
+    "ratingPanel": {
+      "y": 633.6599731445312,
+      "bottom": 714.8867797851562
+    },
+    "height": 900,
+    "menuInViewport": true
+  },
+  {
+    "theme": "dark",
+    "width": 390,
+    "errors": [],
+    "violations": [],
+    "overflow": false,
+    "phone": {
+      "x": 182.921875,
+      "y": 495.71875,
+      "bottom": 811.515625
+    },
+    "ratingPanel": {
+      "y": 689.9676513671875,
+      "bottom": 804.013427734375
+    },
+    "height": 900,
+    "menuInViewport": true
+  },
+  {
+    "theme": "dark",
+    "width": 768,
+    "errors": [],
+    "violations": [],
+    "overflow": false,
+    "phone": {
+      "x": 370.5,
+      "y": 562.40625,
+      "bottom": 1023.4375
+    },
+    "ratingPanel": {
+      "y": 846.0849609375,
+      "bottom": 1012.6409301757812
+    },
+    "height": 900,
+    "menuInViewport": true
+  },
+  {
+    "theme": "dark",
+    "width": 1280,
+    "errors": [],
+    "violations": [],
+    "overflow": false,
+    "phone": {
+      "x": 629.5,
+      "y": 643.84375,
+      "bottom": 1144.96875
+    },
+    "ratingPanel": {
+      "y": 952.6609497070312,
+      "bottom": 1133.9853515625
+    },
+    "height": 900,
+    "menuInViewport": true
+  },
+  {
+    "route": "/product",
+    "violations": [],
+    "overflow": false
+  },
+  {
+    "route": "/pricing",
+    "violations": [],
+    "overflow": false
+  },
+  {
+    "route": "/login",
+    "violations": [],
+    "overflow": false
+  }
+]

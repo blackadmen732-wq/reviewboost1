@@ -5,6 +5,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CustomerFlow } from "@/features/customer-flow/customer-flow";
 import { navigateToDestination } from "@/features/customer-flow/destination-handoff";
 import { customerMessages, type RatingValue } from "@/lib/i18n/customer-messages";
+import { forgetAllTries } from "@/lib/recovery/use-auto-retry";
 import { renderWithProviders } from "@/tests/helpers/render";
 
 vi.mock("@/features/customer-flow/destination-handoff", () => ({
@@ -23,6 +24,7 @@ beforeAll(() => {
 beforeEach(() => {
   navigate.mockClear();
   window.__RB_FIXTURE_CALLS__ = [];
+  forgetAllTries();
 });
 
 async function openRating(token = "fixture-valid") {
@@ -42,6 +44,18 @@ async function tapStar(
 }
 
 describe("one-tap customer flow", () => {
+  it("says which business is asking, above the question", async () => {
+    // With no photo the hero is plain white, and nothing else on the rating
+    // screen named the business: a customer scanning a code on a counter was
+    // asked "How was your visit?" by a page that never said whose it was.
+    await openRating();
+
+    const name = document.querySelector<HTMLElement>("[data-business-name]");
+    expect(name).toHaveTextContent("Mario’s Pizza");
+    const heading = screen.getByRole("heading", { name: customerMessages.en.ratingHeading });
+    expect(name?.compareDocumentPosition(heading)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it("sends every rating 1–5 to a byte-identical handoff and the same destination", async () => {
     const handoffMarkup: string[] = [];
 
@@ -86,6 +100,37 @@ describe("one-tap customer flow", () => {
     expect(operations.filter((operation) => operation === "response")).toHaveLength(1);
   });
 
+  it("starts the session as the page opens, so the star only has the rating left to save", async () => {
+    // One round trip fewer between the star and Google, and an open the
+    // owner can count as a tap even when nobody rates.
+    const operations = () => window.__RB_FIXTURE_CALLS__?.map(({ operation }) => operation) ?? [];
+    const user = await openRating();
+    await waitFor(() => expect(operations()).toContain("session"));
+    expect(operations()).not.toContain("response");
+
+    await tapStar(user, 5);
+    expect(operations().filter((operation) => operation === "session")).toHaveLength(1);
+    expect(operations().filter((operation) => operation === "response")).toHaveLength(1);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(FIXTURE_DESTINATION));
+  });
+
+  it("does not count a tab nobody is looking at until it is shown", async () => {
+    const sessions = () =>
+      window.__RB_FIXTURE_CALLS__?.filter(({ operation }) => operation === "session") ?? [];
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    try {
+      await openRating();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(sessions()).toHaveLength(0);
+
+      visibility.mockReturnValue("visible");
+      document.dispatchEvent(new Event("visibilitychange"));
+      await waitFor(() => expect(sessions()).toHaveLength(1));
+    } finally {
+      visibility.mockRestore();
+    }
+  });
+
   it("does not submit twice when a star is tapped twice", async () => {
     const user = await openRating();
     const star = screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[4] });
@@ -102,12 +147,34 @@ describe("one-tap customer flow", () => {
     const user = await openRating("fixture-response-error");
     await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[2] }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Your rating is still here");
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Your rating is still here");
+    // It will send it again by itself, and says when.
+    expect(alert).toHaveTextContent(customerMessages.en.submitRetryingIn(3));
+    // The phone was online and the server failed, so the connection is not the cause.
+    expect(alert).not.toHaveTextContent(/connection/i);
     expect(navigate).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: customerMessages.en.tryAgain }));
+    await user.click(screen.getByRole("button", { name: customerMessages.en.tryNow }));
     await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
 
+    const responseKeys = window.__RB_FIXTURE_CALLS__
+      ?.filter(({ operation }) => operation === "response")
+      .map(({ idempotencyKey }) => idempotencyKey);
+    expect(responseKeys).toHaveLength(2);
+    expect(new Set(responseKeys).size).toBe(1);
+  });
+
+  it("sends a rating that failed again by itself, with the same key", async () => {
+    const user = await openRating("fixture-response-error");
+    await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[4] }));
+    await screen.findByRole("alert");
+    // No tap: three seconds later it goes again, and this time it lands.
+    await screen.findByRole(
+      "heading",
+      { name: customerMessages.en.thanksHeading },
+      { timeout: 5_000 },
+    );
     const responseKeys = window.__RB_FIXTURE_CALLS__
       ?.filter(({ operation }) => operation === "response")
       .map(({ idempotencyKey }) => idempotencyKey);
@@ -130,6 +197,68 @@ describe("one-tap customer flow", () => {
     );
     await screen.findByRole("heading", { name: customerMessages.en.thanksHeading });
     await waitFor(() => expect(navigate).toHaveBeenCalledWith(FIXTURE_DESTINATION));
+  });
+
+  it("blames the connection only when the phone is offline", async () => {
+    // The context query retries once before giving up, so allow for its backoff.
+    renderWithProviders(<CustomerFlow token="fixture-api-error" />);
+    await screen.findByRole("heading", { name: customerMessages.en.loadErrorHeading }, { timeout: 4000 });
+    // Our trouble: it tries again by itself, and says nothing about signal.
+    expect(screen.getByText(customerMessages.en.retryingIn(3))).toBeVisible();
+    expect(screen.getByRole("button", { name: customerMessages.en.tryNow })).toBeVisible();
+    expect(screen.queryByText(/check your connection|offline/i)).toBeNull();
+    cleanup();
+
+    Object.defineProperty(window.navigator, "onLine", { configurable: true, value: false });
+    try {
+      renderWithProviders(<CustomerFlow token="fixture-valid" />);
+      await screen.findByRole("heading", { name: customerMessages.en.loadErrorHeading }, { timeout: 4000 });
+      // No connection: it waits for one instead of counting down.
+      expect(screen.getByText(customerMessages.en.offline)).toBeVisible();
+      expect(screen.queryByText(customerMessages.en.retryingIn(3))).toBeNull();
+    } finally {
+      Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
+    }
+  });
+
+  it("retries a send that was dropped while the phone is online, never waits for online", async () => {
+    // A dropped request on a phone that says it is online (a captive portal,
+    // one bar of signal) used to show "You're offline" and wait for an
+    // `online` event that never came.
+    const { developmentCustomerFlowApi } = await import("@/lib/api/dev/development-customer-flow-api");
+    const { networkCustomerApiError } = await import("@/lib/api/customer-api-error");
+    const submit = vi
+      .spyOn(developmentCustomerFlowApi, "submitResponse")
+      .mockRejectedValueOnce(networkCustomerApiError(new TypeError("Failed to fetch")));
+    try {
+      const user = await openRating();
+      await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[4] }));
+      await screen.findByText(customerMessages.en.submitRetryingIn(3), { exact: false });
+      expect(screen.queryByText(customerMessages.en.offline)).toBeNull();
+      // It sends again by itself, with the same key, and goes on to Google.
+      await screen.findByRole("heading", { name: customerMessages.en.thanksHeading }, { timeout: 6000 });
+      await waitFor(() => expect(navigate).toHaveBeenCalledWith(FIXTURE_DESTINATION));
+      const keys = submit.mock.calls.map(([, , options]) => options.idempotencyKey);
+      expect(new Set(keys).size).toBe(1);
+    } finally {
+      submit.mockRestore();
+    }
+  });
+
+  it("an owner's preview records nothing: no tap counted, no rating, no trip to Google", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CustomerFlow token="fixture-valid" preview />);
+    await screen.findByRole("heading", { name: customerMessages.en.ratingHeading });
+    expect(screen.getByText("Preview: taps here aren’t saved.")).toBeVisible();
+
+    await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[3] }));
+    expect(await screen.findByText("Nothing was saved. Customers go to Google.")).toBeVisible();
+    // Still the rating screen, the star shown as chosen.
+    expect(screen.getByRole("heading", { name: customerMessages.en.ratingHeading })).toBeVisible();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const operations = window.__RB_FIXTURE_CALLS__?.map(({ operation }) => operation) ?? [];
+    expect(operations.filter((operation) => operation !== "context")).toEqual([]);
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it("shows indistinguishable UI for unknown and inactive links", async () => {

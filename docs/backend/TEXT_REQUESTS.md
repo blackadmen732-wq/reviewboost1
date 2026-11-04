@@ -12,6 +12,52 @@ Nothing authoritative lives in application memory or an in-memory queue. This is
 technical compliance and reliability infrastructure — not a claim of legal SMS
 certification.
 
+## Switched off at launch
+
+What ReviewBoost sells first is the Tag: a customer taps, rates and is handed to
+Google. Texting is built and tested, and switched **off** until Mark decides the
+data shows it earns more than it costs (`frontend/lib/features.ts`). While it is
+off:
+
+- the website and the iPhone app show Home, Feedback and Tags (and Settings);
+  `/text-requests` and `/settings/connections` redirect, and the text-request,
+  customer-list and connection APIs answer 404 (`proxy.ts`);
+- previewing, recording consent and scheduling refuse before reading anything,
+  and the dispatch worker claims nothing, so it needs no provider and health
+  does not expect it to run;
+- Connections are dormant: their webhooks are acknowledged and dropped unread
+  and nothing syncs, while expired customer data is still purged;
+- prices, plans and Billing say nothing about texts, and no pack can be bought.
+  Paid months still mint their included texts in the ledger; nothing shows or
+  spends them;
+- readiness needs neither Twilio nor the pack prices;
+- the SMS webhook is untouched, so a STOP is still recorded whenever Twilio is
+  configured.
+
+`frontend/tests/unit/texting-switch.test.tsx` proves each of these.
+
+**To turn it on**, in this order:
+
+1. Register every business that will text with the carriers (an A2P 10DLC brand
+   and campaign, or toll-free verification) before its first message. It takes
+   days, not minutes.
+2. Vercel production: `SMS_PROVIDER=twilio`, the `TWILIO_*` variables,
+   `SMS_PUBLIC_WEBHOOK_BASE_URL`, `SMS_RATE_PER_SEGMENT_MICROS`, the three pack
+   prices and their webhook events (LAUNCH_GATE.md §4, 2b–2c), then
+   `NEXT_PUBLIC_TEXTING_ENABLED=true`, and redeploy. Readiness refuses the
+   candidate while any of these variables is missing or malformed. It cannot
+   see the webhook events: check 2c in the Stripe dashboard by hand.
+3. iPhone app: a release built with `EXPO_PUBLIC_TEXTING_ENABLED=true`, with the
+   listing changes in `docs/mobile/APP_STORE_METADATA.md` §13. Until that
+   release, the store app keeps its three tabs whatever the server says.
+
+**To turn it off again:** unset `NEXT_PUBLIC_TEXTING_ENABLED` and redeploy; the
+Texts tab leaves every phone at its next Home load. Texts already queued wait in
+the outbox (health reports `outbox_backlog`), so cancel them or let them send
+first. Connections go dormant: their webhooks are acknowledged and dropped
+unread, nothing syncs, and expired customer data is still purged on schedule.
+They read their provider again at their next reconcile once texting is back on.
+
 ## Status legend
 
 - **[impl]** implemented in this PR
@@ -233,9 +279,10 @@ errors, rate-limited where it matters:
 
 | Method | Path | Role | Purpose |
 | --- | --- | --- | --- |
-| POST | `/text-requests` | owner/admin | schedule (rate-limited, idempotent) |
+| POST | `/text-requests` | owner/admin | schedule (rate-limited, idempotent); refuses with `409 not_eligible` before reserving credit |
 | GET | `/text-requests` | any member | list recent |
-| POST | `/text-requests/preview` | owner/admin | segment + cost preview |
+| POST | `/text-requests/preview` | owner/admin | exact final text, segment + cost preview, eligibility |
+| POST | `/text-requests/consent` | owner/admin | record an owner's explicit confirmation that a customer agreed (rate-limited) |
 | POST | `/text-requests/{id}/cancel` | owner/admin | cancel if not yet dispatched |
 | POST | `/webhooks/sms/{provider}` | provider (signed) | delivery + inbound events |
 | POST | `/internal/sms/dispatch` | worker secret | run one dispatch batch |
@@ -295,10 +342,16 @@ them trigger on `supabase/**`, `frontend/lib/server/**`, and `frontend/app/api/*
 ## 21. Still missing before a real SMS can be sent
 
 - A configured provider + credentials + verified sending number (above). **[needs-provider]**
-- An allocation of quota per org (`rpc_sms_quota_allocate`) tied to billing — the
-  ledger exists; the purchase/plan integration does not. **[impl: ledger only]**
-- Recording real consent per recipient (an import path or a capture point);
-  without `opted_in` consent, every send is correctly suppressed. **[impl: mechanism]**
+- Credit tied to billing: a paid plan invoice mints the month's texts
+  (`rpc_billing_apply_invoice_paid`) and a paid text pack mints purchased texts
+  (`rpc_billing_apply_pack_payment`); refunds and disputes take back only unspent
+  credit (docs/MONEY.md §4–§5). **[impl][test-ci]** — not yet exercised
+  against Stripe. **[needs-provider]**
+- Recording real consent per recipient: the owner attestation path exists
+  (`/text-requests/consent`, with method, wording version and acting user as
+  evidence; see `docs/connections/07-consent-and-eligibility.md`). Whether an
+  owner attestation is a sufficient legal basis needs counsel before live
+  messaging. **[impl: owner attestation]**
 - Wiring rating-flow completion to `app.sms_mark_flow_completed` for full
   completed-flow dedupe attribution (the mechanism exists; the trigger from the
   public flow is a follow-up, as it needs a per-recipient link). **[impl: mechanism]**
@@ -307,3 +360,15 @@ them trigger on `supabase/**`, `frontend/lib/server/**`, and `frontend/app/api/*
 
 Nothing here should be read as "SMS compliance is done." The technical controls
 exist and are tested; legal review and live verification are separate steps.
+
+## 22. Message content and consent evidence
+
+Every Text Request is one of the approved messages in
+`frontend/lib/sms/text-request-templates.ts`; there is no free text. The server
+assembles the final body as `{Business}: {message with Tag link}` followed by
+`Reply STOP to opt out.`, and segments and cost are computed on that final
+body. Sending never records consent. An `owner_import` opt-in must carry
+evidence (`method`, `attested_by`, `wording_version`), enforced by
+`sms_consent_events_owner_import_evidence`; opt-ins recorded earlier without
+evidence are reset to `unknown` by `app.sms_reset_unevidenced_owner_consent()`
+(migration `20261012000100_consent_requires_evidence.sql`).

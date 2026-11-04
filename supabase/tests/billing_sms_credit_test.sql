@@ -31,6 +31,11 @@ values
     ('00000000-b101-0000-0000-000000000001', 'Money Co', 'money-co', 'active'),
     ('00000000-b101-0000-0000-000000000002', 'Spend Co', 'spend-co', 'active');
 
+-- The price -> plan authority. Nothing is granted for a price not listed here.
+insert into public.billing_plan_prices (stripe_price_id, plan_id)
+values ('price_starter', 'starter'), ('price_growth', 'growth'), ('price_pro', 'pro')
+on conflict do nothing;
+
 -- ============================================================
 -- 1. STRIPE STATUS BECOMES ENTITLEMENT STATUS
 -- ============================================================
@@ -150,7 +155,7 @@ select is(
 
 select is(
     public.rpc_billing_apply_invoice_paid(
-        '00000000-b101-0000-0000-000000000001', 'in_trial', 'starter',
+        '00000000-b101-0000-0000-000000000001', 'in_trial', 'price_starter',
         now(), now() + interval '30 days', 0),
     'not_paid',
     'a zero-amount invoice — a trial''s invoice — mints nothing');
@@ -162,7 +167,7 @@ select is(
 
 select is(
     public.rpc_billing_apply_invoice_paid(
-        '00000000-b101-0000-0000-000000000001', 'in_1', 'starter',
+        '00000000-b101-0000-0000-000000000001', 'in_1', 'price_starter',
         now(), now() + interval '30 days', 4900),
     'granted',
     'a paid Starter invoice mints its allowance');
@@ -178,7 +183,7 @@ declare i integer;
 begin
     for i in 1..50 loop
         perform public.rpc_billing_apply_invoice_paid(
-            '00000000-b101-0000-0000-000000000001', 'in_1', 'starter',
+            '00000000-b101-0000-0000-000000000001', 'in_1', 'price_starter',
             now(), now() + interval '30 days', 4900);
     end loop;
 end $$;
@@ -188,12 +193,12 @@ select is(
     150::bigint,
     'the same invoice delivered fifty times is still 150 segments');
 
-select is(
-    public.rpc_billing_apply_invoice_paid(
-        '00000000-b101-0000-0000-000000000001', 'in_2', 'enterprise',
-        now(), now() + interval '30 days', 9900),
-    'no_plan',
-    'a plan nobody recognises gets no allowance, not the cheapest tier''s');
+select throws_ok(
+    $$select public.rpc_billing_apply_invoice_paid(
+        '00000000-b101-0000-0000-000000000001', 'in_2', 'price_enterprise',
+        now(), now() + interval '30 days', 9900)$$,
+    'P0001', 'unknown_price',
+    'a price nobody recognises gets no allowance, not the cheapest tier''s — and fails loudly');
 
 -- ============================================================
 -- 5. MONTHLY FIRST, PURCHASED SECOND
@@ -316,7 +321,7 @@ select is(
 -- one: there is no rollover.
 select is(
     public.rpc_billing_apply_invoice_paid(
-        '00000000-b101-0000-0000-000000000002', 'in_renewal', 'starter',
+        '00000000-b101-0000-0000-000000000002', 'in_renewal', 'price_starter',
         now(), now() + interval '30 days', 4900),
     'granted',
     'the next period''s paid invoice mints the next allowance');

@@ -127,16 +127,45 @@ describe("relativeDay", () => {
   const now = new Date("2026-08-10T12:00:00Z").getTime();
 
   it("says today, yesterday, then counts, then dates", () => {
-    expect(relativeDay("2026-08-10T09:00:00Z", now)).toBe("Today");
-    expect(relativeDay("2026-08-09T09:00:00Z", now)).toBe("Yesterday");
-    expect(relativeDay("2026-08-07T09:00:00Z", now)).toBe("3 days ago");
+    expect(relativeDay("2026-08-10T09:00:00Z", "UTC", now)).toBe("Today");
+    expect(relativeDay("2026-08-09T09:00:00Z", "UTC", now)).toBe("Yesterday");
+    expect(relativeDay("2026-08-07T09:00:00Z", "UTC", now)).toBe("3 days ago");
     // Past a week people think in dates, not counts.
-    expect(relativeDay("2026-07-12T09:00:00Z", now)).toMatch(/Jul/);
+    expect(relativeDay("2026-07-12T09:00:00Z", "UTC", now)).toBe("Jul 12");
   });
 
   it("treats a future timestamp as today rather than a negative count", () => {
     // Clock skew between a phone and the server must not produce "-1 days ago".
-    expect(relativeDay("2026-08-11T09:00:00Z", now)).toBe("Today");
+    expect(relativeDay("2026-08-11T09:00:00Z", "UTC", now)).toBe("Today");
+  });
+
+  /**
+   * It counted 24-hour periods, so a rating left at 6 PM and read at 9 the
+   * next morning, 15 hours later, was "Today at 6:00 PM": the evening's
+   * ratings every morning, the time an owner reads them.
+   */
+  it("counts the business's calendar days, not 24-hour periods", () => {
+    const nextMorning = new Date("2026-11-03T09:00:00-05:00").getTime();
+    expect(relativeDay("2026-11-02T18:00:00-05:00", "America/New_York", nextMorning)).toBe("Yesterday");
+    expect(relativeDay("2026-11-03T00:30:00-05:00", "America/New_York", nextMorning)).toBe("Today");
+    // 47 hours, but two days back on the calendar.
+    expect(relativeDay("2026-11-01T10:00:00-05:00", "America/New_York", nextMorning)).toBe("2 days ago");
+  });
+
+  it("never throws: a zone the browser doesn't know, or a date that isn't one", () => {
+    // Noon to noon, three days apart, is three days on every zone's calendar,
+    // whichever zone the device falls back to.
+    expect(relativeDay("2026-08-07T12:00:00Z", "Not/AZone", now)).toBe("3 days ago");
+    expect(relativeDay("not a date", "America/New_York", now)).toBe("Invalid Date");
+  });
+
+  it("puts the day boundary at the business's midnight, wherever the server is", () => {
+    // 01:30 UTC on 3 Nov is still the evening of 2 Nov in New York.
+    const morning = new Date("2026-11-03T14:00:00Z").getTime();
+    expect(relativeDay("2026-11-03T01:30:00Z", "America/New_York", morning)).toBe("Yesterday");
+    expect(relativeDay("2026-11-03T01:30:00Z", "Europe/London", morning)).toBe("Today");
+    // And a date past a week is that day where the business is.
+    expect(relativeDay("2026-10-20T02:00:00Z", "America/Los_Angeles", morning)).toBe("Oct 19");
   });
 });
 
@@ -209,8 +238,6 @@ describe("review integrity in the owner interface", () => {
     expect(code("app/api/v1/staff/route.ts")).not.toMatch(/rating/i);
     expect(code("app/api/v1/staff/[staffId]/route.ts")).not.toMatch(/rating/i);
     expect(code("app/api/v1/team-praise/[praiseId]/route.ts")).not.toMatch(/rating/i);
-    expect(code("features/dashboard/praise-matcher.tsx")).not.toMatch(/rating/i);
-    expect(code("features/dashboard/praise-shared-button.tsx")).not.toMatch(/rating/i);
   });
 
   it("renders every star value through one component with no branch on value", () => {

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
+import { isGoogleReviewWritingUrl, isValidGoogleReviewUrl } from "@/lib/server/google-review-url";
 
 /**
  * Provider-aware destination validation.
@@ -41,6 +41,20 @@ export function isValidDestinationUrl(provider: unknown, url: unknown): boolean 
   switch (provider) {
     case "google":
       return isValidGoogleReviewUrl(url);
+  }
+}
+
+/**
+ * The stricter rule for a destination being set or changed: it must open the
+ * provider's review-writing page. `isValidDestinationUrl` stays the rule for
+ * what may be *served*, so destinations saved before this tightening keep
+ * their Tags working.
+ */
+export function isWritableDestinationUrl(provider: unknown, url: unknown): boolean {
+  if (!isValidDestinationUrl(provider, url)) return false;
+  switch (provider as DestinationProvider) {
+    case "google":
+      return isGoogleReviewWritingUrl(url as string);
   }
 }
 

@@ -20,46 +20,6 @@
   color: var(--rb-muted);
   text-align: center;
 }
-.customer-header {
-  display: flex;
-  min-height: 58px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-inline: -20px;
-  margin-block: -18px 36px;
-  padding: 18px 20px 16px;
-  border-block-end: 1px solid var(--rb-border);
-}
-.business-identity {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 12px;
-}
-.business-avatar {
-  display: grid;
-  width: 56px;
-  height: 56px;
-  flex: 0 0 56px;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid var(--rb-border);
-  border-radius: 17px;
-  background: var(--rb-brand-soft);
-  color: color-mix(in srgb, var(--rb-brand-hover) 88%, var(--rb-ink));
-  box-shadow: var(--shadow-control);
-  font-size: 1.25rem;
-  font-weight: 720;
-}
-.business-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.business-identity__copy {
-  min-width: 0;
-}
 .business-name,
 .location-name {
   overflow: hidden;
@@ -181,10 +141,30 @@
   gap: clamp(3px, 1.5vw, 8px);
 }
 .star-option {
+  position: relative;
   display: block;
   width: clamp(52px, 16vw, 68px);
   height: clamp(56px, 17vw, 70px);
   flex: 0 0 clamp(52px, 16vw, 68px);
+}
+
+/* Nothing hid this input, so the browser painted its own radio circle above
+   every star. The customer page now renders VisitStars instead, but this
+   component is still importable and should not carry the defect with it. */
+.star-option__input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.star-option__input:disabled {
+  cursor: default;
 }
 .star-option__label {
   display: grid;
@@ -455,7 +435,6 @@
     min-height: 36px;
     padding: 4px 16px;
   }
-  .customer-header,
   .loading-header {
     margin-inline: -30px;
     margin-block-start: -28px;
@@ -475,12 +454,10 @@
   .customer-card {
     padding-inline: 16px;
   }
-  .customer-header,
   .loading-header {
     margin-inline: -16px;
     padding-inline: 16px;
   }
-  .business-avatar,
   .loading-avatar {
     width: 50px;
     height: 50px;
@@ -521,46 +498,33 @@
   }
 }
 
-/* ---------------------------------------------------- customer page ------ */
-
-/* The business's published branding, above the stars. Three looks, one
-   renderer — the owner's preview and the public page are the same component,
-   so a template is a set of tokens rather than a second layout. */
-.customer-page-branding {
-  display: grid;
-  gap: 12px;
-  margin-block-end: 20px;
+/* Screen change on the customer page: a short fade and a 6px rise, so one
+   screen visibly replaces the other. Plain CSS instead of an animation library;
+   with reduced motion it is a quick fade with no movement. */
+.customer-screen-enter {
+  animation: customer-screen-enter 220ms ease-out both;
 }
-.customer-page-hero {
-  overflow: hidden;
-  border-radius: var(--radius-card);
-  /* Reserved before the image loads, so the stars do not jump under a
-     thumb that is already moving towards them. */
-  aspect-ratio: 16 / 9;
-  background: var(--rb-quiet);
+@keyframes customer-screen-enter {
+  from {
+    opacity: 0.96;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
-.customer-page-hero img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+@media (prefers-reduced-motion: reduce) {
+  .customer-screen-enter {
+    animation-name: customer-screen-fade;
+    animation-duration: 100ms;
+  }
 }
-.customer-page-tagline {
-  margin: 0;
-  color: var(--rb-muted);
-  font-size: 1rem;
-  line-height: 1.45;
-  text-align: center;
-  text-wrap: balance;
-}
-.customer-page-branding[data-template="bold"] .customer-page-tagline {
-  color: var(--rb-ink);
-  font-size: 1.125rem;
-  font-weight: 650;
-}
-.customer-page-branding[data-template="minimal"] .customer-page-hero {
-  aspect-ratio: 21 / 9;
-}
-.customer-page-branding[data-template="minimal"] .customer-page-tagline {
-  font-size: 0.9375rem;
+@keyframes customer-screen-fade {
+  from {
+    opacity: 0.96;
+  }
+  to {
+    opacity: 1;
+  }
 }

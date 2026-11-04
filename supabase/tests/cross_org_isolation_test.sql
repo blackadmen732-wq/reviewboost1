@@ -242,7 +242,7 @@ select throws_ok(
 -- And the service-role-only money RPCs are not reachable from a browser at all.
 select throws_ok(
     $$select public.rpc_billing_apply_invoice_paid(
-        '00000000-1501-0000-0000-000000000001', 'in_forged', 'pro', now(), now() + interval '30 days', 12900)$$,
+        '00000000-1501-0000-0000-000000000001', 'in_forged', 'price_pro', now(), now() + interval '30 days', 12900)$$,
     '42501', null,
     'an owner cannot mint themselves a month of SMS');
 

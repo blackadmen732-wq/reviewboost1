@@ -1,0 +1,21 @@
+# ReviewBoost
+
+> A code on the counter. The same Google review opportunity for every customer.
+
+ReviewBoost is for local businesses. Customers tap or scan the business's Tag, leave a private rating, and get the business's Google review link. Every rating from one to five stars is offered the same Google link. The owner sees every rating in Feedback.
+
+## Pages
+
+- [How it works](https://reviewboost.fit/how-it-works): Put a Tag where people pay. They scan and rate. Everyone is offered Google.
+- [Product](https://reviewboost.fit/product): A Tag is a printed code or a programmed NFC tag. Same customer page either way.
+- [Pricing](https://reviewboost.fit/pricing): $49, $79 or $129 a month.
+- [Integrity](https://reviewboost.fit/integrity): Every customer who rates one through five stars is offered the same chance to leave a Google review.
+- [Security](https://reviewboost.fit/security): Owner pages need a signed-in session. Customer pages stay anonymous.
+- [Privacy](https://reviewboost.fit/privacy): How ReviewBoost handles business owners' and customers' data.
+- [Terms](https://reviewboost.fit/terms): The agreement between ReviewBoost and the businesses that use it.
+- [Support](https://reviewboost.fit/support): Help with Tags, NFC, the Google link, billing and accounts.
+- [Delete your account](https://reviewboost.fit/delete-account): How to delete a ReviewBoost account.
+
+## Contact
+
+help@reviewboost.fit

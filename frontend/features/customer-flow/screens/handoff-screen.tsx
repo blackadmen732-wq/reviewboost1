@@ -11,6 +11,11 @@ interface HandoffScreenProps {
   businessName: string;
   destinationUrl: string;
   messages: CustomerMessages;
+  /**
+   * This visit is sending the customer to Google now. False for a handoff
+   * restored from an earlier visit, which stays put and says to tap.
+   */
+  leaving?: boolean;
 }
 
 /**
@@ -26,6 +31,7 @@ export function HandoffScreen({
   businessName,
   destinationUrl,
   messages,
+  leaving = true,
 }: HandoffScreenProps) {
   return (
     <section className="flow-screen" data-flow-screen="handoff">
@@ -42,13 +48,13 @@ export function HandoffScreen({
       </div>
 
       <p className="customer-support" role="status">
-        {messages.handoffBody}
+        {leaving ? messages.handoffBody : messages.handoffReturnBody}
       </p>
 
       <CustomerActionBar>
         <a
           className={cn(
-            buttonVariants({ variant: "primary", size: "lg" }),
+            buttonVariants({ variant: "action", size: "lg" }),
             "google-review-link",
           )}
           href={destinationUrl}

@@ -110,3 +110,14 @@ are treated as "no cursor" (return first page).
 Customer-facing routes (`/api/v1/public/q/[token]/...`) require no
 authentication. They use the stand token for authorization. Unknown and
 inactive tokens produce indistinguishable 404 responses.
+
+The customer page itself (`/q/[token]`) reads its context on the server
+(`lib/server/customer-page-context.ts`, the same `getContext`), so the business,
+photo, question and stars arrive in the first HTML. Its stars sit in a form
+that a ~600-byte inline script (`features/customer-flow/early-tap.ts`) submits
+natively if a star is tapped before React is ready; `POST /q/[token]/rate`
+then makes the same session, response and destination-selection writes
+through the same service, rate limits and idempotency (one key per page view),
+and answers 303 to the review destination, or back to the page with the
+chosen star and a Try again if the rating could not be saved. Once React is
+ready it handles every tap through the API as before.

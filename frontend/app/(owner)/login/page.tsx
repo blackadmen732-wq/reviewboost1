@@ -1,26 +1,36 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { AuthFrame } from "@/features/auth/auth-frame";
 import { SignInFlow } from "@/features/auth/sign-in-flow";
+import { isGetStartedNext } from "@/features/public/public-copy";
+import { signInProviders } from "@/lib/auth/sign-in-providers";
 import { safeInternalPath } from "@/lib/security/safe-redirect";
 import { publicFrontendUrl } from "@/lib/server/env";
 import { currentUser } from "@/lib/supabase/server";
 
-export const metadata: Metadata = {
-  title: "Sign in — ReviewBoost",
-  // Sign-in pages have no business in a search index.
-  robots: { index: false, follow: false },
-};
-
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}): Promise<Metadata> {
+  const { next } = await searchParams;
+  const destination = safeInternalPath(next, publicFrontendUrl());
+  return {
+    title: isGetStartedNext(destination) ? "Get started" : "Sign in",
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
   const user = await currentUser();
-  const { next } = await searchParams;
+  const { next, error } = await searchParams;
 
   // The guarded accessor rather than a silent localhost fallback: in
   // production it throws if PUBLIC_FRONTEND_URL is unset instead of validating
@@ -30,8 +40,19 @@ export default async function LoginPage({
   if (user) redirect(destination);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
-      <SignInFlow next={destination} />
-    </main>
+    <AuthFrame>
+      <SignInFlow
+        next={destination}
+        intent={isGetStartedNext(destination) ? "start" : "signin"}
+        providers={signInProviders()}
+        initialError={
+          // Set by /auth/callback when a Google or Apple sign-in came back
+          // unfinished. One fixed sentence: nothing from the URL is shown.
+          error === "sign_in_failed"
+            ? "That sign-in didn't finish. Try again, or use your email."
+            : null
+        }
+      />
+    </AuthFrame>
   );
 }

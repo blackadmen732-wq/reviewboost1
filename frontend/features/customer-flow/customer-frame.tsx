@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ReviewBoostWordmark } from "@/components/brand/reviewboost-wordmark";
+import { ReviewBoostLogo } from "@/components/brand/reviewboost-logo";
 
 interface CustomerFrameProps {
   children: ReactNode;
@@ -11,8 +11,12 @@ export function CustomerFrame({ children, poweredBy }: CustomerFrameProps) {
     <main className="customer-page">
       <div className="customer-card">{children}</div>
       <footer className="powered-by">
-        <ReviewBoostWordmark
-          prefix={poweredBy.replace(/ReviewBoost$/u, "").trim()}
+        {/* The same lockup as the owner product and the public site, mark
+            included — not a second, text-only wordmark. */}
+        <ReviewBoostLogo
+          pose="poweredBy"
+          size="poweredBy"
+          poweredByLabel={poweredBy.replace(/ReviewBoost$/u, "").trim()}
         />
       </footer>
     </main>

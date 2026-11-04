@@ -1,31 +1,34 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { LazyMotion, domAnimation, m, useReducedMotion } from "motion/react";
 import {
   useCallback,
   useEffect,
-  useMemo,
   useReducer,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 
-import { CustomerBlockingState } from "@/features/customer-flow/customer-blocking-state";
-import { CustomerFrame } from "@/features/customer-flow/customer-frame";
-import { CustomerHeader } from "@/features/customer-flow/customer-header";
+import {
+  CustomerBlockingState,
+  RetryingBlockingState,
+} from "@/features/customer-flow/customer-blocking-state";
+import { LanguageSelector } from "@/features/customer-flow/language-selector";
 import { CustomerLoading } from "@/features/customer-flow/customer-loading";
+import { CustomerVisitView } from "@/features/customer-page/customer-visit-view";
+import { DEFAULT_HERO_TRANSFORM } from "@/lib/owner/hero-transform";
 import {
   customerFlowReducer,
   type CustomerFlowState,
 } from "@/features/customer-flow/customer-flow-state";
 import { navigateToDestination } from "@/features/customer-flow/destination-handoff";
+import { clearEarlyTapMarker, readEarlyTapMarker } from "@/features/customer-flow/early-tap";
 import {
   loadCustomerDraft,
   safeInitialCustomerState,
   saveCustomerDraft,
 } from "@/features/customer-flow/recovery-storage";
-import { CustomerPageBranding } from "@/features/customer-flow/customer-page-branding";
 import { HandoffScreen } from "@/features/customer-flow/screens/handoff-screen";
 import { RatingScreen } from "@/features/customer-flow/screens/rating-screen";
 import {
@@ -36,7 +39,10 @@ import {
   CustomerApiError,
   isUnavailableReviewLink,
 } from "@/lib/api/customer-api-error";
-import type { SubmitResponseRequest } from "@/lib/api/customer-flow-types";
+import type {
+  CustomerReviewContext,
+  SubmitResponseRequest,
+} from "@/lib/api/customer-flow-types";
 import { createIdempotencyKey } from "@/lib/api/idempotency";
 import {
   customerMessages,
@@ -47,14 +53,75 @@ import { requireValidatedDestination } from "@/lib/security/destination";
 
 interface CustomerFlowProps {
   token: string;
+  /** Read on the server, so the page is complete in its first response. */
+  initialContext?: CustomerReviewContext | null;
+  /** The server already knows this link is not active. */
+  initialUnavailable?: boolean;
+  /**
+   * The form a star submits natively before React is ready (early-tap.ts).
+   * Absent when there is no server context, such as development fixtures.
+   */
+  earlyForm?: { action: string; key: string } | null;
+  /** An early submit that failed: the star stays chosen, with Try again. */
+  failedRating?: RatingValue | null;
+  /**
+   * The owner looking at their own page (`?preview=1`): the same page, but
+   * nothing is recorded. No session opens, so it is not counted as a tap; a
+   * star shows what happens next and saves nothing.
+   */
+  preview?: boolean;
 }
 
 interface FeedbackAttempt {
   rating: RatingValue;
+  /** The page's language now: used only if a fresh session has to start. */
   locale: Locale;
   sessionId: string | null;
   sessionKey: string;
+  /** The language the session was (or will be) started in, not the page's now. */
+  sessionLocale: Locale;
   responseKey: string;
+}
+
+/** How long the session started at open may take before it is given up. */
+const OPEN_DEADLINE_MS = 8_000;
+/**
+ * How long a star waits for that session before starting it itself, with the
+ * same key: the server then replays it if it was made, or says it is still on
+ * its way, which shows Try again. Without a cap, a request stalled by a phone
+ * switching networks held the star on "Sending…" with nothing to press.
+ */
+const STAR_WAITS_FOR_OPEN_MS = 4_000;
+
+/** A session the server no longer accepts: it expired (a day) or is unknown. */
+function isStaleSession(error: unknown): boolean {
+  return (
+    error instanceof CustomerApiError &&
+    (error.code === "session_expired" || error.code === "session_invalid")
+  );
+}
+
+function within<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    void promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
+}
+
+const noSubscription = () => () => {};
+
+/** Read now, never narrowed: the phone can go offline mid-request. */
+function phoneIsOffline(): boolean {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
 }
 
 function isOfflineError(error: unknown): boolean {
@@ -72,6 +139,28 @@ function normalizedContextLocales(locales: readonly string[]): Locale[] {
   return supported.length ? supported : ["en"];
 }
 
+/** The one place a context becomes safe to render, from the server or the API alike. */
+function prepareContext(context: CustomerReviewContext) {
+  return {
+    ...context,
+    // Re-validated here, not trusted: this is the value the page is about
+    // to send a customer to.
+    destination: requireValidatedDestination(context.destination),
+    supportedLocales: normalizedContextLocales(context.supportedLocales),
+  };
+}
+
+function preparedOrNull(context: CustomerReviewContext | null | undefined) {
+  if (!context) return undefined;
+  try {
+    return prepareContext(context);
+  } catch {
+    // A destination that does not validate: let the browser ask the API, and
+    // show whatever that answer is, exactly as before.
+    return undefined;
+  }
+}
+
 /**
  * THE V1 CUSTOMER CONTRACT
  * ------------------------
@@ -85,20 +174,53 @@ function normalizedContextLocales(locales: readonly string[]): Locale[] {
  * confirm button. Anything added between the star and the destination is a
  * change to the product, not a change to this component.
  */
-export function CustomerFlow({ token }: CustomerFlowProps) {
-  const [state, dispatch] = useReducer(
-    customerFlowReducer,
-    undefined,
-    safeInitialCustomerState,
+export function CustomerFlow({
+  token,
+  initialContext = null,
+  initialUnavailable = false,
+  earlyForm = null,
+  failedRating = null,
+  preview = false,
+}: CustomerFlowProps) {
+  const [initialData] = useState(() => preparedOrNull(initialContext));
+  const [state, dispatch] = useReducer(customerFlowReducer, undefined, () => {
+    const start = safeInitialCustomerState();
+    // Open in the business's own language, so a Spanish page never flashes
+    // English first. A recovered draft still wins, below.
+    const locale = initialData?.supportedLocales.includes(initialData.defaultLocale)
+      ? initialData.defaultLocale
+      : start.locale;
+    return failedRating
+      ? { ...start, locale, rating: failedRating, feedbackStatus: "error" as const }
+      : { ...start, locale };
+  });
+  // This tab already rated through the early form (the back button brought
+  // the customer here): show the handoff, never a second rating form. Read in
+  // the browser only; the server and the first browser pass say "not yet".
+  const earlyDone = useSyncExternalStore(
+    noSubscription,
+    () =>
+      !failedRating &&
+      (Boolean(window.__rbEarly) || readEarlyTapMarker(window.location.pathname)),
+    () => false,
   );
   const [recoveryReady, setRecoveryReady] = useState(false);
+  /** The star the owner tapped in a preview: shown, never sent. */
+  const [previewRating, setPreviewRating] = useState<RatingValue | null>(null);
+  /**
+   * Whether this visit just sent the customer to Google. A handoff restored
+   * from an earlier visit (a re-scan, the back button) stays put, so it must
+   * not say "Taking you to…".
+   */
+  const [leaving, setLeaving] = useState(false);
   const hadRecoveredDraft = useRef(false);
   const localeChosen = useRef(false);
   const feedbackInFlight = useRef(false);
   const destinationInFlight = useRef(false);
   const handoffPending = useRef(false);
+  /** The session started as the page opened, while it is on its way. */
+  const openingSession = useRef<Promise<string | null> | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const prefersReducedMotion = useReducedMotion();
   const messages = customerMessages[state.locale];
 
   const contextQuery = useQuery({
@@ -106,24 +228,29 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     networkMode: "always",
     queryFn: async ({ signal }) => {
       const api = await getCustomerFlowApi();
-      const context = await api.getContext(token, { signal });
-      return {
-        ...context,
-        // Re-validated here, not trusted: this is the value the page is about
-        // to send a customer to.
-        destination: requireValidatedDestination(context.destination),
-        supportedLocales: normalizedContextLocales(context.supportedLocales),
-      };
+      return prepareContext(await api.getContext(token, { signal }));
     },
+    // What the server rendered is what the customer is looking at; reading it
+    // again would only race the tap.
+    initialData,
+    staleTime: Infinity,
+    enabled: !initialUnavailable,
     retry: (failureCount, error) =>
       !isUnavailableReviewLink(error) && failureCount < 1,
   });
+
+  // React owns the stars from here; the early-tap script steps aside.
+  useEffect(() => {
+    window.__rbFlowReady = true;
+    // The submit that marker stood for failed; this tab may rate again.
+    if (failedRating) clearEarlyTapMarker(window.location.pathname);
+  }, [failedRating]);
 
   const destinationUrl = contextQuery.data?.destination.url ?? null;
 
   useEffect(() => {
     const animationFrame = window.requestAnimationFrame(() => {
-      const recovered = loadCustomerDraft(token);
+      const recovered = preview ? null : loadCustomerDraft(token);
       if (recovered) {
         hadRecoveredDraft.current = true;
         dispatch({ type: "restore", state: recovered });
@@ -131,7 +258,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
       setRecoveryReady(true);
     });
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [token]);
+  }, [preview, token]);
 
   useEffect(() => {
     if (
@@ -153,8 +280,8 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
   }, [contextQuery.data, recoveryReady, state.locale]);
 
   useEffect(() => {
-    if (recoveryReady) saveCustomerDraft(token, state);
-  }, [recoveryReady, state, token]);
+    if (recoveryReady && !preview) saveCustomerDraft(token, state);
+  }, [preview, recoveryReady, state, token]);
 
   useEffect(() => {
     document.documentElement.lang = state.locale;
@@ -173,30 +300,102 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     return () => window.cancelAnimationFrame(animationFrame);
   }, [contextQuery.isPending, contextQuery.status, state.screen]);
 
+  /*
+   * The session starts the moment the page opens, not at the star.
+   *
+   * Two reasons, both about the person at the counter. The star then has one
+   * thing left to do, save the rating, so the trip to Google is one round
+   * trip shorter. And an open is what "how many people tapped your Tag"
+   * counts: a page that waited for the star could only count ratings.
+   *
+   * Only for someone looking at the rating screen: not a tab that already
+   * rated (back from Google), not a prerendered or background tab (it starts
+   * when it is shown), not while the early form is already submitting, and
+   * not after an early submit failed (that form already made a session; the
+   * retry star makes its own at the tap, so one customer is one tap). A
+   * failure here costs nothing: the star starts the session itself, with the
+   * same key, exactly as it did before.
+   */
+  const canOpenSession =
+    !preview &&
+    recoveryReady &&
+    Boolean(contextQuery.data) &&
+    !earlyDone &&
+    !failedRating &&
+    state.screen === "rating" &&
+    state.sessionId === null;
+  const { sessionKey: openKey, sessionLocale: openLocale, locale: pageLocale } = state;
+  useEffect(() => {
+    if (!canOpenSession) return undefined;
+    function open() {
+      if (openingSession.current || window.__rbEarly) return;
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+      const sessionKey = openKey ?? createIdempotencyKey("session");
+      const sessionLocale = openLocale ?? pageLocale;
+      dispatch({ type: "session-opening", sessionKey, sessionLocale });
+      openingSession.current = getCustomerFlowApi()
+        .then((api) =>
+          api.createSession(
+            token,
+            { locale: sessionLocale },
+            { idempotencyKey: sessionKey, signal: AbortSignal.timeout(OPEN_DEADLINE_MS) },
+          ),
+        )
+        .then((session) => {
+          dispatch({ type: "session-ready", sessionId: session.sessionId });
+          return session.sessionId;
+        })
+        .catch(() => {
+          openingSession.current = null;
+          return null;
+        });
+    }
+    open();
+    document.addEventListener("visibilitychange", open);
+    return () => document.removeEventListener("visibilitychange", open);
+  }, [canOpenSession, failedRating, openKey, openLocale, pageLocale, token]);
+
   const feedbackMutation = useMutation({
     networkMode: "always",
     mutationFn: async (attempt: FeedbackAttempt) => {
       const api = await getCustomerFlowApi();
-      let sessionId = attempt.sessionId;
-
-      if (!sessionId) {
+      const start = async (sessionKey: string, sessionLocale: Locale) => {
         const session = await api.createSession(
           token,
-          { locale: attempt.locale },
-          { idempotencyKey: attempt.sessionKey },
+          { locale: sessionLocale },
+          { idempotencyKey: sessionKey },
         );
-        sessionId = session.sessionId;
-        dispatch({ type: "session-ready", sessionId });
-      }
-
-      const body: SubmitResponseRequest = {
-        sessionId,
-        rating: attempt.rating,
+        dispatch({ type: "session-ready", sessionId: session.sessionId });
+        return session.sessionId;
       };
-      const response = await api.submitResponse(token, body, {
-        idempotencyKey: attempt.responseKey,
-      });
-      return { sessionId, responseId: response.responseId };
+      const rate = async (sessionId: string, responseKey: string) => {
+        const body: SubmitResponseRequest = { sessionId, rating: attempt.rating };
+        const response = await api.submitResponse(token, body, { idempotencyKey: responseKey });
+        return { sessionId, responseId: response.responseId };
+      };
+
+      // A star tapped while the opening session is still on its way waits for
+      // it, for a while, rather than starting a second one.
+      let sessionId =
+        attempt.sessionId ??
+        (openingSession.current
+          ? await within(openingSession.current, STAR_WAITS_FOR_OPEN_MS, null)
+          : null);
+      if (!sessionId) sessionId = await start(attempt.sessionKey, attempt.sessionLocale);
+
+      try {
+        return await rate(sessionId, attempt.responseKey);
+      } catch (error) {
+        if (!isStaleSession(error)) throw error;
+        // The session now starts when the page opens, so a tab left open for
+        // a day (or restored from its saved draft) can hold one the server
+        // has let go. Start a fresh one, once, and rate on that; the old
+        // keys belong to the old session.
+        const sessionKey = createIdempotencyKey("session");
+        const responseKey = createIdempotencyKey("response");
+        dispatch({ type: "session-replaced", sessionKey, sessionLocale: attempt.locale, responseKey });
+        return await rate(await start(sessionKey, attempt.locale), responseKey);
+      }
     },
   });
 
@@ -238,8 +437,9 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
       if (feedbackInFlight.current) return;
 
       const sessionKey = previous.sessionKey ?? createIdempotencyKey("session");
+      const sessionLocale = previous.sessionLocale ?? previous.locale;
       const responseKey = previous.responseKey ?? createIdempotencyKey("response");
-      dispatch({ type: "feedback-started", sessionKey, responseKey });
+      dispatch({ type: "feedback-started", sessionKey, sessionLocale, responseKey });
 
       if (!navigator.onLine) {
         dispatch({ type: "feedback-offline" });
@@ -253,6 +453,7 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
           locale: previous.locale,
           sessionId: previous.sessionId,
           sessionKey,
+          sessionLocale,
           responseKey,
         });
         const destinationKey =
@@ -279,9 +480,14 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
           ),
         );
         handoffPending.current = true;
-      } catch (error) {
+        setLeaving(true);
+      } catch {
+        // Offline waits for the connection. Anything else, a dropped request
+        // on a phone that is online included, is a failed send that tries
+        // again by itself: waiting for an `online` event that never comes
+        // left the customer stuck on "You're offline".
         dispatch({
-          type: isOfflineError(error) ? "feedback-offline" : "feedback-failed",
+          type: phoneIsOffline() ? "feedback-offline" : "feedback-failed",
         });
       } finally {
         feedbackInFlight.current = false;
@@ -301,12 +507,28 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     navigateToDestination(destinationUrl);
   }, [destinationUrl, state.screen]);
 
+  // Back from Google through the back-forward cache: the page is the one
+  // that sent them, but it is not leaving again.
+  useEffect(() => {
+    function shown(event: PageTransitionEvent) {
+      if (event.persisted) setLeaving(false);
+    }
+    window.addEventListener("pageshow", shown);
+    return () => window.removeEventListener("pageshow", shown);
+  }, []);
+
   const handleRate = useCallback(
     (rating: RatingValue) => {
+      if (preview) {
+        setPreviewRating(rating);
+        return;
+      }
+      // Already on its way through the early form: one tap is one rating.
+      if (window.__rbEarly || earlyDone) return;
       dispatch({ type: "select-rating", rating });
       void submitFeedback(rating, { ...state, responseKey: null });
     },
-    [state, submitFeedback],
+    [earlyDone, preview, state, submitFeedback],
   );
 
   const handleRetry = useCallback(() => {
@@ -355,77 +577,120 @@ export function CustomerFlow({ token }: CustomerFlowProps) {
     dispatch({ type: "change-locale", locale });
   }, []);
 
-  const motionProps = useMemo(
-    () => ({
-      initial: { opacity: 0.96, y: prefersReducedMotion ? 0 : 6 },
-      animate: { opacity: 1, y: 0 },
-      transition: {
-        duration: prefersReducedMotion ? 0.1 : 0.22,
-        ease: "easeOut" as const,
-      },
-    }),
-    [prefersReducedMotion],
-  );
-
-  if (contextQuery.isPending) {
+  if (contextQuery.isPending && !initialUnavailable) {
     return <CustomerLoading messages={messages} />;
   }
 
-  if (contextQuery.isError) {
+  if (initialUnavailable || contextQuery.isError) {
+    // An inactive link stays inactive: nothing to try again. Anything else
+    // tries again by itself, so a customer at the counter never has to.
     return (
       <div ref={contentRef}>
-        <CustomerBlockingState
-          kind={
-            isUnavailableReviewLink(contextQuery.error)
-              ? "unavailable"
-              : "error"
-          }
-          locale={state.locale}
-          messages={messages}
-          onLocaleChange={changeLocale}
-          onRetry={() => void contextQuery.refetch()}
-        />
+        {initialUnavailable || isUnavailableReviewLink(contextQuery.error) ? (
+          <CustomerBlockingState
+            kind="unavailable"
+            locale={state.locale}
+            messages={messages}
+            onLocaleChange={changeLocale}
+          />
+        ) : (
+          <RetryingBlockingState
+            kind={isOfflineError(contextQuery.error) ? "offline" : "error"}
+            locale={state.locale}
+            messages={messages}
+            onLocaleChange={changeLocale}
+            retryKey={`customer-context:${token}`}
+            failure={contextQuery.errorUpdatedAt}
+            onRetry={() => void contextQuery.refetch()}
+          />
+        )}
       </div>
     );
   }
 
   const context = contextQuery.data;
+  if (!context) return <CustomerLoading messages={messages} />;
+  const screen = earlyDone && !preview ? "handoff" : state.screen;
 
   return (
-    <CustomerFrame poweredBy={messages.poweredBy}>
-      <CustomerHeader
-        context={context}
-        locale={state.locale}
-        messages={messages}
-        onLocaleChange={changeLocale}
-      />
-      <div ref={contentRef}>
-        {state.screen === "rating" ? (
-          <CustomerPageBranding
-            page={context.page}
-            businessName={context.business.name}
+    <div ref={contentRef} className="customer-live">
+      <CustomerVisitView
+        heroUrl={context.page?.heroUrl ?? null}
+        businessName={context.business.name}
+        // One deterministic crop, shared by the owner preview and this page.
+        // Main's Customer Page contract stores no per-owner hero transform, and
+        // a preview-only control that the customer never sees would be a lie
+        // about what the business published.
+        transform={DEFAULT_HERO_TRANSFORM}
+        heading={screen === "rating" ? messages.ratingHeading : ""}
+        support={screen === "rating" ? messages.ratingSupport : ""}
+        footerLine={messages.footerPromise}
+        language={
+          <LanguageSelector
+            locale={state.locale}
+            supported={context.supportedLocales}
+            messages={messages}
+            onChange={changeLocale}
           />
-        ) : null}
-        <LazyMotion features={domAnimation} strict>
-          <m.div key={state.screen} {...motionProps}>
-            {state.screen === "rating" ? (
-              <RatingScreen
-                messages={messages}
-                rating={state.rating}
-                status={state.feedbackStatus}
-                onRate={handleRate}
-                onRetry={handleRetry}
-              />
+        }
+      >
+        {/* A plain CSS fade between screens (customer-flow.css). It replaced
+            the motion library, ~27 KB compressed for this one effect on the
+            page that has to load fastest. */}
+        <div key={screen} className="customer-screen-enter">
+            {screen === "rating" ? (
+              earlyForm ? (
+                // A real form, so a star works before the JavaScript has
+                // loaded (early-tap.ts). Once React is here it handles every
+                // tap itself, and this never submits.
+                <form
+                  method="post"
+                  action={earlyForm.action}
+                  data-early-submit=""
+                  onSubmit={(event) => event.preventDefault()}
+                >
+                  <input type="hidden" name="key" value={earlyForm.key} />
+                  <input type="hidden" name="locale" value={state.locale} />
+                  <RatingScreen
+                    messages={messages}
+                    rating={state.rating}
+                    status={state.feedbackStatus}
+                    embedInVisit
+                    onRate={handleRate}
+                    onRetry={handleRetry}
+                  />
+                </form>
+              ) : (
+                <RatingScreen
+                  messages={messages}
+                  rating={preview ? previewRating : state.rating}
+                  status={preview ? "idle" : state.feedbackStatus}
+                  embedInVisit
+                  onRate={handleRate}
+                  onRetry={handleRetry}
+                  note={
+                    preview ? (
+                      // For the owner, in their words: this is a preview.
+                      // One line, so the sheet keeps its shape and its footer.
+                      <p className="visit-status" style={{ maxWidth: "none" }} role="status" data-preview-note>
+                        {previewRating
+                          ? "Nothing was saved. Customers go to Google."
+                          : "Preview: taps here aren’t saved."}
+                      </p>
+                    ) : null
+                  }
+                />
+              )
             ) : (
               <HandoffScreen
                 businessName={context.business.name}
                 destinationUrl={context.destination.url}
                 messages={messages}
+                leaving={leaving}
               />
             )}
-          </m.div>
-        </LazyMotion>
-      </div>
-    </CustomerFrame>
+        </div>
+      </CustomerVisitView>
+    </div>
   );
 }

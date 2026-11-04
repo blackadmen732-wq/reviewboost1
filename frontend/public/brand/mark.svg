@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 290.09 269.09" width="290.09" height="269.09" role="img" aria-labelledby="rb-mark-title">
+<!--
+  THE ReviewBoost mark. Every other logo, icon and raster is generated from
+  this file by scripts/brand/generate-brand-assets.mjs. Edit here, then run it.
+
+  An R whose bowl is a speech bubble and whose leg rises to the right. No
+  background, no container, no padding: iOS and Android draw the app-icon
+  shape, and each surface sets its own clearspace.
+
+  Construction, on this viewBox:
+  - One stroke weight, 32, on every side of the bowl and the counter.
+  - Bowl 264 x 160, corners r56 at the top and r64 at the bottom right.
+  - Counter is a pill (r48) with a speech-bubble tail off its lower left. The
+    tail's straight edge sits 12 inside the pill and stops just below the
+    bowl, inside the stem, so the counter never opens.
+  - Stem tapers into a round foot (r30) and joins the bowl on a tangent curve.
+  - Leg is a 45-degree parallelogram. Its top edge ends where the bowl's
+    bottom-right corner begins, and it sits on the same baseline as the foot.
+  - Optical centre for icons is x 140, y 134.5 (left of the box centre,
+    toward the heavier stem).
+
+  The counter is a hole in the path (it winds the other way), not white paint,
+  so the mark works on any background. Fill is the one ReviewBoost green.
+-->
+<title id="rb-mark-title">ReviewBoost</title>
+<path fill="#00A86B" d="M0 56 A56 56 0 0 1 56 0 H208 A56 56 0 0 1 264 56 V96 A64 64 0 0 1 200 160 H136 C112 160 97.48 163.63 90 180 L57.28 251.57 A30 30 0 0 1 0 239.09 Z M80 32 A48 48 0 0 0 44 111.75 L44 166 C54 142 74 128 108 128 H184 A48 48 0 0 0 184 32 Z"/>
+<path fill="#00A86B" d="M124 176 H196.72 Q200 176 202.32 178.32 L290.09 266.09 H217.37 Q214.09 266.09 211.77 263.77 Z"/>
+</svg>

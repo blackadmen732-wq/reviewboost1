@@ -19,14 +19,10 @@
 
 ### Web Dashboard
 
-- [ ] Navigate to "Your codes" page
-- [ ] Verify QR code loads and displays correctly
-- [ ] Click "Print this code" — verify print dialog opens
-- [ ] Click "Save SVG" — verify SVG file downloads
-- [ ] Select each PNG size (300, 512, 1024, 2048) and click "Save PNG"
-- [ ] Verify each PNG downloads at the correct resolution
-- [ ] Scan a downloaded QR code with phone camera — verify it opens the correct `/q/[token]` URL
-- [ ] Scan at arm's length (30cm) — should resolve on first try
+- [ ] Open Tags → a Tag — verify the code loads and displays correctly
+- [ ] Press "Print this code" — the preview is one page: the business, "How was your visit?", the code and "Scan with your phone’s camera" (plus the place's name, if the business has more than one), and nothing of the app. Same in dark mode.
+- [ ] Print it on a home printer and scan the paper from about 1 m — verify it opens the correct `/q/[token]` URL on the first try
+- [ ] More (…) → "Save code" — verify an SVG downloads and that scanning it opens the same URL
 
 ### Mobile App
 

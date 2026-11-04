@@ -1,5 +1,6 @@
 import "server-only";
 
+import { PLAN_CATALOG } from "@/lib/owner/plan-catalog";
 import type { AuthenticatedContext } from "@/lib/server/auth";
 import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { logger } from "@/lib/server/logger";
@@ -48,7 +49,10 @@ export const PLANS: Record<PlanId, PlanLimits> = {
   pro: { locations: 5, tags: 25, monthlySmsSegments: 1500, priceUsdCents: 12900 },
 };
 
-/** A 7-day trial costs nothing, requires a card, and includes no SMS at all. */
+/**
+ * Starter's 7-day trial costs nothing, requires a card, and includes no SMS at
+ * all. Growth and Pro have no trial: they are charged at checkout.
+ */
 export const TRIAL_LIMITS: PlanLimits = {
   locations: 1,
   tags: 1,
@@ -56,7 +60,13 @@ export const TRIAL_LIMITS: PlanLimits = {
   priceUsdCents: 0,
 };
 
-export const TRIAL_DAYS = 7;
+/** Starter's trial length. The only plan with one; see `PLAN_CATALOG.trialDays`. */
+export const TRIAL_DAYS = PLAN_CATALOG.starter.trialDays;
+
+/** Free days a checkout for this plan starts with. Zero means charge now. */
+export function trialDaysFor(planId: PlanId): number {
+  return PLAN_CATALOG[planId].trialDays;
+}
 
 export interface Entitlement {
   planId: PlanId | null;
