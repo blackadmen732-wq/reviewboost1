@@ -93,18 +93,28 @@ export function OnboardingFlow({
   // the owner off to Google to copy their link. A reload, or a phone dropping
   // the tab meanwhile, must not wipe what they typed. sessionStorage, not
   // localStorage: the draft stays in this tab and never outlives it.
+  // Restored after the first paint, the way the customer flow restores its
+  // draft (customer-flow.tsx): the server render has no storage to read.
   useEffect(() => {
-    try {
-      const raw = window.sessionStorage.getItem(ONBOARDING_DRAFT_KEY);
-      if (!raw) return;
-      const draft = JSON.parse(raw) as { name?: unknown; googleUrl?: unknown; step?: unknown };
-      const savedName = typeof draft.name === "string" ? draft.name : "";
-      if (savedName) setName(savedName);
-      if (typeof draft.googleUrl === "string" && draft.googleUrl) setGoogleUrl(draft.googleUrl);
-      if (draft.step === "google" && savedName.trim()) setStep("google");
-    } catch {
-      // Storage refused (private mode, blocked site data): start empty.
-    }
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        const raw = window.sessionStorage.getItem(ONBOARDING_DRAFT_KEY);
+        if (!raw) return;
+        const draft = JSON.parse(raw) as { name?: unknown; googleUrl?: unknown; step?: unknown };
+        const savedName = typeof draft.name === "string" ? draft.name : "";
+        const savedUrl = typeof draft.googleUrl === "string" ? draft.googleUrl : "";
+        // Only fills what is still empty, and only moves forward from the
+        // first screen: anything typed or pressed since the page opened wins.
+        if (savedName) setName((current) => current || savedName);
+        if (savedUrl) setGoogleUrl((current) => current || savedUrl);
+        if (draft.step === "google" && savedName.trim()) {
+          setStep((current) => (current === "name" ? "google" : current));
+        }
+      } catch {
+        // Storage refused (private mode, blocked site data): start empty.
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
   useEffect(() => {
     try {

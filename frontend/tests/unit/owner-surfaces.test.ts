@@ -108,8 +108,10 @@ describe("the owner surfaces show real state", () => {
     expect(nav).toMatch(/label: "Tags"/);
     expect(nav).toMatch(/label: "Text Requests"/);
     // One product, one word: the web bar and the native tab bar agree.
-    const native = source("../apps/mobile/app/(tabs)/_layout.tsx");
-    expect(native).toMatch(/title: "Tags"/);
+    // The native tab names live in one list the tab bar and back buttons read.
+    const native = source("../apps/mobile/lib/tab-titles.ts");
+    expect(native).toMatch(/stands: "Tags"/);
+    expect(source("../apps/mobile/app/(tabs)/_layout.tsx")).toMatch(/title: TAB_TITLES\.stands/);
     expect(nav).not.toMatch(/label: "Set up"/);
   });
 
