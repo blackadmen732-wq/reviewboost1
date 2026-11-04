@@ -36,6 +36,7 @@ type UploadOptions = {
   headers: Record<string, string>;
   signal?: AbortSignal;
   onProgress: (fraction: number) => void;
+  stallMs?: number;
 };
 /** A test can take the upload over, to hold it part-way. */
 const upload = vi.hoisted(() => ({
@@ -44,6 +45,7 @@ const upload = vi.hoisted(() => ({
     | ((url: string, body: Blob, options: UploadOptions) => Promise<{ ok: boolean; status: number }>),
 }));
 vi.mock("@/lib/images/upload-with-progress", () => ({
+  UploadStalledError: class UploadStalledError extends Error {},
   uploadWithProgress: async (url: string, body: Blob, options: UploadOptions) => {
     if (upload.takeover) return upload.takeover(url, body, options);
     const response = await fetch(url, {
@@ -660,6 +662,66 @@ describe("Customer Page saved-photo recovery", () => {
       finish!();
       await screen.findByText(/Photo saved/);
       expect(screen.queryByRole("progressbar")).toBeNull();
+    } finally {
+      upload.takeover = null;
+    }
+  });
+
+  it("stops an upload when asked, and keeps the page as it was", async () => {
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: () => "blob:local-photo",
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+    const writes: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init?: RequestInit) => {
+        const path = String(input);
+        const method = init?.method ?? "GET";
+        if (method === "GET")
+          return new Response(
+            JSON.stringify({ data: { draft: {}, published: null, publishedVersion: 0 } }),
+            { status: 200 },
+          );
+        writes.push(`${method} ${path}`);
+        if (path.endsWith("/assets") && method === "POST")
+          return new Response(
+            JSON.stringify({ data: { assetId: "new", path: "new.jpg", token: "local" } }),
+            { status: 200 },
+          );
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    let stallMs: number | undefined;
+    upload.takeover = (_url, _body, options) => {
+      stallMs = options.stallMs;
+      options.onProgress(0.3);
+      return new Promise((_resolve, reject) => {
+        options.signal?.addEventListener("abort", () =>
+          reject(new DOMException("Upload cancelled", "AbortError")),
+        );
+      });
+    };
+    try {
+      render(<CustomerPageEditor businessName="Test business" />);
+      await screen.findByRole("button", { name: "Add photo" });
+      fireEvent.change(document.querySelector('input[type="file"]')!, {
+        target: { files: [new File(["x"], "new.jpg", { type: "image/jpeg" })] },
+      });
+      await screen.findByRole("button", { name: "Uploading… 30%" });
+      // Slow is allowed; stuck is not: it gives up after 30 s without progress.
+      expect(stallMs).toBe(30_000);
+
+      fireEvent.click(screen.getByRole("button", { name: "Stop upload" }));
+      await screen.findByText("Upload stopped. Your page hasn’t changed.");
+      expect(screen.getByRole("button", { name: "Add photo" })).toBeEnabled();
+      expect(screen.queryByRole("progressbar")).toBeNull();
+      expect(document.querySelector("[data-hero-layer] img")).toBeNull();
+      // Only the upload ticket was asked for: nothing confirmed, nothing saved.
+      expect(writes).toEqual([expect.stringMatching(/^POST .*\/assets$/)]);
     } finally {
       upload.takeover = null;
     }

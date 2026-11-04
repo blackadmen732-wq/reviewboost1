@@ -13,9 +13,12 @@ import { VisitStars } from "@/features/customer-page/visit-stars";
 import Link from "next/link";
 
 import { PreviewCustomerPage } from "@/features/dashboard/preview-customer-page";
-import { withWriteDeadline } from "@/lib/api/read-deadline";
+import { OWNER_WRITE_TIMEOUT_MS } from "@/lib/api/read-deadline";
 import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
-import { uploadWithProgress } from "@/lib/images/upload-with-progress";
+import {
+  UploadStalledError,
+  uploadWithProgress,
+} from "@/lib/images/upload-with-progress";
 import { checkOutcome } from "@/lib/recovery/check-outcome";
 import { useAutoRetry } from "@/lib/recovery/use-auto-retry";
 import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
@@ -97,11 +100,16 @@ export function CustomerPageEditor({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const operation = useRef(false);
   const mounted = useRef(true);
+  /** Stops the photo going up: the owner's "Stop upload", or leaving. */
+  const uploadStop = useRef<AbortController | null>(null);
+  const [uploadStopped, setUploadStopped] = useState(false);
 
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      // Nothing would confirm it once the editor is gone: stop sending it.
+      uploadStop.current?.abort();
     };
   }, []);
   useEffect(() => {
@@ -207,6 +215,7 @@ export function CustomerPageEditor({
       if (operation.current) return;
       operation.current = true;
       setUploadError(null);
+      setUploadStopped(false);
       setPhotoNote(null);
       setDraftSaveError(null);
       setStatusMsg(null);
@@ -252,16 +261,32 @@ export function CustomerPageEditor({
           setUploadProgress(0);
           setUploadState("uploading");
           const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/customer-page/${ticket.path}?token=${ticket.token}`;
-          const sent = await withWriteDeadline(
-            async (signal) =>
-              await uploadWithProgress(url, photo.blob, {
-                signal,
-                headers: { "Content-Type": photo.type, "x-upsert": "true" },
-                onProgress: (fraction) => {
-                  if (mounted.current) setUploadProgress(fraction);
-                },
-              }),
-          );
+          // A photo may take as long as it keeps moving: on a weak signal it
+          // can need more than the 30 s a change gets, and still arrive. It
+          // gives up after 30 s with no progress, or when the owner stops it.
+          const stop = new AbortController();
+          uploadStop.current = stop;
+          let sent: { ok: boolean; status: number };
+          try {
+            sent = await uploadWithProgress(url, photo.blob, {
+              signal: stop.signal,
+              stallMs: OWNER_WRITE_TIMEOUT_MS,
+              headers: { "Content-Type": photo.type, "x-upsert": "true" },
+              onProgress: (fraction) => {
+                if (mounted.current) setUploadProgress(fraction);
+              },
+            });
+          } catch (caught) {
+            if (!stop.signal.aborted) throw caught;
+            // Stopped on purpose, so not a failure: the page keeps its photo.
+            if (!mounted.current) return;
+            setHeroUrl(previous);
+            setUploadState("idle");
+            setUploadStopped(true);
+            return;
+          } finally {
+            uploadStop.current = null;
+          }
           if (!sent.ok)
             return fail("The photo did not upload. Please try again.");
           if (!mounted.current) return;
@@ -301,7 +326,9 @@ export function CustomerPageEditor({
           fail(
             caught instanceof SessionExpiredError
               ? caught.message
-              : "Could not reach ReviewBoost. Check your connection and try again.",
+              : caught instanceof UploadStalledError
+                ? "The photo stopped uploading. Check your connection and try again."
+                : "Could not reach ReviewBoost. Check your connection and try again.",
           );
         }
       } finally {
@@ -324,6 +351,7 @@ export function CustomerPageEditor({
     if (operation.current) return;
     operation.current = true;
     setUploadError(null);
+    setUploadStopped(false);
     setPhotoNote(null);
     setStatusMsg(null);
     setPublishState("idle");
@@ -575,20 +603,36 @@ export function CustomerPageEditor({
           ) : null}
         </div>
         {uploadState === "uploading" ? (
-          <div
-            role="progressbar"
-            aria-label="Photo upload"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(uploadProgress * 100)}
-            className="mt-3 h-1.5 overflow-hidden rounded-full bg-quiet"
-            data-upload-progress
-          >
+          <div className="mt-2 flex items-center gap-2">
             <div
-              className="h-full rounded-full bg-action transition-[width] duration-200 motion-reduce:transition-none"
-              style={{ width: `${Math.round(uploadProgress * 100)}%` }}
-            />
+              role="progressbar"
+              aria-label="Photo upload"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(uploadProgress * 100)}
+              className="h-1.5 flex-1 overflow-hidden rounded-full bg-quiet"
+              data-upload-progress
+            >
+              <div
+                className="h-full rounded-full bg-action transition-[width] duration-200 motion-reduce:transition-none"
+                style={{ width: `${Math.round(uploadProgress * 100)}%` }}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-auto px-3"
+              onClick={() => uploadStop.current?.abort()}
+            >
+              Stop upload
+            </Button>
           </div>
+        ) : null}
+        {uploadStopped ? (
+          <p role="status" className="mt-3 text-sm text-muted">
+            Upload stopped. Your page hasn’t changed.
+          </p>
         ) : null}
         <p className="mt-3 text-sm leading-relaxed text-muted">
           Your storefront, your team or your best dish. Upright photos fill

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { uploadWithProgress } from "@/lib/images/upload-with-progress";
+import { UploadStalledError, uploadWithProgress } from "@/lib/images/upload-with-progress";
 
 /**
  * The photo upload reports how much has gone, so the button can show a
@@ -96,5 +96,42 @@ describe("uploadWithProgress", () => {
     controller.abort(new DOMException("Took too long", "TimeoutError"));
     await expect(cancelled).rejects.toMatchObject({ name: "TimeoutError" });
     expect(FakeRequest.last!.aborted).toBe(true);
+  });
+
+  it("gives up on an upload that stops moving, never on one that is slow", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal("XMLHttpRequest", FakeRequest);
+      const slow = uploadWithProgress("https://storage.test/upload", new Blob(["x"]), {
+        headers: {},
+        onProgress: () => {},
+        stallMs: 30_000,
+      });
+      const moving = FakeRequest.last!;
+      for (const loaded of [20, 40, 60]) {
+        await vi.advanceTimersByTimeAsync(20_000);
+        moving.progress(loaded, 100);
+      }
+      // A minute in, still moving: still going.
+      expect(moving.aborted).toBe(false);
+      moving.finish(200);
+      await expect(slow).resolves.toEqual({ ok: true, status: 200 });
+
+      const stuck = uploadWithProgress("https://storage.test/upload", new Blob(["x"]), {
+        headers: {},
+        onProgress: () => {},
+        stallMs: 30_000,
+      });
+      const stalled = expect(stuck).rejects.toBeInstanceOf(UploadStalledError);
+      const halted = FakeRequest.last!;
+      halted.progress(10, 100);
+      await vi.advanceTimersByTimeAsync(29_000);
+      expect(halted.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await stalled;
+      expect(halted.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
