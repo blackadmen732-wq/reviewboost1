@@ -96,7 +96,15 @@ test.describe("ReviewBoost customer flow", () => {
   }) => {
     await openFlow(page);
     await page.getByRole("radio", { name: spokenRatings[0] }).focus();
+    // Arrows move between stars and choose nothing (WCAG 3.2.2): pressing → used
+    // to send 2 stars to Google. Space chooses the focused star.
+    const start = page.url();
     await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("radio", { name: spokenRatings[3] })).toBeFocused();
+    expect(page.url()).toBe(start);
+    await page.keyboard.press("Space");
     await page.waitForURL(DESTINATION_PATTERN);
     await expect(
       page.getByRole("heading", { name: "Public review destination" }),
@@ -139,11 +147,13 @@ test.describe("ReviewBoost customer flow", () => {
   }) => {
     await page.goto("/q/fixture-unknown");
     await expect(page.getByRole("heading", { name: "This review link isn’t active." })).toBeVisible();
-    const unknown = await page.locator(".customer-card").innerHTML();
+    // The whole customer panel, which the closed-link screen now shares with
+    // the rating screen.
+    const unknown = await page.locator("[data-customer-visit]").innerHTML();
 
     await page.goto("/q/fixture-inactive");
     await expect(page.getByRole("heading", { name: "This review link isn’t active." })).toBeVisible();
-    expect(await page.locator(".customer-card").innerHTML()).toBe(unknown);
+    expect(await page.locator("[data-customer-visit]").innerHTML()).toBe(unknown);
   });
 
   test("Spanish and Haitian Creole expand without adding contact or marketing fields", async ({

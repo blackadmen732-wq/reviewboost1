@@ -270,17 +270,17 @@ html:has(.customer-live) {
   outline: none;
 }
 
-/* A quiet instruction: regular weight, wide tracking — it explains, the
-   heading asks. */
+/* A quiet instruction — it explains, the heading asks — but one a customer
+   can read: 14px at a 390pt phone in sentence case, #4a4a47 on the sheet
+   (8.6:1). It was 11px pale tracked capitals, under DESIGN.md's 12px floor. */
 .visit-support {
   margin: var(--visit-support-gap, 1.885cqi) 0 0;
-  color: #6a6a6a;
+  color: #4a4a47;
   font-family: var(--font-visit-caps), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 2.885cqi;
+  font-size: 3.6cqi;
   font-weight: 500;
-  letter-spacing: 0.18em;
+  letter-spacing: 0;
   line-height: 1.2;
-  text-transform: uppercase;
 }
 
 /* The stars sit directly under the instruction, and the calm space goes
@@ -298,7 +298,10 @@ html:has(.customer-live) {
   flex: 0 0 auto;
   place-items: center;
   gap: var(--visit-footer-gap, 1.49cqi);
-  margin-top: var(--visit-footer-top, 15.9cqi);
+  /* 15.9cqi until the footer text grew to readable sizes; the ~8cqi it now
+     takes more comes out of this gap, so the footer keeps its place in the
+     fixed sheet and nothing is clipped. */
+  margin-top: var(--visit-footer-top, 7.9cqi);
 }
 
 .visit-powered {
@@ -308,8 +311,8 @@ html:has(.customer-live) {
   margin: 0;
   color: #595959;
   font-family: var(--font-visit-heading), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 2.664cqi;
-  font-weight: 300;
+  font-size: 3.33cqi;
+  font-weight: 400;
   letter-spacing: 0.02em;
 }
 
@@ -332,17 +335,20 @@ html:has(.customer-live) {
 }
 
 
+/* The approved promise line, in its capitals, at 12px on a 390pt phone and on
+   two lines. At 6.4px on one line nobody could read it. */
 .visit-footer__line {
+  max-width: 80cqi;
   margin: 0;
-  color: #6c6c6c;
+  color: #6b6b67;
   font-family: var(--font-visit-caps), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 1.64cqi;
-  font-optical-sizing: none;
+  font-size: 3.08cqi;
   font-weight: 500;
-  letter-spacing: 0.257em;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
   text-align: center;
   text-transform: uppercase;
-  white-space: nowrap;
+  text-wrap: balance;
 }
 
 .visit-stars {
