@@ -145,7 +145,7 @@ export function SignInFlow({
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [next]);
 
   async function handleEmailSubmit(event: React.FormEvent) {
     event.preventDefault();
