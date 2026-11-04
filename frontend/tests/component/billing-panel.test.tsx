@@ -36,6 +36,8 @@ describe("BillingPanel", () => {
     expect(screen.getByText("Card required. $49 a month after 7 days.")).toBeVisible();
     expect(screen.getByText("Charged $79 when you subscribe. No trial.")).toBeVisible();
     expect(screen.getByText("Charged $129 when you subscribe. No trial.")).toBeVisible();
+    // The trial opens fewer Tags than Starter itself, and says so on Starter.
+    expect(screen.getByText("During the 7-day trial: 1 location and 1 Tag.")).toBeVisible();
   });
 
   it("offers no second trial after a cancellation", () => {

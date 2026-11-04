@@ -796,6 +796,14 @@ export function BillingPanel({
                     </div>
                   ) : null}
                 </dl>
+                {firstSubscription && plan.trialDays > 0 ? (
+                  // The trial opens fewer Tags than the plan it leads to. Said
+                  // here, beside the plan's own limits, so "Tags 3" above is
+                  // not read as what the next seven days include.
+                  <p className="mt-3 text-xs text-muted" data-trial-limits>
+                    During the {TRIAL.days}-day trial: {TRIAL.locations} location and {TRIAL.tags} Tag.
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>

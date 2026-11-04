@@ -55,6 +55,9 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
 
 type Step = "name" | "google" | "done";
 
+/** Where an unfinished setup keeps what was typed, for this tab only. */
+const ONBOARDING_DRAFT_KEY = "rb.onboarding.draft";
+
 interface Created {
   organizationId?: string;
   standUrl: string;
@@ -85,6 +88,34 @@ export function OnboardingFlow({
   const [busy, setBusy] = useState<"link" | "later" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Created | null>(null);
+
+  // Nothing reaches the server until the last step, and the Google step sends
+  // the owner off to Google to copy their link. A reload, or a phone dropping
+  // the tab meanwhile, must not wipe what they typed. sessionStorage, not
+  // localStorage: the draft stays in this tab and never outlives it.
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(ONBOARDING_DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as { name?: unknown; googleUrl?: unknown; step?: unknown };
+      const savedName = typeof draft.name === "string" ? draft.name : "";
+      if (savedName) setName(savedName);
+      if (typeof draft.googleUrl === "string" && draft.googleUrl) setGoogleUrl(draft.googleUrl);
+      if (draft.step === "google" && savedName.trim()) setStep("google");
+    } catch {
+      // Storage refused (private mode, blocked site data): start empty.
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      if (step === "done") window.sessionStorage.removeItem(ONBOARDING_DRAFT_KEY);
+      else if (name || googleUrl) {
+        window.sessionStorage.setItem(ONBOARDING_DRAFT_KEY, JSON.stringify({ name, googleUrl, step }));
+      }
+    } catch {
+      // Nothing to keep the draft in; the flow still works without it.
+    }
+  }, [name, googleUrl, step]);
 
   const qr = useAuthenticatedQr(
     created?.standId ?? null,
