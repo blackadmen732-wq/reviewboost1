@@ -56,6 +56,8 @@ export default async function HomePage() {
     counts,
     stands,
     hasLocation: locations.length > 0,
+    placesWithoutGoogleLink:
+      locations.length > 1 ? locations.filter((place) => !place.destination).map((place) => place.name) : [],
     canManage: can.manageTags,
     hasCustomerPhoto,
     service,

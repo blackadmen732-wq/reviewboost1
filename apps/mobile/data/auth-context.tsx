@@ -13,7 +13,17 @@ import { forgetLastBusiness, readLastBusiness, rememberLastBusiness } from "./la
 import { chooseActiveOrg } from "./org-choice";
 import { boundedRead, boundedWrite } from "./read-deadline";
 import { signInForReview } from "./review-sign-in";
-import { sendCodeResult, type SendCodeResult } from "./send-code";
+import { reportReachable, reportUnreachable } from "./connection";
+import {
+  authUnreachable,
+  sendCodeResult,
+  SLOW_CODE_MESSAGE,
+  SLOW_SEND_MESSAGE,
+  verifyCodeResult,
+  type AuthFailure,
+  type SendCodeResult,
+  type VerifyCodeResult,
+} from "./send-code";
 import { parseMemberRole, type Organization } from "./types";
 import { loadFailed } from "./recovery";
 
@@ -29,7 +39,7 @@ interface AuthState {
   organizations: Organization[];
   activeOrg: Organization | null;
   sendCode: (email: string) => Promise<SendCodeResult>;
-  verifyCode: (email: string, code: string) => Promise<string | null>;
+  verifyCode: (email: string, code: string) => Promise<VerifyCodeResult>;
   logout: () => Promise<string | null>;
   selectOrg: (orgId: string) => void;
   /** Back to the business picker. Only offered with more than one business. */
@@ -160,29 +170,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ReviewBoost accounts have no passwords — sign-in is a six-digit code
   // sent by email, identical to the web app.
+  //
+  // Sign-in talks to Supabase Auth, not through apiFetch, so it tells the
+  // connection store what it learned itself: the offline bar then shows on
+  // the sign-in screens too, and the probe notices when the signal is back.
   const sendCode = useCallback(
     async (email: string): Promise<SendCodeResult> => {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { shouldCreateUser: true },
-      });
+      let error: AuthFailure | null;
+      try {
+        ({ error } = await boundedRead(
+          async () =>
+            await supabase.auth.signInWithOtp({
+              email,
+              options: { shouldCreateUser: true },
+            }),
+        ));
+      } catch {
+        // No answer in 20 s. Asking again is safe: the newest code works.
+        return { kind: "failed", message: SLOW_SEND_MESSAGE };
+      }
+      noteAuthReach(error);
       return sendCodeResult(error);
     },
     [],
   );
 
   const verifyCode = useCallback(
-    async (email: string, code: string): Promise<string | null> => {
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token: code,
-        type: "email",
-      });
-      if (!error) return null;
+    async (email: string, code: string): Promise<VerifyCodeResult> => {
+      let error: AuthFailure | null;
+      try {
+        ({ error } = await boundedRead(
+          async () =>
+            await supabase.auth.verifyOtp({
+              email,
+              token: code,
+              type: "email",
+            }),
+        ));
+      } catch {
+        return { kind: "retry", message: SLOW_CODE_MESSAGE };
+      }
+      noteAuthReach(error);
+      const result = verifyCodeResult(error);
+      if (result.kind !== "wrong") return result;
       // The App Review account signs in with a server-configured code rather
       // than an emailed one; for everyone else this is a quiet no.
-      if (await signInForReview(email, code)) return null;
-      return "That code is not right. Check it and type it again.";
+      if (await signInForReview(email, code)) return { kind: "signed-in" };
+      return result;
     },
     [],
   );
@@ -244,6 +278,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
+}
+
+/** Any answer from Supabase Auth proves the connection; none means offline. */
+function noteAuthReach(error: AuthFailure | null): void {
+  if (authUnreachable(error)) reportUnreachable();
+  else reportReachable();
 }
 
 export function useAuth(): AuthState {

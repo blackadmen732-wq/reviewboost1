@@ -65,6 +65,8 @@ export async function GET(request: NextRequest): Promise<Response> {
       counts,
       stands,
       hasLocation: locations.length > 0,
+      placesWithoutGoogleLink:
+        locations.length > 1 ? locations.filter((place) => !place.destination).map((place) => place.name) : [],
       canManage: can.manageTags,
       hasCustomerPhoto,
       service,

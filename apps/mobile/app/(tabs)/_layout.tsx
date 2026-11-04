@@ -41,7 +41,11 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.ink,
         tabBarInactiveTintColor: colors.inkMuted,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "500" },
+        // The label keeps its full height. In the browser build the 49-point
+        // bar squeezed it to 10 px and cut the words in half; on iPhone a
+        // Text never shrinks, so this only stops the web doing what iOS
+        // doesn't.
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "500", flexShrink: 0 },
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
         tabBarBadgeStyle: { backgroundColor: colors.ink, color: colors.onAction, fontSize: 11 },
       }}

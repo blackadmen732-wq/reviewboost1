@@ -64,6 +64,12 @@ interface CustomerFlowProps {
   earlyForm?: { action: string; key: string } | null;
   /** An early submit that failed: the star stays chosen, with Try again. */
   failedRating?: RatingValue | null;
+  /**
+   * The owner looking at their own page (`?preview=1`): the same page, but
+   * nothing is recorded. No session opens, so it is not counted as a tap; a
+   * star shows what happens next and saves nothing.
+   */
+  preview?: boolean;
 }
 
 interface FeedbackAttempt {
@@ -112,6 +118,11 @@ function within<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
 }
 
 const noSubscription = () => () => {};
+
+/** Read now, never narrowed: the phone can go offline mid-request. */
+function phoneIsOffline(): boolean {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
 
 function isOfflineError(error: unknown): boolean {
   return (
@@ -169,6 +180,7 @@ export function CustomerFlow({
   initialUnavailable = false,
   earlyForm = null,
   failedRating = null,
+  preview = false,
 }: CustomerFlowProps) {
   const [initialData] = useState(() => preparedOrNull(initialContext));
   const [state, dispatch] = useReducer(customerFlowReducer, undefined, () => {
@@ -193,6 +205,14 @@ export function CustomerFlow({
     () => false,
   );
   const [recoveryReady, setRecoveryReady] = useState(false);
+  /** The star the owner tapped in a preview: shown, never sent. */
+  const [previewRating, setPreviewRating] = useState<RatingValue | null>(null);
+  /**
+   * Whether this visit just sent the customer to Google. A handoff restored
+   * from an earlier visit (a re-scan, the back button) stays put, so it must
+   * not say "Taking you to…".
+   */
+  const [leaving, setLeaving] = useState(false);
   const hadRecoveredDraft = useRef(false);
   const localeChosen = useRef(false);
   const feedbackInFlight = useRef(false);
@@ -230,7 +250,7 @@ export function CustomerFlow({
 
   useEffect(() => {
     const animationFrame = window.requestAnimationFrame(() => {
-      const recovered = loadCustomerDraft(token);
+      const recovered = preview ? null : loadCustomerDraft(token);
       if (recovered) {
         hadRecoveredDraft.current = true;
         dispatch({ type: "restore", state: recovered });
@@ -238,7 +258,7 @@ export function CustomerFlow({
       setRecoveryReady(true);
     });
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [token]);
+  }, [preview, token]);
 
   useEffect(() => {
     if (
@@ -260,8 +280,8 @@ export function CustomerFlow({
   }, [contextQuery.data, recoveryReady, state.locale]);
 
   useEffect(() => {
-    if (recoveryReady) saveCustomerDraft(token, state);
-  }, [recoveryReady, state, token]);
+    if (recoveryReady && !preview) saveCustomerDraft(token, state);
+  }, [preview, recoveryReady, state, token]);
 
   useEffect(() => {
     document.documentElement.lang = state.locale;
@@ -297,6 +317,7 @@ export function CustomerFlow({
    * same key, exactly as it did before.
    */
   const canOpenSession =
+    !preview &&
     recoveryReady &&
     Boolean(contextQuery.data) &&
     !earlyDone &&
@@ -459,9 +480,14 @@ export function CustomerFlow({
           ),
         );
         handoffPending.current = true;
-      } catch (error) {
+        setLeaving(true);
+      } catch {
+        // Offline waits for the connection. Anything else, a dropped request
+        // on a phone that is online included, is a failed send that tries
+        // again by itself: waiting for an `online` event that never comes
+        // left the customer stuck on "You're offline".
         dispatch({
-          type: isOfflineError(error) ? "feedback-offline" : "feedback-failed",
+          type: phoneIsOffline() ? "feedback-offline" : "feedback-failed",
         });
       } finally {
         feedbackInFlight.current = false;
@@ -481,14 +507,28 @@ export function CustomerFlow({
     navigateToDestination(destinationUrl);
   }, [destinationUrl, state.screen]);
 
+  // Back from Google through the back-forward cache: the page is the one
+  // that sent them, but it is not leaving again.
+  useEffect(() => {
+    function shown(event: PageTransitionEvent) {
+      if (event.persisted) setLeaving(false);
+    }
+    window.addEventListener("pageshow", shown);
+    return () => window.removeEventListener("pageshow", shown);
+  }, []);
+
   const handleRate = useCallback(
     (rating: RatingValue) => {
+      if (preview) {
+        setPreviewRating(rating);
+        return;
+      }
       // Already on its way through the early form: one tap is one rating.
       if (window.__rbEarly || earlyDone) return;
       dispatch({ type: "select-rating", rating });
       void submitFeedback(rating, { ...state, responseKey: null });
     },
-    [earlyDone, state, submitFeedback],
+    [earlyDone, preview, state, submitFeedback],
   );
 
   const handleRetry = useCallback(() => {
@@ -570,7 +610,7 @@ export function CustomerFlow({
 
   const context = contextQuery.data;
   if (!context) return <CustomerLoading messages={messages} />;
-  const screen = earlyDone ? "handoff" : state.screen;
+  const screen = earlyDone && !preview ? "handoff" : state.screen;
 
   return (
     <div ref={contentRef} className="customer-live">
@@ -623,11 +663,22 @@ export function CustomerFlow({
               ) : (
                 <RatingScreen
                   messages={messages}
-                  rating={state.rating}
-                  status={state.feedbackStatus}
+                  rating={preview ? previewRating : state.rating}
+                  status={preview ? "idle" : state.feedbackStatus}
                   embedInVisit
                   onRate={handleRate}
                   onRetry={handleRetry}
+                  note={
+                    preview ? (
+                      // For the owner, in their words: this is a preview.
+                      // One line, so the sheet keeps its shape and its footer.
+                      <p className="visit-status" style={{ maxWidth: "none" }} role="status" data-preview-note>
+                        {previewRating
+                          ? "Nothing was saved. Customers go to Google."
+                          : "Preview: taps here aren’t saved."}
+                      </p>
+                    ) : null
+                  }
                 />
               )
             ) : (
@@ -635,6 +686,7 @@ export function CustomerFlow({
                 businessName={context.business.name}
                 destinationUrl={context.destination.url}
                 messages={messages}
+                leaving={leaving}
               />
             )}
         </div>

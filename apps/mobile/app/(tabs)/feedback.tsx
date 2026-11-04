@@ -1,17 +1,43 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Button } from "@/components/button";
 import { Group, Row } from "@/components/group";
 import { TabScreen } from "@/components/screen";
 import { Segmented } from "@/components/segmented";
 import { Stars } from "@/components/stars";
+import { LoadingBlock } from "@/components/loading-block";
+import { apiFetch } from "@/data/api";
 import { useAuth, useBusinessTimeZone } from "@/data/auth-context";
 import { useFeedback, type FeedbackShow } from "@/data/use-feedback";
-import { relativeDay } from "@/lib/words";
+import { dayAndTime } from "@/lib/words";
 import { colors, type } from "@/theme";
 import type { FeedbackItem } from "@/data/types";
 import { RetryBlock } from "@/components/retry-block";
+
+/**
+ * Whether the business has any rating at all, asked only when "Needs you" is
+ * empty: "All caught up" said to an owner who has never had a rating told
+ * them they had dealt with ratings that never came. Null until known.
+ */
+function useHasAnyRating(orgId: string | undefined, ask: boolean): boolean | null {
+  const [hasAny, setHasAny] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!orgId || !ask) return;
+    let live = true;
+    apiFetch<{ data: unknown[] }>("/api/v1/customer-responses?limit=1", orgId)
+      .then((res) => {
+        if (live) setHasAny(res.data.length > 0);
+      })
+      .catch(() => {
+        // Unknown: the usual "All caught up" stands.
+      });
+    return () => {
+      live = false;
+    };
+  }, [orgId, ask]);
+  return hasAny;
+}
 
 const VIEWS = [
   { value: "needs", label: "Needs you" },
@@ -38,6 +64,8 @@ export default function FeedbackScreen() {
     activeOrg?.orgId,
     show,
   );
+  const emptyNeeds = show === "needs" && !loading && !error && items.length === 0;
+  const hasAnyRating = useHasAnyRating(activeOrg?.orgId, emptyNeeds);
 
   // Back from a rating, the list shows what changed (read, sorted).
   useFocusEffect(
@@ -53,15 +81,17 @@ export default function FeedbackScreen() {
       {error && items.length === 0 ? (
         <RetryBlock message={error} retryKey="feedback" onRetry={() => void load()} />
       ) : loading && items.length === 0 ? (
-        <ActivityIndicator style={styles.spinner} color={colors.inkMuted} />
+        <LoadingBlock label="Loading ratings…" />
       ) : items.length === 0 ? (
-        show === "needs" ? (
+        show === "needs" && hasAnyRating !== false ? (
           <Empty title="All caught up." body="Nothing is waiting on you. Every rating, sorted or read, is under Everything." />
         ) : (
-          <Empty title="Nothing yet." body="Ratings show up here after customers tap or scan your Tag." />
+          <Empty title="No ratings yet." body="Ratings show up here after customers tap or scan your Tag." />
         )
       ) : (
-        <View>
+        <View style={styles.listArea}>
+          {/* A refresh that failed keeps the ratings that were here. */}
+          {error ? <RetryBlock compact message={error} retryKey="feedback-stale" onRetry={() => void load()} /> : null}
           <Group>
             {items.map((item) => (
               <FeedbackRow key={item.id} item={item} />
@@ -84,7 +114,8 @@ export default function FeedbackScreen() {
 }
 
 function FeedbackRow({ item }: { item: FeedbackItem }) {
-  const when = relativeDay(item.submittedAt, useBusinessTimeZone());
+  // "Today at 2:30 PM": when it came in, without opening it.
+  const when = dayAndTime(item.submittedAt, useBusinessTimeZone());
   return (
     <Row
       onPress={() => router.push(`/feedback/${item.id}`)}
@@ -126,7 +157,6 @@ function Empty({ title, body }: { title: string; body: string }) {
 }
 
 const styles = StyleSheet.create({
-  spinner: { marginTop: 32 },
   notice: { gap: 16 },
   noticeText: { ...type.callout, color: colors.ink },
   top: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -135,7 +165,8 @@ const styles = StyleSheet.create({
   when: { ...type.subhead, color: colors.ink, flex: 1, textAlign: "right" },
   whenRead: { color: colors.inkMuted },
   note: { ...type.subhead, color: colors.ink, marginTop: 6, marginLeft: 18 },
-  more: { marginTop: 12 },
+  more: {},
+  listArea: { gap: 12 },
   empty: { paddingVertical: 24, gap: 6 },
   emptyTitle: { ...type.headline, color: colors.ink },
   emptyBody: { ...type.callout, color: colors.inkMuted },

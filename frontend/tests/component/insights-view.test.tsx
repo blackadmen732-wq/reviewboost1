@@ -93,6 +93,17 @@ describe("no ratings ever", () => {
   });
 });
 
+describe("first ratings, all today", () => {
+  it("leads with today, not with an empty month", () => {
+    // A new owner's first three ratings: "No ratings in the last 30 days"
+    // over them read as nothing having worked.
+    renderView(build({ today: [5, 4, 2] }, 30));
+    expect(screen.getByRole("heading", { name: "3 ratings today" })).toBeVisible();
+    expect(screen.getByText("They join these numbers tomorrow, once the day is over.")).toBeVisible();
+    expect(screen.queryByText(/No ratings in the last/)).toBeNull();
+  });
+});
+
 describe("a quiet period", () => {
   it("names the empty period, mentions today, and offers a longer view", () => {
     renderView(build({ earlier: true, today: [5, 4] }, 7));

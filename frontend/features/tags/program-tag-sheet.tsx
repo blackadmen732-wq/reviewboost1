@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { NfcSheetView } from "@/features/tags/nfc-sheet-view";
 import {
@@ -50,6 +50,8 @@ class Superseded extends Error {}
  * On screen all of that is one action: ready, writing, then success or an
  * error — with two interruptions only where a person has to decide.
  */
+const noSubscription = () => () => {};
+
 export function ProgramTagSheet({
   standId,
   open,
@@ -292,9 +294,19 @@ export function ProgramTagSheet({
     }
   }, [accessToken, begin, fail, guard, settle, standId, writeAndConfirm]);
 
+  // A browser with no Web NFC can never start, so the sheet opens on that
+  // answer, not on "Press Start", which could only end in it.
+  const noNfc = useSyncExternalStore(
+    noSubscription,
+    () => !("NDEFReader" in window),
+    () => false,
+  );
+  const shownPhase: ProgramPhase = phase === "idle" && noNfc ? "failed" : phase;
+  const shownFailure: NfcFailure | null = phase === "idle" && noNfc ? "unsupported" : failure;
+
   // The success scene closes itself. Nobody should have to dismiss a green
   // check, and leaving it up invites a second, pointless programming run.
-  const scene = sceneForPhase(phase);
+  const scene = sceneForPhase(shownPhase);
   useEffect(() => {
     if (scene !== "success") return undefined;
     const timer = setTimeout(close, DONE_DWELL_MS);
@@ -307,7 +319,7 @@ export function ProgramTagSheet({
     scene === "writing"
       ? writingCopy(tagDetected(phase), PLATFORM)
       : scene === "error"
-        ? failureCopy(failure)
+        ? failureCopy(shownFailure)
         : scene === "conflict" && existing?.kind === "other"
           ? // The one place a description of what was found is worth showing,
             // because the owner is about to erase it.
@@ -329,7 +341,7 @@ export function ProgramTagSheet({
   return (
     <NfcSheetView
       scene={scene}
-      phase={phase}
+      phase={shownPhase}
       detected={scene === "writing" && tagDetected(phase)}
       copy={copy}
       onPrimary={primary}

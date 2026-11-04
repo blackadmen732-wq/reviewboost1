@@ -54,13 +54,15 @@ export interface HomePrimary {
   label:
     | "Create a Tag"
     | "Print your code"
+    // The app's word for the same button: it shows the code, the website prints.
+    | "Show your code"
     | "Add Google link"
     | "Set up tap"
     | "Read feedback"
     | "Choose a plan"
     | "Update payment"
     | "Open Billing";
-  href: "/stands" | "/onboarding" | "/feedback" | "/settings" | "/settings/billing";
+  href: "/stands" | `/stands/${string}` | "/onboarding" | "/feedback" | "/settings" | "/settings/billing";
 }
 
 export type TagProgramPhase = "not-programmed" | "programmed" | "needs-reprogramming";
@@ -114,6 +116,12 @@ export function tagProgramPhaseLabel(phase: TagProgramPhase): string {
   return "Programmed";
 }
 
+/** "High Street", "High Street and Mall", "A, B and C". */
+function listNames(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
 export function deriveHomeModel({
   counts,
   stands,
@@ -122,10 +130,16 @@ export function deriveHomeModel({
   hasCustomerPhoto = null,
   service = "unknown",
   canManageBilling = false,
+  placesWithoutGoogleLink = [],
 }: {
   counts: HomeCounts;
   stands: HomeStand[];
   hasLocation: boolean;
+  /**
+   * With two or more places, the ones whose Google link is missing, by name,
+   * so "Google link is missing" says where. Empty for a single place.
+   */
+  placesWithoutGoogleLink?: readonly string[];
   /**
    * Whether a published Customer Page carries the business's photo. Null when
    * it could not be read: the step is left out rather than shown wrong.
@@ -205,12 +219,18 @@ export function deriveHomeModel({
   }
 
   if (!counts.hasGoogleLink) {
+    const where = placesWithoutGoogleLink.length > 0 ? ` for ${listNames(placesWithoutGoogleLink)}` : "";
     attentions.push({
       kind: "google",
-      title: counts.googleLinkInvalid ? "That Google link is wrong" : "Google link is missing",
+      title: counts.googleLinkInvalid
+        ? "That Google link is wrong"
+        : `Google link is missing${where}`,
+      // No link means no destination, and the customer page then shows
+      // "This review link isn't active": nobody can rate, not only "nobody
+      // goes to Google".
       body: counts.googleLinkInvalid
         ? GOOGLE_LINK_INVALID
-        : "Set it in Settings. Until then, those Tags send nobody to Google.",
+        : "Add it in Settings. Until then, a scan shows “This review link isn’t active”.",
     });
   }
 
@@ -220,7 +240,7 @@ export function deriveHomeModel({
       title: tags.needsRewrite === 1 ? "One Tag has a new code" : `${tags.needsRewrite} Tags have a new code`,
       body: "The old code stopped working. Reprint it and set up tap again.",
     });
-  } else if (hasStand && tags.programmed === 0) {
+  } else if (hasStand && tags.inUse === 0) {
     attentions.push({
       kind: "tag-unprogrammed",
       title: "Your Tag isn’t set up yet",
@@ -250,8 +270,12 @@ export function deriveHomeModel({
     primary = { label: "Add Google link", href: googleHref };
   } else if (tags.needsRewrite > 0) {
     primary = { label: "Set up tap", href: "/stands" };
-  } else if (kind === "empty" || tags.programmed === 0) {
-    primary = { label: "Print your code", href: "/stands" };
+  } else if (kind === "empty" || tags.inUse === 0) {
+    // Straight to the Tag, whose first tile prints: not the list of Tags.
+    primary = {
+      label: "Print your code",
+      href: previewStand ? `/stands/${previewStand.standId}` : "/stands",
+    };
   } else {
     primary = null;
   }
@@ -259,7 +283,7 @@ export function deriveHomeModel({
   if (!canManage && primary?.href !== "/feedback") primary = null;
 
   // Ready empty: Google is set, a tag exists and is programmed. Waiting.
-  if (kind === "empty" && counts.hasGoogleLink && hasStand && tags.programmed > 0 && tags.needsRewrite === 0) {
+  if (kind === "empty" && counts.hasGoogleLink && hasStand && tags.inUse > 0 && tags.needsRewrite === 0) {
     primary = null;
   }
 
@@ -346,17 +370,20 @@ export function weekTile(week: WeekNumbers): { value: string; unit: string; note
 }
 
 export function tagStatusLine(status: TagStatus): string {
-  if (status.total === 0) return "No tags yet";
+  if (status.total === 0) return "No Tags yet";
   if (status.live === 0) {
-    return status.total === 1 ? "1 tag, none live" : `${status.total} tags, none live`;
+    return status.total === 1 ? "1 Tag, none live" : `${status.total} Tags, none live`;
   }
 
-  const tagWord = status.total === 1 ? "tag" : "tags";
+  const tagWord = status.total === 1 ? "Tag" : "Tags";
   const parts = [`${status.total} ${tagWord}`];
   if (status.needsRewrite > 0) {
     parts.push(status.needsRewrite === 1 ? "1 has a new code" : `${status.needsRewrite} have a new code`);
   } else if (status.programmed > 0) {
     parts.push(status.programmed === 1 ? "1 ready to tap" : `${status.programmed} ready to tap`);
+  } else if (status.inUse > 0) {
+    // Working by its printed code: nothing is wrong, tap is optional.
+    parts.push(status.inUse === 1 ? "1 in use" : `${status.inUse} in use`);
   } else {
     parts.push("tap not set up yet");
   }

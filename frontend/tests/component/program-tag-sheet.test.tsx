@@ -420,9 +420,10 @@ describe("Program Tag sheet", () => {
     delete (window as unknown as Record<string, unknown>).NDEFReader;
 
     renderSheet();
-    await hold();
 
+    // It says so as it opens: no "Press Start" that could only fail.
     await waitFor(() => expect(title()).toBe("This phone can’t set up tap"));
+    expect(screen.queryByRole("button", { name: /start/i })).toBeNull();
     expect(screen.getByText(/QR code on the Tag still works/i)).toBeVisible();
     expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
     expect(screen.getByRole("button", { name: /^close$/i })).toBeVisible();

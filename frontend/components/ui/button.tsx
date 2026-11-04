@@ -18,8 +18,9 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          // Customer flow still uses this variant. Brand green cannot carry a
-          // white label (3.08:1). Owner CTAs use `action` instead.
+          // Nothing uses this: green is never a button background (DESIGN.md
+          // §3), and brand green cannot carry a white label (3.08:1). Buttons
+          // are `action`, the default, on the customer page too.
           "border-brand bg-brand text-on-brand shadow-[var(--shadow-button)] hover:border-brand-hover hover:bg-brand-hover hover:shadow-[var(--shadow-button-hover)] active:bg-brand-active disabled:border-border disabled:bg-quiet disabled:text-muted disabled:shadow-none disabled:opacity-100",
         action:
           // Disabled is neutral grey, not faded green: a washed-out green
@@ -34,7 +35,9 @@ export const buttonVariants = cva(
           "border-[color:var(--rb-border-strong)] bg-transparent text-ink hover:border-brand hover:bg-brand-soft",
         ghost: "border-transparent bg-transparent text-ink hover:bg-quiet",
         destructive:
-          "border-danger bg-danger text-white shadow-[var(--shadow-control)] hover:brightness-95",
+          // White on the light theme's red; dark on the dark theme's lighter
+          // red, where white could not be read (2.19:1).
+          "border-danger bg-danger text-on-danger shadow-[var(--shadow-control)] hover:brightness-95",
       },
       size: {
         sm: "min-h-11 px-4 text-sm",
@@ -43,7 +46,7 @@ export const buttonVariants = cva(
         icon: "h-12 min-h-12 w-12 px-0",
       },
     },
-    defaultVariants: { variant: "primary", size: "default" },
+    defaultVariants: { variant: "action", size: "default" },
   },
 );
 

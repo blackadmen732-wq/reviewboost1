@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { Button } from "@/components/ui/button";
 import { VisitStars } from "@/features/customer-page/visit-stars";
 import type { SubmissionStatus } from "@/features/customer-flow/customer-flow-state";
@@ -17,6 +19,8 @@ interface RatingScreenProps {
   onRetry: () => void;
   /** Heading lives on the shared visit card so preview and live match. */
   embedInVisit?: boolean;
+  /** One line under the stars when nothing else is said there (a preview). */
+  note?: ReactNode;
 }
 
 /**
@@ -33,6 +37,7 @@ export function RatingScreen({
   onRate,
   onRetry,
   embedInVisit = false,
+  note = null,
 }: RatingScreenProps) {
   const isSubmitting = status === "submitting";
   const isOffline = status === "offline";
@@ -74,6 +79,8 @@ export function RatingScreen({
             {messages.offline}
           </p>
         ) : null}
+
+        {!isSubmitting && !hasError && !isOffline ? note : null}
       </div>
     </section>
   );
@@ -110,7 +117,13 @@ function SubmitFailed({
           messages.submitErrorBody
         )}
       </p>
-      <Button type="button" className="visit-retry" onClick={retry.retryNow}>
+      <Button
+        type="button"
+        variant="action"
+        size="lg"
+        className="visit-retry"
+        onClick={retry.retryNow}
+      >
         {retry.phase === "stopped" ? messages.tryAgain : messages.tryNow}
       </Button>
     </>

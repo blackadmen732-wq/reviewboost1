@@ -23,13 +23,35 @@ export function homeModelForApp(model: HomeModel, service: ServiceKind): HomeMod
       if (attention.kind === "payment") {
         return { ...attention, title: "Your last payment didn’t go through", body: "Your Tags are still working." };
       }
+      if (attention.kind === "google") {
+        // The app has no Google link screen: its button opens the website.
+        return { ...attention, body: attention.body.replace("Add it in Settings.", "Add it on the ReviewBoost website.") };
+      }
       if (attention.kind === "plan" && service === "no-plan") {
-        return { ...attention, title: "Your Tag is off", body: "Customers who scan it can’t leave a rating yet." };
+        // The cause, as a fact, so the owner is not sent to set up a Tag
+        // that is already set up. No pointer to where a plan is bought.
+        return {
+          ...attention,
+          title: "Your Tag is off",
+          body: "This business has no plan yet, so a scan shows “This review link isn’t active”.",
+        };
       }
       return attention;
     }),
-    primary: model.primary?.href.startsWith(BILLING) ? null : model.primary,
-    planNote: model.planNote ? { ...model.planNote, href: null } : null,
+    primary: model.primary?.href.startsWith(BILLING)
+      ? null
+      : model.primary?.label === "Print your code"
+        ? // The app shows the code; printing happens on the website.
+          { ...model.primary, label: "Show your code" }
+        : model.primary,
+    // The note keeps the fact and loses the pointer: "until you choose a
+    // plan" is a call to buy, which the app may not make.
+    planNote: model.planNote
+      ? {
+          title: model.planNote.title.replace("until you choose a plan", "until this business has a plan"),
+          href: null,
+        }
+      : null,
     setup:
       model.setup?.map((step) => ({
         ...step,

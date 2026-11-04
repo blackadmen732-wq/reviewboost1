@@ -41,7 +41,8 @@ export function deriveSetupSteps(input: SetupInput): SetupStepView[] {
   const tags = summarizeTags(input.stands);
   const firstActive = input.stands.find((stand) => stand.status === "active") ?? null;
   const pageDone = input.hasGoogleLink;
-  const tagDone = tags.programmed > 0;
+  // Set up means working on the counter: tap, or a printed code people use.
+  const tagDone = tags.inUse > 0;
 
   const pageAction = !input.canManage
     ? null
@@ -81,13 +82,13 @@ export function deriveSetupSteps(input: SetupInput): SetupStepView[] {
       title: "Set up your Tag",
       body: tagDone
         ? "Your Tag is ready. Put it where people pay."
-        : "Program it by tapping your phone on it, or print the code. Either works.",
+        : "Print the code, or set up tap with your phone. Either works.",
       done: tagDone,
       action: tagAction,
       howTo: [
-        "Android phone: open your Tag, tap Program, then hold the top of your phone on the Tag until it says Done.",
-        "iPhone or no NFC: open your Tag and tap Print. Put the printed code by the register.",
-        "Once programmed, the Tag is locked so nobody can change it.",
+        "Open your Tag and tap “Print this code”. Put it by the register.",
+        "Or tap “Set up tap”, then hold your phone on the Tag until it says Done. It needs the ReviewBoost app or Chrome on Android.",
+        "Once set up, the Tag is locked so nobody can change it.",
       ],
     },
     {

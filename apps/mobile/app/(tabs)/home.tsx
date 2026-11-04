@@ -1,6 +1,6 @@
-import { useCallback } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef } from "react";
+import { AppState, StyleSheet, Text, View } from "react-native";
+import { router, useFocusEffect, useNavigation } from "expo-router";
 import { Button } from "@/components/button";
 import { Group, Row } from "@/components/group";
 import { Icon } from "@/components/icon";
@@ -8,11 +8,15 @@ import { TabScreen } from "@/components/screen";
 import { Stars } from "@/components/stars";
 import { Tappable } from "@/components/tappable";
 import { useAuth, useBusinessTimeZone } from "@/data/auth-context";
-import { useHome, type HomeData, type HomeSetupStep } from "@/data/home";
+import { useHome, type AttentionKind, type HomeData, type HomeSetupStep } from "@/data/home";
 import { go, opensBrowser } from "@/lib/destinations";
-import { plural, relativeDay } from "@/lib/words";
+import { dayAndTime, plural } from "@/lib/words";
 import { card, colors, type } from "@/theme";
+import { LoadingBlock } from "@/components/loading-block";
 import { RetryBlock } from "@/components/retry-block";
+
+/** While Home is on screen, ratings that come in show without a tap. */
+const REFRESH_WHILE_OPEN_MS = 60_000;
 
 /**
  * Home: does anything need me? The website's Home, from the same model and in
@@ -24,11 +28,40 @@ export default function HomeScreen() {
   const { activeOrg } = useAuth();
   const { home, loading, error, refresh } = useHome();
 
-  // Fresh every time the owner comes back to it: it is the "what's new" screen.
+  // Fresh every time the owner comes back to it: it is the "what's new"
+  // screen. Coming back means the tab, tapping Home while on it, the app
+  // returning to the foreground, and a quiet look every minute while it is
+  // open, so a rating left at the counter shows up by itself.
+  const latest = useRef(refresh);
+  useEffect(() => {
+    latest.current = refresh;
+  });
   useFocusEffect(
     useCallback(() => {
       void refresh();
+      const timer = setInterval(() => {
+        if (AppState.currentState === "active") void latest.current();
+      }, REFRESH_WHILE_OPEN_MS);
+      const foreground = AppState.addEventListener("change", (state) => {
+        if (state === "active") void latest.current();
+      });
+      return () => {
+        clearInterval(timer);
+        foreground.remove();
+      };
     }, [refresh]),
+  );
+  const navigation = useNavigation();
+  useEffect(
+    () =>
+      // The tab bar's own event: tapping Home while already on Home.
+      (navigation as unknown as { addListener: (event: "tabPress", fn: () => void) => () => void }).addListener(
+        "tabPress",
+        () => {
+          if (navigation.isFocused()) void latest.current();
+        },
+      ),
+    [navigation],
   );
 
   return (
@@ -37,7 +70,7 @@ export default function HomeScreen() {
         error ? (
           <RetryBlock message={error} retryKey="home" onRetry={() => void refresh()} />
         ) : (
-          <ActivityIndicator style={styles.spinner} color={colors.inkMuted} />
+          <LoadingBlock label="Loading Home…" />
         )
       ) : home.model.kind === "empty" ? (
         <EmptyHome home={home} />
@@ -99,10 +132,7 @@ function ActiveHome({ home }: { home: HomeData }) {
           <View style={styles.also}>
             <Text style={styles.sectionLabel}>Also</Text>
             {others.map((attention) => (
-              <View key={attention.kind} style={styles.alsoRow}>
-                <View style={[styles.dot, styles.alsoDot]} />
-                <Text style={styles.alsoText}>{attention.title}</Text>
-              </View>
+              <AlsoRow key={attention.kind} kind={attention.kind} title={attention.title} />
             ))}
           </View>
         ) : null}
@@ -145,7 +175,7 @@ function ActiveHome({ home }: { home: HomeData }) {
                 "Unread",
                 item.hasNote ? "Has a message" : null,
                 item.tagLabel,
-                relativeDay(item.submittedAt, timeZone),
+                dayAndTime(item.submittedAt, timeZone),
               ]
                 .filter(Boolean)
                 .join(". ")}
@@ -157,7 +187,7 @@ function ActiveHome({ home }: { home: HomeData }) {
                 <View style={styles.ratingMeta}>
                   {item.hasNote ? <Icon name="text.bubble" glyph="✎" size={15} color={colors.inkMuted} /> : null}
                   <Text style={styles.when} numberOfLines={1}>
-                    {relativeDay(item.submittedAt, timeZone)}
+                    {dayAndTime(item.submittedAt, timeZone)}
                   </Text>
                 </View>
               </View>
@@ -187,12 +217,16 @@ function EmptyHome({ home }: { home: HomeData }) {
         {blocker ? (
           <Headline title={blocker.title} body={blocker.body} />
         ) : (
-          <Headline title="No ratings yet." body="Your tag is ready. Put it where people pay." />
+          <Headline title="No ratings yet." body="Your Tag is ready. Put it where people pay." />
         )}
         <PrimaryAction primary={model.primary} />
       </View>
 
-      {model.setup ? <SetupSteps steps={model.setup} /> : null}
+      {model.setup ? (
+        // The headline already says how to set up the Tag; the step under it
+        // does not say it a second time.
+        <SetupSteps steps={model.setup} quietStep={blocker?.kind === "tag-unprogrammed" ? "tag" : null} />
+      ) : null}
 
       {model.planNote ? (
         <View style={styles.alsoRow}>
@@ -204,7 +238,53 @@ function EmptyHome({ home }: { home: HomeData }) {
   );
 }
 
-function SetupSteps({ steps }: { steps: HomeSetupStep[] }) {
+/**
+ * Where an "Also" line leads in the app. Plan and payment lines lead nowhere
+ * (App Store 3.1.3(f)), so they stay plain text, without a chevron that
+ * promises a tap.
+ */
+function alsoHref(kind: AttentionKind): string | null {
+  switch (kind) {
+    case "unread":
+    case "unsorted":
+      return "/feedback";
+    case "tag-missing":
+    case "tag-unprogrammed":
+    case "tag-rewrite":
+      return "/stands";
+    case "google":
+    case "google-upgrade":
+      return "/settings";
+    default:
+      return null;
+  }
+}
+
+function AlsoRow({ kind, title }: { kind: AttentionKind; title: string }) {
+  const href = alsoHref(kind);
+  const body = (
+    <>
+      <View style={[styles.dot, styles.alsoDot]} />
+      <Text style={styles.alsoText}>{title}</Text>
+      {href ? <Icon name="chevron.right" glyph="›" size={13} color={colors.inkMuted} weight="semibold" /> : null}
+    </>
+  );
+  if (!href) return <View style={styles.alsoRow}>{body}</View>;
+  return (
+    <Tappable
+      kind="row"
+      onPress={() => go(href)}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      {...(opensBrowser(href) ? { accessibilityHint: "Opens the website in your browser" } : {})}
+      style={[styles.alsoRow, styles.alsoTappable]}
+    >
+      {body}
+    </Tappable>
+  );
+}
+
+function SetupSteps({ steps, quietStep }: { steps: HomeSetupStep[]; quietStep: string | null }) {
   const current = steps.findIndex((step) => !step.done);
   const done = steps.filter((step) => step.done).length;
   return (
@@ -236,7 +316,7 @@ function SetupSteps({ steps }: { steps: HomeSetupStep[] }) {
                 <Text style={[styles.stepTitle, isCurrent ? styles.stepTitleCurrent : null]}>
                   {step.title}
                 </Text>
-                {isCurrent ? <Text style={styles.stepBody}>{step.body}</Text> : null}
+                {isCurrent && step.key !== quietStep ? <Text style={styles.stepBody}>{step.body}</Text> : null}
               </View>
             </View>
           );
@@ -256,10 +336,6 @@ function SetupSteps({ steps }: { steps: HomeSetupStep[] }) {
           );
         })}
       </Group>
-      <Tappable kind="row" onPress={() => router.navigate("/(tabs)/stands")} accessibilityRole="button" style={styles.seeAll}>
-        <Text style={styles.seeAllText}>See all steps</Text>
-        <Icon name="chevron.right" glyph="›" size={13} color={colors.inkMuted} weight="semibold" />
-      </Tappable>
     </View>
   );
 }
@@ -321,7 +397,6 @@ function NumberTile({
 }
 
 const styles = StyleSheet.create({
-  spinner: { marginTop: 40 },
   notice: { gap: 16 },
   noticeText: { ...type.callout, color: colors.ink },
   stateLabel: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
@@ -335,6 +410,7 @@ const styles = StyleSheet.create({
   alsoRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 10 },
   alsoDot: { backgroundColor: colors.starFilled },
   alsoText: { ...type.callout, color: colors.ink, flex: 1 },
+  alsoTappable: { minHeight: 44, marginTop: 4 },
   tiles: { flexDirection: "row", gap: 12 },
   tile: { ...card, flex: 1, padding: 16, minHeight: 150 },
   tileHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -362,6 +438,4 @@ const styles = StyleSheet.create({
   stepTitle: { ...type.callout, color: colors.inkMuted },
   stepTitleCurrent: { fontWeight: "600", color: colors.ink },
   stepBody: { ...type.subhead, color: colors.inkMuted, marginTop: 4 },
-  seeAll: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 44, alignSelf: "flex-start", marginTop: 4 },
-  seeAllText: { ...type.subhead, fontWeight: "500", color: colors.ink },
 });

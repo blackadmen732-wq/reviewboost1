@@ -91,9 +91,11 @@ export default async function SettingsPage() {
 
       <div className="flex max-w-[40rem] flex-col gap-10">
         <Section title="Business">
+          {/* Two fields both called "Name" left owners guessing which one
+              customers see: this one, above "How was your visit?". */}
           <EditableRow
             field="businessName"
-            label="Name"
+            label="Business name"
             value={organization.name}
             placeholder="The Corner Cafe"
             readOnly={readOnly}
@@ -124,7 +126,7 @@ export default async function SettingsPage() {
             >
               <EditableRow
                 field="locationName"
-                label={several ? "Place name" : "Name"}
+                label="Place name"
                 value={location.name}
                 placeholder="High Street"
                 context={{ locationId: location.locationId }}
@@ -155,6 +157,18 @@ export default async function SettingsPage() {
             <p className="text-sm text-muted">
               Your plan includes {entitlements.locationLimit}{" "}
               {entitlements.locationLimit === 1 ? "place" : "places"}.
+              {/* Where more places come from, for whoever can change the plan. */}
+              {can.manageBilling ? (
+                <>
+                  {" "}
+                  <Link
+                    href="/settings/billing"
+                    className="font-medium text-ink underline underline-offset-4 hover:no-underline"
+                  >
+                    See plans
+                  </Link>
+                </>
+              ) : null}
             </p>
           ) : null}
         </Section>

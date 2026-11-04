@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, router, useFocusEffect } from "expo-router";
@@ -9,10 +9,12 @@ import { stackHeader } from "@/components/screen";
 import { useAuth } from "@/data/auth-context";
 import { useHome } from "@/data/home";
 import { useBilling } from "@/data/use-billing";
-import { accountView } from "@/data/billing-view";
+import { accountView, includedView } from "@/data/billing-view";
 import { PUBLIC_LINKS } from "@/data/public-links";
 import { colors, space, type } from "@/theme";
 import { OfflineBar } from "@/components/offline-bar";
+import { RetryBlock } from "@/components/retry-block";
+import { confirmSignOut } from "@/lib/confirm-sign-out";
 
 /**
  * Settings: which business, the plan and what is left, who is signed in, the
@@ -38,7 +40,17 @@ export default function AccountScreen() {
   );
 
   const view = accountView(billing, error);
-  const included = billing?.planId ? billing.plans[billing.planId] : null;
+  // What the server enforces (a trial is one place and one Tag), not the
+  // catalog's numbers for the plan the trial will become.
+  const included = view.kind === "ready" ? includedView(billing) : null;
+  const [signingOut, setSigningOut] = useState(false);
+
+  const signOut = async () => {
+    if (signingOut || !(await confirmSignOut())) return;
+    setSigningOut(true);
+    await logout();
+    setSigningOut(false);
+  };
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
@@ -66,25 +78,29 @@ export default function AccountScreen() {
           {view.kind === "loading" ? (
             <Row>{loading ? <ActivityIndicator color={colors.inkMuted} /> : <Text style={styles.detail}>Loading…</Text>}</Row>
           ) : view.kind === "error" ? (
+            // Tries again by itself (3 s, 10 s, 30 s, or when back online),
+            // never stuck on "Couldn't load billing." after an offline moment.
             <Row>
-              <Text style={styles.error}>{view.message}</Text>
+              <RetryBlock message={view.message} retryKey="billing" onRetry={() => void refresh()} />
             </Row>
           ) : (
             <Row>
               <View style={styles.planHead}>
                 <Text style={styles.value}>{view.planName}</Text>
-                <Text style={[styles.status, view.needsAttention ? styles.statusBad : null]}>{view.statusTitle}</Text>
+                {view.statusTitle ? (
+                  <Text style={[styles.status, view.needsAttention ? styles.statusBad : null]}>{view.statusTitle}</Text>
+                ) : null}
               </View>
               <Text style={styles.detail}>{view.statusBody}</Text>
             </Row>
           )}
-          {view.kind === "ready" && included ? (
+          {included ? (
             <Row>
-              <Text style={styles.label}>Includes</Text>
+              <Text style={styles.label}>{included.label}</Text>
               <Text style={styles.detail}>
                 {included.locations} {included.locations === 1 ? "place" : "places"} · {included.tags}{" "}
                 {included.tags === 1 ? "Tag" : "Tags"}
-                {features.texting ? ` · ${included.monthlySmsSegments.toLocaleString("en-US")} texts a month` : ""}
+                {features.texting ? ` · ${included.texts.toLocaleString("en-US")} texts a month` : ""}
               </Text>
             </Row>
           ) : null}
@@ -125,7 +141,13 @@ export default function AccountScreen() {
         </Group>
 
         <View style={styles.footer}>
-          <Button label="Sign out" variant="secondary" onPress={() => void logout()} />
+          <Button
+            label="Sign out"
+            variant="secondary"
+            busy={signingOut}
+            busyLabel="Signing out…"
+            onPress={() => void signOut()}
+          />
           {/* Apple 5.1.1(v): an app that creates accounts has to let someone
               start deleting one from inside it. Below sign-out and styled as a
               plain row rather than a second red button, so the destructive one

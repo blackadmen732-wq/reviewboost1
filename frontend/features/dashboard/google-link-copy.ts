@@ -35,8 +35,13 @@ export const GOOGLE_LINK_LEGACY =
 export const GOOGLE_LINK_NOT_REVIEW_LINK =
   "This opens your Google listing, not the review box. Paste your “Get more reviews” link instead.";
 
+/**
+ * A place with no Google link has nowhere to send a customer, so its Tags
+ * show "This review link isn’t active" (customer-flow-service: no destination
+ * is a closed door). Say so; it used to promise that customers could rate.
+ */
 export const GOOGLE_LINK_LATER =
-  "The Google link is not set. Customers can rate you. They cannot be sent to Google until you add it in Settings.";
+  "Your Tag won’t work until you add your Google link in Settings.";
 
 /**
  * Google's own words, from its help page "Get more reviews"

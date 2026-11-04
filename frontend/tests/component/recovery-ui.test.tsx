@@ -212,9 +212,10 @@ describe("a part of a page that failed to load", () => {
     await screen.findByText(/The customer page link didn’t load\./);
     expect(screen.getByText("Trying again in 3 s.")).toBeInTheDocument();
     for (let second = 0; second < 3; second += 1) await pass(1_000);
+    // Marked as the owner's preview, so opening it records nothing.
     expect(await screen.findByRole("link", { name: /preview customer page/i })).toHaveAttribute(
       "href",
-      "https://reviewboost.fit/q/tag",
+      "https://reviewboost.fit/q/tag?preview=1",
     );
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
@@ -267,7 +268,7 @@ describe("setting up a business whose answer was lost", () => {
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
     fireEvent.click(await screen.findByRole("button", { name: /i will do this later/i }));
 
-    await screen.findByRole("heading", { name: /your tag is ready/i });
+    await screen.findByRole("heading", { name: /your tag is made/i });
     const posts = fetcher.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === "POST");
     expect(posts).toHaveLength(1);
     expect(screen.queryByText(/already taken/i)).toBeNull();

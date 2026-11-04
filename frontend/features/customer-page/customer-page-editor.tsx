@@ -240,11 +240,14 @@ export function CustomerPageEditor({
         if (!mounted.current) return;
         setUploadState("signing");
         setHeroUrl(URL.createObjectURL(photo.blob));
-        const fail = (message: string) => {
+        // First what happened (the photo is not on the page), then why or
+        // what to do. A bare "Please try again shortly." left owners unsure
+        // whether the photo had gone up.
+        const fail = (reason: string) => {
           if (!mounted.current) return;
           setHeroUrl(previous);
           setUploadState("error");
-          setUploadError(message);
+          setUploadError(`Your photo wasn’t added. ${reason}`);
         };
         try {
           const begin = await ownerFetch("/api/v1/customer-page/assets", {
@@ -253,7 +256,7 @@ export function CustomerPageEditor({
             body: JSON.stringify({ kind: "hero", contentType: photo.type }),
           });
           if (!begin.ok)
-            return fail(await responseMessage(begin, "Upload failed."));
+            return fail(await responseMessage(begin, "Try again."));
           const { data: ticket } = (await begin.json()) as {
             data: { assetId: string; path: string; token: string };
           };
@@ -288,7 +291,7 @@ export function CustomerPageEditor({
             uploadStop.current = null;
           }
           if (!sent.ok)
-            return fail("The photo did not upload. Please try again.");
+            return fail("Try again.");
           if (!mounted.current) return;
           setUploadState("confirming");
           const confirmed = await ownerFetch("/api/v1/customer-page/assets", {
@@ -300,17 +303,12 @@ export function CustomerPageEditor({
             }),
           });
           if (!confirmed.ok)
-            return fail(
-              await responseMessage(
-                confirmed,
-                "The photo could not be checked. Please try again.",
-              ),
-            );
+            return fail(await responseMessage(confirmed, "Try again."));
           const { data } = (await confirmed.json()) as {
             data?: { publicUrl?: string };
           };
           if (!data?.publicUrl)
-            return fail("The photo could not be checked. Try again.");
+            return fail("Try again.");
           if (!mounted.current) return;
           setHeroUrl(data.publicUrl);
           setPhotoNote(
@@ -327,8 +325,8 @@ export function CustomerPageEditor({
             caught instanceof SessionExpiredError
               ? caught.message
               : caught instanceof UploadStalledError
-                ? "The photo stopped uploading. Check your connection and try again."
-                : "Could not reach ReviewBoost. Check your connection and try again.",
+                ? "It stopped moving. Check your connection and try again."
+                : "Check your connection and try again.",
           );
         }
       } finally {
@@ -437,6 +435,8 @@ export function CustomerPageEditor({
   const publish = useCallback(async () => {
     if (operation.current || pendingPublication || !draftSaved) return;
     operation.current = true;
+    // A photo error from before is not about this publish.
+    setUploadError(null);
     setPublishState("publishing");
     setStatusMsg(null);
     try {
@@ -755,7 +755,12 @@ export function CustomerPageEditor({
 
       <figure className="min-w-0">
         <figcaption className="mb-3 text-center text-xs font-medium text-muted">
-          {published ? "Published page" : "Preview · not published yet"}
+          {/* Never published and never changed: customers already see this
+              page (business name, white top, stars), so it is not "not
+              published yet". Only changes that are not live are a preview. */}
+          {published || (publishedDraft === null && editableContent(draft) === editableContent({}))
+            ? "What customers see"
+            : "Preview · not published yet"}
         </figcaption>
         <PhoneFrame
           label={`${businessName} customer page preview`}

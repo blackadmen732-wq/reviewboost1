@@ -50,7 +50,9 @@ export const PUBLIC_HERO = {
   lede: "Customers tap your Tag, pick a star, and land on your Google review page. You see every rating.",
   primary: { href: START_HREF, label: "Start free trial" },
   /** Three facts that remove the usual reasons not to try. Each is checked in faq.ts. */
-  facts: ["7 days free on Starter", "No app for your customers", "Cancel any time"],
+  // The card is said up front: "7 days free" alone and a card form after
+  // sign-up read as a catch.
+  facts: ["7 days free on Starter, card required", "No app for your customers", "Cancel any time"],
 } as const;
 
 export const HOW_IT_WORKS = [

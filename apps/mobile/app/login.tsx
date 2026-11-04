@@ -14,7 +14,11 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Tappable } from "@/components/tappable";
 import { BrandLockup } from "@/components/brand-lockup";
+import { Button } from "@/components/button";
+import { OfflineBar } from "@/components/offline-bar";
 import { useAuth } from "@/data/auth-context";
+import { takeDeletionNotice } from "@/data/farewell";
+import { EMAIL_INCOMPLETE_MESSAGE, isCompleteEmail } from "@/data/send-code";
 import {
   availableSocialProviders,
   signInWithApple,
@@ -37,7 +41,11 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // After a deletion, the one line that says what was deleted, once.
+  const [farewell] = useState<string | null>(() => takeDeletionNotice());
   const [submitting, setSubmitting] = useState(false);
+  /** A sign-in in flight: a typed and an autofilled code never both go. */
+  const verifying = useRef(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const codeField = useRef<TextInput>(null);
   const { sendCode, verifyCode, sessionError } = useAuth();
@@ -80,13 +88,18 @@ export default function LoginScreen() {
     return () => clearTimeout(timer);
   }, [secondsLeft]);
 
-  const canSubmitEmail =
-    email.trim().length >= 5 && email.includes("@") && !submitting;
+  // Not pre-disabled past an "@": tapping Continue says what is missing.
+  const canSubmitEmail = email.includes("@") && !submitting;
   const canSubmitCode = code.length === CODE_LENGTH && !submitting;
 
   const handleSendCode = async () => {
     if (!canSubmitEmail) return;
     const address = email.trim().toLowerCase();
+    // "you@example" would send a code nowhere and wait for it forever.
+    if (!isCompleteEmail(address)) {
+      setError(EMAIL_INCOMPLETE_MESSAGE);
+      return;
+    }
     setError(null);
     setSubmitting(true);
 
@@ -103,7 +116,7 @@ export default function LoginScreen() {
       setSecondsLeft(RESEND_SECONDS);
       setTimeout(() => codeField.current?.focus(), 100);
     } catch {
-      setError("We could not send the code. Check the address and try again.");
+      setError("We could not send the code. Try again.");
     } finally {
       setSubmitting(false);
     }
@@ -123,31 +136,39 @@ export default function LoginScreen() {
       setCode("");
       setSecondsLeft(RESEND_SECONDS);
     } catch {
-      setError("We could not send the code. Check the address and try again.");
+      setError("We could not send the code. Try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleVerify = async () => {
-    if (!canSubmitCode) return;
+  /**
+   * `typed` is the code as it is right now: the six digits that just arrived
+   * from typing, pasting or the keyboard's one-time-code suggestion are
+   * signed in at once, before React has stored them.
+   */
+  const handleVerify = async (typed: string = code) => {
+    if (typed.length !== CODE_LENGTH || verifying.current) return;
+    verifying.current = true;
     setError(null);
     setSubmitting(true);
 
     try {
-      const err = await verifyCode(email, code);
-      if (err) {
-        setError(err);
-        setCode("");
-        codeField.current?.focus();
+      const result = await verifyCode(email, typed);
+      if (result.kind === "signed-in") {
+        router.replace("/select-org");
         return;
       }
-      router.replace("/select-org");
+      setError(result.message);
+      // A refused code is cleared to type again. Offline, slow or down, the
+      // code is still good, so it stays.
+      if (result.kind === "wrong") setCode("");
+      codeField.current?.focus();
     } catch {
-      setError("We could not verify the code. Please try again.");
-      setCode("");
+      setError("We could not check the code. Your code still works.");
       codeField.current?.focus();
     } finally {
+      verifying.current = false;
       setSubmitting(false);
     }
   };
@@ -172,6 +193,7 @@ export default function LoginScreen() {
             <Text style={styles.backText}>← Use a different email</Text>
           </Tappable>
 
+          <OfflineBar />
           <Text style={styles.title} accessibilityRole="header">
             Check your email
           </Text>
@@ -196,28 +218,30 @@ export default function LoginScreen() {
             placeholder="000000"
             placeholderTextColor={colors.inkFaint}
             value={code}
-            onChangeText={(value) =>
-              setCode(value.replace(/\D/g, "").slice(0, CODE_LENGTH))
-            }
+            onChangeText={(value) => {
+              const next = value.replace(/\D/g, "").slice(0, CODE_LENGTH);
+              setCode(next);
+              if (error) setError(null);
+              // Six digits is the whole code: signing in is the only next step.
+              if (next.length === CODE_LENGTH) void handleVerify(next);
+            }}
             keyboardType="number-pad"
             autoComplete="one-time-code"
             textContentType="oneTimeCode"
+            returnKeyType="go"
+            onSubmitEditing={() => void handleVerify()}
             maxLength={CODE_LENGTH}
             editable={!submitting}
           />
 
-          <Tappable
-            style={[styles.button, !canSubmitCode && styles.buttonDisabled]}
-            onPress={handleVerify}
+          <Button
+            label="Sign in"
+            busy={submitting}
+            busyLabel="Signing in…"
             disabled={!canSubmitCode}
-            accessibilityRole="button"
-          >
-            {submitting ? (
-              <ActivityIndicator color={colors.onAction} />
-            ) : (
-              <Text style={styles.buttonText}>Sign in</Text>
-            )}
-          </Tappable>
+            onPress={() => void handleVerify()}
+            style={styles.buttonSpacing}
+          />
 
           <Tappable
             style={styles.resendButton}
@@ -259,6 +283,15 @@ export default function LoginScreen() {
           password to remember.
         </Text>
 
+        <OfflineBar />
+        {farewell ? (
+          <View style={styles.doneBox}>
+            <Text style={styles.doneText} accessibilityLiveRegion="polite">
+              {farewell}
+            </Text>
+          </View>
+        ) : null}
+
         {sessionError && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText} accessibilityLiveRegion="polite">
@@ -283,26 +316,27 @@ export default function LoginScreen() {
           placeholder="you@yourbusiness.com"
           placeholderTextColor={colors.inkFaint}
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(value) => {
+            setEmail(value);
+            if (error === EMAIL_INCOMPLETE_MESSAGE) setError(null);
+          }}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
           autoComplete="email"
+          returnKeyType="go"
+          onSubmitEditing={() => void handleSendCode()}
           editable={!submitting}
         />
 
-        <Tappable
-          style={[styles.button, !canSubmitEmail && styles.buttonDisabled]}
-          onPress={handleSendCode}
+        <Button
+          label="Continue"
+          busy={submitting}
+          busyLabel="Sending code…"
           disabled={!canSubmitEmail}
-          accessibilityRole="button"
-        >
-          {submitting ? (
-            <ActivityIndicator color={colors.onAction} />
-          ) : (
-            <Text style={styles.buttonText}>Continue</Text>
-          )}
-        </Tappable>
+          onPress={() => void handleSendCode()}
+          style={styles.buttonSpacing}
+        />
 
         {providers.length > 0 ? (
           <View style={styles.social}>
@@ -357,7 +391,7 @@ export default function LoginScreen() {
           </Text>{" "}
           and{" "}
           <Text style={styles.termsLink} accessibilityRole="link" onPress={() => void Linking.openURL(PRIVACY_URL)}>
-            privacy policy
+            privacy{"\u00A0"}policy
           </Text>
           .
         </Text>
@@ -394,7 +428,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.dangerBorder,
   },
-  errorText: { color: colors.danger, fontSize: 14, textAlign: "center" },
+  errorText: { color: colors.danger, fontSize: 15, textAlign: "center" },
+  doneBox: {
+    backgroundColor: colors.successBg,
+    borderRadius: radii.badge,
+    padding: 12,
+    marginBottom: 16,
+  },
+  doneText: { color: colors.ink, fontSize: 15, textAlign: "center" },
+  buttonSpacing: { marginTop: 8 },
   input: {
     borderWidth: 1,
     borderColor: colors.borderLight,

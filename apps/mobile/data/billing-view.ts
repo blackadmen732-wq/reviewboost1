@@ -111,6 +111,21 @@ export function accountView(
         serving: false,
       };
     case "suspended":
+      // The server answers "suspended" with no plan for a business that never
+      // had one (frontend/lib/server/billing-service.ts readBillingState).
+      // That is not a suspension: nothing was ever running. Said as a fact,
+      // with no pointer to where a plan is chosen (3.1.3(f)), and said once:
+      // "No plan" beside "No plan yet" in red read as two problems.
+      if (billing.planId === null) {
+        return {
+          kind: "ready",
+          planName: "No plan yet",
+          statusTitle: "",
+          statusBody: "Your Tags are off until this business has a plan.",
+          needsAttention: true,
+          serving: false,
+        };
+      }
       return {
         kind: "ready",
         planName,
@@ -120,6 +135,41 @@ export function accountView(
         serving: false,
       };
   }
+}
+
+/** What the business may have right now, as the server counts it. */
+export interface IncludedView {
+  /** "Includes" for a plan, "During your trial" for a trial. */
+  label: string;
+  locations: number;
+  tags: number;
+  texts: number;
+}
+
+/**
+ * The trial's own allowance, not Starter's: one place, one Tag, no texts.
+ * A copy of TRIAL_LIMITS in frontend/lib/server/entitlements.ts, which the
+ * billing endpoint applies but does not send; `billing-view.test.ts` pins it
+ * to the website's "During your trial · 1 of 1 Tag".
+ */
+export const TRIAL_INCLUDES = { locations: 1, tags: 1, texts: 0 } as const;
+
+/**
+ * The limits the server enforces (entitlements.ts `limitsFor`), never the
+ * catalog's for a plan that is not running: a trial is the trial's
+ * allowance, a running plan (paid up or retrying a card) is its plan, and a
+ * business with no running plan has nothing to list.
+ */
+export function includedView(billing: BillingState | null): IncludedView | null {
+  if (!billing) return null;
+  if (billing.status === "trialing") {
+    return { label: "During your trial", ...TRIAL_INCLUDES };
+  }
+  if ((billing.status === "active" || billing.status === "past_due") && billing.planId) {
+    const plan = billing.plans[billing.planId];
+    return { label: "Includes", locations: plan.locations, tags: plan.tags, texts: plan.monthlySmsSegments };
+  }
+  return null;
 }
 
 export type BalanceView =

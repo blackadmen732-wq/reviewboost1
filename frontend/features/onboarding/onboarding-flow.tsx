@@ -9,7 +9,7 @@ import {
   RefreshCw,
   Store,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
@@ -67,6 +67,18 @@ export function OnboardingFlow({
   selectedPlan?: PlanId | null;
 }) {
   const [step, setStep] = useState<Step>("name");
+  /** Setup finished without a Google link, so the Tag will not work yet. */
+  const [linkSkipped, setLinkSkipped] = useState(false);
+  // A new step starts at its top. Pressed at the bottom of a long step, the
+  // next one opened scrolled down, its heading cut off.
+  const firstStep = useRef(true);
+  useEffect(() => {
+    if (firstStep.current) {
+      firstStep.current = false;
+      return;
+    }
+    window.scrollTo?.({ top: 0 });
+  }, [step]);
   const [name, setName] = useState("");
   const [googleUrl, setGoogleUrl] = useState("");
   /** Which button started the save, so only that one shows it is working. */
@@ -155,6 +167,7 @@ export function OnboardingFlow({
   async function finish(withUrl: string | undefined) {
     if (createCheck.pending) return;
     setBusy(withUrl ? "link" : "later");
+    setLinkSkipped(!withUrl);
     setError(null);
     let token: string | null = null;
 
@@ -396,9 +409,12 @@ export function OnboardingFlow({
           >
             I will do this later
           </Button>
-          <p className="text-sm text-muted" data-google-unset="true">
-            {GOOGLE_LINK_LATER}
-          </p>
+          {/* What skipping means. Not under a link already pasted right. */}
+          {urlLooksRight ? null : (
+            <p className="text-sm text-muted" data-google-unset="true">
+              {GOOGLE_LINK_LATER}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -417,8 +433,10 @@ export function OnboardingFlow({
       </div>
 
       <div className="flex flex-col gap-2">
+        {/* Made, not ready: until a plan starts (and a Google link is set),
+            a scan shows "This review link isn't active". */}
         <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
-          Your Tag is ready
+          Your Tag is made
         </h1>
         {/* It is not working yet, and saying "you are all set" would mean a
             business puts this on the counter and finds out from a customer.
@@ -428,6 +446,11 @@ export function OnboardingFlow({
             ? `Your ${PLAN_CATALOG[selectedPlan].name} choice is saved. Review the price and payment details next to switch on your Tag.`
             : "Choose a plan to switch it on. Starter is free for seven days, and nothing is charged until the trial ends."}
         </p>
+        {linkSkipped ? (
+          <p className="text-base font-medium text-ink" data-done-google-missing>
+            {GOOGLE_LINK_LATER}
+          </p>
+        ) : null}
       </div>
 
       {created ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe2 } from "lucide-react";
+import { Link2Off, RefreshCw, WifiOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CustomerFrame } from "@/features/customer-flow/customer-frame";
@@ -49,8 +49,16 @@ export function CustomerBlockingState({
         />
       </div>
       <section className="flow-screen blocking-state" role="alert">
+        {/* One picture per reason. A globe here read as the language
+            button beside it, and said nothing about what went wrong. */}
         <div className="blocking-state-icon" aria-hidden="true">
-          <Globe2 size={28} strokeWidth={1.9} />
+          {unavailable ? (
+            <Link2Off size={28} strokeWidth={1.9} />
+          ) : kind === "offline" ? (
+            <WifiOff size={28} strokeWidth={1.9} />
+          ) : (
+            <RefreshCw size={28} strokeWidth={1.9} />
+          )}
         </div>
         <div className="screen-heading-group">
           <h1 className="customer-question" data-screen-heading tabIndex={-1}>
@@ -81,6 +89,7 @@ export function CustomerBlockingState({
         </div>
         {unavailable ? null : retry ? (
           <Button
+            variant="action"
             size="lg"
             loading={retry.phase === "retrying"}
             loadingLabel={messages.retrying}
@@ -89,7 +98,7 @@ export function CustomerBlockingState({
             {retry.phase === "stopped" ? messages.tryAgain : messages.tryNow}
           </Button>
         ) : onRetry ? (
-          <Button size="lg" onClick={onRetry}>
+          <Button variant="action" size="lg" onClick={onRetry}>
             {messages.tryAgain}
           </Button>
         ) : null}

@@ -72,9 +72,8 @@ export function RetryNotice({
         )}
       </p>
       <Button
-        variant="secondary"
-        size="sm"
-        className="mt-3 w-auto"
+        variant="action"
+        className="mt-3"
         loading={retry.phase === "retrying"}
         loadingLabel={words.retrying}
         onClick={retry.retryNow}

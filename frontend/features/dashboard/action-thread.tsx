@@ -2,7 +2,7 @@
 
 import { Lock, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
@@ -50,6 +50,8 @@ export function ActionThread({
   const [busy, setBusy] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
+  /** When a note last saved: a second tap right after is not an empty note. */
+  const savedAt = useRef(0);
   /** The note on its way, and the notes there before it. */
   const intent = useRef<{ text: string; ids: Set<string> } | null>(null);
   const check = useOutcomeCheck({
@@ -68,6 +70,16 @@ export function ActionThread({
       setError(message);
     },
   });
+
+  // Typed and not saved, or on its way: leaving would lose it, so the
+  // browser asks first, as the customer page editor does.
+  const unsaved = body.trim().length > 0 || busy || check.pending;
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsaved]);
 
   /** Is the note in the thread now? A read, so nothing is saved twice. */
   async function isSaved(signal: AbortSignal): Promise<boolean> {
@@ -89,8 +101,10 @@ export function ActionThread({
   const canSubmit = body.trim().length > 0 && !busy && !check.pending;
 
   async function add() {
-    // Never a dead button: an empty note says what is missing.
+    // Never a dead button: an empty note says what is missing. Not right
+    // after a save, though: that is a double tap, and the note is saved.
     if (body.trim().length === 0 && !busy && !check.pending) {
+      if (Date.now() - savedAt.current < 2_000) return;
       setError("Write what you did first, then save it.");
       return;
     }
@@ -127,6 +141,7 @@ export function ActionThread({
         return;
       }
       setBody("");
+      savedAt.current = Date.now();
       intent.current = null;
       router.refresh();
     } catch (caught) {
@@ -193,7 +208,7 @@ export function ActionThread({
         rows={3}
         maxLength={2000}
         aria-label="Write what you did about this"
-        placeholder="Checked with the team and agreed what to change…"
+        placeholder="Add a note for your team…"
       />
 
       {/* Secondary: "Mark as sorted" above is this screen's one black button. */}

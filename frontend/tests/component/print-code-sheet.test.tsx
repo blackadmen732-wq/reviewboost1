@@ -153,7 +153,7 @@ describe("the printed code, from the last setup screen", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
     fireEvent.click(await screen.findByRole("button", { name: /i will do this later/i }));
-    await screen.findByRole("heading", { name: /your tag is ready/i });
+    await screen.findByRole("heading", { name: /your tag is made/i });
     return view;
   }
 

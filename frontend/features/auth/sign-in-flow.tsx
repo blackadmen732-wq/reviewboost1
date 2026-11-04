@@ -20,6 +20,46 @@ import { loadSupabaseBrowser, warmSupabaseBrowser } from "@/lib/supabase/lazy-br
 
 type Step = "email" | "verify";
 
+const NO_CONNECTION = "No connection. Check your signal and try again.";
+
+/**
+ * The sign-in service could not be reached (Supabase's AuthRetryableFetchError:
+ * a dropped connection, or its own 502–504). Checked by name: importing the
+ * helper from supabase-js would put the whole client in this page's first
+ * bundle, which loads it lazily on purpose.
+ */
+function unreachable(error: unknown): boolean {
+  return (error as { name?: unknown } | null)?.name === "AuthRetryableFetchError";
+}
+
+class AuthDeadlineError extends Error {
+  constructor() {
+    super("That’s taking too long. Check your connection and try again.");
+    this.name = "AuthDeadlineError";
+  }
+}
+
+/**
+ * The sign-in service has no deadline of its own, so a request on a dead
+ * connection spun forever. After 20 s the owner is told and can try again
+ * (a code that arrives late still works; the newest one wins).
+ */
+function withinAuthDeadline<T>(request: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new AuthDeadlineError()), 20_000);
+    request.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (caught: unknown) => {
+        clearTimeout(timer);
+        reject(caught);
+      },
+    );
+  });
+}
+
 const RESEND_SECONDS = 30;
 
 export function SignInFlow({
@@ -61,22 +101,26 @@ export function SignInFlow({
     setError(null);
 
     try {
-      const { error: sendError } = await (await loadSupabaseBrowser()).auth.signInWithOtp({
-        email: address,
-        options: { shouldCreateUser: true },
-      });
+      const { error: sendError } = await withinAuthDeadline(
+        (async () =>
+          (await loadSupabaseBrowser()).auth.signInWithOtp({
+            email: address,
+            options: { shouldCreateUser: true },
+          }))(),
+      );
       if (sendError) {
+        // No connection is not a wrong address: say which it is.
         setError(
-          "We could not send the code. Check the address and try again.",
+          unreachable(sendError)
+            ? NO_CONNECTION
+            : "We could not send the code. Check the address and try again.",
         );
         return;
       }
       setStep("verify");
       setSecondsLeft(RESEND_SECONDS);
-    } catch {
-      setError(
-        "Could not reach ReviewBoost. Check your connection and try again.",
-      );
+    } catch (caught) {
+      setError(caught instanceof AuthDeadlineError ? caught.message : NO_CONNECTION);
     } finally {
       setBusy(false);
     }
@@ -86,8 +130,10 @@ export function SignInFlow({
     event.preventDefault();
     const address = email.trim().toLowerCase();
 
-    if (!address.includes("@") || address.length < 5) {
-      setError("That does not look like an email address.");
+    // Something@somewhere.end: "tony@barber" was accepted, and the code
+    // went nowhere.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@.]{2,}$/.test(address)) {
+      setError("Check the email address. It needs a dot, like name@shop.com.");
       emailField.current?.focus();
       return;
     }
@@ -102,22 +148,31 @@ export function SignInFlow({
       setError(null);
 
       try {
-        const { error: verifyError } = await (await loadSupabaseBrowser()).auth.verifyOtp({
-          email,
-          token: code,
-          type: "email",
-        });
+        const { error: verifyError } = await withinAuthDeadline(
+          (async () =>
+            (await loadSupabaseBrowser()).auth.verifyOtp({
+              email,
+              token: code,
+              type: "email",
+            }))(),
+        );
         if (verifyError) {
-          setError("That code is not right. Check it and type it again.");
+          // Offline, the code was never checked: it is still good, so keep it.
+          if (unreachable(verifyError)) {
+            setError(`${NO_CONNECTION} Your code still works.`);
+            return;
+          }
+          setError("That code didn’t work. Use the newest code we sent.");
           setResetToken((value) => value + 1);
           return;
         }
         window.location.assign(next);
-      } catch {
+      } catch (caught) {
         setError(
-          "Could not reach ReviewBoost. Check your connection and try again.",
+          caught instanceof AuthDeadlineError
+            ? caught.message
+            : `${NO_CONNECTION} Your code still works.`,
         );
-        setResetToken((value) => value + 1);
       } finally {
         setBusy(false);
       }

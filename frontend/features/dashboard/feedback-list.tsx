@@ -2,7 +2,7 @@ import { Check, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { Stars } from "@/components/ui/stars";
-import { relativeDay } from "@/lib/utils/relative-day";
+import { relativeDayTime } from "@/lib/utils/relative-day";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -85,7 +85,7 @@ export function FeedbackList({
                     item.isRead ? "text-muted" : "font-medium text-ink",
                   )}
                 >
-                  {relativeDay(item.submittedAt, timeZone)}
+                  {relativeDayTime(item.submittedAt, timeZone)}
                 </time>
               </div>
 

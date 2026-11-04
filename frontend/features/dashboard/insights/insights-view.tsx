@@ -78,6 +78,18 @@ export function InsightsView({
               </p>
               <Link href="/stands" className="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline-offset-4 hover:underline">View your Tags</Link>
             </section>
+          ) : state === "quiet" && insights.firstRatingsToday ? (
+            // The first ratings came in today. "No ratings in the last 30
+            // days" over them read as nothing having worked; today is counted
+            // once it is over, so say that instead.
+            <section className="max-w-[36rem]">
+              <h2 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">
+                {ratingsCount(insights.todayTotal)} today
+              </h2>
+              <p className="mt-2 max-w-[40ch] text-base leading-relaxed text-muted">
+                {insights.todayTotal === 1 ? "It joins" : "They join"} these numbers tomorrow, once the day is over.
+              </p>
+            </section>
           ) : state === "quiet" ? (
             <section className="max-w-[36rem]">
               <h2 className="text-[length:var(--rb-text-title)] font-semibold tracking-[-0.02em] text-ink">

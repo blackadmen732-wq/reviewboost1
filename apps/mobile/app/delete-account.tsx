@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -13,11 +13,19 @@ import { OfflineBar } from "@/components/offline-bar";
 import { OutcomeCheckNotice } from "@/components/outcome-check-notice";
 import { stackHeader } from "@/components/screen";
 
+import { Button } from "@/components/button";
 import { Tappable } from "@/components/tappable";
 import { accountFetch, apiFetch, ApiError } from "@/data/api";
 import { useAuth } from "@/data/auth-context";
+import {
+  DELETED_BUSINESS,
+  DELETED_BUSINESS_AND_SIGN_IN,
+  DELETED_SIGN_IN,
+  sayAfterDeletion,
+} from "@/data/farewell";
 import { useOutcomeCheck } from "@/data/use-outcome-check";
-import { colors, fonts, radii } from "@/theme";
+import { sameTypedName } from "@/lib/typed-name";
+import { colors, radii, type } from "@/theme";
 
 /**
  * Deleting the account, from inside the app.
@@ -32,7 +40,7 @@ import { colors, fonts, radii } from "@/theme";
  * exactly like the ones that did not. The database checks the name too.
  */
 export default function DeleteAccountScreen() {
-  const { activeOrg, logout, refreshOrganizations } = useAuth();
+  const { activeOrg, organizations, logout, refreshOrganizations } = useAuth();
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,17 +57,38 @@ export default function DeleteAccountScreen() {
   const holding = busy || check.pending;
 
   const businessName = activeOrg?.name ?? "";
-  const matches =
-    businessName.length > 0 &&
-    typed.trim().toLowerCase() === businessName.trim().toLowerCase();
+  // Case, spaces and curly versus straight quotes aside (lib/typed-name.ts).
+  const matches = sameTypedName(typed, businessName);
   const isOwner = activeOrg?.role === "owner";
+
+  /**
+   * Whether "Delete only my account" can work: the server refuses the only
+   * owner of a business. Asked first, so an only owner is not led into a
+   * flow just to be turned away. Unknown (the check failed) keeps the option:
+   * the server still says no, and that screen offers the way that works.
+   */
+  const [onlyOwner, setOnlyOwner] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!isOwner) return;
+    let live = true;
+    accountFetch<{ data: { allowed: boolean } }>("/api/v1/account/personal-deletion")
+      .then((res) => {
+        if (live) setOnlyOwner(!res.data.allowed);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [isOwner]);
 
   async function leave(signInRemoved: boolean) {
     if (!signInRemoved) {
+      sayAfterDeletion(DELETED_BUSINESS);
       await refreshOrganizations();
       router.replace("/select-org");
       return;
     }
+    sayAfterDeletion(DELETED_BUSINESS_AND_SIGN_IN);
     const signOutError = await logout();
     if (signOutError) {
       setError(
@@ -96,7 +125,9 @@ export default function DeleteAccountScreen() {
         orgId,
         {
           method: "POST",
-          body: JSON.stringify({ confirmation: typed.trim() }),
+          // The business's own name once the typing matches, so the
+          // database's exact check passes whichever apostrophe was typed.
+          body: JSON.stringify({ confirmation: businessName.trim() }),
         },
       );
       setBusy(false);
@@ -122,7 +153,11 @@ export default function DeleteAccountScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <OfflineBar />
         {!isOwner || onlyMe ? (
-          <PersonalDeletion hasBusiness={Boolean(activeOrg)} />
+          <PersonalDeletion
+            hasBusiness={Boolean(activeOrg)}
+            businessName={businessName}
+            onDeleteBusiness={isOwner ? () => setOnlyMe(false) : undefined}
+          />
         ) : (
           <>
             <View style={styles.warning}>
@@ -186,19 +221,27 @@ export default function DeleteAccountScreen() {
               <Text style={styles.cancelText}>Keep my account</Text>
             </Tappable>
 
-            {/* A co-owner may leave and keep the business running. The server
-                refuses only a business's sole owner, and says which one. */}
-            <Tappable
-              style={styles.cancel}
-              onPress={() => setOnlyMe(true)}
-              accessibilityRole="button"
-            >
-              <Text style={styles.cancelText}>Delete only my account</Text>
-            </Tappable>
-            <Text style={styles.body}>
-              Keeps the business for its other owner. If you're the only owner,
-              delete the business instead.
-            </Text>
+            {onlyOwner ? (
+              // Deleting the business is the only way out for its only owner,
+              // and it takes the sign-in with it when nothing else needs it.
+              <Text style={styles.body}>
+                {organizations.length > 1
+                  ? "You’re the only owner. Your sign-in stays for your other businesses."
+                  : "You’re the only owner, so your sign-in is deleted with it."}
+              </Text>
+            ) : (
+              <>
+                {/* A co-owner may leave and keep the business running. */}
+                <Tappable
+                  style={styles.cancel}
+                  onPress={() => setOnlyMe(true)}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.cancelText}>Delete only my account</Text>
+                </Tappable>
+                <Text style={styles.body}>Keeps the business for its other owner.</Text>
+              </>
+            )}
           </>
         )}
       </ScrollView>
@@ -213,7 +256,16 @@ export default function DeleteAccountScreen() {
  * endpoint as the web. The server refuses the only owner of a business and
  * says which one; that is shown rather than a generic failure.
  */
-function PersonalDeletion({ hasBusiness }: { hasBusiness: boolean }) {
+function PersonalDeletion({
+  hasBusiness,
+  businessName,
+  onDeleteBusiness,
+}: {
+  hasBusiness: boolean;
+  businessName: string;
+  /** For an owner refused as the only one: back to deleting the business. */
+  onDeleteBusiness: (() => void) | undefined;
+}) {
   const { logout } = useAuth();
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
@@ -227,6 +279,7 @@ function PersonalDeletion({ hasBusiness }: { hasBusiness: boolean }) {
 
   async function signedOut() {
     // The login is gone server-side; clearing the local copy can't undo that.
+    sayAfterDeletion(DELETED_SIGN_IN);
     await logout();
     router.replace("/login");
   }
@@ -275,9 +328,25 @@ function PersonalDeletion({ hasBusiness }: { hasBusiness: boolean }) {
   }
 
   if (blocked) {
+    // The server's "delete that business first, then delete your account"
+    // was one step too many: deleting the business removes the sign-in too
+    // when it is the last thing it belongs to. So the way out is offered.
     return (
       <View style={styles.card}>
-        <Text style={styles.body}>{blocked}</Text>
+        <Text style={styles.cardTitle}>
+          {businessName ? `You’re the only owner of ${businessName}.` : blocked}
+        </Text>
+        <Text style={styles.body}>
+          Delete the business instead. Your sign-in goes with it when it’s your last.
+        </Text>
+        {onDeleteBusiness ? (
+          <Button
+            label="Delete the business instead"
+            variant="secondary"
+            onPress={onDeleteBusiness}
+            style={styles.cardButton}
+          />
+        ) : null}
       </View>
     );
   }
@@ -346,7 +415,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,
+    gap: 8,
   },
+  cardTitle: { ...type.headline, color: colors.ink },
+  cardButton: { marginTop: 8 },
   warning: {
     backgroundColor: colors.dangerBg,
     borderRadius: radii.card,
@@ -355,10 +427,10 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 6,
   },
-  warningTitle: { ...fonts.heading, color: colors.danger },
-  warningBody: { ...fonts.body, color: colors.ink },
-  body: { ...fonts.body, color: colors.inkMuted },
-  label: { ...fonts.label, color: colors.ink, marginBottom: 8 },
+  warningTitle: { ...type.headline, color: colors.danger },
+  warningBody: { ...type.callout, color: colors.ink },
+  body: { ...type.callout, color: colors.inkMuted },
+  label: { ...type.subhead, fontWeight: "600", color: colors.ink, marginBottom: 8 },
   input: {
     backgroundColor: colors.surface,
     borderRadius: radii.control,
@@ -366,7 +438,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    ...fonts.body,
+    ...type.body,
     color: colors.ink,
   },
   errorBox: {
@@ -374,7 +446,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.control,
     padding: 12,
   },
-  errorText: { ...fonts.body, color: colors.danger },
+  errorText: { ...type.callout, color: colors.danger },
   destructive: {
     backgroundColor: colors.danger,
     borderRadius: radii.control,
@@ -384,7 +456,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   disabled: { opacity: 0.5 },
-  destructiveText: { ...fonts.body, color: colors.white, fontWeight: "600" },
+  destructiveText: { ...type.headline, color: colors.white },
   cancel: {
     borderRadius: radii.control,
     borderWidth: 1,
@@ -392,5 +464,5 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: "center",
   },
-  cancelText: { ...fonts.body, color: colors.ink },
+  cancelText: { ...type.callout, color: colors.ink },
 });

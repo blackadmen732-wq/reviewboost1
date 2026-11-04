@@ -30,6 +30,23 @@ export function relativeDay(iso: string, timeZone: string, now: number = Date.no
   return then.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: zone });
 }
 
+/**
+ * A list row's when: "Today at 2:30 PM" and "Yesterday at 6:05 PM" (as a
+ * rating's own page and the app say it), where the
+ * hour tells two ratings of the same day apart; just the day further back,
+ * where it no longer does.
+ */
+export function relativeDayTime(iso: string, timeZone: string, now: number = Date.now()): string {
+  const day = relativeDay(iso, timeZone, now);
+  if (day !== "Today" && day !== "Yesterday") return day;
+  const clock = new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: knownZone(timeZone),
+  });
+  return `${day} at ${clock}`;
+}
+
 const KNOWN_ZONES = new Map<string, string>();
 
 /**

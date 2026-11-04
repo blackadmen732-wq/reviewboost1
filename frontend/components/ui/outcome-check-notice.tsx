@@ -58,7 +58,8 @@ function Unanswered({
   });
   const checking = check.phase === "checking";
   return (
-    <div className={className} data-outcome-check={auto.phase}>
+    // Full width, so the box keeps its size while the button is away.
+    <div className={`w-full ${className ?? ""}`} data-outcome-check={auto.phase}>
       <InlineNotice kind={auto.phase === "offline" ? "offline" : "info"}>
         {checking ? (
           <p>{words.checkingAgain}</p>
@@ -74,16 +75,14 @@ function Unanswered({
             <span className="sr-only">{words.noAnswerSoon}</span>
           </p>
         )}
-        <Button
-          variant="secondary"
-          size="sm"
-          className="mt-3 w-auto"
-          loading={checking}
-          loadingLabel={words.checkingAgain}
-          onClick={auto.retryNow}
-        >
-          {auto.phase === "stopped" ? words.checkAgain : words.checkNow}
-        </Button>
+        {/* Not while it checks: the line already says "Checking again…".
+            Big, but not black: the app checks by itself, and the screen's
+            black button is its own main action. */}
+        {checking ? null : (
+          <Button variant="secondary" className="mt-3" onClick={auto.retryNow}>
+            {auto.phase === "stopped" ? words.checkAgain : words.checkNow}
+          </Button>
+        )}
       </InlineNotice>
     </div>
   );

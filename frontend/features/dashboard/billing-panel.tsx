@@ -1,7 +1,7 @@
 "use client";
 
 import { Lock } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
@@ -403,6 +403,12 @@ export function BillingPanel({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The message sits above the plans; the button pressed is usually below,
+  // so it was off screen and the press looked like it did nothing.
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  }, [error]);
 
   const state = describe(billing, timeZone);
   const badge = badgeFor(billing);
@@ -442,9 +448,12 @@ export function BillingPanel({
       } | null;
 
       if (!response.ok || !payload?.data?.url) {
+        // Our side failed: say what that means for the owner, not "something
+        // went wrong". Nothing is charged before Stripe's page opens.
         setError(
-          payload?.error?.message ??
-            "That did not go through. Please try again.",
+          response.status >= 500
+            ? "The payment page didn’t open. Nothing was charged. Try again in a minute."
+            : (payload?.error?.message ?? "That didn’t go through. Try again."),
         );
         return;
       }
@@ -533,9 +542,11 @@ export function BillingPanel({
       ) : null}
 
       {error ? (
-        <InlineNotice kind="error" title="That did not go through" blocking>
-          <p>{error}</p>
-        </InlineNotice>
+        <div ref={errorRef}>
+          <InlineNotice kind="error" title="That didn’t go through" blocking>
+            <p>{error}</p>
+          </InlineNotice>
+        </div>
       ) : null}
 
       {error || !texting ? null : <PackReturnNotice packReturn={packReturn} />}

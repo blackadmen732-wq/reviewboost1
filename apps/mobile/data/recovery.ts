@@ -29,13 +29,16 @@ export const recoveryWords = {
   tryNow: "Try now",
   stoppedBody: "Wait a minute, then try again.",
   tryAgain: "Try again",
-  offlineTry: "You’re offline. We’ll try again when you’re back.",
+  // Every screen with these lines also shows the offline bar, which already
+  // says "You’re offline": they say what happens next, not that twice.
+  offlineTry: "We’ll try again once you’re back online.",
 
   checking: "Checking whether that went through…",
   noAnswerIn: (seconds: number) => `No answer yet. Checking again in ${seconds} s.`,
   noAnswerSoon: "No answer yet. Checking again shortly.",
   checkingAgain: "Checking again…",
-  offlineCheck: "You’re offline. We’ll check when you’re back.",
+  // Whether it saved is exactly what is not known yet: said, not implied.
+  offlineCheck: "We’ll check if it saved once you’re back online.",
   stillNoAnswer: "Still no answer. Wait a minute, then check again.",
   checkNow: "Check now",
   checkAgain: "Check again",

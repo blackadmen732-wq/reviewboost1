@@ -705,6 +705,12 @@ export interface Stand {
   tokenRotatedAt: string | null;
   nfcProvisionedAt: string | null;
   lastOpenedAt: string | null;
+  /**
+   * Whether the Tag's place has somewhere to send a customer. Without it the
+   * Tag is a closed door ("This review link isn't active"), whatever its
+   * code and chip say.
+   */
+  placeHasGoogleLink: boolean;
 }
 
 /**
@@ -726,15 +732,17 @@ export const listStands = cache(async (orgId: string, db?: OwnerDb): Promise<Sta
       .order("created_at", { ascending: true }),
     supabase
       .from("locations")
-      .select("id, name")
+      .select("id, name, destination_provider, destination_url")
       .eq("org_id", orgId),
   ]);
   if (standsResult.error) dataFailure("list_stands", standsResult.error);
   if (locationsResult.error) dataFailure("list_stands_locations", locationsResult.error);
 
   const locationMap = new Map<string, string>();
+  const linked = new Set<string>();
   for (const loc of locationsResult.data ?? []) {
     locationMap.set(loc.id as string, loc.name as string);
+    if (locationDestination(loc)) linked.add(loc.id as string);
   }
 
   return (standsResult.data ?? []).map((row) => ({
@@ -748,6 +756,7 @@ export const listStands = cache(async (orgId: string, db?: OwnerDb): Promise<Sta
     tokenRotatedAt: (row.token_rotated_at as string | null) ?? null,
     nfcProvisionedAt: (row.nfc_provisioned_at as string | null) ?? null,
     lastOpenedAt: (row.last_opened_at as string | null) ?? null,
+    placeHasGoogleLink: linked.has(row.location_id as string),
   }));
 });
 

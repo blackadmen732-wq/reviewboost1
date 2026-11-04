@@ -80,7 +80,7 @@ describe("deriveHomeModel", () => {
     });
 
     expect(model.kind).toBe("empty");
-    expect(model.primary).toEqual({ label: "Print your code", href: "/stands" });
+    expect(model.primary).toEqual({ label: "Print your code", href: "/stands/stand-1" });
     expect(model.attentions[0]?.kind).toBe("tag-unprogrammed");
     expect(model.showPreview).toBe(true);
     expect(model.previewStandId).toBe("stand-1");
@@ -233,21 +233,33 @@ describe("a member or viewer on Home", () => {
 
 describe("tagStatusLine", () => {
   it("states absence honestly", () => {
-    expect(tagStatusLine({ total: 0, live: 0, programmed: 0, needsRewrite: 0 })).toBe(
-      "No tags yet",
+    expect(tagStatusLine({ total: 0, live: 0, programmed: 0, needsRewrite: 0, inUse: 0 })).toBe(
+      "No Tags yet",
     );
   });
 
   it("uses real counts only", () => {
     expect(
-      tagStatusLine({ total: 2, live: 2, programmed: 1, needsRewrite: 0 }),
-    ).toBe("2 tags · 1 ready to tap");
+      tagStatusLine({ total: 2, live: 2, programmed: 1, needsRewrite: 0, inUse: 1 }),
+    ).toBe("2 Tags · 1 ready to tap");
+  });
+
+  it("counts a Tag whose printed code customers open as set up", () => {
+    // "Print the code or set up tap. Either works": a Tag that is being
+    // scanned is set up, chip or not, and Home stops asking.
+    const scanned = { ...liveStand, lastOpenedAt: "2026-11-02T15:00:00.000Z" };
+    const model = deriveHomeModel({ counts: emptyCounts, stands: [scanned], hasLocation: true });
+    expect(model.attentions.map((attention) => attention.kind)).not.toContain("tag-unprogrammed");
+    expect(tagStatusLine(summarizeTags([scanned]))).toBe("1 Tag · 1 in use");
+    // Opened before the code changed: the old code, so not set up.
+    const stale = { ...scanned, tokenRotatedAt: "2026-11-02T16:00:00.000Z" };
+    expect(summarizeTags([stale]).inUse).toBe(0);
   });
 
   it("names reprogramming in the sequence", () => {
     expect(
-      tagStatusLine({ total: 2, live: 2, programmed: 2, needsRewrite: 1 }),
-    ).toBe("2 tags · 1 has a new code");
+      tagStatusLine({ total: 2, live: 2, programmed: 2, needsRewrite: 1, inUse: 1 }),
+    ).toBe("2 Tags · 1 has a new code");
   });
 });
 
@@ -340,8 +352,8 @@ describe("only active Tags count as ready", () => {
   });
 
   it("reads as none live in the status line", () => {
-    expect(tagStatusLine(summarizeTags([paused]))).toBe("1 tag, none live");
-    expect(tagStatusLine(summarizeTags([paused, retired]))).toBe("2 tags, none live");
+    expect(tagStatusLine(summarizeTags([paused]))).toBe("1 Tag, none live");
+    expect(tagStatusLine(summarizeTags([paused, retired]))).toBe("2 Tags, none live");
   });
 });
 

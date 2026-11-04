@@ -55,8 +55,17 @@ export function TagsList({
                   {stand.locationName ?? "Place"} · {lastUsedLabel(stand.lastOpenedAt, timeZone)}
                 </p>
                 <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                  <Readiness ok={qrOk} label={qrOk ? "QR ready" : "Reprint QR"} />
-                  <Readiness ok={nfcOk} label={nfcLabel} />
+                  {stand.placeHasGoogleLink === false ? (
+                    // A closed door: no Google link at its place means a
+                    // scan shows "This review link isn't active". "QR ready"
+                    // in green would be the one thing not to say.
+                    <Readiness ok={false} label="Needs your Google link" />
+                  ) : (
+                    <>
+                      <Readiness ok={qrOk} label={qrOk ? "QR ready" : "Reprint QR"} />
+                      <Readiness ok={nfcOk} label={nfcLabel} />
+                    </>
+                  )}
                 </p>
               </div>
 

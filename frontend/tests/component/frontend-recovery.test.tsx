@@ -68,7 +68,8 @@ it("keeps the email and restores Continue when requesting a code loses the netwo
     target: { value: "owner@example.test" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  await screen.findByText(/could not reach reviewboost/i);
+  // The connection, not the address: say so.
+  await screen.findByText("No connection. Check your signal and try again.");
   expect(screen.getByLabelText("Email")).toHaveValue("owner@example.test");
   expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
 });
@@ -151,9 +152,10 @@ it("opens a prepared preview through a native link rather than an async popup", 
   const link = await screen.findByRole("link", {
     name: /preview customer page/i,
   });
+  // The owner's preview: the same page, marked so it records nothing.
   expect(link).toHaveAttribute(
     "href",
-    "https://reviewboost.fit/q/local-sample",
+    "https://reviewboost.fit/q/local-sample?preview=1",
   );
   expect(link).toHaveAttribute("target", "_blank");
   expect(link).toHaveAttribute("rel", "noopener noreferrer");

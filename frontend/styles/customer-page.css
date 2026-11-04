@@ -132,9 +132,11 @@ html:has(.customer-live) {
   --rb-brand-soft: #e3f5ec;
   --rb-brand-text: #007a4d;
   --rb-on-brand: #0d2118;
-  --rb-action: #007a4d;
-  --rb-action-hover: #006b43;
-  --rb-action-pressed: #005b39;
+  /* The light theme's action colour: black means "do this", as on the
+     owner's screens (the brand green is not a button colour). */
+  --rb-action: #1a1a19;
+  --rb-action-hover: #333331;
+  --rb-action-pressed: #000000;
   --rb-on-action: #ffffff;
   --rb-star: #b97d0c;
   --rb-star-soft: #fff7e5;
@@ -494,10 +496,12 @@ html:has(.customer-live) {
   overflow: visible;
 }
 
+/* Trying again is the one thing left to do: a black button as big as the
+   Google button, with the same side margins (7cqi), never a small pill. */
 .visit-card .visit-retry {
+  justify-self: stretch;
   width: auto;
-  min-width: 160px;
-  min-height: 44px;
+  margin-inline: 7cqi;
 }
 
 /* ------------------------------------------------ owner phone preview --- */

@@ -23,6 +23,7 @@
   --color-star: var(--rb-star);
   --color-star-soft: var(--rb-star-soft);
   --color-danger: var(--rb-danger);
+  --color-on-danger: var(--rb-on-danger);
   --color-danger-soft: var(--rb-danger-soft);
   --color-warning: var(--rb-warning);
   --color-warning-soft: var(--rb-warning-soft);
@@ -73,6 +74,8 @@
   --rb-raised: #ffffff;
   --rb-danger: #b33a3a;
   --rb-danger-soft: #fce8e8;
+
+  --rb-on-danger: #ffffff;
   --rb-info: #2663a0;
   --rb-focus: #005fcc;
   --rb-focus-soft: rgb(0 95 204 / 28%);
@@ -138,6 +141,8 @@
     --rb-star-soft: #3a2e14;
     --rb-danger: #ff8f8f;
     --rb-danger-soft: #452323;
+
+    --rb-on-danger: #1a1a19;
     --rb-info: #78b5f4;
     --rb-info-soft: #1b2a3a;
     --rb-warning: #f0b45a;
@@ -182,6 +187,8 @@
   --rb-star-soft: #fff7e5;
   --rb-danger: #b33a3a;
   --rb-danger-soft: #fce8e8;
+
+  --rb-on-danger: #ffffff;
   --rb-info: #2663a0;
   --rb-info-soft: #eaf2fb;
   --rb-warning: #9a6415;
@@ -225,6 +232,8 @@
   --rb-star-soft: #3a2e14;
   --rb-danger: #ff8f8f;
   --rb-danger-soft: #452323;
+
+  --rb-on-danger: #1a1a19;
   --rb-info: #78b5f4;
   --rb-info-soft: #1b2a3a;
   --rb-warning: #f0b45a;

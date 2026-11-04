@@ -189,6 +189,11 @@ export interface FeedbackInsights {
   current: PeriodStats;
   previous: PeriodStats;
   todayTotal: number;
+  /**
+   * The business's first ratings ever all came in today: nothing before
+   * them, so the page leads with today rather than an empty period.
+   */
+  firstRatingsToday: boolean;
   trend: TrendPoint[];
   /** What one trend point covers, after any daily-to-weekly fallback. */
   trendUnit: TrendUnit;
@@ -322,6 +327,7 @@ export function summarizeInsights(
     current,
     previous,
     todayTotal,
+    firstRatingsToday: todayTotal > 0 && current.total === 0 && previous.total === 0 && !hasEarlier,
     trend,
     trendUnit,
     comparison: state === "full" ? compareAverages(current, previous) : null,

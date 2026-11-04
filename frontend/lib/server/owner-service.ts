@@ -208,23 +208,26 @@ export async function getOnboardingState(context: AuthenticatedContext, requestI
 export async function listStands(context: AuthenticatedContext, requestId: string, orgId: string) {
   const { data, error } = await context.db
     .from("review_stands")
-    .select("id, org_id, location_id, label, stand_type, status, public_token_prefix, created_at, last_opened_at, token_rotated_at, nfc_provisioned_at, locations(name)")
+    .select("id, org_id, location_id, label, stand_type, status, public_token_prefix, created_at, last_opened_at, token_rotated_at, nfc_provisioned_at, locations(name, destination_provider, destination_url)")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false })
     .limit(MAX_PAGE_SIZE);
 
   if (error) databaseFailure("list_stands", error, requestId);
 
-  return (data ?? []).map((stand) => ({
-    standId: stand.id as string,
-    locationId: stand.location_id as string,
+  return (data ?? []).map((stand) => {
     // The embed is an object for this many-to-one join, but PostgREST types
     // it loosely; null when RLS hides the location row.
-    locationName: (() => {
-      const embedded = stand.locations as { name?: string } | { name?: string }[] | null;
-      const row = Array.isArray(embedded) ? embedded[0] : embedded;
-      return row?.name ?? null;
-    })(),
+    type Place = { name?: string; destination_provider?: unknown; destination_url?: unknown };
+    const embedded = stand.locations as Place | Place[] | null;
+    const place = Array.isArray(embedded) ? embedded[0] : embedded;
+    return {
+    standId: stand.id as string,
+    locationId: stand.location_id as string,
+    locationName: place?.name ?? null,
+    /** No Google link at the place: a scan shows "This review link isn't active". */
+    placeHasGoogleLink:
+      typeof place?.destination_provider === "string" && typeof place?.destination_url === "string",
     label: stand.label as string,
     standType: stand.stand_type as string,
     status: stand.status as string,
@@ -233,7 +236,8 @@ export async function listStands(context: AuthenticatedContext, requestId: strin
     lastOpenedAt: (stand.last_opened_at as string | null) ?? null,
     tokenRotatedAt: (stand.token_rotated_at as string | null) ?? null,
     nfcProvisionedAt: (stand.nfc_provisioned_at as string | null) ?? null,
-  }));
+    };
+  });
 }
 
 /**

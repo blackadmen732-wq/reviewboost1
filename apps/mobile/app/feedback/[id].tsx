@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -23,6 +22,7 @@ import { useFeedbackDetail } from "@/data/use-feedback-detail";
 import { useOutcomeCheck } from "@/data/use-outcome-check";
 import { clock, relativeDay } from "@/lib/words";
 import { card, colors, radii, space, type } from "@/theme";
+import { LoadingBlock } from "@/components/loading-block";
 import { RetryBlock } from "@/components/retry-block";
 
 const MAX_NOTE = 2000;
@@ -95,7 +95,7 @@ export default function FeedbackDetailScreen() {
             <RetryBlock message={error} retryKey={`feedback:${id}`} onRetry={() => void load()} />
           </View>
         ) : (
-          <ActivityIndicator style={styles.spinner} color={colors.inkMuted} />
+          <LoadingBlock label="Loading this rating…" />
         )}
       </SafeAreaView>
     );
@@ -139,13 +139,14 @@ export default function FeedbackDetailScreen() {
             {item.tagLabel ? ` · ${item.tagLabel}` : ""}
           </Text>
 
+          {/* The customer's words, when a rating has any. Customers are not
+              asked for a message, so "A rating with no message." was said of
+              every rating. */}
           {item.note ? (
             <Text style={styles.customerNote} selectable>
               {item.note}
             </Text>
-          ) : (
-            <Text style={styles.noMessage}>A rating with no message.</Text>
-          )}
+          ) : null}
 
           <View style={styles.sortBar}>
             {item.isResolved || needsAction ? (
@@ -225,7 +226,7 @@ export default function FeedbackDetailScreen() {
               editable={!saving && !noteCheck.pending}
               multiline
               maxLength={MAX_NOTE}
-              placeholder="Checked with the team and agreed what to change…"
+              placeholder="Add a note for your team…"
               placeholderTextColor={colors.inkMuted}
               accessibilityLabel="Write what you did about this"
               style={styles.input}
@@ -252,13 +253,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
   fill: { flex: 1 },
   content: { padding: space.gutter, paddingBottom: 48 },
-  spinner: { marginTop: 60 },
   centered: { padding: space.gutter, gap: 16 },
   empty: { ...type.callout, color: colors.inkMuted, textAlign: "center", marginTop: 40 },
   errorText: { ...type.callout, color: colors.danger },
   meta: { ...type.callout, color: colors.inkMuted, marginTop: 12 },
   customerNote: { ...type.body, fontSize: 19, lineHeight: 28, color: colors.ink, marginTop: 20 },
-  noMessage: { ...type.callout, color: colors.inkMuted, marginTop: 20 },
   sortBar: {
     marginTop: 24,
     paddingVertical: 16,

@@ -55,8 +55,7 @@ function Countdown({ startAt }: { startAt: number }) {
     <div className="flex w-full max-w-xs flex-col items-center gap-4" data-retry={retry.phase}>
       <p className="text-base text-muted">{copy.body}</p>
       <Button
-        variant="secondary"
-        className="w-auto"
+        variant="action"
         loading={retry.phase === "retrying"}
         loadingLabel="Trying again…"
         onClick={retry.retryNow}

@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Image,
   Platform,
   Share,
@@ -13,13 +12,25 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams } from "expo-router";
 import * as Linking from "expo-linking";
 import { isReviewBoostTagUrl } from "@/lib/tag-url";
+import { customerPagePreviewUrl } from "@/lib/preview-url";
+import { go } from "@/lib/destinations";
+import { LoadingBlock } from "@/components/loading-block";
+import { useBilling } from "@/data/use-billing";
 import { Button } from "@/components/button";
 import { Icon } from "@/components/icon";
 import { stackHeader } from "@/components/screen";
 import { useAuth } from "@/data/auth-context";
 import { apiFetch, authorizedImage } from "@/data/api";
 import { useStands } from "@/data/use-stands";
-import { lastUsedLabel, tagChecks, tagNeedsRewrite, tagReadiness, tagReadinessLabel } from "@/lib/words";
+import {
+  lastUsedLabel,
+  scansOffFor,
+  scansOffLabel,
+  tagChecks,
+  tagNeedsRewrite,
+  tagReadiness,
+  tagReadinessLabel,
+} from "@/lib/words";
 import { card, colors, radii, space, type } from "@/theme";
 import { NfcProgramSheet } from "@/components/nfc-program-sheet";
 import {
@@ -66,6 +77,10 @@ export default function StandDetailScreen() {
   // the printed code and the chip are current.
   const { stands, refresh: refreshStands } = useStands(orgId);
   const stand = stands.find((item) => item.standId === id) ?? null;
+  // Whether a scan of this Tag can work at all: its place's Google link, and
+  // the business's plan.
+  const { billing } = useBilling(orgId);
+  const off = stand && stand.status === "active" ? scansOffFor(stand, billing) : null;
 
   const [nfcSupported, setNfcSupported] = useState<boolean | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -270,13 +285,13 @@ export default function StandDetailScreen() {
       : stand.nfcProvisionedAt === null
         ? { text: "Not set", good: false }
         : { text: "Done", good: true };
-  const allGood = checks ? checks.qr.ok && checks.nfc.ok : false;
+  const allGood = checks ? checks.qr.ok && checks.nfc.ok && off === null : false;
 
   if (loading && !stand) {
     return (
       <SafeAreaView style={styles.center}>
         <Stack.Screen options={stackHeader("")} />
-        <ActivityIndicator size="large" color={colors.inkMuted} />
+        <LoadingBlock label="Loading this Tag…" />
       </SafeAreaView>
     );
   }
@@ -295,12 +310,28 @@ export default function StandDetailScreen() {
             // Status first, in a word and a colour; then when it was last used.
             <View style={styles.metaRow}>
               <View style={[styles.metaDot, { backgroundColor: allGood ? colors.brand : colors.starFilled }]} />
-              <Text style={styles.metaStatus}>{tagReadinessLabel(tagReadiness(stand))}</Text>
+              <Text style={styles.metaStatus}>{off ? scansOffLabel(off) : tagReadinessLabel(tagReadiness(stand))}</Text>
               <Text style={styles.meta}>{lastUsedLabel(stand.lastOpenedAt, activeOrg?.timezone ?? "UTC")}</Text>
               {stand.locationName ? <Text style={styles.meta}>{stand.locationName}</Text> : null}
             </View>
           ) : null}
         </View>
+
+        {off === "google" ? (
+          // The one thing that makes every scan of this Tag fail, and where
+          // it is fixed: the Google link is edited on the website.
+          <View style={styles.section}>
+            <Text style={styles.sectionDesc}>
+              This Tag’s place has no Google link yet, so a scan shows “This review link isn’t active”.
+            </Text>
+            <Button
+              label="Add Google link"
+              variant="secondary"
+              onPress={() => go("/settings")}
+              accessibilityHint="Opens the website in your browser"
+            />
+          </View>
+        ) : null}
 
         {error ? (
           // Tries again by itself (3 s, 10 s, 30 s, or when back online).
@@ -326,10 +357,15 @@ export default function StandDetailScreen() {
             {checks && !checks.qr.ok ? (
               <Text style={styles.sectionDesc}>The code changed. Print it again: the old printout opens nothing.</Text>
             ) : null}
+            {/* The app shows the code; it does not print. Said where it is. */}
+            <Text style={styles.sectionDesc}>To print this code, open this Tag on the ReviewBoost website.</Text>
+            {/* ?preview=1: the page records nothing, so the owner's look is
+                not counted as a tap and a star saves no rating. Only here:
+                the code and the chip carry the plain Tag link. */}
             <Button
               label="Preview customer page"
               variant="secondary"
-              onPress={() => void Linking.openURL(standUrl)}
+              onPress={() => void Linking.openURL(customerPagePreviewUrl(standUrl))}
               accessibilityHint="Opens in your browser"
             />
             <Button

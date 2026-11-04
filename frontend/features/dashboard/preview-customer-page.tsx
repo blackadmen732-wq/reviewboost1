@@ -7,6 +7,17 @@ import { RetryNotice } from "@/components/ui/retry-notice";
 import { ownerFetch, SessionExpiredError } from "@/lib/api/owner-fetch";
 import { useAutoRetry } from "@/lib/recovery/use-auto-retry";
 
+/**
+ * The Tag's page, marked as the owner's preview (`?preview=1`): it looks
+ * exactly as customers see it, but opening it is not a tap and a star there
+ * is not a rating.
+ */
+function previewUrl(standUrl: string): string {
+  const url = new URL(standUrl);
+  url.searchParams.set("preview", "1");
+  return url.toString();
+}
+
 /** Resolve the owner's link before the click, so a normal link opens on mobile. */
 export function PreviewCustomerPage({
   standId,
@@ -40,7 +51,7 @@ export function PreviewCustomerPage({
         };
         if (!data?.standUrl) throw new Error("preview_missing");
         if (!controller.signal.aborted)
-          setResult({ standId, url: data.standUrl });
+          setResult({ standId, url: previewUrl(data.standUrl) });
       } catch (caught) {
         if (!controller.signal.aborted)
           setResult({

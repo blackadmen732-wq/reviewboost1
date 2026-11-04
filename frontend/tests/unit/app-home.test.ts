@@ -51,6 +51,16 @@ describe("Home for the iPhone app", () => {
     },
   );
 
+  it("says why a Tag is off while setup is unfinished, without a word about buying", () => {
+    // No Google link yet: the plan waits behind setup as a note, and the
+    // note said "until you choose a plan".
+    const { app } = forApp("no-plan", { hasGoogleLink: false });
+    expect(app.planNote?.title).toBe("Your Tag is off until this business has a plan");
+    expect(JSON.stringify(app)).not.toMatch(PAYING);
+    // And the Google card points at the website, where the link is set.
+    expect(app.attentions.find((attention) => attention.kind === "google")?.body).toContain("ReviewBoost website");
+  });
+
   it("changes nothing for a business whose plan is running", () => {
     const { web, app } = forApp("serving", { recentCount: 4, unread: 2 });
     expect(app).toEqual(web);

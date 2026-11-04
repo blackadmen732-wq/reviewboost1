@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { clock, lastUsedLabel, plural, relativeDay, tagChecks, tagReadiness, tagReadinessLabel, textStatus } from "../../lib/words";
+import {
+  clock,
+  dayAndTime,
+  lastUsedLabel,
+  plural,
+  relativeDay,
+  scansOffFor,
+  scansOffLabel,
+  tagChecks,
+  tagReadiness,
+  tagReadinessLabel,
+  textStatus,
+} from "../../lib/words";
 
 /** The iPhone says days, times and Tag states in the website's words. */
 const NOW = Date.parse("2026-11-02T18:00:00Z");
@@ -82,5 +94,47 @@ describe("text statuses", () => {
     expect(textStatus("delivered").label).toBe("Delivered");
     expect(textStatus("suppressed").label).toBe("Not sent · opted out or blocked");
     expect(textStatus("something_new").label).toBe("something_new");
+  });
+});
+
+describe("when a rating came in, on a list row", () => {
+  it("says the day and the time, as the rating page does", () => {
+    expect(dayAndTime("2026-11-02T14:30:00Z", "UTC", NOW)).toBe("Today at 2:30 PM");
+    expect(dayAndTime("2026-11-01T18:05:00Z", "UTC", NOW)).toBe("Yesterday at 6:05 PM");
+  });
+});
+
+describe("a Tag nobody can use says why", () => {
+  const plain = { placeHasGoogleLink: true };
+  const running = { status: "active", planId: "starter" };
+
+  it("names the missing Google link in the website's words", () => {
+    expect(scansOffFor({ placeHasGoogleLink: false }, running)).toBe("google");
+    expect(scansOffLabel("google")).toBe("Needs your Google link");
+  });
+
+  it("names a business with no plan, a cancelled one and a stopped one apart", () => {
+    expect(scansOffFor(plain, { status: "suspended", planId: null })).toBe("no-plan");
+    expect(scansOffFor(plain, { status: "cancelled", planId: "starter" })).toBe("plan-cancelled");
+    expect(scansOffFor(plain, { status: "suspended", planId: "growth" })).toBe("plan-off");
+    expect(scansOffLabel("no-plan")).toBe("Off: no plan yet");
+  });
+
+  it("puts the Tag's own reason first", () => {
+    expect(scansOffFor({ placeHasGoogleLink: false }, { status: "suspended", planId: null })).toBe("google");
+  });
+
+  it("claims nothing it does not know", () => {
+    // An older server sends no flag; a running or past-due plan serves.
+    expect(scansOffFor({}, running)).toBeNull();
+    expect(scansOffFor(plain, { status: "past_due", planId: "starter" })).toBeNull();
+    expect(scansOffFor(plain, { status: "trialing", planId: "starter" })).toBeNull();
+    expect(scansOffFor(plain, null)).toBeNull();
+  });
+
+  it("never says anything about buying", () => {
+    for (const reason of ["google", "no-plan", "plan-cancelled", "plan-off"] as const) {
+      expect(scansOffLabel(reason)).not.toMatch(/subscribe|upgrade|buy|purchase|website|pricing/i);
+    }
   });
 });

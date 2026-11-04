@@ -56,6 +56,14 @@ export function clock(iso: string, timeZone: string): string {
   }
 }
 
+/**
+ * "Today at 2:30 PM": the day and the time a rating came in, as the rating
+ * page says it, so a list row says when without being opened.
+ */
+export function dayAndTime(iso: string, timeZone: string, now: number = Date.now()): string {
+  return `${relativeDay(iso, timeZone, now)} at ${clock(iso, timeZone)}`;
+}
+
 export interface TagTimes {
   nfcProvisionedAt: string | null;
   tokenRotatedAt: string | null;
@@ -95,6 +103,45 @@ export function tagChecks(input: TagTimes): { qr: { ok: boolean; label: string }
     qr: { ok: qrOk, label: qrOk ? "QR ready" : "Reprint QR" },
     nfc: { ok: nfcOk, label: nfcOk ? "Tap ready" : tagNeedsRewrite(input) ? "Set up tap again" : "Set up tap" },
   };
+}
+
+/**
+ * Why no scan of a Tag works right now, whatever its code and chip say: its
+ * place has no Google link, or the business has no running plan. Either way a
+ * customer who scans it sees "This review link isn't active", so a green "QR
+ * ready" would be a promise the customer page breaks.
+ */
+export type ScansOff = "google" | "no-plan" | "plan-cancelled" | "plan-off";
+
+/** The one line a Tag shows instead of its checks, in the website's words. */
+export function scansOffLabel(reason: ScansOff): string {
+  switch (reason) {
+    case "google":
+      // frontend/features/tags/tags-list.tsx, word for word.
+      return "Needs your Google link";
+    case "no-plan":
+      return "Off: no plan yet";
+    case "plan-cancelled":
+      return "Off: plan cancelled";
+    case "plan-off":
+      return "Off: plan not active";
+  }
+}
+
+/**
+ * The Tag's own reason first (its place's Google link), then the business's
+ * (the plan). `placeHasGoogleLink` is absent from an older server: unknown is
+ * not "missing", so it is not claimed.
+ */
+export function scansOffFor(
+  tag: { placeHasGoogleLink?: boolean },
+  plan: { status: string; planId: string | null } | null,
+): ScansOff | null {
+  if (tag.placeHasGoogleLink === false) return "google";
+  if (!plan) return null;
+  if (plan.status === "suspended") return plan.planId === null ? "no-plan" : "plan-off";
+  if (plan.status === "cancelled") return "plan-cancelled";
+  return null;
 }
 
 /** frontend/lib/owner/tag-readiness.ts lastUsedLabel */

@@ -115,9 +115,16 @@ export function InstallPrompt() {
   return (
     <div className="mb-6 rounded-[var(--radius-card)] border border-border bg-surface p-4 shadow-[var(--shadow-control)] lg:hidden">
       <div className="flex items-start gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-[22%] bg-brand text-lg font-bold text-on-brand">
-          B
-        </span>
+        {/* The real home-screen icon, so the card shows what will appear on
+            the phone. A green "B" tile matched nothing the owner would see. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/icon-180.png"
+          alt=""
+          width={44}
+          height={44}
+          className="size-11 shrink-0 rounded-[22%]"
+        />
 
         <div className="min-w-0 flex-1">
           <p className="text-base font-semibold text-ink">Put this on your home screen</p>

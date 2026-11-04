@@ -23,7 +23,7 @@ export const recoveryWords = {
   noAnswerIn: (seconds: number) => `No answer yet. Checking again in ${seconds} s.`,
   noAnswerSoon: "No answer yet. Checking again shortly.",
   checkingAgain: "Checking again…",
-  offlineCheck: "You’re offline. We’ll check when you’re back.",
+  offlineCheck: "You’re offline. We’ll check if it saved when you’re back.",
   stillNoAnswer: "Still no answer. Wait a minute, then check again.",
   checkNow: "Check now",
   checkAgain: "Check again",

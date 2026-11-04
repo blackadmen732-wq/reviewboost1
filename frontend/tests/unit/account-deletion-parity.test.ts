@@ -71,8 +71,10 @@ describe("the phone and the browser delete the same way", () => {
       ["web", web],
       ["native", native],
     ] as const) {
+      // Inline, or through sameTypedName (case, spaces and curly quotes
+      // aside, the same name).
       expect(source, `${name} does not compare a typed name`).toMatch(
-        /toLowerCase\(\)\s*===/,
+        /toLowerCase\(\)\s*===|sameTypedName\(/,
       );
     }
     // The shapes deliberately avoided: both are dismissed by muscle memory.

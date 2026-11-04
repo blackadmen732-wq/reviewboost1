@@ -41,7 +41,7 @@ export default function OfflinePage() {
         </p>
       </div>
       <script dangerouslySetInnerHTML={{ __html: RELOAD_WHEN_ONLINE }} />
-      <Button asChild variant="secondary" className="w-auto">
+      <Button asChild variant="action" className="max-w-xs">
         <Link href="/home">Try Home again</Link>
       </Button>
     </main>

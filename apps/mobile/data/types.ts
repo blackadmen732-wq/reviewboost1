@@ -55,4 +55,9 @@ export interface StandItem {
   lastOpenedAt: string | null;
   tokenRotatedAt: string | null;
   nfcProvisionedAt: string | null;
+  /**
+   * False when this Tag's place has no Google link, so a scan shows "This
+   * review link isn't active". Absent from an older server: unknown.
+   */
+  placeHasGoogleLink?: boolean;
 }

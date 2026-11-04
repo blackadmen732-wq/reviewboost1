@@ -44,6 +44,8 @@ export interface CustomerMessages {
   thanksHeading: string;
   feedbackSent: (businessName: string) => string;
   handoffBody: string;
+  /** A handoff restored from an earlier visit: nothing moves by itself. */
+  handoffReturnBody: string;
   openReviewPage: string;
   poweredBy: string;
   footerPromise: string;
@@ -96,6 +98,7 @@ const en: CustomerMessages = {
   thanksHeading: "Thanks for sharing.",
   feedbackSent: (businessName) => `Your rating was sent to ${businessName}.`,
   handoffBody: "Taking you to the public review page…",
+  handoffReturnBody: "Tap below to open the review page.",
   openReviewPage: "Open the review page",
   poweredBy: "Powered by ReviewBoost",
   footerPromise: "Real businesses. Real feedback. A brighter tomorrow.",
@@ -142,6 +145,7 @@ const es: CustomerMessages = {
   thanksHeading: "Gracias por compartir.",
   feedbackSent: (businessName) => `Tu calificación se envió a ${businessName}.`,
   handoffBody: "Te llevamos a la página pública de reseñas…",
+  handoffReturnBody: "Toca abajo para abrir la página de reseñas.",
   openReviewPage: "Abrir la página de reseñas",
   poweredBy: "Con tecnología de ReviewBoost",
   footerPromise: "Negocios reales. Comentarios reales. Un mañana más brillante.",
@@ -188,6 +192,7 @@ const ht: CustomerMessages = {
   thanksHeading: "Mèsi paske ou pataje.",
   feedbackSent: (businessName) => `Nòt ou bay la te voye bay ${businessName}.`,
   handoffBody: "N ap mennen ou sou paj revi piblik la…",
+  handoffReturnBody: "Peze bouton an pou ouvri paj revi a.",
   openReviewPage: "Ouvri paj revi a",
   poweredBy: "ReviewBoost mache paj sa a",
   footerPromise: "Biznis reyèl. Kòmantè reyèl. Yon demen pi klere.",

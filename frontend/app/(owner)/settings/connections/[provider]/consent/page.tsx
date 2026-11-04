@@ -76,7 +76,7 @@ export default async function FakeConsentPage({
             </label>
           ))}
         </fieldset>
-        <button type="submit" className={cn(buttonVariants({ variant: "primary" }))}>
+        <button type="submit" className={cn(buttonVariants({ variant: "action" }))}>
           Allow
         </button>
         <a href={deny} className={cn(buttonVariants({ variant: "secondary" }))}>

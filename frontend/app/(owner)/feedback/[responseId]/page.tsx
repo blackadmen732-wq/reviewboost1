@@ -70,15 +70,14 @@ export default async function FeedbackDetailPage({
           </p>
         </header>
 
+        {/* Customers only tap a star, so most ratings have no message; saying
+            so on every one read as something missing. Older ratings that
+            carry one still show it. */}
         {review.note ? (
           <p className="whitespace-pre-wrap text-lg leading-relaxed text-ink">
             {review.note}
           </p>
-        ) : (
-          <p className="text-base text-muted">
-            A rating with no message.
-          </p>
-        )}
+        ) : null}
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-border py-4">
           {review.isResolved || needsAction ? (

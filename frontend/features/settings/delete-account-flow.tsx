@@ -10,6 +10,7 @@ import { OutcomeCheckNotice } from "@/components/ui/outcome-check-notice";
 import { withReadDeadline, withWriteDeadline } from "@/lib/api/read-deadline";
 import { useOutcomeCheck } from "@/lib/recovery/use-outcome-check";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { sameTypedName } from "@/lib/utils/typed-name";
 
 /**
  * Deleting the account, from inside the account.
@@ -50,8 +51,7 @@ export function DeleteAccountFlow({
     onExpired: setError,
   });
 
-  const matches =
-    typed.trim().toLowerCase() === businessName.trim().toLowerCase();
+  const matches = sameTypedName(typed, businessName);
 
   if (!isOwner) {
     // A team member can't delete the business, but can always delete their
@@ -116,7 +116,9 @@ export function DeleteAccountFlow({
               "Content-Type": "application/json",
               Authorization: `Bearer ${session.access_token}`,
             },
-            body: JSON.stringify({ confirmation: typed.trim() }),
+            // The name as saved: the database checks it exactly, and what
+            // was typed may differ only in quotes or spacing (sameTypedName).
+            body: JSON.stringify({ confirmation: businessName.trim() }),
           }),
       );
       if (!response.ok) {

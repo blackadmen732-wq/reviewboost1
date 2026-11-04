@@ -206,7 +206,7 @@ describe("OwnerHome", () => {
       "href",
       "/feedback",
     );
-    expect(screen.getByText("1 tag · tap not set up yet")).toBeVisible();
+    expect(screen.getByText("1 Tag · tap not set up yet")).toBeVisible();
     expect(screen.queryByText("No ratings yet.")).not.toBeInTheDocument();
   });
 });

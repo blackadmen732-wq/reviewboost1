@@ -24,6 +24,7 @@ const stand = (over: Partial<Stand> = {}): Stand => ({
   tokenRotatedAt: null,
   nfcProvisionedAt: null,
   lastOpenedAt: null,
+  placeHasGoogleLink: true,
   ...over,
 });
 
@@ -69,5 +70,12 @@ describe("Tags list", () => {
 
     expect(screen.getByText("Reprint QR")).toBeVisible();
     expect(screen.getByText("Set up tap again")).toBeVisible();
+  });
+  it("says a Tag needs its Google link instead of calling it ready", () => {
+    // No Google link at its place: a scan shows "This review link isn't
+    // active", so a green "QR ready" would be the wrong thing to say.
+    render(<TagsList timeZone="UTC" stands={[stand({ placeHasGoogleLink: false })]} />);
+    expect(screen.getByText("Needs your Google link")).toBeVisible();
+    expect(screen.queryByText("QR ready")).toBeNull();
   });
 });

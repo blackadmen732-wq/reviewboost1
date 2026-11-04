@@ -410,16 +410,23 @@ function StatusLine({
   status: ReturnType<typeof tagReadiness>;
   timeZone: string;
 }) {
-  const good = status === "ready";
+  // No Google link at its place: nothing else about the Tag matters yet.
+  const closed = stand.placeHasGoogleLink === false;
+  const good = status === "ready" && !closed;
   return (
     // No dots between the parts: a long status wraps, and a line that starts
     // with "·" reads as a mistake. The status is ink with its colour; the rest
     // is quiet.
-    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-muted" data-tag-status={status}>
+    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-muted" data-tag-status={closed ? "needs-google" : status}>
       <span className="inline-flex items-center gap-2 font-medium text-ink">
         <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", good ? "bg-brand" : "bg-star")} />
-        {tagReadinessLabel(status)}
+        {closed ? "Needs your Google link" : tagReadinessLabel(status)}
       </span>
+      {closed ? (
+        <Link href="/settings" className="inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4 hover:no-underline">
+          Add it in Settings
+        </Link>
+      ) : null}
       <span>{lastUsedLabel(stand.lastOpenedAt, timeZone)}</span>
       {stand.locationName ? <span>{stand.locationName}</span> : null}
     </p>

@@ -221,6 +221,46 @@ describe("one-tap customer flow", () => {
     }
   });
 
+  it("retries a send that was dropped while the phone is online, never waits for online", async () => {
+    // A dropped request on a phone that says it is online (a captive portal,
+    // one bar of signal) used to show "You're offline" and wait for an
+    // `online` event that never came.
+    const { developmentCustomerFlowApi } = await import("@/lib/api/dev/development-customer-flow-api");
+    const { networkCustomerApiError } = await import("@/lib/api/customer-api-error");
+    const submit = vi
+      .spyOn(developmentCustomerFlowApi, "submitResponse")
+      .mockRejectedValueOnce(networkCustomerApiError(new TypeError("Failed to fetch")));
+    try {
+      const user = await openRating();
+      await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[4] }));
+      await screen.findByText(customerMessages.en.submitRetryingIn(3), { exact: false });
+      expect(screen.queryByText(customerMessages.en.offline)).toBeNull();
+      // It sends again by itself, with the same key, and goes on to Google.
+      await screen.findByRole("heading", { name: customerMessages.en.thanksHeading }, { timeout: 6000 });
+      await waitFor(() => expect(navigate).toHaveBeenCalledWith(FIXTURE_DESTINATION));
+      const keys = submit.mock.calls.map(([, , options]) => options.idempotencyKey);
+      expect(new Set(keys).size).toBe(1);
+    } finally {
+      submit.mockRestore();
+    }
+  });
+
+  it("an owner's preview records nothing: no tap counted, no rating, no trip to Google", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CustomerFlow token="fixture-valid" preview />);
+    await screen.findByRole("heading", { name: customerMessages.en.ratingHeading });
+    expect(screen.getByText("Preview: taps here aren’t saved.")).toBeVisible();
+
+    await user.click(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[3] }));
+    expect(await screen.findByText("Nothing was saved. Customers go to Google.")).toBeVisible();
+    // Still the rating screen, the star shown as chosen.
+    expect(screen.getByRole("heading", { name: customerMessages.en.ratingHeading })).toBeVisible();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const operations = window.__RB_FIXTURE_CALLS__?.map(({ operation }) => operation) ?? [];
+    expect(operations.filter((operation) => operation !== "context")).toEqual([]);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it("shows indistinguishable UI for unknown and inactive links", async () => {
     renderWithProviders(<CustomerFlow token="fixture-unknown" />);
     await screen.findByRole("heading", { name: customerMessages.en.unavailableHeading });

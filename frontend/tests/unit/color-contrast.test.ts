@@ -89,6 +89,11 @@ describe.each(["light", "dark"] as const)("%s theme", (theme) => {
     expect(contrast(onAction(), action())).toBeGreaterThanOrEqual(AA_TEXT);
   });
 
+  it("red button label is readable", () => {
+    // White on the dark theme's salmon measured 2.19:1 ("Make a new code").
+    expect(contrast(token("rb-on-danger", theme), token("rb-danger", theme))).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
   it("brand text token is readable on every surface it is used on", () => {
     for (const background of [canvas(), surface(), brandSoft()]) {
       expect(contrast(brandText(), background)).toBeGreaterThanOrEqual(AA_TEXT);

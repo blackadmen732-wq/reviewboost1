@@ -38,10 +38,13 @@ export default async function CustomerReviewPage({ params, searchParams }: Custo
   const query = await searchParams;
   const server = await loadCustomerPageContext(token);
   const failedRating = query["retry"] ? retryRating(query["rating"]) : null;
+  // The owner's own look at the page: nothing is recorded, so no early form.
+  const preview = query["preview"] === "1";
+  const early = server?.kind === "ready" && !preview;
 
   return (
     <>
-      {server?.kind === "ready" ? (
+      {early ? (
         // Runs as soon as it is parsed, before any bundle. Static text: no
         // request data is interpolated into it.
         <script dangerouslySetInnerHTML={{ __html: EARLY_TAP_SCRIPT }} />
@@ -52,7 +55,7 @@ export default async function CustomerReviewPage({ params, searchParams }: Custo
         initialContext={server?.kind === "ready" ? server.context : null}
         initialUnavailable={server?.kind === "unavailable"}
         earlyForm={
-          server?.kind === "ready"
+          early
             ? {
                 action: `/q/${encodeURIComponent(token)}/rate`,
                 // One key per page view: a double tap or a resent form is the
@@ -62,6 +65,7 @@ export default async function CustomerReviewPage({ params, searchParams }: Custo
             : null
         }
         failedRating={failedRating}
+        preview={preview}
       />
     </>
   );

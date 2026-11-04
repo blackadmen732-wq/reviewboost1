@@ -46,7 +46,7 @@ export function ConnectionCallback({ providerId, providerName, state, code, erro
       <div className="flex flex-col gap-4">
         <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">{providerName} wasn&apos;t connected</h1>
         <InlineNotice kind="error">{failure}</InlineNotice>
-        <Link href={`/settings/connections/${providerId}`} className={buttonVariants({ variant: "primary" })}>
+        <Link href={`/settings/connections/${providerId}`} className={buttonVariants({ variant: "action" })}>
           Back to {providerName}
         </Link>
       </div>
