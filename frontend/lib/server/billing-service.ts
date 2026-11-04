@@ -238,6 +238,27 @@ function reportUnknownPrice(
 
 // ------------------------------------------------------------- checkout ----
 
+/** Stripe statuses after which a subscription can never charge again. */
+const ENDED_STRIPE_STATUSES: ReadonlySet<string> = new Set(["canceled", "incomplete_expired"]);
+
+/**
+ * A business has one subscription. Any subscription that has not ended
+ * blocks a new checkout: one that is running is changed in the portal, and
+ * one waiting on a payment (incomplete, unpaid, paused) is settled there too.
+ * A second one would leave two subscriptions writing over the same plan.
+ */
+function refuseIfSubscriptionNotEnded(status: string | null | undefined): void {
+  if (!status || ENDED_STRIPE_STATUSES.has(status)) return;
+  const waitingOnPayment = status === "incomplete" || status === "unpaid" || status === "paused";
+  throw new ApiError(
+    409,
+    ERROR_CODE.validationFailed,
+    waitingOnPayment
+      ? "This business has a plan waiting on a payment. Update the payment from billing settings."
+      : "This business already has a subscription. Change the plan from billing settings.",
+  );
+}
+
 /**
  * Start a subscription.
  *
@@ -267,16 +288,24 @@ export async function createCheckoutSession(
   }
 
   const status = (existing as { stripe_status?: string } | null)?.stripe_status;
-  if (status === "active" || status === "trialing" || status === "past_due") {
-    throw new ApiError(
-      409,
-      ERROR_CODE.validationFailed,
-      "This business already has a subscription. Change the plan from billing settings.",
-    );
-  }
+  refuseIfSubscriptionNotEnded(status);
 
   const customerId = await ensureStripeCustomer(orgId, requestId);
   const origin = publicFrontendUrl();
+
+  // The row above is written by the webhook, so it lags Stripe: a checkout
+  // finished a moment ago, or one waiting on a payment, is not in it yet.
+  // Stripe is asked directly, so a second checkout cannot open a second
+  // subscription for a business that already has one.
+  const live = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 10 });
+  for (const subscription of live.data) refuseIfSubscriptionNotEnded(subscription.status);
+
+  // Two tabs, or a double tap, would otherwise leave two payment pages open,
+  // and paying on both makes two subscriptions. Only the newest page stays.
+  const open = await stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 10 });
+  for (const stale of open.data) {
+    if (stale.mode === "subscription") await stripe.checkout.sessions.expire(stale.id);
+  }
 
   // A business that has subscribed before does not get a second trial by
   // cancelling and checking out again.
@@ -748,6 +777,18 @@ export async function applyStripeEvent(event: Stripe.Event): Promise<EventOutcom
       if (error) {
         reportUnknownPrice(error, event, fields.priceId);
         throw error;
+      }
+      if (data === "other_subscription") {
+        // A second subscription for a business whose plan is live elsewhere
+        // (migration 20261104000100). Nothing to apply; worth a look, since a
+        // second subscription should not exist.
+        logger.warn("billing.other_subscription_ignored", {
+          eventId: event.id,
+          orgId,
+          subscriptionId: subscription.id,
+          stripeStatus: subscription.status,
+        });
+        return "stale";
       }
       return data === "stale" ? "stale" : "applied";
     }

@@ -4,6 +4,7 @@ import { ApiError, ERROR_CODE } from "@/lib/server/errors";
 import { handle, json } from "@/lib/server/http";
 import { textingEnabled } from "@/lib/features";
 import { checkConfiguration } from "@/lib/server/readiness";
+import { staleAfterSeconds } from "@/lib/server/schedule";
 import { serviceRoleClient } from "@/lib/server/supabase";
 import { tagKeyProblems, tagKeyRows } from "@/lib/server/tag-keys";
 import { workerAuthorized } from "@/lib/server/worker-auth";
@@ -26,11 +27,12 @@ export const dynamic = "force-dynamic";
 
 const ROUTE = "/api/v1/internal/health";
 
-// Cadence plus one missed run of slack: dispatch every minute, maintenance
-// every fifteen. See docs/backend/OPERATIONS.md for the alert table.
+// One missed run plus slack, measured against the schedule that is actually
+// deployed (lib/server/schedule.ts reads vercel.json). See
+// docs/backend/OPERATIONS.md for the alert table.
 const STALE_AFTER_SECONDS: Record<string, number> = {
-  sms_dispatch: 5 * 60,
-  maintenance: 45 * 60,
+  sms_dispatch: staleAfterSeconds("sms_dispatch"),
+  maintenance: staleAfterSeconds("maintenance"),
 };
 
 // Pack reconciliation runs once a day with maintenance; two days allows one
@@ -79,11 +81,12 @@ export async function GET(request: NextRequest): Promise<Response> {
     const smsWebhooks = Number(row?.["webhooks_unprocessed"] ?? 0);
     const stripeWebhooks = Number(row?.["stripe_unprocessed"] ?? 0);
 
-    // Thresholds, not opinions: a minute-by-minute dispatcher that has left
-    // something pending for ten minutes is not dispatching, and an unprocessed
-    // Stripe event is billing state that has not been applied.
+    // Thresholds, not opinions: a text still waiting after the dispatcher has
+    // had its turn (one missed run plus slack, as deployed) is not being
+    // dispatched, and an unprocessed Stripe event is billing state that has
+    // not been applied.
     const problems: string[] = [];
-    if (oldestPendingAge > 600) problems.push("outbox_backlog");
+    if (oldestPendingAge > STALE_AFTER_SECONDS.sms_dispatch!) problems.push("outbox_backlog");
     if (oldestUnknownAge > 3600) problems.push("provider_unknown_age");
     if (deadLetter > 0) problems.push("dead_letters");
     if (stripeWebhooks > 0) problems.push("stripe_webhooks_unprocessed");

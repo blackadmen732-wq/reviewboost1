@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { FeedbackList, tagLabels } from "@/features/dashboard/feedback-list";
 import { FeedbackTabs } from "@/features/dashboard/feedback-tabs";
+import { isHomeEmpty } from "@/features/dashboard/home-model";
 import { OwnerShell } from "@/features/dashboard/owner-shell";
 import {
   filterInstants,
@@ -90,7 +91,9 @@ export default async function FeedbackPage({
               </Button>
             }
           />
-        ) : showAll ? (
+        ) : showAll || isHomeEmpty(counts) ? (
+          // "All caught up" before the first rating read as if something had
+          // already happened; a new owner was told so by a blind tester.
           <EmptyState
             title="Nothing yet."
             description="Ratings show up here after customers tap or scan your Tag."

@@ -38,7 +38,7 @@ export function AddStandButton({ locations, standIds }: AddStandButtonProps) {
     setLabel("");
     notify.success(
       "Tag created",
-      "Print the code or program the tag, then put it where people pay.",
+      "Open it to print the code or set up tap, then put it where customers will see it.",
     );
     router.refresh();
   }

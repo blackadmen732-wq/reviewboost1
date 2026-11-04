@@ -297,10 +297,16 @@ lost access.
 
 See §3.
 
-### 5.3 SMS / Text Requests — IMPLEMENTED, CI-TESTED (backend) — not live-verified
+### 5.3 SMS / Text Requests — IMPLEMENTED, CI-TESTED — SWITCHED OFF — not live-verified
 
 Owner language is **Text Requests**, never "campaigns". There is no marketing
 path. Detail: `docs/backend/TEXT_REQUESTS.md`.
+
+**Switched off by the owner's decision (3 Nov 2026):** sell the Tag first, and
+keep texting built but off until the data says it pays. One variable turns it
+on: `NEXT_PUBLIC_TEXTING_ENABLED=true` (`frontend/lib/features.ts`). While it
+is off, the texting pages redirect, their APIs answer 404, the send worker
+claims nothing, and no surface offers, prices or sells a text.
 
 **Implemented and CI-tested:**
 
@@ -311,7 +317,9 @@ path. Detail: `docs/backend/TEXT_REQUESTS.md`.
 - GSM-7 / UCS-2 segment calculator (not `length / 160`) and integer micro-unit
   cost preview.
 - Quota ledger (allocation / reservation / consumption / release / refund /
-  expiration / adjustment) with a projection. **Purchase of quota is not built.**
+  expiration / adjustment) with a projection. Purchase is built: monthly texts
+  are minted by a paid Stripe invoice, and text packs (50 / 200 / 500) by a
+  paid one-time checkout (`20261103000100_sms_pack_money.sql`, `docs/MONEY.md`).
 - Authenticated APIs: schedule, list, preview, cancel; signed provider webhook;
   worker-secret dispatch trigger.
 - Twilio adapter in code. No credentials are committed. In production,
@@ -324,12 +332,18 @@ path. Detail: `docs/backend/TEXT_REQUESTS.md`.
 
 **78** vitest cases and **59** pgTAP assertions cover this surface in CI.
 
+The owner screen (`/text-requests`) and the iPhone Texts tab exist, and are
+hidden while texting is off.
+
 **Not built / not live-verified:**
 
-- Owner UI for Text Requests
 - A configured SMS provider account, From number, and live carrier send/receive
 - Real per-segment production pricing
-- Quota purchase / Stripe billing integration
+- Stripe billing and text packs are built and CI-tested, and not yet run against
+  a real Stripe account
+- Before switching texting on: phone opt-outs survive a digest-key rotation,
+  scheduling and dispatch check the plan, and dispatch runs more than once a day
+  in the recipient's own time zone (`docs/SCHEDULING.md`)
 - Legal SMS certification (A2P 10DLC, Advanced Opt-Out as a live provider
   feature). Technical controls exist; that is not certification.
 

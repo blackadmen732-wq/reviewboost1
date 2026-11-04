@@ -14,6 +14,7 @@ import {
   PRICING,
   PUBLIC_HERO,
   SECURITY,
+  SIGN_IN_HREF,
   START_HREF,
 } from "@/features/public/public-copy";
 import { ProductDemo } from "@/features/public/product-demo";
@@ -54,6 +55,18 @@ export function PublicHome() {
               Try the example <ArrowDown className="size-4" aria-hidden="true" />
             </a>
           </div>
+          {/* On a phone the header has room for one button, and Sign in sat
+              behind the menu; a returning owner hunted for it among
+              "Get started" buttons. From 640px up it is in the header. */}
+          <p className="mt-3 text-sm text-muted sm:hidden">
+            Already have an account?{" "}
+            <Link
+              href={SIGN_IN_HREF}
+              className="inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4 hover:no-underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]"
+            >
+              Sign in
+            </Link>
+          </p>
           <ul className="public-hero__facts" aria-label="At a glance">
             {PUBLIC_HERO.facts.map((fact) => (
               <li key={fact}>

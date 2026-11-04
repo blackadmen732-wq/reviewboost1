@@ -155,6 +155,17 @@ describe("Tag readiness after programming", () => {
     expect(screen.getByText(/Tap not set up/)).toBeVisible();
   });
 
+  // The printed code works alone, so tap that was never set up is optional,
+  // in grey: an orange "Not set" read as unfinished setup to a blind tester.
+  it("marks never-set-up tap as optional, not as a warning", () => {
+    setQr("ready", "blob:code");
+    render(<TagDetail timeZone="UTC" stand={stand} canManage />);
+    const chip = screen.getByText("Optional");
+    expect(chip.className).toContain("text-muted");
+    expect(chip.className).not.toContain("rb-warning");
+    expect(screen.queryByText("Not set")).not.toBeInTheDocument();
+  });
+
   it("stops saying tap is not set up as soon as setup reports success", () => {
     setQr("ready", "blob:code");
     render(<TagDetail timeZone="UTC" stand={stand} canManage />);

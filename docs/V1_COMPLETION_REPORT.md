@@ -2,18 +2,102 @@
 
 Living document. Updated at every stage, not written at the end.
 
-**Last updated:** 2026-09-17
-**Integration branch:** `cursor/sprint-forge-owner-systems-v15-7042`
-**Canonical pull request:** [#67](https://github.com/blackadmen732-wq/reviewboost1/pull/67)
-**Head:** `38829bb` — 53 commits ahead of `main` (`0155948`)
-**Merged to `main`:** nothing. None of this has shipped.
+**Last updated:** 2026-11-04
+**Integration branch:** `ccr-386a4d15-qw2263`
+**Canonical pull request:** [#86](https://github.com/blackadmen732-wq/reviewboost1/pull/86), with fixes from a full local run stacked on it from `claude/sharp-noether-xs4w28`
+**Merged to `main`:** nothing. None of this has shipped. `main` is still `0155948`.
 
+> Until 4 November this header named PR #67 on
+> `cursor/sprint-forge-owner-systems-v15-7042` at `38829bb`. #86 carries all of
+> #67 and the PRs that targeted it; the sections below 4 November are the record
+> as it stood on 17 September.
+>
 > The earlier half of this program ran on PR #71, from the branch
 > `claude/reviewboost-v1-recovery-cokccs`. Those are the header values this
 > file carried until now, and they are wrong for the current work — recorded
 > here rather than quietly replaced,
 > because a status document that rewrites its own history is not one you can
 > check.
+
+## 4 November 2026: the whole product, run end to end
+
+Until now nothing here had run outside unit tests and Playwright fixtures.
+On 4 November the PR #86 code ran against a real local Supabase stack (all
+migrations from empty, GoTrue email sign-in, Storage, PostgREST, the mail
+catcher), with the web app and the iPhone app's browser build on top. That is
+more than CI-TESTED and less than HOSTED-VERIFIED: it is not a status in the
+table below, and it is named here rather than rounded up to one.
+
+**What was exercised, as a new owner and as customers:**
+
+| Step | Result |
+|---|---|
+| Homepage → Get started → email → six-digit code | Signed in at the sixth digit |
+| Setup: business name, Google link (bad links refused), Tag made | Worked; the QR decodes to the Tag |
+| Before a plan | Home and Tags say the Tag is off; a scan shows "This review link isn't active" |
+| Plan through Stripe webhooks, signed with the local secret | Forged signature refused; real event applied (Starter, trialing); repeat recorded as duplicate |
+| Three customers tap (2★, 5★, 4★) | Each saved; each went to the same Google page; about 1 s from star to Google |
+| Owner Home, Feedback, a rating: note and Mark as sorted | Saved, badge counts follow |
+| Customer page: photo upload and publish | Customers see the photo; preview saves nothing |
+| Print this code | One page: business, "How was your visit?", the code |
+| Delete a business with a live subscription | Stripe unreachable, so nothing was deleted and the owner was told so |
+| Reading or renaming another business with this login | Refused by the database |
+| iPhone app (browser build) | Sign-in, Home, Feedback, a rating, the same live numbers |
+
+Not exercised: Stripe's own payment page (no keys), a real text, an NFC chip, a
+real iPhone, the production database.
+
+**Defects the run found, fixed on `claude/sharp-noether-xs4w28`:**
+
+1. **A second subscription could switch off the one being paid.** Every
+   subscription event overwrote the business's one row, so an abandoned
+   checkout's `incomplete_expired` suspended a paying business. The database
+   now ignores a non-live event from a different subscription while the one on
+   record is live (`20261104000100`, 18 pgTAP assertions); checkout refuses any
+   subscription that has not ended, asks Stripe directly, and expires other
+   open checkout pages; Billing offers "Update payment method" for a payment
+   that is stuck.
+2. **The maintenance worker could not run two of its steps.** service_role was
+   never granted the `app` functions behind `rpc_sms_reconcile_aged_unknowns`
+   and `rpc_sms_release_dead_letters`, so every run failed both with
+   "permission denied" (`20261104000300`, with a test that fails for any wrapper
+   with the same gap).
+3. **The sign-in email's link did not sign anyone in.** It returned to `/`,
+   which never exchanges the code, and `/auth/callback` redirected to
+   `localhost`, dropping the session cookie. It now returns through the callback
+   to `PUBLIC_FRONTEND_URL`.
+4. **Health was red about 23 hours a day.** It assumed every-minute and
+   every-fifteen-minute workers while `vercel.json` runs them daily. Health now
+   reads the deployed schedule (`lib/server/schedule.ts`).
+5. **Home could read "0 taps · 2 rated".** A rating now counts its own session
+   as a tap (`20261104000200`).
+6. **Owner screens that said something untrue or forgot input:** the Tags list
+   showed green "QR ready" while the plan was off; Billing's Starter card showed
+   "Tags 3" beside the trial without saying the trial opens one; setup forgot
+   everything on a reload; on iPhone, VoiceOver read the back button as "(tabs),
+   back".
+
+Two suspected issues were checked and are not defects: the rating page's
+heading is named by its stars ("2 out of 5") for screen readers, and the
+iPhone tab icons are SF Symbols (the text glyphs only show in the browser build).
+
+**Verification at the head of `claude/sharp-noether-xs4w28`:** 83 migrations from
+empty; 33 pgTAP suites, 1,094 assertions; 1,528 web cases; 42 Playwright cases
+(customer flow, accessibility, light and dark screenshots); 189 mobile cases;
+typecheck, lint and production build clean on web and mobile; iOS bundle export.
+
+**Still open, and none of it is code:**
+
+1. Stripe test keys and one real checkout, then live keys.
+2. Supabase Pro, a backup, then the production migrations (production had 45
+   on 2 November).
+3. `TOKEN_DIGEST_KEY` (and `TOKEN_DIGEST_KEY_PREVIOUS`) in production, so the
+   Tags already printed keep working (`docs/backend/LAUNCH_GATE.md` §4).
+4. One printed code scanned, and one NFC chip written and read on a real phone.
+5. The App Store project ID and a demo account for App Review.
+6. Before texting is switched on: opt-outs that survive a key rotation, plan
+   checks on scheduling and dispatch, and a dispatcher that runs more than once
+   a day.
 
 ## How to read the statuses
 

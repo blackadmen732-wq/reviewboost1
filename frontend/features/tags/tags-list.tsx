@@ -20,10 +20,17 @@ import { cn } from "@/lib/utils/cn";
 export function TagsList({
   stands,
   timeZone,
+  serving = true,
 }: {
   stands: Stand[];
   /** The business's, so "Used yesterday" is the business's yesterday. */
   timeZone: string;
+  /**
+   * Whether the business's plan lets Tags serve customers. While it does not,
+   * every scan shows "This review link isn't active", so a green "QR ready"
+   * on the row would contradict the notice above the list.
+   */
+  serving?: boolean;
 }) {
   return (
     <ul className="divide-y divide-border border-y border-border">
@@ -55,7 +62,9 @@ export function TagsList({
                   {stand.locationName ?? "Place"} · {lastUsedLabel(stand.lastOpenedAt, timeZone)}
                 </p>
                 <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                  {stand.placeHasGoogleLink === false ? (
+                  {!serving ? (
+                    <Readiness ok={false} label="Off until a plan is active" />
+                  ) : stand.placeHasGoogleLink === false ? (
                     // A closed door: no Google link at its place means a
                     // scan shows "This review link isn't active". "QR ready"
                     // in green would be the one thing not to say.

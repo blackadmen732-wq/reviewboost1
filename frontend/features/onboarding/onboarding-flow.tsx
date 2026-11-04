@@ -55,6 +55,9 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
 
 type Step = "name" | "google" | "done";
 
+/** Where an unfinished setup keeps what was typed, for this tab only. */
+const ONBOARDING_DRAFT_KEY = "rb.onboarding.draft";
+
 interface Created {
   organizationId?: string;
   standUrl: string;
@@ -85,6 +88,44 @@ export function OnboardingFlow({
   const [busy, setBusy] = useState<"link" | "later" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Created | null>(null);
+
+  // Nothing reaches the server until the last step, and the Google step sends
+  // the owner off to Google to copy their link. A reload, or a phone dropping
+  // the tab meanwhile, must not wipe what they typed. sessionStorage, not
+  // localStorage: the draft stays in this tab and never outlives it.
+  // Restored after the first paint, the way the customer flow restores its
+  // draft (customer-flow.tsx): the server render has no storage to read.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        const raw = window.sessionStorage.getItem(ONBOARDING_DRAFT_KEY);
+        if (!raw) return;
+        const draft = JSON.parse(raw) as { name?: unknown; googleUrl?: unknown; step?: unknown };
+        const savedName = typeof draft.name === "string" ? draft.name : "";
+        const savedUrl = typeof draft.googleUrl === "string" ? draft.googleUrl : "";
+        // Only fills what is still empty, and only moves forward from the
+        // first screen: anything typed or pressed since the page opened wins.
+        if (savedName) setName((current) => current || savedName);
+        if (savedUrl) setGoogleUrl((current) => current || savedUrl);
+        if (draft.step === "google" && savedName.trim()) {
+          setStep((current) => (current === "name" ? "google" : current));
+        }
+      } catch {
+        // Storage refused (private mode, blocked site data): start empty.
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+  useEffect(() => {
+    try {
+      if (step === "done") window.sessionStorage.removeItem(ONBOARDING_DRAFT_KEY);
+      else if (name || googleUrl) {
+        window.sessionStorage.setItem(ONBOARDING_DRAFT_KEY, JSON.stringify({ name, googleUrl, step }));
+      }
+    } catch {
+      // Nothing to keep the draft in; the flow still works without it.
+    }
+  }, [name, googleUrl, step]);
 
   const qr = useAuthenticatedQr(
     created?.standId ?? null,

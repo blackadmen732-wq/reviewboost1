@@ -96,11 +96,54 @@ test.describe("ReviewBoost customer flow", () => {
   }) => {
     await openFlow(page);
     await page.getByRole("radio", { name: spokenRatings[0] }).focus();
+    // Arrows move between stars and choose nothing (WCAG 3.2.2): pressing → used
+    // to send 2 stars to Google. Space chooses the focused star.
+    const start = page.url();
     await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("radio", { name: spokenRatings[3] })).toBeFocused();
+    expect(page.url()).toBe(start);
+    // The focused star and those before it fill, so the rating about to be
+    // sent is seen, not counted; the fifth stays empty.
+    const starFills = page.locator(".visit-star__label svg");
+    for (let index = 0; index < 4; index += 1) {
+      await expect(starFills.nth(index)).toHaveCSS("fill", "rgb(245, 180, 34)");
+    }
+    await expect(starFills.nth(4)).toHaveCSS("fill", "rgb(246, 246, 246)");
+    await page.keyboard.press("Space");
     await page.waitForURL(DESTINATION_PATTERN);
     await expect(
       page.getByRole("heading", { name: "Public review destination" }),
     ).toBeVisible();
+  });
+
+  /**
+   * "Sending…" used to join the sheet's flow, under a 30px gap, in a sheet of
+   * fixed height with no room left: the footer was pushed past the bottom and
+   * clipped, which a blind tester caught mid-send. It now sits in the space
+   * above the footer, and the stars do not move under the thumb.
+   */
+  test("sending keeps the stars still and the footer on the sheet", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await openFlow(page, "fixture-slow", { stayOnPage: true });
+    const before = await page.locator(".visit-stars").boundingBox();
+
+    await page.getByRole("radio", { name: spokenRatings[3] }).click();
+    const sending = page.getByText("Sending…");
+    await expect(sending).toBeVisible();
+
+    const [stars, status, footer, card] = await Promise.all([
+      page.locator(".visit-stars").boundingBox(),
+      sending.boundingBox(),
+      page.locator(".visit-footer").boundingBox(),
+      page.locator(".visit-card").boundingBox(),
+    ]);
+    if (!before || !stars || !status || !footer || !card) throw new Error("Missing a box.");
+    expect(stars.y).toBeCloseTo(before.y, 0);
+    expect(status.y).toBeGreaterThanOrEqual(stars.y + stars.height);
+    expect(status.y + status.height).toBeLessThanOrEqual(footer.y + 1);
+    expect(footer.y + footer.height).toBeLessThanOrEqual(card.y + card.height + 1);
   });
 
   test("offline rating is held and submitted after reconnect", async ({ context, page }) => {
@@ -108,6 +151,13 @@ test.describe("ReviewBoost customer flow", () => {
     await context.setOffline(true);
     await page.getByRole("radio", { name: spokenRatings[0] }).click();
     await expect(page.getByText("You’re offline. We’ll try when you reconnect.")).toBeVisible();
+    // Two lines of notice grow the sheet into the artwork; the footer stays on it.
+    const [footer, card] = await Promise.all([
+      page.locator(".visit-footer").boundingBox(),
+      page.locator(".visit-card").boundingBox(),
+    ]);
+    if (!footer || !card) throw new Error("Missing a box.");
+    expect(footer.y + footer.height).toBeLessThanOrEqual(card.y + card.height + 1);
 
     await context.setOffline(false);
     await page.waitForURL(DESTINATION_PATTERN);
@@ -139,11 +189,13 @@ test.describe("ReviewBoost customer flow", () => {
   }) => {
     await page.goto("/q/fixture-unknown");
     await expect(page.getByRole("heading", { name: "This review link isn’t active." })).toBeVisible();
-    const unknown = await page.locator(".customer-card").innerHTML();
+    // The whole customer panel, which the closed-link screen now shares with
+    // the rating screen.
+    const unknown = await page.locator("[data-customer-visit]").innerHTML();
 
     await page.goto("/q/fixture-inactive");
     await expect(page.getByRole("heading", { name: "This review link isn’t active." })).toBeVisible();
-    expect(await page.locator(".customer-card").innerHTML()).toBe(unknown);
+    expect(await page.locator("[data-customer-visit]").innerHTML()).toBe(unknown);
   });
 
   test("Spanish and Haitian Creole expand without adding contact or marketing fields", async ({

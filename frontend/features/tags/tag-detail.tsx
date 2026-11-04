@@ -94,6 +94,7 @@ export function TagDetail({
           businessName={businessName}
           placeName={placeName}
           timeZone={timeZone}
+          closed={closedNotice !== null}
         />
       ) : (
         <ReadOnlyTagDetail stand={stand} timeZone={timeZone} />
@@ -141,12 +142,15 @@ function ManagedTagDetail({
   businessName,
   placeName,
   timeZone,
+  closed,
 }: {
   stand: Stand;
   organizationId: string | undefined;
   businessName: string | undefined;
   placeName: string | undefined;
   timeZone: string;
+  /** Tags are off for want of a plan: the preview shows the closed screen. */
+  closed: boolean;
 }) {
   const router = useRouter();
   const qr = useAuthenticatedQr(stand.standId, organizationId);
@@ -328,7 +332,10 @@ function ManagedTagDetail({
               ? { text: "Done", tone: "good" }
               : status === "both"
                 ? { text: "Redo", tone: "needs" }
-                : { text: "Not set", tone: "needs" }
+                : // Never set up: optional, since the printed code works on
+                  // its own. An orange "Not set" made a blind tester think
+                  // setup was unfinished on a Tag that was ready to print.
+                  { text: "Optional", tone: "quiet" }
           }
           onClick={() => setProgram(true)}
           data-nfc-section
@@ -341,7 +348,7 @@ function ManagedTagDetail({
         </p>
       ) : null}
       <div className="max-w-[28rem]">
-        <PreviewCustomerPage standId={stand.standId} variant="button" />
+        <PreviewCustomerPage standId={stand.standId} variant="button" closed={closed} />
       </div>
 
       {/* Only the current code reaches paper: while a new one loads, the old
@@ -446,7 +453,7 @@ function ActionTile({
   icon: LucideIcon;
   label: string;
   filled: boolean;
-  chip: { text: string; tone: "good" | "needs" } | null;
+  chip: { text: string; tone: "good" | "needs" | "quiet" } | null;
   disabled?: boolean;
   onClick: () => void;
   "data-nfc-section"?: boolean;
@@ -472,7 +479,9 @@ function ActionTile({
               "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold",
               chip.tone === "good"
                 ? "bg-brand-soft text-brand-text"
-                : "bg-[color:var(--rb-warning-soft)] text-[color:var(--rb-warning)]",
+                : chip.tone === "quiet"
+                  ? "bg-quiet text-muted"
+                  : "bg-[color:var(--rb-warning-soft)] text-[color:var(--rb-warning)]",
             )}
           >
             {chip.tone === "good" ? <Check aria-hidden="true" className="size-3.5" strokeWidth={3} /> : null}

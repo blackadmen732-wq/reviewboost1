@@ -113,7 +113,10 @@ export function InstallPrompt() {
   const isIos = eligibility === "ios";
 
   return (
-    <div className="mb-6 rounded-[var(--radius-card)] border border-border bg-surface p-4 shadow-[var(--shadow-control)] lg:hidden">
+    // Home places this under its own content: the top of a screen says where
+    // you are, what is happening and what to do next (DESIGN.md §1), and an
+    // app install tip is none of those.
+    <div className="mt-8 rounded-[var(--radius-card)] border border-border bg-surface p-4 shadow-[var(--shadow-control)] lg:hidden">
       <div className="flex items-start gap-3">
         {/* The real home-screen icon, so the card shows what will appear on
             the phone. A green "B" tile matched nothing the owner would see. */}
@@ -148,8 +151,12 @@ export function InstallPrompt() {
       {isIos ? (
         <p className="mt-3 flex items-center gap-2 rounded-[var(--radius-control)] bg-quiet px-3 py-2.5 text-sm text-ink">
           <Share className="size-4 shrink-0 text-muted" aria-hidden="true" />
-          Tap <span className="font-semibold">Share</span>, then{" "}
-          <span className="font-semibold">Add to Home Screen</span>
+          {/* One text node beside the icon: as flex children, each word group
+              wrapped on its own and the sentence broke apart. */}
+          <span>
+            Tap <span className="font-semibold">Share</span>, then{" "}
+            <span className="font-semibold">Add to Home Screen</span>
+          </span>
         </p>
       ) : (
         <Button

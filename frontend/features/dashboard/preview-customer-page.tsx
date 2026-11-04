@@ -22,9 +22,16 @@ function previewUrl(standUrl: string): string {
 export function PreviewCustomerPage({
   standId,
   variant = "link",
+  closed = false,
 }: {
   standId: string;
   variant?: "link" | "button";
+  /**
+   * The business has no plan, so the Tag is off. The preview opens what a
+   * customer gets, the closed-link screen, which reads as broken unless the
+   * owner is told first. A blind tester thought something had failed.
+   */
+  closed?: boolean;
 }) {
   const [result, setResult] = useState<{
     standId: string;
@@ -112,6 +119,12 @@ export function PreviewCustomerPage({
           Preparing preview…
         </p>
       )}
+      {closed ? (
+        <p className="mt-2 max-w-[28rem] text-sm leading-relaxed text-muted" data-preview-closed>
+          While your Tags are off, this opens what customers see now: “This
+          review link isn’t active.”
+        </p>
+      ) : null}
     </div>
   );
 }

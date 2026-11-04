@@ -56,6 +56,31 @@ describe("RatingScreen", () => {
     },
   );
 
+  it.each(["{Enter}", " "])(
+    "lets a keyboard user move with the arrows, then choose with %s",
+    async (key) => {
+      // An arrow used to select, and selecting submits: → from the first star
+      // sent 2 stars to Google. Arrows now only move (WCAG 3.2.2).
+      const user = userEvent.setup();
+      const onRate = vi.fn();
+      render(
+        <RatingScreen messages={customerMessages.en} rating={null} status="idle" onRate={onRate} onRetry={vi.fn()} />,
+      );
+      await user.tab();
+      expect(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[1] })).toHaveFocus();
+
+      await user.keyboard("{ArrowRight}{ArrowRight}{ArrowRight}");
+      expect(onRate).not.toHaveBeenCalled();
+      expect(screen.getByRole("radio", { name: customerMessages.en.ratingSpoken[4] })).toHaveFocus();
+      await user.keyboard("{ArrowLeft}{ArrowRight}");
+      expect(onRate).not.toHaveBeenCalled();
+
+      await user.keyboard(key);
+      expect(onRate).toHaveBeenCalledTimes(1);
+      expect(onRate).toHaveBeenCalledWith(4);
+    },
+  );
+
   it("offers recovery — and only recovery — after a failed submit", () => {
     const sharedProps = {
       messages: customerMessages.en,

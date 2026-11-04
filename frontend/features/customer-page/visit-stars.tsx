@@ -22,6 +22,30 @@ export function VisitStars({
   disabled?: boolean;
   preview?: boolean;
 }) {
+  // A radio group selects on arrow keys, and choosing a star here sends the
+  // customer to Google: a keyboard user pressing → from the first star gave 2
+  // stars and was gone (WCAG 3.2.2). Arrows only move between stars; Space,
+  // Enter, a click or a tap chooses one. The inline early-tap script does the
+  // same before React is ready (early-tap.ts).
+  function moveOrChoose(event: React.KeyboardEvent<HTMLInputElement>, rating: RatingValue) {
+    const step =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? -1
+          : 0;
+    if (step !== 0) {
+      event.preventDefault();
+      const next = ratings[ratings.indexOf(rating) + step];
+      if (next) document.getElementById(`visit-rating-${next}`)?.focus();
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onChange?.(rating);
+    }
+  }
+
   return (
     <fieldset className="visit-stars" disabled={disabled || preview}>
       <legend className="sr-only">{messages.ratingGroup}</legend>
@@ -44,6 +68,7 @@ export function VisitStars({
                 checked={value === rating}
                 disabled={disabled || preview}
                 onChange={() => onChange?.(rating)}
+                onKeyDown={(event) => moveOrChoose(event, rating)}
                 aria-label={messages.ratingSpoken[rating]}
               />
               <label className="visit-star__label" htmlFor={`visit-rating-${rating}`} data-filled={selected || undefined}>

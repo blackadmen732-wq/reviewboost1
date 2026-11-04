@@ -1,9 +1,11 @@
 import { Stack } from "expo-router";
+import { getFocusedRouteNameFromRoute } from "expo-router/react-navigation";
 import { Platform, StatusBar, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import { AuthProvider, useAuth } from "@/data/auth-context";
 import { HomeProvider } from "@/data/home";
 import { LAUNCH_BACKGROUND, LaunchScreen } from "@/components/launch-screen";
+import { tabTitle } from "@/lib/tab-titles";
 import { colors } from "@/theme";
 
 // Retain the native launch image until the first app-owned screen is ready.
@@ -47,7 +49,12 @@ function RootNavigator() {
           <Stack.Screen name="select-org" />
         </Stack.Protected>
         <Stack.Protected guard={isLoggedIn && !!activeOrg}>
-          <Stack.Screen name="(tabs)" />
+          {/* Named after the open tab, so a back button over it reads
+              "Feedback, back", not the folder name "(tabs), back". */}
+          <Stack.Screen
+            name="(tabs)"
+            options={({ route }) => ({ title: tabTitle(getFocusedRouteNameFromRoute(route)) })}
+          />
           <Stack.Screen name="feedback/[id]" />
           <Stack.Screen name="stand/[id]" />
           <Stack.Screen name="account" />

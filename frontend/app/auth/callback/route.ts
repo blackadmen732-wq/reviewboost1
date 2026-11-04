@@ -8,7 +8,8 @@ import { safeInternalPath } from "@/lib/security/safe-redirect";
 import { supabaseServer } from "@/lib/supabase/server";
 
 /**
- * Where Google and Apple send someone back after "Continue with …".
+ * Where Google and Apple send someone back after "Continue with …", and
+ * where the sign-in email's "tap here" link returns (`provider=email`).
  *
  * Supabase returns a one-time `code`; exchanging it here sets the session
  * cookies (PKCE: the browser kept the verifier). Then the person lands where
@@ -26,12 +27,17 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const requestId = requestIdOf(request);
   const url = request.nextUrl;
-  const next = safeInternalPath(url.searchParams.get("next"), publicFrontendUrl());
+  // Redirects go to the app's own origin, not `request.url`: Next builds that
+  // from its bind address (`localhost`) under `next dev` and `next start`, and
+  // a session cookie set for the host the browser used is not sent to
+  // localhost, so the person landed on sign-in again with a valid session.
+  const origin = publicFrontendUrl();
+  const next = safeInternalPath(url.searchParams.get("next"), origin);
   const provider = url.searchParams.get("provider");
   const code = url.searchParams.get("code");
 
   const failed = () => {
-    const back = new URL("/login", request.url);
+    const back = new URL("/login", origin);
     back.searchParams.set("next", next);
     back.searchParams.set("error", "sign_in_failed");
     return NextResponse.redirect(back);
@@ -56,5 +62,5 @@ export async function GET(request: NextRequest) {
     await keepAppleRefreshToken(data.session.user.id, appleRefresh, servicesId, requestId);
   }
 
-  return NextResponse.redirect(new URL(next, request.url));
+  return NextResponse.redirect(new URL(next, origin));
 }

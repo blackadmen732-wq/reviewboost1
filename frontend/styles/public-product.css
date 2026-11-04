@@ -790,6 +790,10 @@
   padding: 0;
   list-style: none;
 }
+/* An odd group ends on a card alone in a half-empty row; it takes the row. */
+.public-feature-grid > .public-feature:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
 .public-feature {
   padding: 20px;
   border: 1px solid var(--rb-border);

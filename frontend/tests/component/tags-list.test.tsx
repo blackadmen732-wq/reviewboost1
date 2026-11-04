@@ -71,6 +71,16 @@ describe("Tags list", () => {
     expect(screen.getByText("Reprint QR")).toBeVisible();
     expect(screen.getByText("Set up tap again")).toBeVisible();
   });
+  it("says a Tag is off while the plan is off, instead of calling it ready", () => {
+    // Every scan shows "This review link isn't active" until a plan is on, so
+    // green "QR ready" here would contradict the notice above the list.
+    render(<TagsList timeZone="UTC" serving={false} stands={[stand({ nfcProvisionedAt: "2026-09-01T00:00:00.000Z" })]} />);
+
+    expect(screen.getByText("Off until a plan is active")).toBeVisible();
+    expect(screen.queryByText("QR ready")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tap ready")).not.toBeInTheDocument();
+  });
+
   it("says a Tag needs its Google link instead of calling it ready", () => {
     // No Google link at its place: a scan shows "This review link isn't
     // active", so a green "QR ready" would be the wrong thing to say.

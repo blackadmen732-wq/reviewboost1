@@ -72,4 +72,17 @@ describe("setup steps", () => {
       expect(step.body).not.toMatch(/NFC record|token|URL|API/i);
     }
   });
+
+  // ReviewBoost cannot see a printer. A blind tester printed the code and
+  // waited for the tick; the step now says what makes it tick.
+  it("says a printed code ticks step 2 off when it is first scanned", () => {
+    const steps = deriveSetupSteps({ ...base, hasGoogleLink: true, stands: [tag()], serving: true });
+    expect(steps[1]?.done).toBe(false);
+    expect(steps[1]?.body).toContain("ticks this off the first time someone scans it");
+  });
+
+  it("says a closed business needs a plan before a scan can tick it", () => {
+    const steps = deriveSetupSteps({ ...base, hasGoogleLink: true, stands: [tag()], serving: false });
+    expect(steps[1]?.body).toContain("after you choose a plan");
+  });
 });

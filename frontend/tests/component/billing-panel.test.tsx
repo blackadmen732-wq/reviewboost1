@@ -36,6 +36,8 @@ describe("BillingPanel", () => {
     expect(screen.getByText("Card required. $49 a month after 7 days.")).toBeVisible();
     expect(screen.getByText("Charged $79 when you subscribe. No trial.")).toBeVisible();
     expect(screen.getByText("Charged $129 when you subscribe. No trial.")).toBeVisible();
+    // The trial opens fewer Tags than Starter itself, and says so on Starter.
+    expect(screen.getByText("During the 7-day trial: 1 location and 1 Tag.")).toBeVisible();
   });
 
   it("offers no second trial after a cancellation", () => {
@@ -103,6 +105,22 @@ describe("BillingPanel", () => {
 
     expect(screen.getByText("None during the trial")).toBeVisible();
     expect(screen.getByText("0 of 1 Tag")).toBeVisible();
+  });
+
+  it("sends a plan stuck on a payment to the payment fix, not to a second checkout", () => {
+    render(
+      <BillingPanel
+        billing={{ ...NEVER_SUBSCRIBED, planId: "starter", status: "suspended", paymentPending: true }}
+        canManage
+      />,
+    );
+
+    expect(screen.getByText("Your payment did not go through")).toBeVisible();
+    expect(screen.getByText("Payment needed")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Update payment method" })).toBeVisible();
+    // Checkout refuses a second subscription beside this one, so the screen
+    // must not offer one.
+    expect(screen.queryByRole("button", { name: /trial|choose/i })).not.toBeInTheDocument();
   });
 
   it("puts a failed payment in a banner, keeps the Tags honest, and offers the fix", () => {

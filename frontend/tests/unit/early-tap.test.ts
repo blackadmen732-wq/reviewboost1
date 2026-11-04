@@ -99,8 +99,36 @@ describe("a star tapped before the JavaScript has loaded", () => {
     expect(second.submit).toHaveBeenCalledTimes(1);
   });
 
+  it("moves between stars on arrow keys without choosing one", () => {
+    const { submit } = page();
+    const first = document.getElementById("r1") as HTMLInputElement;
+    first.focus();
+    // A real browser checks the next radio on an arrow and fires change; the
+    // script must stop that before it happens, so nothing is submitted.
+    const arrow = new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true });
+    first.dispatchEvent(arrow);
+    expect(arrow.defaultPrevented).toBe(true);
+    expect(document.activeElement?.id).toBe("r2");
+    document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+    document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
+    expect(document.activeElement?.id).toBe("r2");
+    expect(submit).not.toHaveBeenCalled();
+    expect([1, 2, 3, 4, 5].some((n) => (document.getElementById(`r${n}`) as HTMLInputElement).checked)).toBe(false);
+  });
+
+  it("chooses the focused star on Enter", () => {
+    const { submit } = page();
+    const fourth = document.getElementById("r4") as HTMLInputElement;
+    fourth.focus();
+    fourth.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(window.__rbEarly).toBe(4);
+  });
+
   it("stays small and has no request data in it", () => {
-    expect(EARLY_TAP_SCRIPT.length).toBeLessThan(800);
+    // Under 1 KB: the keyboard handling (arrows move, Enter chooses) took it
+    // past the old 800-character budget.
+    expect(EARLY_TAP_SCRIPT.length).toBeLessThan(1000);
     expect(EARLY_TAP_SCRIPT).not.toMatch(/token|key=/i);
   });
 });

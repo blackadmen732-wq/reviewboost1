@@ -60,6 +60,11 @@ vi.mock("expo-router", () => ({
     },
   ),
 }));
+// The root layout names the tab group after the open tab; the navigator is
+// mocked above, so there is no route state to read.
+vi.mock("expo-router/react-navigation", () => ({
+  getFocusedRouteNameFromRoute: () => undefined,
+}));
 import Index from "../../app/index";
 import RootLayout from "../../app/_layout";
 
