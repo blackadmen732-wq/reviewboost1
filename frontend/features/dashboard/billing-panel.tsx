@@ -37,6 +37,8 @@ interface Billing {
   } | null;
   /** The server's answer: an active plan, and pack prices configured. */
   packsAvailable?: boolean;
+  /** A subscription exists and is waiting on a payment; fixed in the portal. */
+  paymentPending?: boolean;
 }
 
 /** Where Stripe sent the owner back from a text pack checkout, if anywhere. */
@@ -161,6 +163,13 @@ function describe(billing: Billing, timeZone: string | undefined): {
       // Suspended with no plan is not a punishment: it is every business that
       // has not been through checkout yet, including one that signed up a
       // minute ago. Saying "suspended" to them would be alarming and wrong.
+      if (billing.paymentPending) {
+        return {
+          title: "Your payment did not go through",
+          body: "Your Tags are not serving customers until it does. Update your payment and they start working again. Nothing has been deleted.",
+          tone: "error",
+        };
+      }
       if (billing.planId === null) {
         return {
           title: "Choose a plan to open your Tags",
@@ -208,6 +217,7 @@ function badgeFor(billing: Billing): { label: string; tone: Tone } {
     case "cancelled":
       return { label: "Cancelled", tone: "neutral" };
     case "suspended":
+      if (billing.paymentPending) return { label: "Payment needed", tone: "danger" };
       return billing.planId === null
         ? { label: "No plan yet", tone: "neutral" }
         : { label: "Suspended", tone: "danger" };
@@ -414,11 +424,15 @@ export function BillingPanel({
   const badge = badgeFor(billing);
   // Anyone without a subscription behind them needs to start one. A trial
   // with no plan is a business that predates billing, not one that has paid.
+  // A subscription waiting on a payment is settled in the portal: checkout
+  // refuses to open a second subscription beside it.
   const needsCheckout =
-    billing.status === null ||
-    billing.status === "cancelled" ||
-    billing.status === "suspended" ||
-    (billing.status === "trialing" && billing.planId === null);
+    !billing.paymentPending &&
+    (billing.status === null ||
+      billing.status === "cancelled" ||
+      billing.status === "suspended" ||
+      (billing.status === "trialing" && billing.planId === null));
+  const paymentNeeded = billing.status === "past_due" || Boolean(billing.paymentPending);
 
   async function act(body: Record<string, unknown>, key: string) {
     setBusy(key);
@@ -609,14 +623,14 @@ export function BillingPanel({
         {canManage && !needsCheckout ? (
           <Button
             type="button"
-            variant={billing.status === "past_due" ? "action" : "secondary"}
+            variant={paymentNeeded ? "action" : "secondary"}
             className="sm:w-auto sm:shrink-0"
             onClick={() => void act({ action: "portal" }, "portal")}
             loading={busy === "portal"}
             loadingLabel="Opening…"
             disabled={busy !== null}
           >
-            {billing.status === "past_due"
+            {paymentNeeded
               ? "Update payment method"
               : "Manage plan and payment"}
           </Button>

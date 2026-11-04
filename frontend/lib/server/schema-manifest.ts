@@ -86,4 +86,5 @@ export const EXPECTED_MIGRATIONS: readonly string[] = [
   "sms_pack_money",
   "tag_key_check",
   "tag_opens",
+  "one_live_subscription",
 ];

@@ -1264,7 +1264,16 @@ export interface OwnerBilling {
    * the pack prices. The same rule checkout enforces.
    */
   packsAvailable: boolean;
+  /**
+   * The subscription exists but is waiting on a payment (Stripe `incomplete`,
+   * `unpaid` or `paused`). The owner fixes it in Stripe's portal, not with a
+   * new checkout, which checkout refuses while one is open.
+   */
+  paymentPending: boolean;
 }
+
+/** Stripe statuses where a subscription exists but has not been paid for. */
+const PAYMENT_PENDING_STATUSES: ReadonlySet<string> = new Set(["incomplete", "unpaid", "paused"]);
 
 /**
  * What the backend believes about this business's billing, and nothing else.
@@ -1276,7 +1285,7 @@ export interface OwnerBilling {
 export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBilling> => {
   const supabase = await supabaseServer();
 
-  const [entitlement, balance, tags, locations] = await Promise.all([
+  const [entitlement, balance, tags, locations, subscription] = await Promise.all([
     supabase
       .from("entitlement_snapshots")
       .select("plan_id, status, cancel_at_period_end, trial_ends_at, current_period_end")
@@ -1293,9 +1302,16 @@ export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBillin
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
       .eq("status", "active"),
+    supabase
+      .from("billing_subscriptions")
+      .select("stripe_status")
+      .eq("org_id", orgId)
+      .maybeSingle(),
   ]);
 
   if (entitlement.error) dataFailure("owner_billing", entitlement.error);
+  if (subscription.error) dataFailure("owner_billing.subscription", subscription.error);
+  const stripeStatus = (subscription.data as { stripe_status?: string } | null)?.stripe_status ?? null;
   if (tags.error) dataFailure("owner_billing.tags", tags.error);
   if (locations.error) dataFailure("owner_billing.locations", locations.error);
 
@@ -1328,6 +1344,8 @@ export const readOwnerBilling = cache(async (orgId: string): Promise<OwnerBillin
       row?.status === "active" &&
       !row.cancel_at_period_end &&
       stripePackPricesConfigured(),
+    paymentPending:
+      row?.status === "suspended" && stripeStatus !== null && PAYMENT_PENDING_STATUSES.has(stripeStatus),
   };
 });
 

@@ -105,6 +105,22 @@ describe("BillingPanel", () => {
     expect(screen.getByText("0 of 1 Tag")).toBeVisible();
   });
 
+  it("sends a plan stuck on a payment to the payment fix, not to a second checkout", () => {
+    render(
+      <BillingPanel
+        billing={{ ...NEVER_SUBSCRIBED, planId: "starter", status: "suspended", paymentPending: true }}
+        canManage
+      />,
+    );
+
+    expect(screen.getByText("Your payment did not go through")).toBeVisible();
+    expect(screen.getByText("Payment needed")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Update payment method" })).toBeVisible();
+    // Checkout refuses a second subscription beside this one, so the screen
+    // must not offer one.
+    expect(screen.queryByRole("button", { name: /trial|choose/i })).not.toBeInTheDocument();
+  });
+
   it("puts a failed payment in a banner, keeps the Tags honest, and offers the fix", () => {
     render(
       <BillingPanel

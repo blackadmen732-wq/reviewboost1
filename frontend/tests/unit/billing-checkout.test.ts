@@ -15,6 +15,9 @@ const ORG = "11111111-1111-1111-1111-111111111111";
 
 let subscriptionRow: { stripe_status: string } | null = null;
 const sessionsCreate = vi.fn();
+const sessionsList = vi.fn();
+const sessionsExpire = vi.fn();
+const subscriptionsList = vi.fn();
 
 function builder(row: unknown) {
   const chain: Record<string, unknown> = {};
@@ -24,7 +27,10 @@ function builder(row: unknown) {
 }
 
 vi.mock("@/lib/server/stripe", () => ({
-  stripeClient: () => ({ checkout: { sessions: { create: sessionsCreate } } }),
+  stripeClient: () => ({
+    checkout: { sessions: { create: sessionsCreate, list: sessionsList, expire: sessionsExpire } },
+    subscriptions: { list: subscriptionsList },
+  }),
 }));
 
 vi.mock("@/lib/server/supabase", () => ({
@@ -58,6 +64,12 @@ beforeEach(() => {
   subscriptionRow = null;
   sessionsCreate.mockReset();
   sessionsCreate.mockResolvedValue({ url: "https://checkout.stripe.test/s" });
+  sessionsList.mockReset();
+  sessionsList.mockResolvedValue({ data: [] });
+  sessionsExpire.mockReset();
+  sessionsExpire.mockResolvedValue({});
+  subscriptionsList.mockReset();
+  subscriptionsList.mockResolvedValue({ data: [] });
 });
 
 async function checkout(planId: "starter" | "growth" | "pro") {
@@ -97,6 +109,60 @@ describe("who gets a trial at checkout", () => {
       status: 409,
     });
     expect(sessionsCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("one subscription per business", () => {
+  it.each(["incomplete", "unpaid", "paused"])(
+    "refuses a new checkout while a %s subscription is waiting on payment",
+    async (stripeStatus) => {
+      subscriptionRow = { stripe_status: stripeStatus };
+      const { createCheckoutSession } = await import("@/lib/server/billing-service");
+      await expect(createCheckoutSession(context(), ORG, "starter", "req-3")).rejects.toMatchObject({
+        status: 409,
+        message: expect.stringContaining("waiting on a payment"),
+      });
+      expect(sessionsCreate).not.toHaveBeenCalled();
+    },
+  );
+
+  it("asks Stripe, so a subscription the webhook has not written yet still blocks", async () => {
+    subscriptionsList.mockResolvedValue({ data: [{ id: "sub_just_paid", status: "active" }] });
+    const { createCheckoutSession } = await import("@/lib/server/billing-service");
+    await expect(createCheckoutSession(context(), ORG, "starter", "req-4")).rejects.toMatchObject({
+      status: 409,
+    });
+    expect(subscriptionsList).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: "cus_existing", status: "all" }),
+    );
+    expect(sessionsCreate).not.toHaveBeenCalled();
+  });
+
+  it("lets a business whose old subscriptions have all ended check out again", async () => {
+    subscriptionRow = { stripe_status: "canceled" };
+    subscriptionsList.mockResolvedValue({
+      data: [
+        { id: "sub_old", status: "canceled" },
+        { id: "sub_abandoned", status: "incomplete_expired" },
+      ],
+    });
+    await checkout("growth");
+    expect(sessionsCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes other open plan checkout pages, and leaves text-pack pages alone", async () => {
+    sessionsList.mockResolvedValue({
+      data: [
+        { id: "cs_other_tab", mode: "subscription" },
+        { id: "cs_text_pack", mode: "payment" },
+      ],
+    });
+    await checkout("starter");
+    expect(sessionsExpire).toHaveBeenCalledTimes(1);
+    expect(sessionsExpire).toHaveBeenCalledWith("cs_other_tab");
+    expect(sessionsExpire.mock.invocationCallOrder[0]).toBeLessThan(
+      sessionsCreate.mock.invocationCallOrder[0]!,
+    );
   });
 });
 
