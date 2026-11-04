@@ -131,7 +131,7 @@ Body text needs 4.5:1. Large text and UI outlines need 3:1.
 **Fonts.**
 - The app body and controls use Geist Sans.
 - Website headlines use Instrument Serif, with an italic second line in `--rb-brand-text`.
-- Customer page: Inter Tight heading; DM Sans instruction (14px) and promise line (12px).
+- The customer page uses Inter Tight for the heading and DM Sans for the small tracked line.
 - Counts, prices and times use tabular numerals.
 
 **Sizes.**

@@ -280,17 +280,18 @@ html:has(.customer-live) {
   outline: none;
 }
 
-/* A quiet instruction — it explains, the heading asks — but one a customer
-   can read: 14px at a 390pt phone in sentence case, #4a4a47 on the sheet
-   (8.6:1). It was 11px pale tracked capitals, under DESIGN.md's 12px floor. */
+/* A quiet instruction: regular weight, wide tracking — it explains, the
+   heading asks. The approved reference's small tracked capitals; the owner
+   chose this look over a larger sentence-case line (4 Nov 2026). */
 .visit-support {
   margin: var(--visit-support-gap, 1.885cqi) 0 0;
-  color: #4a4a47;
+  color: #6a6a6a;
   font-family: var(--font-visit-caps), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 3.6cqi;
+  font-size: 2.885cqi;
   font-weight: 500;
-  letter-spacing: 0;
+  letter-spacing: 0.18em;
   line-height: 1.2;
+  text-transform: uppercase;
 }
 
 /* The stars sit directly under the instruction, and the calm space goes
@@ -308,10 +309,7 @@ html:has(.customer-live) {
   flex: 0 0 auto;
   place-items: center;
   gap: var(--visit-footer-gap, 1.49cqi);
-  /* 15.9cqi until the footer text grew to readable sizes; the ~8cqi it now
-     takes more comes out of this gap, so the footer keeps its place in the
-     fixed sheet and nothing is clipped. */
-  margin-top: var(--visit-footer-top, 7.9cqi);
+  margin-top: var(--visit-footer-top, 15.9cqi);
 }
 
 .visit-powered {
@@ -321,8 +319,8 @@ html:has(.customer-live) {
   margin: 0;
   color: #595959;
   font-family: var(--font-visit-heading), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 3.33cqi;
-  font-weight: 400;
+  font-size: 2.664cqi;
+  font-weight: 300;
   letter-spacing: 0.02em;
 }
 
@@ -345,20 +343,18 @@ html:has(.customer-live) {
 }
 
 
-/* The approved promise line, in its capitals, at 12px on a 390pt phone and on
-   two lines. At 6.4px on one line nobody could read it. */
+/* The approved promise line: one line of tracked capitals. */
 .visit-footer__line {
-  max-width: 80cqi;
   margin: 0;
-  color: #6b6b67;
+  color: #6c6c6c;
   font-family: var(--font-visit-caps), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 3.08cqi;
+  font-size: 1.64cqi;
+  font-optical-sizing: none;
   font-weight: 500;
-  letter-spacing: 0.04em;
-  line-height: 1.35;
+  letter-spacing: 0.257em;
   text-align: center;
   text-transform: uppercase;
-  text-wrap: balance;
+  white-space: nowrap;
 }
 
 .visit-stars {
@@ -498,7 +494,7 @@ html:has(.customer-live) {
   top: 100%;
   inset-inline: 0;
   display: grid;
-  height: var(--visit-footer-top, 7.9cqi);
+  height: var(--visit-footer-top, 15.9cqi);
   align-content: center;
   justify-items: center;
   gap: 10px;
