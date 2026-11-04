@@ -53,9 +53,9 @@ JSON assertion on `data.ok`, paging after 2 consecutive failures.
 
 | Problem | Condition | Means | First action |
 |---|---|---|---|
-| `outbox_backlog` | oldest pending SMS job > 10 min | dispatcher not keeping up or not running | check `sms_dispatch_stale`; worker logs `sms.dispatch_*` |
-| `sms_dispatch_stale` | no successful dispatch in 5 min (or never) | scheduler stopped / never configured / plan cadence | scheduler dashboard; call the dispatch URL by hand |
-| `maintenance_stale` | no successful maintenance in 45 min | reconciliation, dead-letter release, allowance expiry not running | as above |
+| `outbox_backlog` | oldest pending SMS job older than the dispatcher's stale limit (below) | dispatcher not keeping up or not running | check `sms_dispatch_stale`; worker logs `sms.dispatch_*` |
+| `sms_dispatch_stale` | no successful dispatch within two scheduled runs + 5 min (or never). Read from `vercel.json` by `lib/server/schedule.ts`: 48 h 5 min on the committed daily schedule, 7 min at every minute | scheduler stopped / never configured / plan cadence | scheduler dashboard; call the dispatch URL by hand |
+| `maintenance_stale` | no successful maintenance within two scheduled runs + 5 min: 48 h 5 min daily, 35 min at every fifteen | reconciliation, dead-letter release, allowance expiry not running | as above |
 | `sms_dispatch_failing` / `maintenance_failing` | last run failed after last success | worker errors | `worker_heartbeats.last_error`; `maintenance.step_failed` logs |
 | `provider_unknown_age` | oldest unconfirmed send > 1 h | Twilio callbacks not arriving | callback URL, Twilio console |
 | `dead_letters` | any dead-lettered job | a message exhausted retries | inspect; credit is released by maintenance |

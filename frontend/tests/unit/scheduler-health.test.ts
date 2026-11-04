@@ -195,7 +195,8 @@ describe("health", () => {
   });
 
   it("is 503 when the dispatcher has not succeeded for longer than its cadence allows", async () => {
-    results.set("rpc_worker_health", { data: workers(24 * 3600, 300), error: null });
+    // vercel.json runs dispatch once a day: two days and an hour is a missed run.
+    results.set("rpc_worker_health", { data: workers(49 * 3600, 300), error: null });
     const { status, body } = await health();
     expect(status).toBe(503);
     expect(body.data.ok).toBe(false);
@@ -210,6 +211,20 @@ describe("health", () => {
     const { status, body } = await health();
     expect(body.data.problems).toEqual([]);
     expect(status).toBe(200);
+  });
+
+  it("stays green between once-a-day runs, the schedule vercel.json deploys", async () => {
+    // Maintenance last ran 20 hours ago. On the committed daily schedule that
+    // is on time; the old fixed 45-minute limit called it stale all day.
+    results.set("rpc_worker_health", { data: workers(20 * 3600, 20 * 3600), error: null });
+    const { status, body } = await health();
+    expect(body.data.problems).toEqual([]);
+    expect(status).toBe(200);
+  });
+
+  it("still calls a daily worker stale once it has missed a run", async () => {
+    results.set("rpc_worker_health", { data: workers(300, 49 * 3600), error: null });
+    expect((await health()).body.data.problems).toContain("maintenance_stale");
   });
 
   it("treats a worker that has never run as stale", async () => {
