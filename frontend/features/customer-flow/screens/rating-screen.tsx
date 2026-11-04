@@ -75,7 +75,7 @@ export function RatingScreen({
         {hasError ? <SubmitFailed messages={messages} onRetry={onRetry} /> : null}
 
         {isOffline ? (
-          <p id="feedback-status" className="visit-status" role="status">
+          <p id="feedback-status" className="visit-status visit-status--offline" role="status">
             {messages.offline}
           </p>
         ) : null}

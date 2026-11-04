@@ -103,6 +103,16 @@ html:has(.customer-live) {
   background: rgb(255 255 255 / 12%);
 }
 
+/* The pill sits on the owner's photo, which can be any colour, and the shared
+   teal ring at 28% all but vanished on a dark one. A white ring inside the
+   stars' focus blue shows on dark artwork and on the white top alike. The
+   transparent outline is what forced-colours mode draws, as it drops shadows. */
+.visit-language .language-select:focus-visible {
+  border-color: transparent;
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #005fcc;
+}
+
 /* The Mario card is a fixed light surface in both themes — so every colour
  * inside it is a light-theme colour.
  *
@@ -456,13 +466,49 @@ html:has(.customer-live) {
   border-radius: 8px;
 }
 
+/* Keyboard only: the star in focus and the ones before it fill, so the rating
+   Space or Enter will send can be seen rather than counted. A blind keyboard
+   tester arrowed to four empty stars and had to count the focus box. A tap
+   never matches :focus-visible, so touch looks as before, and the fill does
+   not pop, because nothing has been chosen yet. */
+.visit-star:has(.visit-star__input:focus-visible) .visit-star__label,
+.visit-star:has(~ .visit-star .visit-star__input:focus-visible) .visit-star__label {
+  color: #b27405;
+}
+
+.visit-star:has(.visit-star__input:focus-visible) .visit-star__label svg,
+.visit-star:has(~ .visit-star .visit-star__input:focus-visible) .visit-star__label svg {
+  fill: #f5b422;
+}
+
 /* ------------------------------------------------ rating status line --- */
 
+/* A one-line status ("Sending…", or the owner's preview note) sits in the
+   space between the stars and the footer, which is the footer's own top
+   margin, and out of the flow. In the flow it added the screen's 30px gap and
+   its own line to a sheet with no room left, so the footer was pushed past the
+   bottom and clipped. Here the sheet keeps its footer and the stars stay under
+   the thumb. Offline and error say more and grow the sheet instead (below). */
+.visit-card [data-flow-screen="rating"] {
+  position: relative;
+}
+
 .visit-card .rating-actions {
+  position: absolute;
+  top: 100%;
+  inset-inline: 0;
   display: grid;
+  height: var(--visit-footer-top, 7.9cqi);
+  align-content: center;
   justify-items: center;
   gap: 10px;
   min-height: 0;
+  margin-top: 0;
+}
+
+.visit-card .rating-actions:has(.visit-status--error, .visit-status--offline) {
+  position: static;
+  height: auto;
   margin-top: 14px;
 }
 
@@ -487,10 +533,11 @@ html:has(.customer-live) {
   font-weight: 650;
 }
 
-/* An error needs its message and its retry on screen together. The stars no
-   longer have to hold still — the customer has already tapped — so the sheet
-   grows into the artwork instead of clipping either. */
-.visit-card:has(.visit-status--error) {
+/* An error needs its message and its retry on screen together, and the offline
+   notice runs to two lines. The stars no longer have to hold still — the
+   customer has already tapped — so the sheet grows into the artwork instead of
+   clipping either. */
+.visit-card:has(.visit-status--error, .visit-status--offline) {
   flex: 0 0 auto;
   height: auto;
   min-height: 82.05cqi;
@@ -498,7 +545,7 @@ html:has(.customer-live) {
   padding-bottom: max(6cqi, calc(env(safe-area-inset-bottom) + 2cqi));
 }
 
-.visit-card:has(.visit-status--error) .visit-card__body {
+.visit-card:has(.visit-status--error, .visit-status--offline) .visit-card__body {
   overflow: visible;
 }
 
