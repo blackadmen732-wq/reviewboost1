@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { Icon, type SFSymbol } from "@/components/icon";
 import { useHome } from "@/data/home";
+import { TAB_TITLES } from "@/lib/tab-titles";
 import { colors } from "@/theme";
 
 /**
@@ -52,12 +53,12 @@ export default function TabLayout() {
     >
       <Tabs.Screen
         name="home"
-        options={{ title: "Home", tabBarIcon: ({ focused }) => <TabIcon label="Home" focused={focused} /> }}
+        options={{ title: TAB_TITLES.home, tabBarIcon: ({ focused }) => <TabIcon label="Home" focused={focused} /> }}
       />
       <Tabs.Screen
         name="feedback"
         options={{
-          title: "Feedback",
+          title: TAB_TITLES.feedback,
           tabBarIcon: ({ focused }) => <TabIcon label="Feedback" focused={focused} />,
           ...(unreadCount > 0 ? { tabBarBadge: unreadCount > 99 ? "99+" : unreadCount } : {}),
         }}
@@ -65,7 +66,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="text-requests"
         options={{
-          title: "Texts",
+          title: TAB_TITLES["text-requests"],
           tabBarIcon: ({ focused }) => <TabIcon label="Texts" focused={focused} />,
           // Off: the route stays (an old link lands on Home), the tab goes.
           ...(features.texting ? {} : { href: null }),
@@ -75,7 +76,7 @@ export default function TabLayout() {
           The route stays /stands so existing deep links keep working. */}
       <Tabs.Screen
         name="stands"
-        options={{ title: "Tags", tabBarIcon: ({ focused }) => <TabIcon label="Tags" focused={focused} /> }}
+        options={{ title: TAB_TITLES.stands, tabBarIcon: ({ focused }) => <TabIcon label="Tags" focused={focused} /> }}
       />
     </Tabs>
   );
