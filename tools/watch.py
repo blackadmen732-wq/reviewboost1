@@ -5,7 +5,7 @@ Use it on every reference Mark sends and on every render of ours BEFORE Mark see
 
     python3 tools/watch.py <video.mp4 | https://instagram.com/reel/... | tiktok/youtube link> [out_dir]
     python3 tools/watch.py compare <ours.mp4> <reference.mp4|link> [out_dir]     # side by side, same seconds
-    options: --fps 4 (frames per second on the sheets)  --no-crop  --gemini (also ask Gemini to watch it, needs the key)
+    options: --fps 4 (frames per second on the sheets)  --no-crop  --gemini (Gemini also watches it; key in network secrets)
 
 Writes to out_dir (default watch/<name>/, git-ignored):
   video.mp4          the file (downloaded with yt-dlp when given a link; private/login reels need cookies, see below)
@@ -269,31 +269,37 @@ def compare(ours, ref, out, fps=4, crop_ok=True):
 
 
 def gemini(path, out, prompt=None):
-    """optional second pair of eyes that sees the real motion: Gemini watches the whole file.
-    The key lives in the environment's network secrets (header x-goog-api-key on generativelanguage.googleapis.com);
-    the proxy adds it, so a dummy goes here."""
+    """second pair of eyes that sees the real motion: Gemini watches the whole file (sound included).
+    The key is a network secret of the cloud environment (host generativelanguage.googleapis.com, saved with the
+    secure form as a Bearer key); the proxy adds it, so a placeholder goes here. Bearer keys only work on Gemini's
+    OpenAI-compatible endpoint, so the video goes inline (shrunk to 540 px wide first so it stays small)."""
+    import base64
     import urllib.request
-    host = "https://generativelanguage.googleapis.com"
-    model = os.environ.get("MK_GEMINI_MODEL", "gemini-2.5-flash")
-    key = os.environ.get("GEMINI_API_KEY", "proxy-injected")
-    size = os.path.getsize(path)
-    req = urllib.request.Request(f"{host}/upload/v1beta/files", method="POST", headers={"x-goog-api-key": key, "X-Goog-Upload-Protocol": "resumable", "X-Goog-Upload-Command": "start", "X-Goog-Upload-Header-Content-Length": str(size), "X-Goog-Upload-Header-Content-Type": "video/mp4", "Content-Type": "application/json"}, data=json.dumps({"file": {"display_name": Path(path).name}}).encode())
-    url = urllib.request.urlopen(req).headers["X-Goog-Upload-URL"]
-    up = urllib.request.Request(url, method="POST", headers={"X-Goog-Upload-Offset": "0", "X-Goog-Upload-Command": "upload, finalize", "Content-Length": str(size)}, data=open(path, "rb").read())
-    f = json.loads(urllib.request.urlopen(up).read())["file"]
-    import time
-    while f.get("state") == "PROCESSING":
-        time.sleep(3)
-        f = json.loads(urllib.request.urlopen(urllib.request.Request(f"{host}/v1beta/{f['name']}", headers={"x-goog-api-key": key})).read())
-    prompt = prompt or ("You are a motion-design art director. Watch this short video. Give a shot-by-shot breakdown with timestamps: "
-                        "what is on screen, camera move, object size in frame, lighting, text on screen, sound/music hits, and the pace. "
-                        "Then list everything that looks fake, cheap, jerky or hard to read, with the exact fix.")
-    body = {"contents": [{"parts": [{"file_data": {"mime_type": "video/mp4", "file_uri": f["uri"]}}, {"text": prompt}]}]}
-    r = urllib.request.Request(f"{host}/v1beta/models/{model}:generateContent", method="POST", headers={"x-goog-api-key": key, "Content-Type": "application/json"}, data=json.dumps(body).encode())
-    res = json.loads(urllib.request.urlopen(r).read())
-    text = "".join(p.get("text", "") for p in res["candidates"][0]["content"]["parts"])
+    model = os.environ.get("MK_GEMINI_MODEL", "gemini-3.5-flash")
+    with tempfile.TemporaryDirectory() as tmp:
+        small = Path(tmp) / "v.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", path, "-vf", "scale=540:-2,fps=30", "-c:v", "libx264", "-crf", "28", "-preset", "fast", "-c:a", "aac", "-b:a", "64k", str(small)], check=True)
+        data = base64.b64encode(small.read_bytes()).decode()
+    if len(data) > 18_000_000:
+        return "(video too big for Gemini inline: trim it to under ~60 s)"
+    prompt = prompt or ("You are a motion-design art director. Watch this short vertical video. Give a shot-by-shot breakdown with "
+                        "timestamps: what is on screen, camera move, hero object size in frame, lighting, on-screen text, sound/music hits, "
+                        "pace. Then list everything that looks fake, cheap, jerky, static or hard to read on a phone, each with the exact fix. "
+                        "End with SCORE: n/10.")
+    body = {"model": model, "messages": [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "data:video/mp4;base64," + data}}, {"type": "text", "text": prompt}]}]}
+    req = urllib.request.Request("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json", "Authorization": "Bearer " + os.environ.get("GEMINI_API_KEY", "proxy-injected")})
+    try:
+        text = json.loads(urllib.request.urlopen(req, timeout=300).read())["choices"][0]["message"]["content"]
+    except urllib.error.HTTPError as e:  # e.g. a retired model name: set MK_GEMINI_MODEL
+        text = f"(Gemini failed: {e.code} {e.read()[:300]!r})"
     (out / "GEMINI.md").write_text(text)
     return text
+
+
+def compare_path(src, out):
+    v = out / "video.mp4"
+    return str(v) if v.exists() else src
 
 
 def main(argv):
@@ -310,7 +316,7 @@ def main(argv):
         out = Path(args[3]) if len(args) > 3 else ROOT / "watch" / ("compare-" + Path(args[1]).stem)
         print("\n".join(compare(args[1], args[2], out, fps, crop_ok)))
         if "--gemini" in flags:
-            print(gemini(str(Path(args[1])), out))
+            print(gemini(compare_path(args[1], out / "ours"), out))
         print(f"\n-> {out}")
         return
     src = args[0]
