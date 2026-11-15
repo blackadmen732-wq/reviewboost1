@@ -89,4 +89,6 @@ export const EXPECTED_MIGRATIONS: readonly string[] = [
   "one_live_subscription",
   "rating_counts_its_tap",
   "maintenance_grants",
+  "tag_cap_on_reactivate",
+  "texts_need_an_open_plan",
 ];

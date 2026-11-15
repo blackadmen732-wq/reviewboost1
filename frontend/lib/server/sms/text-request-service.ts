@@ -215,6 +215,7 @@ function renderMessage(
 
 /** Why a number may not be texted, in the words an owner reads. */
 const BLOCK_REASON_COPY: Record<string, string> = {
+  plan_inactive: "Texts need an active plan. Choose one in Billing.",
   no_consent: "They haven't agreed to texts from you yet.",
   opt_out: "They asked not to get texts.",
   stop_keyword: "They asked not to get texts.",

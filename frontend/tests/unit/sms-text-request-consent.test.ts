@@ -95,6 +95,15 @@ describe("checkEligibility — the same gate dispatch uses, failing closed", () 
     expect(result.message).toMatch(/haven't agreed/);
   });
 
+  it("tells the owner a closed plan is why, not the customer", async () => {
+    const { checkEligibility } = await load();
+    rpc.mockResolvedValue({ data: [{ allowed: false, reason: "plan_inactive" }], error: null });
+    const result = await checkEligibility(ORG, "a".repeat(64), "req-1");
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe("plan_inactive");
+    expect(result.message).toBe("Texts need an active plan. Choose one in Billing.");
+  });
+
   it("refuses with a 503 when the gate cannot answer", async () => {
     const { checkEligibility } = await load();
     rpc.mockResolvedValue({ data: null, error: { message: "connection reset" } });

@@ -18,6 +18,12 @@ select plan(14);
 insert into public.organizations (id, name, slug)
 values ('8c000000-0000-0000-0000-00000000000a', 'Evidence Org', 'evidence-org');
 
+-- A paying business, so the gate's answers below are about the customer's
+-- consent. A closed business is refused first (20261115000200), whatever the
+-- consent says; that rule has its own suite, texts_need_an_open_plan_test.sql.
+update public.entitlement_snapshots set plan_id = 'starter', status = 'active', source = 'test'
+ where org_id = '8c000000-0000-0000-0000-00000000000a';
+
 -- ------------------------------------------------ the constraint ---------
 
 select throws_ok(
