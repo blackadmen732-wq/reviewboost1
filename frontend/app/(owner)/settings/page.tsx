@@ -38,6 +38,11 @@ export default async function SettingsPage() {
     <AppShell businessName={organization.name}>
       <h1 className="mb-6 text-2xl font-semibold tracking-[-0.02em] text-ink">Settings</h1>
 
+      <Link href="/engagement" className="mb-6 block rounded-[var(--radius-card)] border border-border bg-surface p-5 text-ink transition-colors hover:bg-quiet focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--rb-focus-soft)]">
+        <span className="font-semibold">Loyalty &amp; Growth</span>
+        <span className="mt-1 block text-sm text-muted">Manage rewards, customer reminders, and measured campaign results.</span>
+      </Link>
+
       <section className="mb-6 flex flex-col gap-3">
         <EditableRow
           field="businessName"
