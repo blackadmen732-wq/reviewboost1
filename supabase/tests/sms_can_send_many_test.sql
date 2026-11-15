@@ -15,6 +15,12 @@ select plan(8);
 insert into public.organizations (id, name, slug)
 values ('8d000000-0000-0000-0000-00000000000a', 'Picker Org', 'picker-org');
 
+-- A paying business, so the gate's answers below are about each customer. A
+-- closed business is refused first (20261115000200); that rule has its own
+-- suite, texts_need_an_open_plan_test.sql.
+update public.entitlement_snapshots set plan_id = 'starter', status = 'active', source = 'test'
+ where org_id = '8d000000-0000-0000-0000-00000000000a';
+
 -- b agreed (attested), c opted out, d never asked.
 select app.sms_record_consent('8d000000-0000-0000-0000-00000000000a', repeat('b', 64),
     'v1:enc', 1::smallint, '1002', 'review_request', 'opted_in', 'owner_import', null,

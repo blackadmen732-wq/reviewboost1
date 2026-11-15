@@ -115,8 +115,13 @@ is a projection maintained in the same transaction as the event it reflects.
 ## 4. Suppression & the pre-send gate **[impl][test-ci]**
 
 `app.sms_can_send(org, phone_hash, purpose)` is the single authoritative
-answer. It blocks in this order: a **phone-level opt-out** (see §5) first, then
-consent = `opted_in`, then no active suppression. Suppression reasons:
+answer. It blocks in this order: a **business that is not open** first
+(`plan_inactive`: the same rule as its Tags, `app.entitlement_allows_service`
+over the effective status, so trialing, active or the past-due grace; a missing
+entitlement is closed), then a **phone-level opt-out** (see §5), then
+consent = `opted_in`, then no active suppression. A text queued before a plan
+lapsed is therefore suppressed at dispatch and its reservation released
+(`20261115000200`). Suppression reasons:
 `opt_out`, `stop_keyword`, `compliance`, `hard_bounce`, `recent_send`,
 `completed_flow` (dedupe window), `manual`. Permanent reasons never expire;
 dedupe reasons carry an `expires_at`. **The gate runs again in

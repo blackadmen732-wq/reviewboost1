@@ -88,6 +88,12 @@ values
     ('7c000000-0000-0000-0000-00000000000a', 'TR Org A', 'tr-org-a'),
     ('7c000000-0000-0000-0000-00000000000b', 'TR Org B', 'tr-org-b');
 
+-- Paying businesses, so the gate's answers below are about the customer:
+-- consent, opt-out, suppression. A closed business is refused first
+-- (20261115000200); that rule has its own suite, texts_need_an_open_plan_test.sql.
+update public.entitlement_snapshots set plan_id = 'starter', status = 'active', source = 'test'
+ where org_id in ('7c000000-0000-0000-0000-00000000000a', '7c000000-0000-0000-0000-00000000000b');
+
 insert into public.organization_members (org_id, user_id, role, status)
 values
     ('7c000000-0000-0000-0000-00000000000a', '7b000000-0000-0000-0000-000000000001', 'owner', 'active'),
