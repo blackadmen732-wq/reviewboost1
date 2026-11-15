@@ -1,0 +1,37 @@
+name: Engagement worker
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+
+permissions: {}
+
+concurrency:
+  group: engagement-worker
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    if: ${{ vars.ENGAGEMENT_AUTOMATION_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Prepare and dispatch one bounded batch
+        env:
+          WORKER_URL: ${{ vars.ENGAGEMENT_WORKER_URL }}
+          WORKER_TOKEN: ${{ secrets.ENGAGEMENT_WORKER_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$WORKER_URL" in
+            https://*/api/v1/internal/engagement/dispatch) ;;
+            *) echo 'Set ENGAGEMENT_WORKER_URL to the HTTPS dispatch endpoint.'; exit 1 ;;
+          esac
+          if [ "${#WORKER_TOKEN}" -lt 32 ]; then
+            echo 'Set ENGAGEMENT_WORKER_SECRET before enabling the scheduler.'
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 60 --connect-timeout 10 \
+            --request POST --header "Authorization: Bearer $WORKER_TOKEN" \
+            --url "$WORKER_URL"
