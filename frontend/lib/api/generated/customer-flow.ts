@@ -90,10 +90,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/q/{token}/loyalty": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explicitly join an enabled loyalty program
+         * @description Optional and independent of the rating. Requires an unexpired session at this stand, explicit loyalty acceptance, and separate reminder consent. Deduplicated per session; identical retries recover the same opaque member capability. Does not issue a wallet pass, award a stamp, send a notification, or establish a Google review outcome.
+         */
+        post: operations["enrollLoyaltyMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/loyalty/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw loyalty membership using its opaque member capability
+         * @description Works while the program is disabled. Existing and unknown capabilities both return 204. Stops future earning and reminder eligibility, queues a wallet revision, and does not claim the pass has been removed.
+         */
+        post: operations["withdrawLoyaltyMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Opaque high-entropy capability, never a customer name or email */
+        LoyaltyCapability: string;
+        LoyaltyEnrollmentRequest: {
+            sessionId: components["schemas"]["LoyaltyCapability"];
+            /** @constant */
+            acceptLoyalty: true;
+            remindersConsent: boolean;
+        };
+        LoyaltyEnrollmentResponse: {
+            memberToken: components["schemas"]["LoyaltyCapability"];
+            stamps: number;
+            rewards: number;
+            /** @constant */
+            walletDelivery: "not_configured";
+        };
         /** @enum {string} */
         Locale: "en" | "es" | "ht";
         /** @description Contains no organization id, location id, stand id, or subscription state. A caller who learned the tenant could write unlimited fabricated feedback into it. */
@@ -495,6 +550,78 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             404: components["responses"]["SessionInvalid"];
             409: components["responses"]["IdempotencyConflict"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    enrollLoyaltyMember: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Echoed back, so a trace survives the hop. */
+                "X-Request-Id"?: components["parameters"]["RequestId"];
+            };
+            path: {
+                /** @description The stand's public token. At least 256 bits of entropy, stored only as a keyed digest, and never sequential — it is the sole thing authorising a write into a business's data, so guessability is the whole security argument. */
+                token: components["parameters"]["ReviewToken"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoyaltyEnrollmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Enrollment created or replayed; wallet delivery is not configured */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyEnrollmentResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            404: components["responses"]["SessionInvalid"];
+            /** @description Program disabled, membership withdrawn, or conflicting enrollment input */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    withdrawLoyaltyMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    memberToken: components["schemas"]["LoyaltyCapability"];
+                };
+            };
+        };
+        responses: {
+            /** @description Withdrawal recorded or already absent */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
             429: components["responses"]["RateLimited"];
             500: components["responses"]["InternalError"];
             503: components["responses"]["ServiceUnavailable"];

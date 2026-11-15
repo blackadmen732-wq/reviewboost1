@@ -9,7 +9,7 @@ info:
   title: ReviewBoost public customer API
   version: 1.0.0
   description: >-
-    The four anonymous endpoints the customer review page calls. Backend-owned
+    Anonymous review endpoints and optional loyalty enrollment. Backend-owned
     and authoritative; records the error codes, the idempotency semantics, and
     the review-integrity guarantee.
 
@@ -205,6 +205,68 @@ paths:
         "500": { $ref: "#/components/responses/InternalError" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
+  /api/v1/public/q/{token}/loyalty:
+    post:
+      operationId: enrollLoyaltyMember
+      tags: [public]
+      summary: Explicitly join an enabled loyalty program
+      description: >-
+        Optional and independent of the rating. Requires an unexpired session
+        at this stand, explicit loyalty acceptance, and separate reminder
+        consent. Deduplicated per session; identical retries recover the same
+        opaque member capability. Does not issue a wallet pass, award a stamp,
+        send a notification, or establish a Google review outcome.
+      parameters:
+        - $ref: "#/components/parameters/ReviewToken"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoyaltyEnrollmentRequest" }
+      responses:
+        "200":
+          description: Enrollment created or replayed; wallet delivery is not configured
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyEnrollmentResponse" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "404": { $ref: "#/components/responses/SessionInvalid" }
+        "409":
+          description: Program disabled, membership withdrawn, or conflicting enrollment input
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /api/v1/public/loyalty/withdraw:
+    post:
+      operationId: withdrawLoyaltyMember
+      tags: [public]
+      summary: Withdraw loyalty membership using its opaque member capability
+      description: >-
+        Works while the program is disabled. Existing and unknown capabilities
+        both return 204. Stops future earning and reminder eligibility, queues
+        a wallet revision, and does not claim the pass has been removed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [memberToken]
+              properties:
+                memberToken: { $ref: "#/components/schemas/LoyaltyCapability" }
+      responses:
+        "204": { description: Withdrawal recorded or already absent }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
 components:
   parameters:
     ReviewToken:
@@ -338,6 +400,30 @@ components:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   schemas:
+    LoyaltyCapability:
+      type: string
+      minLength: 8
+      maxLength: 128
+      pattern: "^[A-Za-z0-9_-]+$"
+      description: Opaque high-entropy capability, never a customer name or email
+    LoyaltyEnrollmentRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId, acceptLoyalty, remindersConsent]
+      properties:
+        sessionId: { $ref: "#/components/schemas/LoyaltyCapability" }
+        acceptLoyalty: { type: boolean, const: true }
+        remindersConsent: { type: boolean }
+    LoyaltyEnrollmentResponse:
+      type: object
+      additionalProperties: false
+      required: [memberToken, stamps, rewards, walletDelivery]
+      properties:
+        memberToken: { $ref: "#/components/schemas/LoyaltyCapability" }
+        stamps: { type: integer, minimum: 0 }
+        rewards: { type: integer, minimum: 0 }
+        walletDelivery: { type: string, const: not_configured }
+
     Locale:
       type: string
       enum: [en, es, ht]
